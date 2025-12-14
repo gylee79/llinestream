@@ -88,13 +88,14 @@ export default function AuthForm() {
         createdAt: Timestamp.now(),
       };
       
-      // Use the non-blocking function to set the document
+      // Use the non-blocking function to set the document, ensuring it's a new doc.
       setDocumentNonBlocking(userRef, newUser, { merge: false });
 
       toast({ title: '회원가입 성공', description: '로그인 탭에서 로그인해주세요.' });
       registerForm.reset();
       // In a real app, you might auto-login or switch tabs.
-    } catch (error: any) {
+    } catch (error: any)
+{
       toast({ variant: 'destructive', title: '회원가입 실패', description: error.message });
     }
   };
