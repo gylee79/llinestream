@@ -22,10 +22,11 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
+import { collection, query, where, doc, addDoc } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 
@@ -36,6 +37,7 @@ interface VideoUploadDialogProps {
 
 export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDialogProps) {
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
   
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -47,6 +49,7 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
   const [selectedField, setSelectedField] = useState<string | null>(null);
   const [selectedClassification, setSelectedClassification] = useState<string | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
 
 
   const fieldsQuery = useMemoFirebase(() => collection(firestore, 'fields'), [firestore]);
@@ -64,12 +67,12 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
   );
   const { data: courses } = useCollection<Course>(coursesQuery);
 
-  const handleUpload = () => {
-    if (!title || !selectedCourseId) {
+  const handleUpload = async () => {
+    if (!title || !selectedCourseId || !videoFile) {
       toast({
         variant: 'destructive',
         title: '입력 오류',
-        description: '제목과 소속 상세분류를 모두 선택해야 합니다.',
+        description: '제목, 소속 상세분류, 비디오 파일을 모두 선택해야 합니다.',
       });
       return;
     }
@@ -77,27 +80,57 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     setIsUploading(true);
     setUploadProgress(0);
 
-    const newEpisode: Omit<Episode, 'id'> = {
-      courseId: selectedCourseId,
-      title,
-      description,
-      duration: Math.floor(Math.random() * 2000) + 600, // Placeholder duration
-      isFree,
-      videoUrl: '', // Placeholder video URL
-    };
-    
-    addDocumentNonBlocking(collection(firestore, 'courses', selectedCourseId, 'episodes'), newEpisode);
+    const newEpisodeDocRef = doc(collection(firestore, 'courses', selectedCourseId, 'episodes'));
+    const episodeId = newEpisodeDocRef.id;
+    const storageRef = ref(storage, `episodes/${selectedCourseId}/${episodeId}/${videoFile.name}`);
+    const uploadTask = uploadBytesResumable(storageRef, videoFile);
 
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
+    uploadTask.on('state_changed',
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        setUploadProgress(progress);
+      },
+      (error) => {
+        console.error("Upload failed:", error);
+        toast({
+          variant: 'destructive',
+          title: '업로드 실패',
+          description: '파일 업로드 중 오류가 발생했습니다.',
+        });
+        setIsUploading(false);
+      },
+      async () => {
+        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+        const newEpisode: Omit<Episode, 'id'> = {
+          courseId: selectedCourseId,
+          title,
+          description,
+          duration: 0, // Should be extracted from video file metadata on server
+          isFree,
+          videoUrl: downloadURL,
+        };
+
+        try {
+          // Use `setDoc` with the generated ref to ensure the ID is what we used for the storage path
+          await addDocumentNonBlocking(collection(firestore, 'courses', selectedCourseId, 'episodes'), newEpisode);
+
+          toast({
+            title: '업로드 완료',
+            description: `${title} 에피소드가 성공적으로 추가되었습니다.`
+          });
+          onOpenChange(false);
+        } catch (error) {
+            console.error("Firestore write failed:", error);
+            toast({
+              variant: 'destructive',
+              title: '저장 실패',
+              description: '에피소드 정보를 Firestore에 저장하는 데 실패했습니다.',
+            });
+        } finally {
+            setIsUploading(false);
         }
-        return prev + 20;
-      });
-    }, 200);
+      }
+    );
   };
   
   const resetForm = () => {
@@ -107,22 +140,10 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     setSelectedField(null);
     setSelectedClassification(null);
     setSelectedCourseId(null);
+    setVideoFile(null);
     setUploadProgress(0);
     setIsUploading(false);
   }
-
-  useEffect(() => {
-    if (uploadProgress === 100) {
-        toast({
-            title: '업로드 완료',
-            description: `${title} 에피소드가 성공적으로 추가되었습니다.`
-        });
-        const timer = setTimeout(() => {
-            onOpenChange(false);
-        }, 500);
-        return () => clearTimeout(timer);
-    }
-  }, [uploadProgress, onOpenChange, title]);
 
   useEffect(() => {
     if (!open) {
@@ -151,15 +172,15 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
           <div className="grid grid-cols-4 items-center gap-4">
             <Label className="text-right">분류</Label>
             <div className="col-span-3 grid grid-cols-3 gap-2 items-center">
-              <Select value={selectedField || ''} onValueChange={(v) => { setSelectedField(v); setSelectedClassification(null); setSelectedCourseId(null); }} disabled={isFree}>
+              <Select value={selectedField || ''} onValueChange={(v) => { setSelectedField(v); setSelectedClassification(null); setSelectedCourseId(null); }}>
                 <SelectTrigger><SelectValue placeholder="분야" /></SelectTrigger>
                 <SelectContent>{fields?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
               </Select>
-              <Select value={selectedClassification || ''} onValueChange={(v) => { setSelectedClassification(v); setSelectedCourseId(null); }} disabled={isFree || !selectedField}>
+              <Select value={selectedClassification || ''} onValueChange={(v) => { setSelectedClassification(v); setSelectedCourseId(null); }} disabled={!selectedField}>
                 <SelectTrigger><SelectValue placeholder="큰분류" /></SelectTrigger>
                 <SelectContent>{classifications?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
-              <Select value={selectedCourseId || ''} onValueChange={setSelectedCourseId} disabled={isFree || !selectedClassification}>
+              <Select value={selectedCourseId || ''} onValueChange={setSelectedCourseId} disabled={!selectedClassification}>
                 <SelectTrigger><SelectValue placeholder="상세분류" /></SelectTrigger>
                 <SelectContent>{courses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
@@ -174,7 +195,13 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="video-file" className="text-right">비디오 파일</Label>
-            <Input id="video-file" type="file" className="col-span-3" />
+            <Input 
+                id="video-file" 
+                type="file" 
+                className="col-span-3" 
+                onChange={(e) => setVideoFile(e.target.files ? e.target.files[0] : null)}
+                accept="video/*"
+            />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="thumbnail-file" className="text-right">썸네일</Label>
@@ -186,7 +213,7 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
           {isUploading && (
             <div className="col-span-4">
               <Progress value={uploadProgress} />
-              <p className="text-sm text-center text-muted-foreground mt-2">{uploadProgress}%</p>
+              <p className="text-sm text-center text-muted-foreground mt-2">{uploadProgress.toFixed(0)}%</p>
             </div>
           )}
         </div>

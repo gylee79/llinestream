@@ -46,6 +46,7 @@ export interface Episode {
   id: string;
   courseId: string;
   title: string;
+  description?: string;
   duration: number; // in seconds
   isFree: boolean;
   videoUrl: string;
@@ -64,8 +65,4 @@ export interface Subscription {
     classificationId: string;
     purchasedAt: Timestamp;
     expiresAt: Timestamp;
-}
-
-export interface AdminRole {
-    assignedAt: Timestamp;
 }
