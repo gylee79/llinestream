@@ -1,0 +1,109 @@
+'use client';
+
+import { useState } from 'react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { classifications as mockClassifications } from '@/lib/data';
+import type { Classification } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
+
+export default function PricingManager() {
+  const [classifications, setClassifications] = useState<Classification[]>(mockClassifications);
+  const { toast } = useToast();
+
+  const handlePriceChange = (classId: string, duration: keyof Classification['prices'], value: string) => {
+    const price = Number(value);
+    if (isNaN(price)) return;
+    
+    setClassifications(prev => 
+      prev.map(c => 
+        c.id === classId 
+          ? { ...c, prices: { ...c.prices, [duration]: price } }
+          : c
+      )
+    );
+  };
+  
+  const handleSave = (classId: string) => {
+    const classification = classifications.find(c => c.id === classId);
+    console.log("Saving prices for:", classification);
+    toast({
+      title: '저장 완료',
+      description: `${classification?.name}의 가격 정보가 업데이트되었습니다.`,
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>분류 및 가격 관리</CardTitle>
+        <p className="text-sm text-muted-foreground">각 '큰분류'별 이용권 가격을 설정합니다.</p>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>큰분류 이름</TableHead>
+              <TableHead>1일 이용권 (원)</TableHead>
+              <TableHead>30일 이용권 (원)</TableHead>
+              <TableHead>60일 이용권 (원)</TableHead>
+              <TableHead>90일 이용권 (원)</TableHead>
+              <TableHead className="text-right">저장</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {classifications.map((item) => (
+              <TableRow key={item.id}>
+                <TableCell className="font-medium">{item.name}</TableCell>
+                <TableCell>
+                  <Input
+                    type="number"
+                    value={item.prices.day1}
+                    onChange={(e) => handlePriceChange(item.id, 'day1', e.target.value)}
+                    className="w-24"
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    type="number"
+                    value={item.prices.day30}
+                    onChange={(e) => handlePriceChange(item.id, 'day30', e.target.value)}
+                    className="w-24"
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    type="number"
+                    value={item.prices.day60}
+                    onChange={(e) => handlePriceChange(item.id, 'day60', e.target.value)}
+                    className="w-24"
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    type="number"
+                    value={item.prices.day90}
+                    onChange={(e) => handlePriceChange(item.id, 'day90', e.target.value)}
+                    className="w-24"
+                  />
+                </TableCell>
+                <TableCell className="text-right">
+                    <Button onClick={() => handleSave(item.id)}>저장</Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
