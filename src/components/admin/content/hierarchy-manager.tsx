@@ -7,9 +7,10 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import type { Field, Classification, Course } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where, doc } from 'firebase/firestore';
-import { addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
 
 const Column = ({ title, items, selectedId, onSelect, onAdd, onEdit, onDelete, isLoading }: {
   title: string;
@@ -54,12 +55,20 @@ const Column = ({ title, items, selectedId, onSelect, onAdd, onEdit, onDelete, i
   </Card>
 );
 
+type DialogState = {
+  isOpen: boolean;
+  item: HierarchyItem | null;
+  type: '분야' | '큰분류' | '상세분류';
+};
+
 export default function HierarchyManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const [selectedField, setSelectedField] = useState<string | null>(null);
   const [selectedClassification, setSelectedClassification] = useState<string | null>(null);
+
+  const [dialogState, setDialogState] = useState<DialogState>({ isOpen: false, item: null, type: '분야' });
 
   const fieldsQuery = useMemoFirebase(() => collection(firestore, 'fields'), [firestore]);
   const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
@@ -76,7 +85,6 @@ export default function HierarchyManager() {
   );
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
   
-  // When fields are reloaded, if the selected field is no longer present, reset the selection
   useEffect(() => {
     if (fields && selectedField && !fields.find(f => f.id === selectedField)) {
         setSelectedField(null);
@@ -94,45 +102,51 @@ export default function HierarchyManager() {
     setSelectedField(id);
     setSelectedClassification(null);
   };
-  
-  const handleAdd = async (type: '분야' | '큰분류' | '상세분류') => {
-    const name = prompt(`새로운 ${type}의 이름을 입력하세요:`);
-    if (!name) return;
 
-    let collectionName = '';
-    let data: any = { name };
-
-    if (type === '분야') {
-        collectionName = 'fields';
-    } else if (type === '큰분류') {
-        if (!selectedField) {
-            toast({ variant: 'destructive', title: '오류', description: '분야를 먼저 선택해주세요.' });
-            return;
-        }
-        collectionName = 'classifications';
-        data.fieldId = selectedField;
-        data.description = "새로운 분류 설명";
-        data.prices = { day1: 0, day30: 0, day60: 0, day90: 0 };
-    } else if (type === '상세분류') {
-        if (!selectedClassification) {
-            toast({ variant: 'destructive', title: '오류', description: '큰분류를 먼저 선택해주세요.' });
-            return;
-        }
-        collectionName = 'courses';
-        data.classificationId = selectedClassification;
-        data.description = "새로운 상세분류 설명";
-        data.thumbnailUrl = `https://picsum.photos/seed/${Math.random()}/600/400`;
-        data.thumbnailHint = 'placeholder image';
+  const openDialog = (type: DialogState['type'], item: HierarchyItem | null = null) => {
+    if ((type === '큰분류' && !selectedField) || (type === '상세분류' && !selectedClassification)) {
+      toast({ variant: 'destructive', title: '오류', description: '상위 계층을 먼저 선택해주세요.' });
+      return;
     }
+    setDialogState({ isOpen: true, item, type });
+  };
 
-    if(collectionName){
-        addDocumentNonBlocking(collection(firestore, collectionName), data);
-        toast({ title: '성공', description: `${type} '${name}'이(가) 추가되었습니다.` });
+  const closeDialog = () => setDialogState({ isOpen: false, item: null, type: '분야' });
+
+  const handleSave = (item: HierarchyItem) => {
+    if (dialogState.item) { // Edit mode
+        const collectionName = dialogState.type === '분야' ? 'fields' : dialogState.type === '큰분류' ? 'classifications' : 'courses';
+        updateDocumentNonBlocking(doc(firestore, collectionName, item.id), { name: item.name });
+        toast({ title: '성공', description: `${dialogState.type} '${item.name}'이(가) 수정되었습니다.` });
+    } else { // Add mode
+        let collectionName = '';
+        let data: any = { name: item.name };
+
+        if (dialogState.type === '분야') {
+            collectionName = 'fields';
+        } else if (dialogState.type === '큰분류') {
+            collectionName = 'classifications';
+            data.fieldId = selectedField;
+            data.description = "새로운 분류 설명";
+            data.prices = { day1: 0, day30: 0, day60: 0, day90: 0 };
+        } else if (dialogState.type === '상세분류') {
+            collectionName = 'courses';
+            data.classificationId = selectedClassification;
+            data.description = "새로운 상세분류 설명";
+            data.thumbnailUrl = `https://picsum.photos/seed/${Math.random()}/600/400`;
+            data.thumbnailHint = 'placeholder image';
+        }
+        
+        if (collectionName) {
+            addDocumentNonBlocking(collection(firestore, collectionName), data);
+            toast({ title: '성공', description: `${dialogState.type} '${item.name}'이(가) 추가되었습니다.` });
+        }
     }
+    closeDialog();
   };
 
   const handleDelete = (type: string, collectionName: 'fields' | 'classifications' | 'courses', id: string) => {
-    if (!confirm(`정말로 '${type}' 항목을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
+    if (!confirm(`정말로 '${type}' 항목을 삭제하시겠습니까? 하위 항목이 있는 경우 함께 삭제되지 않으니 주의해주세요. 이 작업은 되돌릴 수 없습니다.`)) return;
 
     deleteDocumentNonBlocking(doc(firestore, collectionName, id));
 
@@ -145,53 +159,58 @@ export default function HierarchyManager() {
 
     toast({ title: '성공', description: `${type} 항목이 삭제되었습니다.` });
   };
-  
-  const handleEdit = (type: string, id: string, currentName: string) => {
-    alert(`'${type}' (ID: ${id}) 수정 기능 (구현 필요)`);
-  };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>계층 구조 관리</CardTitle>
-        <p className="text-sm text-muted-foreground">분야 &gt; 큰분류 &gt; 상세분류 순서로 콘텐츠 계층을 관리합니다.</p>
-      </CardHeader>
-      <CardContent>
-        <div className="flex gap-4">
-          <Column
-            title="분야 (Field)"
-            items={fields}
-            selectedId={selectedField}
-            onSelect={handleSelectField}
-            onAdd={() => handleAdd('분야')}
-            onEdit={(id, name) => handleEdit('분야', id, name)}
-            onDelete={(id) => handleDelete('분야', 'fields', id)}
-            isLoading={fieldsLoading}
-          />
-          <Column
-            title="큰분류 (Classification)"
-            items={classifications}
-            selectedId={selectedClassification}
-            onSelect={setSelectedClassification}
-            onAdd={() => handleAdd('큰분류')}
-            onEdit={(id, name) => handleEdit('큰분류', id, name)}
-            onDelete={(id) => handleDelete('큰분류', 'classifications', id)}
-            isLoading={!selectedField || classificationsLoading}
-          />
-          <Column
-            title="상세분류 (Course)"
-            items={courses}
-            selectedId={null} // Courses are leaf nodes in this view
-            onSelect={() => {}}
-            onAdd={() => handleAdd('상세분류')}
-            onEdit={(id, name) => handleEdit('상세분류', id, name)}
-            onDelete={(id) => handleDelete('상세분류', 'courses', id)}
-            isLoading={!selectedClassification || coursesLoading}
-          />
-        </div>
-      </CardContent>
-    </Card>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>계층 구조 관리</CardTitle>
+          <p className="text-sm text-muted-foreground">분야 &gt; 큰분류 &gt; 상세분류 순서로 콘텐츠 계층을 관리합니다.</p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-4">
+            <Column
+              title="분야 (Field)"
+              items={fields}
+              selectedId={selectedField}
+              onSelect={handleSelectField}
+              onAdd={() => openDialog('분야')}
+              onEdit={(id, name) => openDialog('분야', { id, name })}
+              onDelete={(id) => handleDelete('분야', 'fields', id)}
+              isLoading={fieldsLoading}
+            />
+            <Column
+              title="큰분류 (Classification)"
+              items={classifications}
+              selectedId={selectedClassification}
+              onSelect={setSelectedClassification}
+              onAdd={() => openDialog('큰분류')}
+              onEdit={(id, name) => openDialog('큰분류', { id, name })}
+              onDelete={(id) => handleDelete('큰분류', 'classifications', id)}
+              isLoading={!selectedField || classificationsLoading}
+            />
+            <Column
+              title="상세분류 (Course)"
+              items={courses}
+              selectedId={null} // Courses are leaf nodes in this view
+              onSelect={() => {}}
+              onAdd={() => openDialog('상세분류')}
+              onEdit={(id, name) => openDialog('상세분류', { id, name })}
+              onDelete={(id) => handleDelete('상세분류', 'courses', id)}
+              isLoading={!selectedClassification || coursesLoading}
+            />
+          </div>
+        </CardContent>
+      </Card>
+      {dialogState.isOpen && (
+        <HierarchyItemDialog
+          isOpen={dialogState.isOpen}
+          onClose={closeDialog}
+          onSave={handleSave}
+          item={dialogState.item}
+          itemType={dialogState.type}
+        />
+      )}
+    </>
   );
 }
-
-    
