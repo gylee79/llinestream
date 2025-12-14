@@ -60,6 +60,7 @@ export default function AuthForm() {
   });
 
   const onLoginSubmit = async (values: z.infer<typeof loginSchema>) => {
+    if (!auth) return;
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       toast({ title: '로그인 성공', description: '홈으로 이동합니다.' });
@@ -70,6 +71,7 @@ export default function AuthForm() {
   };
 
   const onRegisterSubmit = async (values: z.infer<typeof registerSchema>) => {
+    if (!auth || !firestore) return;
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
@@ -86,7 +88,8 @@ export default function AuthForm() {
         createdAt: Timestamp.now(),
       };
       
-      setDocumentNonBlocking(userRef, newUser, {});
+      // Use the non-blocking function to set the document
+      setDocumentNonBlocking(userRef, newUser, { merge: false });
 
       toast({ title: '회원가입 성공', description: '로그인 탭에서 로그인해주세요.' });
       registerForm.reset();
