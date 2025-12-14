@@ -1,7 +1,7 @@
 'use server';
 
 import { writeBatch, collection, doc, getFirestore } from 'firebase/firestore';
-import { fields, classifications, courses, episodes, users, subscriptions, adminRoles, policies } from '@/lib/data';
+import { fields, classifications, courses, episodes, users, subscriptions, policies } from '@/lib/data';
 import { initializeApp, getApps } from 'firebase/app';
 import { firebaseConfig } from '@/firebase/config';
 
@@ -24,13 +24,6 @@ export async function uploadMockData() {
     users.forEach((item) => {
         const docRef = doc(firestore, 'users', item.id);
         batch.set(docRef, item);
-    });
-
-    // Upload Admin Roles
-    console.log(`Uploading ${adminRoles.length} admin roles...`);
-    adminRoles.forEach((item) => {
-        const docRef = doc(firestore, 'roles_admin', item.userId);
-        batch.set(docRef, item.data);
     });
 
     // Upload Fields

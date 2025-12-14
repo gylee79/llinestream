@@ -5,27 +5,25 @@
  * This ruleset implements a dual security model. User-specific data (profiles,
  * subscriptions) is governed by a strict ownership model, ensuring users can only
  * access their own information. Public content (fields, courses, episodes) is
-
  * publicly readable to all users, but write operations are restricted to
  * designated administrators. This allows for a public-facing content catalog
  * while maintaining strict control over its management.
  *
  * Data Structure:
- * - /users/{userId}: Private user profile data. Each user's data is isolated.
+ * - /users/{userId}: Private user profile data, which includes a 'role' field.
  * - /users/{userId}/subscriptions/{subscriptionId}: User's private subscription records.
  * - /fields, /classifications, /courses: Top-level collections for public content.
  * - /courses/{courseId}/episodes/{episodeId}: Subcollection for episodes.
  * - /policies: Top-level collection for public legal documents.
- * - /roles_admin: A private collection used as a lookup table to identify administrators.
  *
  * Key Security Decisions:
  * - Default Deny: All paths are closed by default. Access is granted explicitly.
  * - No User Listing: Listing the top-level `/users` collection is forbidden for privacy, only admins can list users.
- * - Admin-Managed Content: All public content is managed by users with an admin role, verified by checking the `/roles_admin` collection.
+ * - Admin-Managed Content: All public content is managed by users with an admin role, verified by checking the 'role' field in their user document.
  * - Subscription Check: To access a paid episode, a user must have a valid, non-expired subscription to the corresponding classification. This is checked by looking up the subscription in the user's private `subscriptions` subcollection.
  *
  * Denormalization for Authorization:
- * - Admin Roles: An admin's UID is stored as a document ID in `/roles_admin/{userId}`. This allows a fast, single `exists()` check to verify admin status.
+ * - Admin Roles: A user's admin status is stored in their own user document (`/users/{userId}`). This allows a fast, single `get()` check to verify admin status.
  * - Active Subscriptions on User: The `users/{userId}` document contains an `activeSubscriptions` map. This allows the client to quickly know which classifications are active without querying the subcollection, simplifying UI logic. Security rules, however, will query the subcollection for security.
  */
 rules_version = '2';
@@ -45,7 +43,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
     function isOwnerOrAdmin(userId) {
@@ -90,10 +88,6 @@ service cloud.firestore {
       }
     }
 
-    match /roles_admin/{userId} {
-      allow read, write: if false; // Managed via Console/server-side logic only
-    }
-
     match /fields/{fieldId} {
       allow get, list: if true;
       allow create, update, delete: if isAdmin();
@@ -122,4 +116,3 @@ service cloud.firestore {
     }
   }
 }
-    

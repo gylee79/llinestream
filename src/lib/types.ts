@@ -69,5 +69,3 @@ export interface Subscription {
 export interface AdminRole {
     assignedAt: Timestamp;
 }
-
-    

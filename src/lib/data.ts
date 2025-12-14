@@ -1,4 +1,4 @@
-import { Field, Classification, Course, Episode, User, Policy, Subscription, AdminRole } from './types';
+import { Field, Classification, Course, Episode, User, Policy, Subscription } from './types';
 import { Timestamp } from 'firebase/firestore';
 
 // Mock Users
@@ -13,10 +13,6 @@ export const users: User[] = [
   { id: 'user-08', name: '윤디자인', email: 'user7@example.com', phone: '010-8888-8888', dob: '1997-04-16', role: 'user', createdAt: Timestamp.fromDate(new Date('2023-09-05')) },
   { id: 'user-09', name: '장기획', email: 'user8@example.com', phone: '010-9999-9999', dob: '1991-08-28', role: 'user', createdAt: Timestamp.fromDate(new Date('2023-10-15')) },
   { id: 'user-10', name: '임신입', email: 'user9@example.com', phone: '010-0000-0000', dob: '2002-03-01', role: 'user', createdAt: Timestamp.fromDate(new Date('2023-11-20')) },
-];
-
-export const adminRoles: {userId: string, data: AdminRole}[] = [
-    { userId: 'admin-user-01', data: { assignedAt: Timestamp.fromDate(new Date('2023-01-15')) } }
 ];
 
 export const fields: Field[] = [
@@ -156,5 +152,3 @@ LlineStream은 다음의 목적을 위하여 개인정보를 처리합니다. �
 ];
 
 export const getPolicyBySlug = (slug: string) => policies.find(p => p.slug === slug);
-
-    
