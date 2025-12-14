@@ -111,6 +111,18 @@ export default function AuthForm() {
     field.onChange(formattedValue);
   };
 
+  const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>, field: any) => {
+    const value = e.target.value.replace(/\D/g, '');
+    let formattedValue = value;
+
+    if (value.length > 4 && value.length <= 6) {
+      formattedValue = `${value.slice(0, 4)}-${value.slice(4)}`;
+    } else if (value.length > 6) {
+      formattedValue = `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
+    }
+    field.onChange(formattedValue);
+  };
+
   return (
     <Tabs defaultValue="login" className="w-full max-w-md">
       <TabsList className="grid w-full grid-cols-2">
@@ -236,7 +248,11 @@ export default function AuthForm() {
                     <FormItem>
                       <FormLabel>생년월일</FormLabel>
                       <FormControl>
-                        <Input placeholder="YYYY-MM-DD" {...field} />
+                        <Input 
+                          placeholder="YYYY-MM-DD" 
+                          {...field}
+                          onChange={(e) => handleDobChange(e, field)}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
