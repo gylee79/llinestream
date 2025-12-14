@@ -23,8 +23,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
-import type { Field, Classification, Course } from '@/lib/types';
+import { collection, query, where, doc } from 'firebase/firestore';
+import type { Field, Classification, Course, Episode } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
+import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 
 interface VideoUploadDialogProps {
@@ -34,13 +36,18 @@ interface VideoUploadDialogProps {
 
 export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDialogProps) {
   const firestore = useFirestore();
+  const { toast } = useToast();
   
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-  const [isFree, setIsFree] = useState(false);
   
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [isFree, setIsFree] = useState(false);
   const [selectedField, setSelectedField] = useState<string | null>(null);
   const [selectedClassification, setSelectedClassification] = useState<string | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+
 
   const fieldsQuery = useMemoFirebase(() => collection(firestore, 'fields'), [firestore]);
   const { data: fields } = useCollection<Field>(fieldsQuery);
@@ -58,37 +65,68 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
   const { data: courses } = useCollection<Course>(coursesQuery);
 
   const handleUpload = () => {
+    if (!title || !selectedCourseId) {
+      toast({
+        variant: 'destructive',
+        title: '입력 오류',
+        description: '제목과 소속 상세분류를 모두 선택해야 합니다.',
+      });
+      return;
+    }
+
     setIsUploading(true);
-    setUploadProgress(0); // Start progress from 0
+    setUploadProgress(0);
+
+    const newEpisode: Omit<Episode, 'id'> = {
+      courseId: selectedCourseId,
+      title,
+      description,
+      duration: Math.floor(Math.random() * 2000) + 600, // Placeholder duration
+      isFree,
+      videoUrl: '', // Placeholder video URL
+    };
+    
+    addDocumentNonBlocking(collection(firestore, 'courses', selectedCourseId, 'episodes'), newEpisode);
+
+    // Simulate upload progress
     const interval = setInterval(() => {
       setUploadProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval);
           return 100;
         }
-        return prev + 10;
+        return prev + 20;
       });
     }, 200);
   };
   
+  const resetForm = () => {
+    setTitle('');
+    setDescription('');
+    setIsFree(false);
+    setSelectedField(null);
+    setSelectedClassification(null);
+    setSelectedCourseId(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+  }
+
   useEffect(() => {
     if (uploadProgress === 100) {
-        // Delay closing to allow user to see completion
+        toast({
+            title: '업로드 완료',
+            description: `${title} 에피소드가 성공적으로 추가되었습니다.`
+        });
         const timer = setTimeout(() => {
-            setIsUploading(false);
             onOpenChange(false);
         }, 500);
         return () => clearTimeout(timer);
     }
-  }, [uploadProgress, onOpenChange]);
+  }, [uploadProgress, onOpenChange, title]);
 
   useEffect(() => {
     if (!open) {
-      setUploadProgress(0);
-      setIsUploading(false);
-      setIsFree(false);
-      setSelectedField(null);
-      setSelectedClassification(null);
+      resetForm();
     }
   }, [open]);
 
@@ -104,24 +142,24 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="title" className="text-right">제목</Label>
-            <Input id="title" className="col-span-3" />
+            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="description" className="text-right">설명</Label>
-            <Textarea id="description" className="col-span-3" />
+            <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label className="text-right">분류</Label>
             <div className="col-span-3 grid grid-cols-3 gap-2 items-center">
-              <Select onValueChange={setSelectedField} disabled={isFree}>
+              <Select value={selectedField || ''} onValueChange={(v) => { setSelectedField(v); setSelectedClassification(null); setSelectedCourseId(null); }} disabled={isFree}>
                 <SelectTrigger><SelectValue placeholder="분야" /></SelectTrigger>
                 <SelectContent>{fields?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
               </Select>
-              <Select onValueChange={setSelectedClassification} disabled={isFree || !selectedField}>
+              <Select value={selectedClassification || ''} onValueChange={(v) => { setSelectedClassification(v); setSelectedCourseId(null); }} disabled={isFree || !selectedField}>
                 <SelectTrigger><SelectValue placeholder="큰분류" /></SelectTrigger>
                 <SelectContent>{classifications?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
-              <Select disabled={isFree || !selectedClassification}>
+              <Select value={selectedCourseId || ''} onValueChange={setSelectedCourseId} disabled={isFree || !selectedClassification}>
                 <SelectTrigger><SelectValue placeholder="상세분류" /></SelectTrigger>
                 <SelectContent>{courses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
