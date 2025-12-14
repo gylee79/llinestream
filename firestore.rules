@@ -72,6 +72,15 @@ service cloud.firestore {
     }
 
     // =========================================================================
+    // Collection Group Rules
+    // =========================================================================
+    
+    match /{path=**}/episodes/{episodeId} {
+      // Allow admins to list all episodes across all courses for management purposes.
+      allow list: if isAdmin();
+    }
+
+    // =========================================================================
     // Collection Rules
     // =========================================================================
 
@@ -105,7 +114,10 @@ service cloud.firestore {
       match /episodes/{episodeId} {
         // Free episodes are public. Paid ones require a valid subscription.
         allow get: if resource.data.isFree == true || (isSignedIn() && hasActiveSubscription(get(/databases/$(database)/documents/courses/$(courseId)).data.classificationId));
-        allow list: if true;
+        // Note: 'list' for a subcollection is different from a collection group query.
+        // The collection group query rule above handles the 'list' for all episodes.
+        // This rule allows listing episodes *within* a single course page.
+        allow list: if true; 
         allow create, update, delete: if isAdmin();
       }
     }
