@@ -59,12 +59,11 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
 
   const handleUpload = () => {
     setIsUploading(true);
+    setUploadProgress(0); // Start progress from 0
     const interval = setInterval(() => {
       setUploadProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval);
-          setIsUploading(false);
-          onOpenChange(false);
           return 100;
         }
         return prev + 10;
@@ -72,6 +71,17 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     }, 200);
   };
   
+  useEffect(() => {
+    if (uploadProgress === 100) {
+        // Delay closing to allow user to see completion
+        const timer = setTimeout(() => {
+            setIsUploading(false);
+            onOpenChange(false);
+        }, 500);
+        return () => clearTimeout(timer);
+    }
+  }, [uploadProgress, onOpenChange]);
+
   useEffect(() => {
     if (!open) {
       setUploadProgress(0);
