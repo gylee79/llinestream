@@ -23,12 +23,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
-import { collection, query, where, doc, addDoc } from 'firebase/firestore';
+import { collection, query, where, doc, setDoc } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-
 
 interface VideoUploadDialogProps {
   open: boolean;
@@ -80,11 +78,15 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     setIsUploading(true);
     setUploadProgress(0);
 
+    // 1. Create a new document reference in the subcollection to get a unique ID.
     const newEpisodeDocRef = doc(collection(firestore, 'courses', selectedCourseId, 'episodes'));
     const episodeId = newEpisodeDocRef.id;
+
+    // 2. Create a storage reference using the new document ID.
     const storageRef = ref(storage, `episodes/${selectedCourseId}/${episodeId}/${videoFile.name}`);
     const uploadTask = uploadBytesResumable(storageRef, videoFile);
 
+    // 3. Set up the upload task listeners.
     uploadTask.on('state_changed',
       (snapshot) => {
         const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
@@ -100,7 +102,10 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
         setIsUploading(false);
       },
       async () => {
+        // 4. On successful upload, get the download URL.
         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+        
+        // 5. Prepare the new episode data object.
         const newEpisode: Omit<Episode, 'id'> = {
           courseId: selectedCourseId,
           title,
@@ -111,8 +116,8 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
         };
 
         try {
-          // Use `setDoc` with the generated ref to ensure the ID is what we used for the storage path
-          await addDocumentNonBlocking(collection(firestore, 'courses', selectedCourseId, 'episodes'), newEpisode);
+          // 6. Use `setDoc` with the reference created in step 1 to save the data.
+          await setDoc(newEpisodeDocRef, newEpisode);
 
           toast({
             title: '업로드 완료',
@@ -201,13 +206,14 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
                 className="col-span-3" 
                 onChange={(e) => setVideoFile(e.target.files ? e.target.files[0] : null)}
                 accept="video/*"
+                disabled={isUploading}
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="thumbnail-file" className="text-right">썸네일</Label>
             <div className="col-span-3 flex items-center gap-2">
-                <Input id="thumbnail-file" type="file" />
-                <Button variant="secondary" size="sm">AI 생성</Button>
+                <Input id="thumbnail-file" type="file" disabled={isUploading} />
+                <Button variant="secondary" size="sm" disabled={isUploading}>AI 생성</Button>
             </div>
           </div>
           {isUploading && (
@@ -218,7 +224,7 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
           )}
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>취소</Button>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isUploading}>취소</Button>
           <Button type="submit" onClick={handleUpload} disabled={isUploading}>
             {isUploading ? '업로드 중...' : '업로드'}
           </Button>
