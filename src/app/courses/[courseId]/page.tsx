@@ -1,6 +1,6 @@
 'use client';
 import Image from 'next/image';
-import { notFound } from 'next/navigation';
+import { notFound, useParams } from 'next/navigation';
 import { Lock, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,7 +11,8 @@ import { doc, collection, query } from 'firebase/firestore';
 import type { Course, Episode, Classification } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export default function CourseDetailPage({ params }: { params: { courseId: string } }) {
+export default function CourseDetailPage() {
+  const params = useParams<{ courseId: string }>();
   const firestore = useFirestore();
   const { user } = useUser();
 
