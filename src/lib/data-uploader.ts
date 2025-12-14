@@ -1,7 +1,7 @@
 'use server';
 
 import { writeBatch, collection, doc } from 'firebase/firestore';
-import { fields, classifications, courses, episodes, users, subscriptions, adminRoles } from '@/lib/data';
+import { fields, classifications, courses, episodes, users, subscriptions, adminRoles, policies } from '@/lib/data';
 import { getSdks } from '@/firebase';
 import { initializeApp, getApps } from 'firebase/app';
 import { firebaseConfig } from '@/firebase/config';
@@ -55,11 +55,12 @@ export async function uploadMockData() {
       batch.set(docRef, item);
     });
 
-    // Upload Episodes as subcollections
+    // Upload Episodes
     console.log(`Uploading ${episodes.length} episodes...`);
     episodes.forEach((item) => {
-      const episodeRef = doc(collection(firestore, 'courses', item.courseId, 'episodes'), item.id);
-      batch.set(episodeRef, item);
+        // The episode ID is now explicitly set in the data
+        const episodeRef = doc(firestore, `courses/${item.courseId}/episodes/${item.id}`);
+        batch.set(episodeRef, item);
     });
 
     // Upload Subscriptions as subcollections
@@ -77,6 +78,13 @@ export async function uploadMockData() {
         }
       });
     });
+
+    // Upload Policies
+    console.log(`Uploading ${policies.length} policies...`);
+    policies.forEach((item) => {
+        const docRef = doc(firestore, 'policies', item.id);
+        batch.set(docRef, item);
+    });
     
     await batch.commit();
     console.log('Batch commit successful!');
@@ -90,5 +98,3 @@ export async function uploadMockData() {
     return { success: false, message: 'An unknown error occurred during upload.' };
   }
 }
-
-    
