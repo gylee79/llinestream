@@ -26,8 +26,9 @@ import {
     SelectTrigger,
     SelectValue,
   } from '@/components/ui/select';
-import type { User } from '@/lib/types';
-import { classifications } from '@/lib/data';
+import type { User, Classification } from '@/lib/types';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 interface UserDetailsDialogProps {
   user: User;
@@ -36,10 +37,14 @@ interface UserDetailsDialogProps {
 }
 
 export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialogProps) {
-    const activeSubs = Object.entries(user.activeSubscriptions).map(([id, sub]) => ({
-        classification: classifications.find(c => c.id === id)?.name || '알 수 없음',
-        expiresAt: sub.expiresAt.toLocaleDateString(),
-    }));
+    const firestore = useFirestore();
+    const classificationsQuery = useMemoFirebase(() => collection(firestore, 'classifications'), [firestore]);
+    const { data: classifications } = useCollection<Classification>(classificationsQuery);
+
+    const activeSubs = user.activeSubscriptions ? Object.entries(user.activeSubscriptions).map(([id, sub]) => ({
+        classification: classifications?.find(c => c.id === id)?.name || '알 수 없음',
+        expiresAt: sub.expiresAt.toDate().toLocaleDateString(),
+    })) : [];
 
     const transactionHistory = [
         { date: '2024-05-01', type: '결제', item: '코딩 30일 이용권', amount: '₩9,900' },
@@ -50,7 +55,7 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="font-headline">{user.name} 님의 정보</DialogTitle>
+          <DialogTitle className="font-headline">{user.name || user.email}</DialogTitle>
           <DialogDescription>{user.email}</DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="info" className="mt-4">
@@ -88,7 +93,7 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
             <div className="flex gap-2 items-center">
                 <Select>
                     <SelectTrigger className="w-[180px]"><SelectValue placeholder="분류 선택" /></SelectTrigger>
-                    <SelectContent>{classifications.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                    <SelectContent>{classifications?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                 </Select>
                 <Input type="number" placeholder="일수" className="w-24" />
                 <Button>추가</Button>

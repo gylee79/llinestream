@@ -1,13 +1,32 @@
+'use client';
 import { notFound } from 'next/navigation';
-import { getPolicyBySlug } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-export async function generateStaticParams() {
-  return [{ slug: 'terms' }, { slug: 'privacy' }, { slug: 'refund' }];
-}
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import type { Policy } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function PolicyPage({ params }: { params: { slug: string } }) {
-  const policy = getPolicyBySlug(params.slug);
+  const firestore = useFirestore();
+  const policyRef = useMemoFirebase(() => doc(firestore, 'policies', params.slug), [firestore, params.slug]);
+  const { data: policy, isLoading } = useDoc<Policy>(policyRef);
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto max-w-4xl py-12">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-10 w-3/4" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!policy) {
     notFound();

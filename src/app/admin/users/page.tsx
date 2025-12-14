@@ -13,23 +13,30 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
-import { users as mockUsers } from '@/lib/data';
 import type { User } from '@/lib/types';
 import { UserDetailsDialog } from '@/components/admin/users/user-details-dialog';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>(mockUsers);
+  const firestore = useFirestore();
+  const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const { data: users, isLoading } = useCollection<User>(usersQuery);
+
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isDialogOpen, setDialogOpen] = useState(false);
 
   const getActiveSubscriptions = (user: User) => {
+    if (!user.activeSubscriptions) return '없음';
     const subCount = Object.keys(user.activeSubscriptions).length;
     if (subCount === 0) return '없음';
     return `${subCount}개 활성`;
   };
 
   const getFinalExpiry = (user: User) => {
-    const dates = Object.values(user.activeSubscriptions).map(s => s.expiresAt.getTime());
+    if (!user.activeSubscriptions) return 'N/A';
+    const dates = Object.values(user.activeSubscriptions).map(s => s.expiresAt.toDate().getTime());
     if (dates.length === 0) return 'N/A';
     const maxDate = new Date(Math.max(...dates));
     return maxDate.toLocaleDateString();
@@ -72,19 +79,27 @@ export default function AdminUsersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>{user.createdAt.toLocaleDateString()}</TableCell>
-                    <TableCell>{user.phone || 'N/A'}</TableCell>
-                    <TableCell>{getActiveSubscriptions(user)}</TableCell>
-                    <TableCell>{getFinalExpiry(user)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => openDetails(user)}>수정</Button>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7}>
+                      <Skeleton className="h-8 w-full" />
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  users?.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">{user.name || 'N/A'}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>{user.createdAt?.toDate().toLocaleDateString() || 'N/A'}</TableCell>
+                      <TableCell>{user.phone || 'N/A'}</TableCell>
+                      <TableCell>{getActiveSubscriptions(user)}</TableCell>
+                      <TableCell>{getFinalExpiry(user)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" onClick={() => openDetails(user)}>수정</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>

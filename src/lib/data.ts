@@ -1,31 +1,35 @@
 import { Field, Classification, Course, Episode, User, Policy } from './types';
 import { Timestamp } from 'firebase/firestore';
 
-export const fields: Omit<Field, 'id'>[] = [
-  { name: '교육' },
-  { name: '영화' },
+export const fields: Field[] = [
+  { id: 'field-01', name: '교육' },
+  { id: 'field-02', name: '영화' },
 ];
 
-export const classifications: Omit<Classification, 'id'>[] = [
+export const classifications: Classification[] = [
   {
+    id: 'class-001',
     fieldId: 'field-01',
     name: '코딩',
     description: '기초부터 실전까지, 다양한 프로그래밍 언어와 기술을 배워보세요.',
     prices: { day1: 1000, day30: 9900, day60: 18000, day90: 25000 },
   },
   {
+    id: 'class-002',
     fieldId: 'field-02',
     name: '액션',
     description: '숨막히는 추격전과 화려한 액션을 즐겨보세요.',
     prices: { day1: 1500, day30: 12900, day60: 24000, day90: 34000 },
   },
   {
+    id: 'class-003',
     fieldId: 'field-01',
     name: '홈트레이닝',
     description: '집에서 편안하게 전문적인 피트니스 프로그램을 경험하세요.',
     prices: { day1: 800, day30: 7900, day60: 14000, day90: 20000 },
   },
   {
+    id: 'class-004',
     fieldId: 'field-02',
     name: '다큐멘터리',
     description: '세상의 다양한 지식과 감동적인 이야기를 만나보세요.',
@@ -33,8 +37,9 @@ export const classifications: Omit<Classification, 'id'>[] = [
   },
 ];
 
-export const courses: Omit<Course, 'id'>[] = [
+export const courses: Course[] = [
   {
+    id: 'course-001',
     classificationId: 'class-001',
     name: 'React 마스터 클래스',
     description: '컴포넌트 기반 아키텍처부터 최신 기능까지 React의 모든 것을 마스터합니다.',
@@ -42,6 +47,7 @@ export const courses: Omit<Course, 'id'>[] = [
     thumbnailHint: 'code laptop'
   },
   {
+    id: 'course-002',
     classificationId: 'class-002',
     name: '스페이스 어드벤처',
     description: '광활한 우주를 배경으로 펼쳐지는 위대한 여정. 미지의 행성을 탐사하고 외계의 위협에 맞서 싸우세요.',
@@ -49,6 +55,7 @@ export const courses: Omit<Course, 'id'>[] = [
     thumbnailHint: 'galaxy planet'
   },
   {
+    id: 'course-003',
     classificationId: 'class-003',
     name: '매일 30분 요가',
     description: '하루 30분 투자로 몸과 마음의 균형을 찾으세요. 초보자도 쉽게 따라할 수 있습니다.',
@@ -56,6 +63,7 @@ export const courses: Omit<Course, 'id'>[] = [
     thumbnailHint: 'yoga mat'
   },
   {
+    id: 'course-004',
     classificationId: 'class-001',
     name: 'Python 기초',
     description: '프로그래밍이 처음이신가요? Python으로 쉽고 재미있게 시작해보세요.',
@@ -63,6 +71,7 @@ export const courses: Omit<Course, 'id'>[] = [
     thumbnailHint: 'python code'
   },
   {
+    id: 'course-005',
     classificationId: 'class-002',
     name: '블록버스터 액션',
     description: '도시를 구하기 위한 영웅의 이야기. 스케일이 다른 액션을 경험하세요.',
@@ -70,6 +79,7 @@ export const courses: Omit<Course, 'id'>[] = [
     thumbnailHint: 'car explosion'
   },
   {
+    id: 'course-006',
     classificationId: 'class-004',
     name: '위대한 자연',
     description: '경이로운 자연의 모습을 담은 다큐멘터리 시리즈.',
@@ -78,64 +88,38 @@ export const courses: Omit<Course, 'id'>[] = [
   },
 ];
 
-export const episodes: Omit<Episode, 'id'>[] = [
+export const episodes: Episode[] = [
   // React 마스터 클래스
-  { courseId: 'course-001', title: '1. React 소개 및 환경 설정', duration: 980, isFree: true, videoUrl: '' },
-  { courseId: 'course-001', title: '2. JSX와 컴포넌트의 이해', duration: 1230, isFree: false, videoUrl: '' },
-  { courseId: 'course-001', title: '3. State와 Lifecycle', duration: 1500, isFree: false, videoUrl: '' },
-  { courseId: 'course-001', title: '4. Hooks 완전 정복', duration: 1850, isFree: false, videoUrl: '' },
+  { id: 'ep-001', courseId: 'course-001', title: '1. React 소개 및 환경 설정', duration: 980, isFree: true, videoUrl: '' },
+  { id: 'ep-002', courseId: 'course-001', title: '2. JSX와 컴포넌트의 이해', duration: 1230, isFree: false, videoUrl: '' },
+  { id: 'ep-003', courseId: 'course-001', title: '3. State와 Lifecycle', duration: 1500, isFree: false, videoUrl: '' },
+  { id: 'ep-004', courseId: 'course-001', title: '4. Hooks 완전 정복', duration: 1850, isFree: false, videoUrl: '' },
 
   // 스페이스 어드벤처
-  { courseId: 'course-002', title: '제1화: 새로운 시작', duration: 2700, isFree: true, videoUrl: '' },
-  { courseId: 'course-002', title: '제2화: 미지의 신호', duration: 2850, isFree: false, videoUrl: '' },
-  { courseId: 'course-002', title: '제3화: 첫 번째 접촉', duration: 2640, isFree: false, videoUrl: '' },
+  { id: 'ep-005', courseId: 'course-002', title: '제1화: 새로운 시작', duration: 2700, isFree: true, videoUrl: '' },
+  { id: 'ep-006', courseId: 'course-002', title: '제2화: 미지의 신호', duration: 2850, isFree: false, videoUrl: '' },
+  { id: 'ep-007', courseId: 'course-002', title: '제3화: 첫 번째 접촉', duration: 2640, isFree: false, videoUrl: '' },
 
   // 매일 30분 요가
-  { courseId: 'course-003', title: 'Week 1: 기본 자세 익히기', duration: 1800, isFree: true, videoUrl: '' },
-  { courseId: 'course-003', title: 'Week 2: 코어 강화', duration: 1860, isFree: false, videoUrl: '' },
+  { id: 'ep-008', courseId: 'course-003', title: 'Week 1: 기본 자세 익히기', duration: 1800, isFree: true, videoUrl: '' },
+  { id: 'ep-009', courseId: 'course-003', title: 'Week 2: 코어 강화', duration: 1860, isFree: false, videoUrl: '' },
   
   // Python 기초
-  { courseId: 'course-004', title: '1. 변수와 자료형', duration: 1100, isFree: true, videoUrl: '' },
-  { courseId: 'course-004', title: '2. 제어문 (if, for, while)', duration: 1400, isFree: false, videoUrl: '' },
+  { id: 'ep-010', courseId: 'course-004', title: '1. 변수와 자료형', duration: 1100, isFree: true, videoUrl: '' },
+  { id: 'ep-011', courseId: 'course-004', title: '2. 제어문 (if, for, while)', duration: 1400, isFree: false, videoUrl: '' },
   
   // 블록버스터 액션
-  { courseId: 'course-005', title: '블록버스터 액션', duration: 7200, isFree: false, videoUrl: '' },
+  { id: 'ep-012', courseId: 'course-005', title: '블록버스터 액션', duration: 7200, isFree: false, videoUrl: '' },
 
   // 위대한 자연
-  { courseId: 'course-006', title: '1. 숲의 지배자들', duration: 3200, isFree: true, videoUrl: '' },
-  { courseId: 'course-006', title: '2. 바다의 거인들', duration: 3300, isFree: true, videoUrl: '' },
+  { id: 'ep-013', courseId: 'course-006', title: '1. 숲의 지배자들', duration: 3200, isFree: true, videoUrl: '' },
+  { id: 'ep-014', courseId: 'course-006', title: '2. 바다의 거인들', duration: 3300, isFree: true, videoUrl: '' },
 ];
 
-
-export const mockUsers: User[] = [
-  {
-    id: 'user-001',
-    name: '홍길동',
-    email: 'user@example.com',
-    phone: '010-1234-5678',
-    dob: '1990-01-01',
-    activeSubscriptions: {
-      'class-001': { expiresAt: Timestamp.fromDate(new Date(new Date().setDate(new Date().getDate() + 25))) }
-    },
-    createdAt: Timestamp.fromDate(new Date('2023-01-15')),
-  },
-  {
-    id: 'user-002',
-    name: '김관리',
-    email: 'admin@example.com',
-    phone: '010-9876-5432',
-    dob: '1985-05-10',
-    activeSubscriptions: {
-      'class-001': { expiresAt: Timestamp.fromDate(new Date(new Date().setDate(new Date().getDate() + 365))) },
-      'class-002': { expiresAt: Timestamp.fromDate(new Date(new Date().setDate(new Date().getDate() + 365))) },
-      'class-003': { expiresAt: Timestamp.fromDate(new Date(new Date().setDate(new Date().getDate() + 365))) },
-    },
-    createdAt: Timestamp.fromDate(new Date('2022-11-20')),
-  }
-];
 
 export const policies: Policy[] = [
     {
+        id: 'terms',
         slug: 'terms',
         title: '서비스 이용약관',
         content: `
@@ -150,6 +134,7 @@ export const policies: Policy[] = [
         `,
     },
     {
+        id: 'privacy',
         slug: 'privacy',
         title: '개인정보처리방침',
         content: `
@@ -164,6 +149,7 @@ LlineStream은 다음의 목적을 위하여 개인정보를 처리합니다. �
         `,
     },
     {
+        id: 'refund',
         slug: 'refund',
         title: '환불 규정',
         content: `
@@ -183,9 +169,4 @@ LlineStream은 다음의 목적을 위하여 개인정보를 처리합니다. �
     }
 ];
 
-// Helper functions are no longer needed as we will fetch from Firestore
-// export const getCoursesByClassification = (classificationId: string) => courses.filter(c => c.classificationId === classificationId);
-// export const getEpisodesByCourse = (courseId: string) => episodes.filter(e => e.courseId === courseId);
-// export const getCourseById = (id: string) => courses.find(c => c.id === id);
-// export const getClassificationById = (id: string) => classifications.find(c => c.id === id);
 export const getPolicyBySlug = (slug: string) => policies.find(p => p.slug === slug);

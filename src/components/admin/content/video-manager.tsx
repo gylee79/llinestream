@@ -14,8 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, PlusCircle } from 'lucide-react';
-import { episodes as mockEpisodes, courses } from '@/lib/data';
-import type { Episode } from '@/lib/types';
+import type { Episode, Course } from '@/lib/types';
 import VideoUploadDialog from './video-upload-dialog';
 import {
   DropdownMenu,
@@ -23,22 +22,38 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, doc, query } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
+import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { useToast } from '@/hooks/use-toast';
 
 export default function VideoManager() {
-  const [episodes, setEpisodes] = useState<Episode[]>(mockEpisodes);
+  const firestore = useFirestore();
+  const { toast } = useToast();
+  
+  const episodesQuery = useMemoFirebase(() => collection(firestore, 'episodes'), [firestore]);
+  const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
+  
+  const coursesQuery = useMemoFirebase(() => collection(firestore, 'courses'), [firestore]);
+  const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
+  
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
 
   const getCourseName = (courseId: string) => {
-    return courses.find(c => c.id === courseId)?.name || 'N/A';
+    return courses?.find(c => c.id === courseId)?.name || 'N/A';
   };
 
-  const toggleFreeStatus = (episodeId: string) => {
-    setEpisodes(prev =>
-      prev.map(ep =>
-        ep.id === episodeId ? { ...ep, isFree: !ep.isFree } : ep
-      )
-    );
+  const toggleFreeStatus = (episode: Episode) => {
+    const docRef = doc(firestore, 'episodes', episode.id);
+    updateDocumentNonBlocking(docRef, { isFree: !episode.isFree });
+    toast({
+      title: '상태 변경',
+      description: `${episode.title}의 무료 상태가 변경되었습니다.`,
+    });
   };
+
+  const isLoading = episodesLoading || coursesLoading;
 
   return (
     <>
@@ -65,43 +80,47 @@ export default function VideoManager() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {episodes.map((episode) => (
-                <TableRow key={episode.id}>
-                  <TableCell className="font-medium">{episode.title}</TableCell>
-                  <TableCell>{getCourseName(episode.courseId)}</TableCell>
-                  <TableCell>{episode.duration}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                    <Switch
-                      checked={episode.isFree}
-                      onCheckedChange={() => toggleFreeStatus(episode.id)}
-                      aria-label="Toggle free status"
-                    />
-                    <Badge variant={episode.isFree ? "secondary" : "outline"}>
-                        {episode.isFree ? '무료' : '유료'}
-                    </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">메뉴 열기</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => alert(`수정: ${episode.title}`)}>
-                          수정
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => alert(`삭제: ${episode.title}`)}>
-                          삭제
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {isLoading ? (
+                <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+              ) : (
+                episodes?.map((episode) => (
+                  <TableRow key={episode.id}>
+                    <TableCell className="font-medium">{episode.title}</TableCell>
+                    <TableCell>{getCourseName(episode.courseId)}</TableCell>
+                    <TableCell>{episode.duration}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={episode.isFree}
+                          onCheckedChange={() => toggleFreeStatus(episode)}
+                          aria-label="Toggle free status"
+                        />
+                        <Badge variant={episode.isFree ? "secondary" : "outline"}>
+                          {episode.isFree ? '무료' : '유료'}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">메뉴 열기</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => alert(`수정: ${episode.title}`)}>
+                            수정
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onClick={() => alert(`삭제: ${episode.title}`)}>
+                            삭제
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

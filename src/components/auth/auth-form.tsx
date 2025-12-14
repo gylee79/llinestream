@@ -24,6 +24,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/firebase';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 
 const loginSchema = z.object({
   email: z.string().email({ message: '유효한 이메일을 입력해주세요.' }),
@@ -42,6 +44,7 @@ const registerSchema = z.object({
 export default function AuthForm() {
   const router = useRouter();
   const { toast } = useToast();
+  const auth = useAuth();
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -53,16 +56,24 @@ export default function AuthForm() {
     defaultValues: { email: '', password: '', phone: '', dob: '' },
   });
 
-  const onLoginSubmit = (values: z.infer<typeof loginSchema>) => {
-    console.log('Login values:', values);
-    toast({ title: '로그인 성공', description: '홈으로 이동합니다.' });
-    router.push('/');
+  const onLoginSubmit = async (values: z.infer<typeof loginSchema>) => {
+    try {
+      await signInWithEmailAndPassword(auth, values.email, values.password);
+      toast({ title: '로그인 성공', description: '홈으로 이동합니다.' });
+      router.push('/');
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: '로그인 실패', description: error.message });
+    }
   };
 
-  const onRegisterSubmit = (values: z.infer<typeof registerSchema>) => {
-    console.log('Register values:', values);
-    toast({ title: '회원가입 성공', description: '로그인 탭에서 로그인해주세요.' });
-    // In a real app, you might auto-login or switch tabs.
+  const onRegisterSubmit = async (values: z.infer<typeof registerSchema>) => {
+    try {
+      await createUserWithEmailAndPassword(auth, values.email, values.password);
+      toast({ title: '회원가입 성공', description: '로그인 탭에서 로그인해주세요.' });
+      // In a real app, you might auto-login or switch tabs.
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: '회원가입 실패', description: error.message });
+    }
   };
 
   return (
@@ -108,7 +119,9 @@ export default function AuthForm() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full">로그인</Button>
+                <Button type="submit" className="w-full" disabled={loginForm.formState.isSubmitting}>
+                  {loginForm.formState.isSubmitting ? "로그인 중..." : "로그인"}
+                </Button>
               </form>
             </Form>
           </CardContent>
@@ -177,7 +190,9 @@ export default function AuthForm() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full">회원가입</Button>
+                <Button type="submit" className="w-full" disabled={registerForm.formState.isSubmitting}>
+                  {registerForm.formState.isSubmitting ? "가입 중..." : "회원가입"}
+                </Button>
               </form>
             </Form>
           </CardContent>

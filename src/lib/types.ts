@@ -2,16 +2,16 @@ import { Timestamp } from 'firebase/firestore';
 
 export interface User {
   id: string;
-  name: string;
+  name?: string;
   email: string;
   phone?: string;
   dob?: string; // Date of Birth
-  activeSubscriptions: {
+  activeSubscriptions?: {
     [classificationId: string]: {
-      expiresAt: Timestamp; // Changed from Date to Timestamp
+      expiresAt: Timestamp;
     };
   };
-  createdAt: Timestamp; // Changed from Date to Timestamp
+  createdAt?: Timestamp;
 }
 
 export interface Field {
@@ -51,6 +51,7 @@ export interface Episode {
 }
 
 export interface Policy {
+  id: string;
   slug: 'terms' | 'privacy' | 'refund';
   title: string;
   content: string;

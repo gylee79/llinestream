@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -22,13 +22,10 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { fields, classifications, courses } from '@/lib/data';
-import { Plus } from 'lucide-react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
+import type { Field, Classification, Course } from '@/lib/types';
+
 
 interface VideoUploadDialogProps {
   open: boolean;
@@ -36,10 +33,30 @@ interface VideoUploadDialogProps {
 }
 
 export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDialogProps) {
+  const firestore = useFirestore();
+  
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [isFree, setIsFree] = useState(false);
   
+  const [selectedField, setSelectedField] = useState<string | null>(null);
+  const [selectedClassification, setSelectedClassification] = useState<string | null>(null);
+
+  const fieldsQuery = useMemoFirebase(() => collection(firestore, 'fields'), [firestore]);
+  const { data: fields } = useCollection<Field>(fieldsQuery);
+
+  const classificationsQuery = useMemoFirebase(() => 
+    selectedField ? query(collection(firestore, 'classifications'), where('fieldId', '==', selectedField)) : null, 
+    [firestore, selectedField]
+  );
+  const { data: classifications } = useCollection<Classification>(classificationsQuery);
+
+  const coursesQuery = useMemoFirebase(() => 
+    selectedClassification ? query(collection(firestore, 'courses'), where('classificationId', '==', selectedClassification)) : null, 
+    [firestore, selectedClassification]
+  );
+  const { data: courses } = useCollection<Course>(coursesQuery);
+
   const handleUpload = () => {
     setIsUploading(true);
     const interval = setInterval(() => {
@@ -55,30 +72,15 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     }, 200);
   };
   
-  const CategoryCreator = ({ type }: { type: string }) => (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="icon" className="h-9 w-9 ml-2">
-          <Plus className="h-4 w-4" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-80">
-        <div className="grid gap-4">
-          <div className="space-y-2">
-            <h4 className="font-medium leading-none">새 {type} 생성</h4>
-            <p className="text-sm text-muted-foreground">
-              즉석에서 새 {type}을(를) 생성합니다.
-            </p>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="new-category-name">이름</Label>
-            <Input id="new-category-name" />
-            <Button size="sm">생성</Button>
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
+  useEffect(() => {
+    if (!open) {
+      setUploadProgress(0);
+      setIsUploading(false);
+      setIsFree(false);
+      setSelectedField(null);
+      setSelectedClassification(null);
+    }
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -101,21 +103,18 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
           <div className="grid grid-cols-4 items-center gap-4">
             <Label className="text-right">분류</Label>
             <div className="col-span-3 grid grid-cols-3 gap-2 items-center">
-              <Select disabled={isFree}>
+              <Select onValueChange={setSelectedField} disabled={isFree}>
                 <SelectTrigger><SelectValue placeholder="분야" /></SelectTrigger>
-                <SelectContent>{fields.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{fields?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
               </Select>
-              <Select disabled={isFree}>
+              <Select onValueChange={setSelectedClassification} disabled={isFree || !selectedField}>
                 <SelectTrigger><SelectValue placeholder="큰분류" /></SelectTrigger>
-                <SelectContent>{classifications.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{classifications?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
-              <div className="flex">
-              <Select disabled={isFree}>
+              <Select disabled={isFree || !selectedClassification}>
                 <SelectTrigger><SelectValue placeholder="상세분류" /></SelectTrigger>
-                <SelectContent>{courses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{courses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
-              <CategoryCreator type="상세분류" />
-              </div>
             </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">

@@ -1,3 +1,5 @@
+'use client';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5,9 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { policies } from "@/lib/data";
+import type { Policy } from '@/lib/types';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 export default function AdminSettingsPage() {
+  const firestore = useFirestore();
+  const policiesQuery = useMemoFirebase(() => collection(firestore, 'policies'), [firestore]);
+  const { data: policies } = useCollection<Policy>(policiesQuery);
+
+  const termsPolicy = policies?.find(p => p.id === 'terms');
+  const privacyPolicy = policies?.find(p => p.id === 'privacy');
+  const refundPolicy = policies?.find(p => p.id === 'refund');
+
   return (
     <div>
       <h1 className="text-3xl font-bold tracking-tight font-headline">설정</h1>
@@ -56,18 +68,24 @@ export default function AdminSettingsPage() {
         <Card>
             <CardHeader><CardTitle>약관 및 정책 수정</CardTitle></CardHeader>
             <CardContent className="space-y-6">
-                <div>
-                    <Label htmlFor="terms-editor">{policies[0].title}</Label>
-                    <Textarea id="terms-editor" defaultValue={policies[0].content} rows={10} />
-                </div>
-                <div>
-                    <Label htmlFor="privacy-editor">{policies[1].title}</Label>
-                    <Textarea id="privacy-editor" defaultValue={policies[1].content} rows={10} />
-                </div>
-                <div>
-                    <Label htmlFor="refund-editor">{policies[2].title}</Label>
-                    <Textarea id="refund-editor" defaultValue={policies[2].content} rows={10} />
-                </div>
+                {termsPolicy && (
+                  <div>
+                      <Label htmlFor="terms-editor">{termsPolicy.title}</Label>
+                      <Textarea id="terms-editor" defaultValue={termsPolicy.content} rows={10} />
+                  </div>
+                )}
+                {privacyPolicy && (
+                  <div>
+                      <Label htmlFor="privacy-editor">{privacyPolicy.title}</Label>
+                      <Textarea id="privacy-editor" defaultValue={privacyPolicy.content} rows={10} />
+                  </div>
+                )}
+                {refundPolicy && (
+                  <div>
+                      <Label htmlFor="refund-editor">{refundPolicy.title}</Label>
+                      <Textarea id="refund-editor" defaultValue={refundPolicy.content} rows={10} />
+                  </div>
+                )}
                 <Button>저장</Button>
             </CardContent>
           </Card>
