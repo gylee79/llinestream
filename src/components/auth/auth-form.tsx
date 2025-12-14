@@ -24,8 +24,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore, setDocumentNonBlocking } from '@/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, Timestamp } from 'firebase/firestore';
 
 const loginSchema = z.object({
   email: z.string().email({ message: '유효한 이메일을 입력해주세요.' }),
@@ -33,6 +34,7 @@ const loginSchema = z.object({
 });
 
 const registerSchema = z.object({
+  name: z.string().min(2, { message: '이름은 2자 이상이어야 합니다.'}),
   email: z.string().email({ message: '유효한 이메일을 입력해주세요.' }),
   password: z.string().min(8, { message: '비밀번호는 8자 이상이어야 합니다.' }),
   phone: z.string().min(10, { message: '유효한 연락처를 입력해주세요.' }),
@@ -45,6 +47,7 @@ export default function AuthForm() {
   const router = useRouter();
   const { toast } = useToast();
   const auth = useAuth();
+  const firestore = useFirestore();
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -53,7 +56,7 @@ export default function AuthForm() {
 
   const registerForm = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { email: '', password: '', phone: '', dob: '' },
+    defaultValues: { name: '', email: '', password: '', phone: '', dob: '' },
   });
 
   const onLoginSubmit = async (values: z.infer<typeof loginSchema>) => {
@@ -68,8 +71,25 @@ export default function AuthForm() {
 
   const onRegisterSubmit = async (values: z.infer<typeof registerSchema>) => {
     try {
-      await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
+
+      // Create user document in Firestore
+      const userRef = doc(firestore, 'users', user.uid);
+      const newUser = {
+        id: user.uid,
+        name: values.name,
+        email: values.email,
+        phone: values.phone,
+        dob: values.dob,
+        activeSubscriptions: {},
+        createdAt: Timestamp.now(),
+      };
+      
+      setDocumentNonBlocking(userRef, newUser, {});
+
       toast({ title: '회원가입 성공', description: '로그인 탭에서 로그인해주세요.' });
+      registerForm.reset();
       // In a real app, you might auto-login or switch tabs.
     } catch (error: any) {
       toast({ variant: 'destructive', title: '회원가입 실패', description: error.message });
@@ -138,6 +158,19 @@ export default function AuthForm() {
           <CardContent>
             <Form {...registerForm}>
               <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
+                <FormField
+                  control={registerForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>이름</FormLabel>
+                      <FormControl>
+                        <Input placeholder="홍길동" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={registerForm.control}
                   name="email"
