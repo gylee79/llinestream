@@ -1,7 +1,21 @@
+'use client';
 import ContentCarousel from '@/components/shared/content-carousel';
-import { courses, classifications } from '@/lib/data';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import type { Course, Classification } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ContentsPage() {
+  const firestore = useFirestore();
+
+  const coursesQuery = useMemoFirebase(() => collection(firestore, 'courses'), [firestore]);
+  const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
+
+  const classificationsQuery = useMemoFirebase(() => collection(firestore, 'classifications'), [firestore]);
+  const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
+
+  const isLoading = coursesLoading || classificationsLoading;
+
   return (
     <div className="container mx-auto py-12">
       <header className="mb-12">
@@ -9,19 +23,42 @@ export default function ContentsPage() {
         <p className="mt-2 text-lg text-muted-foreground">LlineStream의 모든 콘텐츠를 한 눈에 살펴보세요.</p>
       </header>
       <div className="space-y-12">
-        {classifications.map((classification) => {
-          const classificationCourses = courses.filter(
-            (course) => course.classificationId === classification.id
-          );
-          if (classificationCourses.length === 0) return null;
-          return (
-            <ContentCarousel
-              key={classification.id}
-              title={classification.name}
-              courses={classificationCourses}
-            />
-          );
-        })}
+        {isLoading ? (
+          <>
+            <div className="space-y-4">
+              <Skeleton className="h-8 w-1/4" />
+              <div className="flex space-x-4">
+                <Skeleton className="h-64 w-1/4" />
+                <Skeleton className="h-64 w-1/4" />
+                <Skeleton className="h-64 w-1/4" />
+                <Skeleton className="h-64 w-1/4" />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <Skeleton className="h-8 w-1/4" />
+              <div className="flex space-x-4">
+                <Skeleton className="h-64 w-1/4" />
+                <Skeleton className="h-64 w-1/4" />
+                <Skeleton className="h-64 w-1/4" />
+                <Skeleton className="h-64 w-1/4" />
+              </div>
+            </div>
+          </>
+        ) : (
+          classifications?.map((classification) => {
+            const classificationCourses = courses?.filter(
+              (course) => course.classificationId === classification.id
+            );
+            if (!classificationCourses || classificationCourses.length === 0) return null;
+            return (
+              <ContentCarousel
+                key={classification.id}
+                title={classification.name}
+                courses={classificationCourses}
+              />
+            );
+          })
+        )}
       </div>
     </div>
   );

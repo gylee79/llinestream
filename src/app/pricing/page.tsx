@@ -1,8 +1,17 @@
+'use client';
 import PricingCard from '@/components/pricing/pricing-card';
-import { classifications } from '@/lib/data';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
+import type { Classification } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function PricingPage() {
-  const subscribableClassifications = classifications.filter(c => c.prices.day30 > 0);
+  const firestore = useFirestore();
+  const classificationsQuery = useMemoFirebase(() => 
+    query(collection(firestore, 'classifications'), where('prices.day30', '>', 0)),
+    [firestore]
+  );
+  const { data: subscribableClassifications, isLoading } = useCollection<Classification>(classificationsQuery);
 
   return (
     <div className="container mx-auto py-12">
@@ -13,9 +22,17 @@ export default function PricingPage() {
         </p>
       </header>
       <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-        {subscribableClassifications.map((classification) => (
-          <PricingCard key={classification.id} classification={classification} />
-        ))}
+        {isLoading ? (
+          <>
+            <Skeleton className="h-96 w-full" />
+            <Skeleton className="h-96 w-full" />
+            <Skeleton className="h-96 w-full" />
+          </>
+        ) : (
+          subscribableClassifications?.map((classification) => (
+            <PricingCard key={classification.id} classification={classification} />
+          ))
+        )}
       </div>
     </div>
   );

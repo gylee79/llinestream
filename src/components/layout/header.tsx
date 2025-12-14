@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { users } from '@/lib/data';
+import { useUser } from '@/firebase';
 
 const navLinks = [
   { href: '/', label: 'Home', icon: Home },
@@ -33,17 +33,10 @@ const navLinks = [
   { href: '/admin', label: '관리자' },
 ];
 
-// Mock authentication state
-const useAuth = () => {
-  return {
-    isLoggedIn: true, // Change to false to see the logged-out state
-    user: users[0],
-  };
-};
-
 export default function Header() {
   const pathname = usePathname();
-  const { isLoggedIn, user } = useAuth();
+  const { user, isUserLoading } = useUser();
+  const isLoggedIn = !!user;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -66,20 +59,24 @@ export default function Header() {
           ))}
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-4">
-          {isLoggedIn && user ? (
+          {isUserLoading ? (
+             <Avatar className="h-8 w-8">
+                <AvatarFallback>?</AvatarFallback>
+             </Avatar>
+          ) : isLoggedIn && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={`https://avatar.vercel.sh/${user.id}.png`} alt={user.name} />
-                    <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={user.photoURL || `https://avatar.vercel.sh/${user.uid}.png`} alt={user.displayName || user.email || ''} />
+                    <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user.name}</p>
+                    <p className="text-sm font-medium leading-none">{user.displayName || 'Unnamed User'}</p>
                     <p className="text-xs leading-none text-muted-foreground">
                       {user.email}
                     </p>

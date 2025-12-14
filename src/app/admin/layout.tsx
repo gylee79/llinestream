@@ -6,6 +6,7 @@ import {
   BarChart3,
   Cog,
   CreditCard,
+  Database,
   FolderKanban,
   LayoutDashboard,
   Users,
@@ -19,6 +20,7 @@ const adminNavLinks = [
   { href: '/admin/content', label: '콘텐츠 관리', icon: FolderKanban },
   { href: '/admin/subscriptions', label: '구독/결제 관리', icon: CreditCard },
   { href: '/admin/revenue', label: '매출 관리', icon: BarChart3 },
+  { href: '/admin/data-upload', label: '데이터 업로드', icon: Database },
   { href: '/admin/settings', label: '설정', icon: Cog },
 ];
 

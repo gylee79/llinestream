@@ -1,3 +1,5 @@
+import { Timestamp } from 'firebase/firestore';
+
 export interface User {
   id: string;
   name: string;
@@ -6,10 +8,10 @@ export interface User {
   dob?: string; // Date of Birth
   activeSubscriptions: {
     [classificationId: string]: {
-      expiresAt: Date;
+      expiresAt: Timestamp; // Changed from Date to Timestamp
     };
   };
-  createdAt: Date;
+  createdAt: Timestamp; // Changed from Date to Timestamp
 }
 
 export interface Field {

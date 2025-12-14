@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -12,20 +11,36 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { classifications as mockClassifications } from '@/lib/data';
 import type { Classification } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import { updateDocumentNonBlocking } from '@/firebase';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function PricingManager() {
-  const [classifications, setClassifications] = useState<Classification[]>(mockClassifications);
+  const firestore = useFirestore();
   const { toast } = useToast();
+  
+  const classificationsQuery = useMemoFirebase(() => collection(firestore, 'classifications'), [firestore]);
+  const { data: classifications, isLoading } = useCollection<Classification>(classificationsQuery);
+
+  // We need a local state to handle input changes before saving to Firestore
+  const [localClassifications, setLocalClassifications] = useState<Classification[] | null>(null);
+
+  useEffect(() => {
+    if (classifications) {
+      setLocalClassifications(classifications);
+    }
+  }, [classifications]);
+
 
   const handlePriceChange = (classId: string, duration: keyof Classification['prices'], value: string) => {
     const price = Number(value);
-    if (isNaN(price)) return;
+    if (isNaN(price) || !localClassifications) return;
     
-    setClassifications(prev => 
-      prev.map(c => 
+    setLocalClassifications(prev => 
+      prev!.map(c => 
         c.id === classId 
           ? { ...c, prices: { ...c.prices, [duration]: price } }
           : c
@@ -34,11 +49,17 @@ export default function PricingManager() {
   };
   
   const handleSave = (classId: string) => {
-    const classification = classifications.find(c => c.id === classId);
-    console.log("Saving prices for:", classification);
+    if (!localClassifications) return;
+    const classification = localClassifications.find(c => c.id === classId);
+    if (!classification) return;
+
+    const docRef = doc(firestore, 'classifications', classId);
+    // We only update the prices field
+    updateDocumentNonBlocking(docRef, { prices: classification.prices });
+
     toast({
       title: '저장 완료',
-      description: `${classification?.name}의 가격 정보가 업데이트되었습니다.`,
+      description: `${classification.name}의 가격 정보가 업데이트되었습니다.`,
     });
   };
 
@@ -61,46 +82,54 @@ export default function PricingManager() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {classifications.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell className="font-medium">{item.name}</TableCell>
-                <TableCell>
-                  <Input
-                    type="number"
-                    value={item.prices.day1}
-                    onChange={(e) => handlePriceChange(item.id, 'day1', e.target.value)}
-                    className="w-24"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Input
-                    type="number"
-                    value={item.prices.day30}
-                    onChange={(e) => handlePriceChange(item.id, 'day30', e.target.value)}
-                    className="w-24"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Input
-                    type="number"
-                    value={item.prices.day60}
-                    onChange={(e) => handlePriceChange(item.id, 'day60', e.target.value)}
-                    className="w-24"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Input
-                    type="number"
-                    value={item.prices.day90}
-                    onChange={(e) => handlePriceChange(item.id, 'day90', e.target.value)}
-                    className="w-24"
-                  />
-                </TableCell>
-                <TableCell className="text-right">
-                    <Button onClick={() => handleSave(item.id)}>저장</Button>
+            {isLoading || !localClassifications ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-24 text-center">
+                  <Skeleton className="h-8 w-full" />
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              localClassifications.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={item.prices.day1}
+                      onChange={(e) => handlePriceChange(item.id, 'day1', e.target.value)}
+                      className="w-24"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={item.prices.day30}
+                      onChange={(e) => handlePriceChange(item.id, 'day30', e.target.value)}
+                      className="w-24"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={item.prices.day60}
+                      onChange={(e) => handlePriceChange(item.id, 'day60', e.target.value)}
+                      className="w-24"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={item.prices.day90}
+                      onChange={(e) => handlePriceChange(item.id, 'day90', e.target.value)}
+                      className="w-24"
+                    />
+                  </TableCell>
+                  <TableCell className="text-right">
+                      <Button onClick={() => handleSave(item.id)}>저장</Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </CardContent>
