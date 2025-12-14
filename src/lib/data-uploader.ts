@@ -1,8 +1,7 @@
 'use server';
 
-import { writeBatch, collection, doc } from 'firebase/firestore';
+import { writeBatch, collection, doc, getFirestore } from 'firebase/firestore';
 import { fields, classifications, courses, episodes, users, subscriptions, adminRoles, policies } from '@/lib/data';
-import { getSdks } from '@/firebase';
 import { initializeApp, getApps } from 'firebase/app';
 import { firebaseConfig } from '@/firebase/config';
 
@@ -15,7 +14,7 @@ export async function uploadMockData() {
   } else {
     app = getApps()[0];
   }
-  const { firestore } = getSdks(app);
+  const firestore = getFirestore(app);
 
   const batch = writeBatch(firestore);
 
