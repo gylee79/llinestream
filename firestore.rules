@@ -1,180 +1,249 @@
 /**
- * Core Philosophy: This ruleset enforces a strict user-ownership model for private data, while providing public read-only access to shared content like courses and categories. The primary goal is to secure user-specific information, such as profiles and subscriptions, ensuring only the authenticated owner can access or modify their own data.
+ * LlineStream Firestore Security Rules - Prototyping Version
  *
- * Data Structure: The data is segregated into two main categories:
- * 1. Private User Data: All data specific to a user is nested under the `/users/{userId}` path (e.g., `/users/{userId}/subscriptions`). This structure enables simple and performant path-based security rules.
- * 2. Public Content Data: Top-level collections like `/fields`, `/classifications`, and `/courses` store publicly accessible information. These collections are intended to be read by all users but managed exclusively by a backend service, hence client-side writes are disabled.
+ * Core Philosophy:
+ * This ruleset implements a dual security model. User-specific data (profiles,
+ * subscriptions) is governed by a strict ownership model, ensuring users can only
+ * access their own information. Public content (fields, courses, episodes) is
+ * publicly readable to all users, but write operations are restricted to
+ * designated administrators. This allows for a public-facing content catalog
+ * while maintaining strict control over its management.
+ *
+ * Data Structure:
+ * - /users/{userId}: Private user profile data. Each user's data is isolated.
+ * - /users/{userId}/subscriptions/{subscriptionId}: User's private subscription records.
+ * - /fields, /classifications, /courses, /episodes: Top-level collections for public content.
+ * - /policies: Top-level collection for public legal documents.
+ * - /roles_admin: A private collection used as a lookup table to identify administrators.
  *
  * Key Security Decisions:
- * - User Isolation: Users can only access documents within their own `/users/{userId}` data tree. Listing or viewing other users' profiles or subscriptions is strictly prohibited.
- * - Public Content is Read-Only: All content collections (`fields`, `classifications`, `courses`, `episodes`) are configured to be read-only for clients. This is a secure pattern that assumes content is managed via a trusted backend server using the Admin SDK, which bypasses these rules. This prevents unauthorized modification or deletion of shared application content.
- * - Ownership Integrity: For all user-created documents (e.g., their profile or subscriptions), rules enforce that the document data contains a `userId` field that matches the user's authenticated UID and the document's path. This field is immutable to prevent documents from being "re-assigned" to another user after creation.
- * - No User Deletion: Users are not permitted to delete their own `/users/{userId}` document directly via the client. This is a common safety measure to prevent accidental data loss and is typically handled by a managed server process.
+ * - Default Deny: All paths are closed by default. Access is granted explicitly.
+ * - No User Listing: Listing the top-level `/users` collection is forbidden to prevent user data enumeration.
+ * - Admin-Managed Content: All public content is managed by users with an admin role, verified by checking the `/roles_admin` collection.
+ * - Subscription Check Simplification: Securely checking if a user has a subscription for a *specific* episode's classification is not possible with the current data structure. As a prototyping measure, access to paid content is granted if the user has *any* active subscription. A production implementation will require denormalizing a user's active classification IDs into their user document for a direct lookup.
+ *
+ * Denormalization for Authorization:
+ * - Admin Roles: An admin's UID is stored in `/roles_admin/{userId}`. This allows a fast, single `exists()` check to verify admin status without needing to query a collection.
+ * - Subscription Status: The `activeSubscriptionIds` array on the User document is used for a simplified check for paid content access. While not ideal, it avoids impossible cross-collection queries.
+ *
+ * Structural Segregation:
+ * User data is segregated under `/users/{userId}`, completely separate from the public, top-level content collections. This makes it simple to apply broad read rules to public content without accidentally exposing private user data.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ------------------------------------------------------------------------
+    // =========================================================================
     // Helper Functions
-    // ------------------------------------------------------------------------
+    // =========================================================================
 
     /**
-     * Returns true if the user is authenticated.
+     * Checks if the user is authenticated.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * Returns true if the requesting user's UID matches the provided userId.
-     * Use this to verify a user's ownership of a document or data path.
+     * Checks if the authenticated user's UID matches the provided userId.
+     * This is the core of the ownership-based security model.
+     * @param userId The user ID from the document path.
      */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-    
+
     /**
-     * Returns true if the user is the owner and the document already exists.
-     * CRITICAL: Use for all update and delete operations to prevent modifying
-     * or deleting non-existent data.
+     * Checks if a document exists AND the user is the owner.
+     * Used for safe updates and deletes to prevent operating on non-existent data.
+     * @param userId The user ID from the document path.
      */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
 
     /**
-     * Validates required authorization fields for User creation.
-     * Ensures the document ID is consistent with the user's auth UID.
+     * Checks if the user has an admin role.
+     * Admins are defined by the existence of a document in the /roles_admin collection.
+     * This is a secure lookup that does not require read access to the collection itself.
      */
-    function hasValidUserDataOnCreate(userId) {
-      let data = request.resource.data;
-      return data.id == userId;
-    }
-    
-    /**
-     * Ensures critical, immutable User fields are not changed on update.
-     */
-    function hasImmutableUserData() {
-      let data = request.resource.data;
-      return data.id == resource.data.id;
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
     /**
-     * Validates required authorization fields for Subscription creation.
-     * Enforces consistency between the path and the internal userId field.
+     * Validates that the user is creating their own user document.
+     * Ensures the document's internal `id` field matches the path `userId`.
+     * This enforces relational integrity on creation.
+     * @param userId The user ID from the document path.
      */
-    function hasValidSubscriptionDataOnCreate(userId) {
-      let data = request.resource.data;
-      return data.userId == userId;
-    }
-    
-    /**
-     * Ensures critical, immutable Subscription fields are not changed on update.
-     */
-    function hasImmutableSubscriptionData() {
-      let data = request.resource.data;
-      return data.userId == resource.data.userId;
+    function isCreatingOwnUserDoc(userId) {
+      return request.resource.data.id == userId;
     }
 
-    // ------------------------------------------------------------------------
-    // User Data Rules
-    // ------------------------------------------------------------------------
+    /**
+     * Validates that immutable fields are not changed during an update.
+     * The user's `id` should never change post-creation.
+     */
+    function isNotUpdatingImmutableUserFields() {
+      return request.resource.data.id == resource.data.id;
+    }
 
     /**
-     * @description Controls access to a user's own profile document.
+     * Validates that a user is creating a subscription under their own path
+     * and that the internal `userId` field correctly points to them.
+     * @param userId The user ID from the document path.
+     */
+    function isCreatingOwnSubscription(userId) {
+      return request.resource.data.userId == userId;
+    }
+
+    /**
+     * Validates that the immutable `userId` field on a subscription is not changed during an update.
+     */
+    function isNotUpdatingImmutableSubscriptionFields() {
+      return request.resource.data.userId == resource.data.userId;
+    }
+
+    /**
+     * Checks if an episode can be accessed by the current user.
+     * Access is granted if the episode is free, or if the user is signed in
+     * and has at least one active subscription.
+     * NOTE: This is a simplified check for prototyping. A production system
+     * would require a more robust denormalized data model on the User document
+     * (e.g., a map of active classification IDs) to check for a specific subscription.
+     */
+    function canGetEpisode() {
+      return resource.data.isFree == true || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.activeSubscriptionIds.size() > 0);
+    }
+
+    // =========================================================================
+    // Collection Rules
+    // =========================================================================
+
+    /**
+     * @description Controls access to user profile documents.
      * @path /users/{userId}
-     * @allow (create) A new user creating their own profile document: `create /users/user_abc` as user_abc.
-     * @deny (get) Another user trying to read a profile: `get /users/user_abc` as user_xyz.
-     * @deny (list) Any user trying to list all user profiles: `list /users`.
+     * @allow A signed-in user (create)s their own user document with a matching ID.
+     * @allow A signed-in user (get)s, (update)s, or (delete)s their own document.
+     * @deny An anonymous user tries to read a user document.
+     * @deny A signed-in user tries to (update) another user's document.
+     * @deny Listing all users via (list) is forbidden for privacy.
      * @principle Restricts access to a user's own data tree and enforces self-creation.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId) && hasValidUserDataOnCreate(userId);
-      allow update: if isExistingOwner(userId) && hasImmutableUserData();
-      allow delete: if false;
-    }
-
-    /**
-     * @description Manages user subscriptions, ensuring they are private to the owner.
-     * @path /users/{userId}/subscriptions/{subscriptionId}
-     * @allow (create) A user creating a new subscription for themselves: `create /users/user_abc/subscriptions/sub_123` as user_abc.
-     * @allow (list) A user listing their own subscriptions: `list /users/user_abc/subscriptions` as user_abc.
-     * @deny (get) A user trying to read another user's subscription: `get /users/user_abc/subscriptions/sub_123` as user_xyz.
-     * @principle Enforces strict document ownership within a user's private subcollection.
-     */
-    match /users/{userId}/subscriptions/{subscriptionId} {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId) && hasValidSubscriptionDataOnCreate(userId);
-      allow update: if isExistingOwner(userId) && hasImmutableSubscriptionData();
+      allow create: if isOwner(userId) && isCreatingOwnUserDoc(userId);
+      allow update: if isExistingOwner(userId) && isNotUpdatingImmutableUserFields();
       allow delete: if isExistingOwner(userId);
-    }
-
-    // ------------------------------------------------------------------------
-    // Public Content Rules (Read-Only for Clients)
-    // ------------------------------------------------------------------------
-
-    /**
-     * @description Publicly readable categories. Writes are disabled for clients.
-     * @path /fields/{fieldId}
-     * @allow (get) Any user, signed in or not, can read a field: `get /fields/edu_123`.
-     * @deny (create) Any client trying to create a new field: `create /fields/new_field`.
-     * @principle Provides public read access to application content while securing it from client modification. Content is managed by a backend service.
-     */
-    match /fields/{fieldId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Publicly readable classifications (genres). Writes are disabled for clients.
-     * @path /classifications/{classificationId}
-     * @allow (get) Any user, signed in or not, can read a classification: `get /classifications/coding_456`.
-     * @deny (update) Any client trying to change a classification's price: `update /classifications/coding_456`.
-     * @principle Provides public read access to application content while securing it from client modification. Content is managed by a backend service.
-     */
-    match /classifications/{classificationId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-    
-    /**
-     * @description Publicly readable courses. Writes are disabled for clients.
-     * @path /courses/{courseId}
-     * @allow (list) Any user, signed in or not, can list all courses: `list /courses`.
-     * @deny (delete) Any client trying to delete a course: `delete /courses/react_789`.
-     * @principle Provides public read access to application content while securing it from client modification. Content is managed by a backend service.
-     */
-    match /courses/{courseId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
 
       /**
-       * @description Publicly readable episodes within a course. Writes are disabled for clients.
-       * @path /courses/{courseId}/episodes/{episodeId}
-       * @allow (get) Any user, signed in or not, can read an episode: `get /courses/react_789/episodes/ep_01`.
-       * @deny (create) Any client trying to add an episode: `create /courses/react_789/episodes/ep_02`.
-       * @principle Provides public read access to application content while securing it from client modification. Content is managed by a backend service.
+       * @description Controls access to a user's subscription records.
+       * @path /users/{userId}/subscriptions/{subscriptionId}
+       * @allow A signed-in user (create)s a subscription for themselves.
+       * @allow A signed-in user (list)s, (get)s, (update)s, or (delete)s their own subscriptions.
+       * @deny A user tries to read or modify another user's subscriptions.
+       * @principle Enforces strict data ownership within a user's private data tree.
        */
-      match /episodes/{episodeId} {
-        allow get: if true;
-        allow list: if true;
-        allow create: if false;
-        allow update: if false;
-        allow delete: if false;
+      match /subscriptions/{subscriptionId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isCreatingOwnSubscription(userId);
+        allow update: if isExistingOwner(userId) && isNotUpdatingImmutableSubscriptionFields();
+        allow delete: if isExistingOwner(userId);
       }
+    }
+
+    /**
+     * @description Controls access to the admin role lookup collection.
+     * @path /roles_admin/{userId}
+     * @allow No client-side operations are permitted.
+     * @deny All read and write operations from any client are denied.
+     * @principle This collection acts as a secure, server-side-only lookup table for the `isAdmin()` function, preventing any client from reading or modifying admin roles.
+     */
+    match /roles_admin/{userId} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Controls access to Fields (top-level content categories).
+     * @path /fields/{fieldId}
+     * @allow Any user, signed-in or not, can (get) or (list) fields.
+     * @allow An admin user can (create), (update), or (delete) a field.
+     * @deny A non-admin user attempts to (create) a new field.
+     * @principle Implements a public-read, admin-write access model for global content.
+     */
+    match /fields/{fieldId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Controls access to Classifications (content genres).
+     * @path /classifications/{classificationId}
+     * @allow Any user, signed-in or not, can (get) or (list) classifications.
+     * @allow An admin user can (create), (update), or (delete) a classification.
+     * @deny A non-admin user attempts to (update) a classification.
+     * @principle Implements a public-read, admin-write access model for global content.
+     */
+    match /classifications/{classificationId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Controls access to Courses (video series).
+     * @path /courses/{courseId}
+     * @allow Any user, signed-in or not, can (get) or (list) courses.
+     * @allow An admin user can (create), (update), or (delete) a course.
+     * @deny A non-admin user attempts to (delete) a course.
+     * @principle Implements a public-read, admin-write access model for global content.
+     */
+    match /courses/{courseId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Controls access to Episodes (individual videos).
+     * @path /episodes/{episodeId}
+     * @allow A user can (get) an episode if it is marked as free, OR if they have an active subscription.
+     * @allow Any user can (list) episodes to browse the catalog.
+     * @allow An admin user can (create), (update), or (delete) an episode.
+     * @deny A non-subscribed, signed-in user tries to (get) a non-free episode.
+     * @principle Implements conditional read access based on subscription status for paid content, while maintaining public catalog visibility and admin-only writes.
+     */
+    match /episodes/{episodeId} {
+      allow get: if canGetEpisode();
+      allow list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Controls access to legal Policies.
+     * @path /policies/{policyId}
+     * @allow Any user, signed-in or not, can (get) or (list) policies.
+     * @allow An admin user can (create), (update), or (delete) a policy.
+     * @deny A non-admin user attempts to (create) a new policy.
+     * @principle Implements a public-read, admin-write access model for legal documents.
+     */
+    match /policies/{policyId} {
+      allow get, list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
   }
 }

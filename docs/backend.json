@@ -15,7 +15,7 @@
           "description": "User's email address.",
           "format": "email"
         },
-        "phoneNumber": {
+        "contact": {
           "type": "string",
           "description": "User's contact phone number."
         },
@@ -24,22 +24,24 @@
           "description": "User's birth date.",
           "format": "date-time"
         },
+        "joinDate": {
+          "type": "string",
+          "description": "The date the user joined the application.",
+          "format": "date-time"
+        },
         "activeSubscriptionIds": {
           "type": "array",
           "description": "References to active Subscriptions. (Relationship: User 1:N Subscription)",
           "items": {
             "type": "string"
           }
-        },
-        "joinDate": {
-          "type": "string",
-          "description": "The date the user joined the application.",
-          "format": "date-time"
         }
       },
       "required": [
         "id",
         "email",
+        "contact",
+        "birthDate",
         "joinDate"
       ]
     },
@@ -47,7 +49,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Field",
       "type": "object",
-      "description": "Represents a top-level category in the LlineStream application (e.g., Education, Movies).",
+      "description": "Represents a top-level category for content (e.g., Education, Movies).",
       "properties": {
         "id": {
           "type": "string",
@@ -64,14 +66,15 @@
       },
       "required": [
         "id",
-        "name"
+        "name",
+        "description"
       ]
     },
     "Classification": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Classification",
       "type": "object",
-      "description": "Represents a subscription category/genre (e.g., Coding, Action) within a Field.",
+      "description": "Represents a genre or category that can be subscribed to (e.g., Coding, Action).",
       "properties": {
         "id": {
           "type": "string",
@@ -89,26 +92,29 @@
           "type": "string",
           "description": "Description of the classification."
         },
-        "monthlySubscriptionPrice": {
+        "monthlySubscriptionFee": {
           "type": "number",
-          "description": "Monthly subscription price for this classification."
+          "description": "Monthly subscription fee for this classification."
         },
-        "dailySubscriptionPrice": {
+        "dailySubscriptionFee": {
           "type": "number",
-          "description": "Daily subscription price for this classification."
+          "description": "Daily subscription fee for this classification."
         }
       },
       "required": [
         "id",
         "fieldId",
-        "name"
+        "name",
+        "description",
+        "monthlySubscriptionFee",
+        "dailySubscriptionFee"
       ]
     },
     "Course": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Course",
       "type": "object",
-      "description": "Represents a video series within a Classification (e.g., React Master Class).",
+      "description": "Represents a video series within a classification (e.g., React Master Class).",
       "properties": {
         "id": {
           "type": "string",
@@ -135,14 +141,16 @@
       "required": [
         "id",
         "classificationId",
-        "name"
+        "name",
+        "description",
+        "thumbnailUrl"
       ]
     },
     "Episode": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Episode",
       "type": "object",
-      "description": "Represents an individual video within a Course.",
+      "description": "Represents an individual video within a course.",
       "properties": {
         "id": {
           "type": "string",
@@ -171,22 +179,55 @@
         },
         "isFree": {
           "type": "boolean",
-          "description": "Indicates if the episode is free to watch."
+          "description": "Indicates whether the episode is free to watch."
         }
       },
       "required": [
         "id",
         "courseId",
         "title",
+        "description",
         "videoUrl",
-        "duration"
+        "duration",
+        "isFree"
+      ]
+    },
+    "Policy": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Policy",
+      "type": "object",
+      "description": "Represents the legal policies of the application (e.g., Terms of Service, Privacy Policy).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Policy entity."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of policy (e.g., termsOfService, privacyPolicy, refundPolicy)."
+        },
+        "content": {
+          "type": "string",
+          "description": "The text content of the policy."
+        },
+        "lastUpdated": {
+          "type": "string",
+          "description": "Date and time the policy was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "content",
+        "lastUpdated"
       ]
     },
     "Subscription": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Subscription",
       "type": "object",
-      "description": "Represents a user's subscription to a specific Classification.",
+      "description": "Represents a user's subscription to a specific classification.",
       "properties": {
         "id": {
           "type": "string",
@@ -210,9 +251,9 @@
           "description": "End date of the subscription.",
           "format": "date-time"
         },
-        "price": {
-          "type": "number",
-          "description": "Price paid for the subscription."
+        "paymentTransactionId": {
+          "type": "string",
+          "description": "Reference to payment transaction id"
         }
       },
       "required": [
@@ -220,8 +261,7 @@
         "userId",
         "classificationId",
         "startDate",
-        "endDate",
-        "price"
+        "endDate"
       ]
     }
   },
@@ -240,11 +280,11 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user profiles. Uses path-based ownership for private user data.",
+          "description": "Stores user profile information. Includes the 'activeSubscriptionIds' array for quick access to active subscriptions. This enables direct access without requiring complex queries. Authorization is based on path ownership (`request.auth.uid == userId`).",
           "params": [
             {
               "name": "userId",
-              "description": "The unique identifier of the user."
+              "description": "The unique identifier for the user."
             }
           ]
         }
@@ -256,11 +296,11 @@
           "schema": {
             "$ref": "#/backend/entities/Field"
           },
-          "description": "Stores top-level categories (e.g., Education, Movies).",
+          "description": "Stores top-level content categories (e.g., Education, Movies). Authorization: Open read access, restricted write access to admins.",
           "params": [
             {
               "name": "fieldId",
-              "description": "The unique identifier of the field."
+              "description": "The unique identifier for the field."
             }
           ]
         }
@@ -272,11 +312,11 @@
           "schema": {
             "$ref": "#/backend/entities/Classification"
           },
-          "description": "Stores subscription categories/genres within a Field.",
+          "description": "Stores content classifications or genres (e.g., Coding, Action). Authorization: Open read access, restricted write access to admins.",
           "params": [
             {
               "name": "classificationId",
-              "description": "The unique identifier of the classification."
+              "description": "The unique identifier for the classification."
             }
           ]
         }
@@ -288,31 +328,43 @@
           "schema": {
             "$ref": "#/backend/entities/Course"
           },
-          "description": "Stores video series within a Classification.",
+          "description": "Stores video series within a classification (e.g., React Master Class). Authorization: Open read access, restricted write access to admins.",
           "params": [
             {
               "name": "courseId",
-              "description": "The unique identifier of the course."
+              "description": "The unique identifier for the course."
             }
           ]
         }
       },
       {
-        "path": "/courses/{courseId}/episodes/{episodeId}",
+        "path": "/episodes/{episodeId}",
         "definition": {
           "entityName": "Episode",
           "schema": {
             "$ref": "#/backend/entities/Episode"
           },
-          "description": "Stores individual videos within a Course.",
+          "description": "Stores individual videos within a course. Authorization: Open read access, restricted write access to admins.  Access to non-free episodes requires a valid subscription, which should be checked in security rules.",
           "params": [
             {
-              "name": "courseId",
-              "description": "The unique identifier of the course."
-            },
-            {
               "name": "episodeId",
-              "description": "The unique identifier of the episode."
+              "description": "The unique identifier for the episode."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/policies/{policyId}",
+        "definition": {
+          "entityName": "Policy",
+          "schema": {
+            "$ref": "#/backend/entities/Policy"
+          },
+          "description": "Stores legal policies (e.g., Terms of Service, Privacy Policy). Authorization: Open read access, restricted write access to admins.",
+          "params": [
+            {
+              "name": "policyId",
+              "description": "The unique identifier for the policy."
             }
           ]
         }
@@ -324,20 +376,36 @@
           "schema": {
             "$ref": "#/backend/entities/Subscription"
           },
-          "description": "Stores user subscriptions to specific Classifications. Uses path-based ownership.",
+          "description": "Stores user subscriptions. Authorization: Only the user can read/write their own subscriptions (`request.auth.uid == userId`).",
           "params": [
             {
               "name": "userId",
-              "description": "The unique identifier of the user."
+              "description": "The unique identifier for the user."
             },
             {
               "name": "subscriptionId",
-              "description": "The unique identifier of the subscription."
+              "description": "The unique identifier for the subscription."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "adminRole",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Collection to store admin users. Document existence indicates admin role.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
             }
           ]
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support LlineStream's video streaming service, focusing on clear authorization and efficient data retrieval. It leverages path-based ownership for user-specific data (subscriptions) and a membership map approach where collaborative access is required. The design ensures authorization independence by denormalizing necessary authorization data, eliminating the need for `get()` calls in security rules and maintaining atomic operations. Segregation is implemented to maintain homogeneous security postures for collections.\n\n*   **Authorization Independence**: The structure avoids hierarchical authorization dependencies by using path-based ownership for user-specific data (subscriptions) and membership maps where collaborative access is required. This denormalization allows security rules to be written without `get()` calls, crucial for atomic operations.\n*   **QAPs (Rules are not Filters)**: The design supports secure `list` operations by segregating data with different access requirements into separate collections. For instance, user-specific data is stored under `/users/{userId}`, allowing simple rules to control access based on the authenticated user's ID.\n*   **DBAC (Database-Based Access Control)**: User roles or group memberships are stored directly within database documents, avoiding reliance on custom claims. This approach simplifies the security rules and makes them more transparent.\n*   **Data Integrity**: The schema enforces invariants like ownership and timestamps through strict naming conventions and explicit field definitions. For instance, `userId` always represents the owner of a subscription."
+    "reasoning": "The Firestore structure is designed to support LlineStream's video streaming and subscription model while adhering to the principles of Authorization Independence, Structural Segregation, Access Modeling, and Data Clarity. Each top-level collection represents a distinct entity type, simplifying security rules and data management.\n\n*   **Authorization Independence:** Denormalization is used extensively to avoid `get()` calls in security rules. For instance, subscription information crucial for content access control is embedded within User documents and potentially duplicated in denormalized copies within content documents if required. Membership Maps (e.g., in hypothetical collaborative playlists) would also denormalize user roles.\n\n*   **Structural Segregation:**  The structure separates different types of data into distinct collections based on their access control needs. User-specific data resides under `/users/{userId}`, while global content like `/fields`, `/classifications`, `/courses`, and `/episodes` are placed in separate top-level collections.  This segregation is critical for QAPs because it allows secure listing of content (e.g., listing all Courses) without exposing private user data.\n\n*   **Access Modeling:** Path-based ownership is used for user-specific data (`/users/{userId}/subscriptions`). Global roles (admin) would be managed through a dedicated collection (e.g., `/roles_admin/{userId}`). The Subscription documents directly under users enable easy querying of a user's active subscriptions.\n\n*   **Data Clarity and Predictability:** Explicit state modeling using a `status` field (if needed, e.g., for courses) is recommended. Semantic naming conventions are used for all paths and parameters.\n\nThis structure facilitates robust security rules because access control can be based directly on the path and the contents of the document being accessed, without needing to fetch related documents. It also supports the required QAPs by enabling secure listing of content and efficient querying of user-specific data."
   }
 }
