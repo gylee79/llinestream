@@ -72,6 +72,7 @@ export default function AdminUsersPage() {
                 <TableRow>
                   <TableHead>이름</TableHead>
                   <TableHead>이메일</TableHead>
+                  <TableHead>연락처</TableHead>
                   <TableHead>역할</TableHead>
                   <TableHead>가입일</TableHead>
                   <TableHead>활성 구독</TableHead>
@@ -83,7 +84,7 @@ export default function AdminUsersPage() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={7}>
+                      <TableCell colSpan={8}>
                         <Skeleton className="h-8 w-full" />
                       </TableCell>
                     </TableRow>
@@ -93,6 +94,7 @@ export default function AdminUsersPage() {
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.name || 'N/A'}</TableCell>
                       <TableCell>{user.email}</TableCell>
+                      <TableCell>{user.phone}</TableCell>
                       <TableCell>
                         <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
                           {user.role}
@@ -118,5 +120,3 @@ export default function AdminUsersPage() {
     </>
   );
 }
-
-    

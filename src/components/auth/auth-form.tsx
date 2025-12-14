@@ -83,7 +83,7 @@ export default function AuthForm() {
         email: values.email,
         phone: values.phone,
         dob: values.dob,
-        role: 'user', // Default role for new users
+        role: 'user',
         activeSubscriptions: {},
         createdAt: Timestamp.now(),
       };
@@ -97,6 +97,18 @@ export default function AuthForm() {
 {
       toast({ variant: 'destructive', title: '회원가입 실패', description: error.message });
     }
+  };
+  
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>, field: any) => {
+    const value = e.target.value.replace(/\D/g, '');
+    let formattedValue = value;
+
+    if (value.length > 3 && value.length <= 7) {
+      formattedValue = `${value.slice(0, 3)}-${value.slice(3)}`;
+    } else if (value.length > 7) {
+      formattedValue = `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7, 11)}`;
+    }
+    field.onChange(formattedValue);
   };
 
   return (
@@ -207,7 +219,11 @@ export default function AuthForm() {
                     <FormItem>
                       <FormLabel>연락처</FormLabel>
                       <FormControl>
-                        <Input placeholder="010-1234-5678" {...field} />
+                        <Input 
+                            placeholder="010-1234-5678" 
+                            {...field}
+                            onChange={(e) => handlePhoneChange(e, field)}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -237,5 +253,3 @@ export default function AuthForm() {
     </Tabs>
   );
 }
-
-    
