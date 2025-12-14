@@ -18,6 +18,7 @@ import { UserDetailsDialog } from '@/components/admin/users/user-details-dialog'
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 
 export default function AdminUsersPage() {
   const firestore = useFirestore();
@@ -71,8 +72,8 @@ export default function AdminUsersPage() {
                 <TableRow>
                   <TableHead>이름</TableHead>
                   <TableHead>이메일</TableHead>
+                  <TableHead>역할</TableHead>
                   <TableHead>가입일</TableHead>
-                  <TableHead>연락처</TableHead>
                   <TableHead>활성 구독</TableHead>
                   <TableHead>최종 만료일</TableHead>
                   <TableHead className="text-right">관리</TableHead>
@@ -80,18 +81,24 @@ export default function AdminUsersPage() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7}>
-                      <Skeleton className="h-8 w-full" />
-                    </TableCell>
-                  </TableRow>
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell colSpan={7}>
+                        <Skeleton className="h-8 w-full" />
+                      </TableCell>
+                    </TableRow>
+                  ))
                 ) : (
                   users?.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.name || 'N/A'}</TableCell>
                       <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                          {user.role}
+                        </Badge>
+                      </TableCell>
                       <TableCell>{user.createdAt?.toDate().toLocaleDateString() || 'N/A'}</TableCell>
-                      <TableCell>{user.phone || 'N/A'}</TableCell>
                       <TableCell>{getActiveSubscriptions(user)}</TableCell>
                       <TableCell>{getFinalExpiry(user)}</TableCell>
                       <TableCell className="text-right">
@@ -111,3 +118,5 @@ export default function AdminUsersPage() {
     </>
   );
 }
+
+    

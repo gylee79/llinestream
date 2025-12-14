@@ -2,16 +2,17 @@ import { Timestamp } from 'firebase/firestore';
 
 export interface User {
   id: string;
-  name?: string;
+  name: string;
   email: string;
-  phone?: string;
-  dob?: string; // Date of Birth
+  phone: string;
+  dob: string; // Date of Birth YYYY-MM-DD
+  role: 'user' | 'admin';
   activeSubscriptions?: {
     [classificationId: string]: {
       expiresAt: Timestamp;
     };
   };
-  createdAt?: Timestamp;
+  createdAt: Timestamp;
 }
 
 export interface Field {
@@ -56,3 +57,17 @@ export interface Policy {
   title: string;
   content: string;
 }
+
+export interface Subscription {
+    id: string; // Should be the same as classificationId for easy lookup
+    userId: string;
+    classificationId: string;
+    purchasedAt: Timestamp;
+    expiresAt: Timestamp;
+}
+
+export interface AdminRole {
+    assignedAt: Timestamp;
+}
+
+    

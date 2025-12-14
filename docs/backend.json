@@ -10,39 +10,42 @@
           "type": "string",
           "description": "Unique identifier for the User entity."
         },
+        "name": {
+          "type": "string",
+          "description": "User's full name."
+        },
         "email": {
           "type": "string",
           "description": "User's email address.",
           "format": "email"
         },
-        "contact": {
+        "phone": {
           "type": "string",
-          "description": "User's contact phone number."
+          "description": "User's contact phone number in 010-XXXX-XXXX format."
         },
-        "birthDate": {
+        "dob": {
           "type": "string",
-          "description": "User's birth date.",
-          "format": "date-time"
+          "description": "User's birth date in YYYY-MM-DD format."
         },
-        "joinDate": {
+        "createdAt": {
           "type": "string",
           "description": "The date the user joined the application.",
           "format": "date-time"
         },
-        "activeSubscriptionIds": {
-          "type": "array",
-          "description": "References to active Subscriptions. (Relationship: User 1:N Subscription)",
-          "items": {
-            "type": "string"
-          }
+        "role": {
+          "type": "string",
+          "description": "The role of the user.",
+          "enum": ["user", "admin"]
         }
       },
       "required": [
         "id",
+        "name",
         "email",
-        "contact",
-        "birthDate",
-        "joinDate"
+        "phone",
+        "dob",
+        "createdAt",
+        "role"
       ]
     },
     "Field": {
@@ -58,16 +61,11 @@
         "name": {
           "type": "string",
           "description": "Name of the field (e.g., Education)."
-        },
-        "description": {
-          "type": "string",
-          "description": "Description of the field."
         }
       },
       "required": [
         "id",
-        "name",
-        "description"
+        "name"
       ]
     },
     "Classification": {
@@ -92,13 +90,15 @@
           "type": "string",
           "description": "Description of the classification."
         },
-        "monthlySubscriptionFee": {
-          "type": "number",
-          "description": "Monthly subscription fee for this classification."
-        },
-        "dailySubscriptionFee": {
-          "type": "number",
-          "description": "Daily subscription fee for this classification."
+        "prices": {
+          "type": "object",
+          "description": "Price map for different subscription durations.",
+          "properties": {
+            "day1": { "type": "number" },
+            "day30": { "type": "number" },
+            "day60": { "type": "number" },
+            "day90": { "type": "number" }
+          }
         }
       },
       "required": [
@@ -106,8 +106,7 @@
         "fieldId",
         "name",
         "description",
-        "monthlySubscriptionFee",
-        "dailySubscriptionFee"
+        "prices"
       ]
     },
     "Course": {
@@ -136,6 +135,10 @@
           "type": "string",
           "description": "URL of the course thumbnail image.",
           "format": "uri"
+        },
+        "thumbnailHint": {
+          "type": "string",
+          "description": "Hint for AI to find a relevant image."
         }
       },
       "required": [
@@ -143,7 +146,8 @@
         "classificationId",
         "name",
         "description",
-        "thumbnailUrl"
+        "thumbnailUrl",
+        "thumbnailHint"
       ]
     },
     "Episode": {
@@ -164,15 +168,6 @@
           "type": "string",
           "description": "Title of the episode."
         },
-        "description": {
-          "type": "string",
-          "description": "Description of the episode."
-        },
-        "videoUrl": {
-          "type": "string",
-          "description": "URL of the video file.",
-          "format": "uri"
-        },
         "duration": {
           "type": "number",
           "description": "Duration of the episode in seconds."
@@ -180,16 +175,20 @@
         "isFree": {
           "type": "boolean",
           "description": "Indicates whether the episode is free to watch."
+        },
+        "videoUrl": {
+          "type": "string",
+          "description": "URL of the video file.",
+          "format": "uri"
         }
       },
       "required": [
         "id",
         "courseId",
         "title",
-        "description",
-        "videoUrl",
         "duration",
-        "isFree"
+        "isFree",
+        "videoUrl"
       ]
     },
     "Policy": {
@@ -202,25 +201,24 @@
           "type": "string",
           "description": "Unique identifier for the Policy entity."
         },
-        "type": {
+        "slug": {
           "type": "string",
-          "description": "Type of policy (e.g., termsOfService, privacyPolicy, refundPolicy)."
+          "enum": ["terms", "privacy", "refund"]
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the policy."
         },
         "content": {
           "type": "string",
           "description": "The text content of the policy."
-        },
-        "lastUpdated": {
-          "type": "string",
-          "description": "Date and time the policy was last updated.",
-          "format": "date-time"
         }
       },
       "required": [
         "id",
-        "type",
-        "content",
-        "lastUpdated"
+        "slug",
+        "title",
+        "content"
       ]
     },
     "Subscription": {
@@ -241,34 +239,43 @@
           "type": "string",
           "description": "Reference to Classification. (Relationship: Classification 1:N Subscription)"
         },
-        "startDate": {
-          "type": "string",
-          "description": "Start date of the subscription.",
-          "format": "date-time"
-        },
-        "endDate": {
+        "expiresAt": {
           "type": "string",
           "description": "End date of the subscription.",
           "format": "date-time"
         },
-        "paymentTransactionId": {
-          "type": "string",
-          "description": "Reference to payment transaction id"
+        "purchasedAt": {
+            "type": "string",
+            "description": "Start date of the subscription.",
+            "format": "date-time"
         }
       },
       "required": [
         "id",
         "userId",
         "classificationId",
-        "startDate",
-        "endDate"
+        "purchasedAt",
+        "expiresAt"
       ]
+    },
+    "AdminRole": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "AdminRole",
+        "type": "object",
+        "description": "Defines an admin user. The document ID is the user's UID.",
+        "properties": {
+            "assignedAt": {
+                "type": "string",
+                "description": "The date the admin role was assigned.",
+                "format": "date-time"
+            }
+        },
+        "required": ["assignedAt"]
     }
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous"
+      "password"
     ]
   },
   "firestore": {
@@ -278,9 +285,9 @@
         "definition": {
           "entityName": "User",
           "schema": {
-            "$ref": "#/backend/entities/User"
+            "$ref": "#/entities/User"
           },
-          "description": "Stores user profile information. Includes the 'activeSubscriptionIds' array for quick access to active subscriptions. This enables direct access without requiring complex queries. Authorization is based on path ownership (`request.auth.uid == userId`).",
+          "description": "Stores user profile information. Authorization is based on path ownership (`request.auth.uid == userId`) or admin role.",
           "params": [
             {
               "name": "userId",
@@ -294,7 +301,7 @@
         "definition": {
           "entityName": "Field",
           "schema": {
-            "$ref": "#/backend/entities/Field"
+            "$ref": "#/entities/Field"
           },
           "description": "Stores top-level content categories (e.g., Education, Movies). Authorization: Open read access, restricted write access to admins.",
           "params": [
@@ -310,7 +317,7 @@
         "definition": {
           "entityName": "Classification",
           "schema": {
-            "$ref": "#/backend/entities/Classification"
+            "$ref": "#/entities/Classification"
           },
           "description": "Stores content classifications or genres (e.g., Coding, Action). Authorization: Open read access, restricted write access to admins.",
           "params": [
@@ -326,7 +333,7 @@
         "definition": {
           "entityName": "Course",
           "schema": {
-            "$ref": "#/backend/entities/Course"
+            "$ref": "#/entities/Course"
           },
           "description": "Stores video series within a classification (e.g., React Master Class). Authorization: Open read access, restricted write access to admins.",
           "params": [
@@ -335,30 +342,29 @@
               "description": "The unique identifier for the course."
             }
           ]
-        }
-      },
-      {
-        "path": "/episodes/{episodeId}",
-        "definition": {
-          "entityName": "Episode",
-          "schema": {
-            "$ref": "#/backend/entities/Episode"
-          },
-          "description": "Stores individual videos within a course. Authorization: Open read access, restricted write access to admins.  Access to non-free episodes requires a valid subscription, which should be checked in security rules.",
-          "params": [
-            {
-              "name": "episodeId",
-              "description": "The unique identifier for the episode."
+        },
+        "subcollections": [
+          {
+            "path": "/episodes/{episodeId}",
+            "definition": {
+              "entityName": "Episode",
+              "schema": {
+                "$ref": "#/entities/Episode"
+              },
+              "description": "Stores individual videos within a course. Authorization: Read access requires subscription, write access for admins.",
+              "params": [
+                { "name": "episodeId", "description": "The unique identifier for the episode." }
+              ]
             }
-          ]
-        }
+          }
+        ]
       },
       {
         "path": "/policies/{policyId}",
         "definition": {
           "entityName": "Policy",
           "schema": {
-            "$ref": "#/backend/entities/Policy"
+            "$ref": "#/entities/Policy"
           },
           "description": "Stores legal policies (e.g., Terms of Service, Privacy Policy). Authorization: Open read access, restricted write access to admins.",
           "params": [
@@ -374,7 +380,7 @@
         "definition": {
           "entityName": "Subscription",
           "schema": {
-            "$ref": "#/backend/entities/Subscription"
+            "$ref": "#/entities/Subscription"
           },
           "description": "Stores user subscriptions. Authorization: Only the user can read/write their own subscriptions (`request.auth.uid == userId`).",
           "params": [
@@ -392,11 +398,11 @@
       {
         "path": "/roles_admin/{userId}",
         "definition": {
-          "entityName": "adminRole",
+          "entityName": "AdminRole",
           "schema": {
-            "$ref": "#/backend/entities/User"
+            "$ref": "#/entities/AdminRole"
           },
-          "description": "Collection to store admin users. Document existence indicates admin role.",
+          "description": "Collection to store admin users. Document existence indicates admin role. This collection should be read-only for all clients and only managed from the server or Firebase Console.",
           "params": [
             {
               "name": "userId",
@@ -406,6 +412,8 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support LlineStream's video streaming and subscription model while adhering to the principles of Authorization Independence, Structural Segregation, Access Modeling, and Data Clarity. Each top-level collection represents a distinct entity type, simplifying security rules and data management.\n\n*   **Authorization Independence:** Denormalization is used extensively to avoid `get()` calls in security rules. For instance, subscription information crucial for content access control is embedded within User documents and potentially duplicated in denormalized copies within content documents if required. Membership Maps (e.g., in hypothetical collaborative playlists) would also denormalize user roles.\n\n*   **Structural Segregation:**  The structure separates different types of data into distinct collections based on their access control needs. User-specific data resides under `/users/{userId}`, while global content like `/fields`, `/classifications`, `/courses`, and `/episodes` are placed in separate top-level collections.  This segregation is critical for QAPs because it allows secure listing of content (e.g., listing all Courses) without exposing private user data.\n\n*   **Access Modeling:** Path-based ownership is used for user-specific data (`/users/{userId}/subscriptions`). Global roles (admin) would be managed through a dedicated collection (e.g., `/roles_admin/{userId}`). The Subscription documents directly under users enable easy querying of a user's active subscriptions.\n\n*   **Data Clarity and Predictability:** Explicit state modeling using a `status` field (if needed, e.g., for courses) is recommended. Semantic naming conventions are used for all paths and parameters.\n\nThis structure facilitates robust security rules because access control can be based directly on the path and the contents of the document being accessed, without needing to fetch related documents. It also supports the required QAPs by enabling secure listing of content and efficient querying of user-specific data."
+    "reasoning": "The Firestore structure is designed to support LlineStream's video streaming and subscription model. User roles are managed via the `roles_admin` collection for secure and efficient admin checks in security rules. User data is self-contained. Content is structured hierarchically (Field -> Classification -> Course -> Episode) for easy browsing and management. Subscriptions are stored under each user to easily query a user's entitlements."
   }
 }
+
+    

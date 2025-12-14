@@ -1,7 +1,7 @@
 'use server';
 
 import { writeBatch, collection, doc } from 'firebase/firestore';
-import { fields, classifications, courses, episodes } from '@/lib/data';
+import { fields, classifications, courses, episodes, users, subscriptions, adminRoles } from '@/lib/data';
 import { getSdks } from '@/firebase';
 import { initializeApp, getApps } from 'firebase/app';
 import { firebaseConfig } from '@/firebase/config';
@@ -20,6 +20,20 @@ export async function uploadMockData() {
   const batch = writeBatch(firestore);
 
   try {
+    // Upload Users
+    console.log(`Uploading ${users.length} users...`);
+    users.forEach((item) => {
+        const docRef = doc(firestore, 'users', item.id);
+        batch.set(docRef, item);
+    });
+
+    // Upload Admin Roles
+    console.log(`Uploading ${adminRoles.length} admin roles...`);
+    adminRoles.forEach((item) => {
+        const docRef = doc(firestore, 'roles_admin', item.userId);
+        batch.set(docRef, item.data);
+    });
+
     // Upload Fields
     console.log(`Uploading ${fields.length} fields...`);
     fields.forEach((item) => {
@@ -41,12 +55,27 @@ export async function uploadMockData() {
       batch.set(docRef, item);
     });
 
-    // Upload Episodes
+    // Upload Episodes as subcollections
     console.log(`Uploading ${episodes.length} episodes...`);
     episodes.forEach((item) => {
-      const courseCollectionRef = collection(firestore, 'courses', item.courseId, 'episodes');
-      const docRef = doc(courseCollectionRef, item.id);
-      batch.set(docRef, item);
+      const episodeRef = doc(collection(firestore, 'courses', item.courseId, 'episodes'), item.id);
+      batch.set(episodeRef, item);
+    });
+
+    // Upload Subscriptions as subcollections
+    console.log(`Uploading ${subscriptions.length} subscriptions...`);
+    subscriptions.forEach((item) => {
+      // The subscription ID is the classification ID for easy lookup
+      const subRef = doc(collection(firestore, 'users', item.userId, 'subscriptions'), item.id);
+      batch.set(subRef, item);
+      
+      // Also update the denormalized activeSubscriptions map on the user document
+      const userRef = doc(firestore, 'users', item.userId);
+      batch.update(userRef, {
+        [`activeSubscriptions.${item.classificationId}`]: {
+            expiresAt: item.expiresAt
+        }
+      });
     });
     
     await batch.commit();
@@ -61,3 +90,5 @@ export async function uploadMockData() {
     return { success: false, message: 'An unknown error occurred during upload.' };
   }
 }
+
+    

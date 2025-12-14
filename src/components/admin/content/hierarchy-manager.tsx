@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import type { Field, Classification, Course } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where, doc } from 'firebase/firestore';
-import { addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -15,7 +15,7 @@ const Column = ({ title, items, selectedId, onSelect, onAdd, onEdit, onDelete, i
   title: string;
   items: { id: string, name: string }[] | null;
   selectedId: string | null;
-  onSelect: (id: string) => void;
+  onSelect: (id: string | null) => void;
   onAdd: () => void;
   onEdit: (id: string, name: string) => void;
   onDelete: (id: string) => void;
@@ -75,8 +75,22 @@ export default function HierarchyManager() {
     [firestore, selectedClassification]
   );
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
+  
+  // When fields are reloaded, if the selected field is no longer present, reset the selection
+  useEffect(() => {
+    if (fields && selectedField && !fields.find(f => f.id === selectedField)) {
+        setSelectedField(null);
+    }
+  }, [fields, selectedField]);
 
-  const handleSelectField = (id: string) => {
+  useEffect(() => {
+    if (classifications && selectedClassification && !classifications.find(c => c.id === selectedClassification)) {
+        setSelectedClassification(null);
+    }
+  }, [classifications, selectedClassification]);
+
+
+  const handleSelectField = (id: string | null) => {
     setSelectedField(id);
     setSelectedClassification(null);
   };
@@ -97,6 +111,7 @@ export default function HierarchyManager() {
         }
         collectionName = 'classifications';
         data.fieldId = selectedField;
+        data.description = "새로운 분류 설명";
         data.prices = { day1: 0, day30: 0, day60: 0, day90: 0 };
     } else if (type === '상세분류') {
         if (!selectedClassification) {
@@ -105,6 +120,7 @@ export default function HierarchyManager() {
         }
         collectionName = 'courses';
         data.classificationId = selectedClassification;
+        data.description = "새로운 상세분류 설명";
         data.thumbnailUrl = `https://picsum.photos/seed/${Math.random()}/600/400`;
         data.thumbnailHint = 'placeholder image';
     }
@@ -115,18 +131,19 @@ export default function HierarchyManager() {
     }
   };
 
-  const handleDelete = (type: string, id: string) => {
-    if (!confirm(`정말로 '${type}' 항목을 삭제하시겠습니까?`)) return;
+  const handleDelete = (type: string, collectionName: 'fields' | 'classifications' | 'courses', id: string) => {
+    if (!confirm(`정말로 '${type}' 항목을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
 
-    let collectionName = '';
-    if (type === '분야') collectionName = 'fields';
-    else if (type === '큰분류') collectionName = 'classifications';
-    else if (type === '상세분류') collectionName = 'courses';
+    deleteDocumentNonBlocking(doc(firestore, collectionName, id));
 
-    if(collectionName){
-        deleteDocumentNonBlocking(doc(firestore, collectionName, id));
-        toast({ title: '성공', description: `${type} 항목이 삭제되었습니다.` });
+    if (collectionName === 'fields' && selectedField === id) {
+        setSelectedField(null);
     }
+    if (collectionName === 'classifications' && selectedClassification === id) {
+        setSelectedClassification(null);
+    }
+
+    toast({ title: '성공', description: `${type} 항목이 삭제되었습니다.` });
   };
   
   const handleEdit = (type: string, id: string, currentName: string) => {
@@ -148,7 +165,7 @@ export default function HierarchyManager() {
             onSelect={handleSelectField}
             onAdd={() => handleAdd('분야')}
             onEdit={(id, name) => handleEdit('분야', id, name)}
-            onDelete={(id) => handleDelete('분야', id)}
+            onDelete={(id) => handleDelete('분야', 'fields', id)}
             isLoading={fieldsLoading}
           />
           <Column
@@ -158,7 +175,7 @@ export default function HierarchyManager() {
             onSelect={setSelectedClassification}
             onAdd={() => handleAdd('큰분류')}
             onEdit={(id, name) => handleEdit('큰분류', id, name)}
-            onDelete={(id) => handleDelete('큰분류', id)}
+            onDelete={(id) => handleDelete('큰분류', 'classifications', id)}
             isLoading={!selectedField || classificationsLoading}
           />
           <Column
@@ -168,7 +185,7 @@ export default function HierarchyManager() {
             onSelect={() => {}}
             onAdd={() => handleAdd('상세분류')}
             onEdit={(id, name) => handleEdit('상세분류', id, name)}
-            onDelete={(id) => handleDelete('상세분류', id)}
+            onDelete={(id) => handleDelete('상세분류', 'courses', id)}
             isLoading={!selectedClassification || coursesLoading}
           />
         </div>
@@ -176,3 +193,5 @@ export default function HierarchyManager() {
     </Card>
   );
 }
+
+    

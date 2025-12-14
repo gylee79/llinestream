@@ -37,9 +37,9 @@ const registerSchema = z.object({
   name: z.string().min(2, { message: '이름은 2자 이상이어야 합니다.'}),
   email: z.string().email({ message: '유효한 이메일을 입력해주세요.' }),
   password: z.string().min(8, { message: '비밀번호는 8자 이상이어야 합니다.' }),
-  phone: z.string().min(10, { message: '유효한 연락처를 입력해주세요.' }),
-  dob: z.string().refine((val) => !isNaN(Date.parse(val)), {
-    message: '유효한 생년월일을 입력해주세요. (YYYY-MM-DD)',
+  phone: z.string().regex(/^\d{3}-\d{3,4}-\d{4}$/, { message: '전화번호 형식을 확인해주세요. (010-XXXX-XXXX)' }),
+  dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
+    message: '생년월일 형식을 확인해주세요. (YYYY-MM-DD)',
   }),
 });
 
@@ -76,7 +76,6 @@ export default function AuthForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
-      // Create user document in Firestore
       const userRef = doc(firestore, 'users', user.uid);
       const newUser = {
         id: user.uid,
@@ -84,11 +83,11 @@ export default function AuthForm() {
         email: values.email,
         phone: values.phone,
         dob: values.dob,
+        role: 'user', // Default role for new users
         activeSubscriptions: {},
         createdAt: Timestamp.now(),
       };
       
-      // Use the non-blocking function to set the document, ensuring it's a new doc.
       setDocumentNonBlocking(userRef, newUser, { merge: false });
 
       toast({ title: '회원가입 성공', description: '로그인 탭에서 로그인해주세요.' });
@@ -238,3 +237,5 @@ export default function AuthForm() {
     </Tabs>
   );
 }
+
+    
