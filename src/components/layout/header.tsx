@@ -11,6 +11,7 @@ import {
   Clapperboard,
   Menu,
   Shield,
+  X,
 } from 'lucide-react';
 
 import { LlineStreamLogo } from '@/components/icons';
@@ -30,6 +31,8 @@ import {
   SheetContent,
   SheetTrigger,
   SheetClose,
+  SheetHeader,
+  SheetTitle,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@/firebase';
@@ -83,19 +86,25 @@ export default function Header() {
                 <span className="sr-only">Toggle Navigation</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left">
-              <nav className="grid gap-6 text-lg font-medium mt-8">
-                {navLinks.map((link) => (
-                  <SheetClose asChild key={link.href}>
-                    <NavLink {...link} isMobile />
-                  </SheetClose>
-                ))}
-                {isAdmin && (
-                  <SheetClose asChild>
-                    <NavLink {...adminLink} isMobile />
-                  </SheetClose>
-                )}
-              </nav>
+            <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm">
+                <SheetHeader className="border-b pb-4">
+                    <SheetTitle className="sr-only">메뉴</SheetTitle>
+                    <Link href="/" className="self-start">
+                        <LlineStreamLogo className="h-6 w-auto" />
+                    </Link>
+                </SheetHeader>
+                <nav className="grid gap-4 py-6 text-lg font-medium">
+                    {navLinks.map((link) => (
+                    <SheetClose asChild key={link.href}>
+                        <NavLink {...link} isMobile />
+                    </SheetClose>
+                    ))}
+                    {isAdmin && (
+                    <SheetClose asChild>
+                        <NavLink {...adminLink} isMobile />
+                    </SheetClose>
+                    )}
+                </nav>
             </SheetContent>
           </Sheet>
         </div>
