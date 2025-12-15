@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -23,16 +23,25 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
-import { collection, query, where, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, doc, setDoc, Timestamp } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { v4 as uuidv4 } from 'uuid';
+import { Separator } from '@/components/ui/separator';
+import { PlusCircle } from 'lucide-react';
+import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
 
 interface VideoUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+type DialogState = {
+  isOpen: boolean;
+  item: HierarchyItem | null;
+  type: '분야' | '큰분류' | '상세분류';
+};
 
 export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDialogProps) {
   const firestore = useFirestore();
@@ -49,6 +58,9 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
   const [selectedClassification, setSelectedClassification] = useState<string | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+
+  const [hierarchyDialogState, setHierarchyDialogState] = useState<DialogState>({ isOpen: false, item: null, type: '분야' });
+  const [isPending, startTransition] = useTransition();
 
   const fieldsQuery = useMemoFirebase(() => collection(firestore, 'fields'), [firestore]);
   const { data: fields } = useCollection<Field>(fieldsQuery);
@@ -164,6 +176,50 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     }
   };
 
+  const openHierarchyDialog = (type: DialogState['type']) => {
+    if ((type === '큰분류' && !selectedField) || (type === '상세분류' && !selectedClassification)) {
+      toast({ variant: 'destructive', title: '오류', description: '상위 계층을 먼저 선택해주세요.' });
+      return;
+    }
+    setHierarchyDialogState({ isOpen: true, item: null, type });
+  };
+  const closeHierarchyDialog = () => setHierarchyDialogState({ isOpen: false, item: null, type: '분야' });
+
+  const handleSaveHierarchy = async (item: HierarchyItem) => {
+    const { type } = hierarchyDialogState;
+    const newId = uuidv4();
+    let collectionName = '';
+    let data: any = { id: newId, name: item.name, createdAt: Timestamp.now() };
+
+    if (type === '분야') {
+        collectionName = 'fields';
+    } else if (type === '큰분류') {
+        collectionName = 'classifications';
+        data.fieldId = selectedField;
+        data.description = "새로운 분류 설명";
+        data.prices = { day1: 0, day30: 0, day60: 0, day90: 0 };
+    } else if (type === '상세분류') {
+        collectionName = 'courses';
+        data.classificationId = selectedClassification;
+        data.description = "새로운 상세분류 설명";
+        data.thumbnailUrl = `https://picsum.photos/seed/${newId}/600/400`;
+        data.thumbnailHint = 'placeholder image';
+    }
+    
+    if (collectionName) {
+        const docRef = doc(firestore, collectionName, newId);
+        await setDoc(docRef, data);
+        toast({ title: '성공', description: `${type} '${item.name}'이(가) 추가되었습니다.` });
+
+        startTransition(() => {
+          if (type === '분야') setSelectedField(newId);
+          if (type === '큰분류') setSelectedClassification(newId);
+          if (type === '상세분류') setSelectedCourseId(newId);
+        });
+    }
+    closeHierarchyDialog();
+  };
+
   useEffect(() => {
     if (!open) {
       resetForm();
@@ -171,81 +227,110 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
   }, [open]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[625px]">
-        <DialogHeader>
-          <DialogTitle className="font-headline">비디오 업로드</DialogTitle>
-          <DialogDescription>
-            새 에피소드를 추가하거나 기존 에피소드를 수정합니다.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="title" className="text-right">제목</Label>
-            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" disabled={isUploading} />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="description" className="text-right">설명</Label>
-            <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" disabled={isUploading} />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label className="text-right">분류</Label>
-            <div className="col-span-3 grid grid-cols-3 gap-2 items-center">
-              <Select value={selectedField || ''} onValueChange={(v) => { setSelectedField(v); setSelectedClassification(null); setSelectedCourseId(null); }} disabled={isUploading}>
-                <SelectTrigger><SelectValue placeholder="분야" /></SelectTrigger>
-                <SelectContent>{fields?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
-              </Select>
-              <Select value={selectedClassification || ''} onValueChange={(v) => { setSelectedClassification(v); setSelectedCourseId(null); }} disabled={!selectedField || isUploading}>
-                <SelectTrigger><SelectValue placeholder="큰분류" /></SelectTrigger>
-                <SelectContent>{classifications?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-              </Select>
-              <Select value={selectedCourseId || ''} onValueChange={setSelectedCourseId} disabled={!selectedClassification || isUploading}>
-                <SelectTrigger><SelectValue placeholder="상세분류" /></SelectTrigger>
-                <SelectContent>{courses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-              </Select>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[625px]">
+          <DialogHeader>
+            <DialogTitle className="font-headline">비디오 업로드</DialogTitle>
+            <DialogDescription>
+              새 에피소드를 추가하거나 기존 에피소드를 수정합니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="title" className="text-right">제목</Label>
+              <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" disabled={isUploading} />
             </div>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <div />
-            <div className="col-span-3 flex items-center space-x-2">
-                <Checkbox id="isFree" checked={isFree} onCheckedChange={(checked) => setIsFree(!!checked)} disabled={isUploading} />
-                <Label htmlFor="isFree">무료 콘텐츠</Label>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="description" className="text-right pt-2">설명</Label>
+              <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" disabled={isUploading} />
             </div>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="video-file" className="text-right">비디오 파일</Label>
-            <Input 
-                id="video-file" 
-                type="file" 
-                className="col-span-3" 
-                onChange={(e) => setVideoFile(e.target.files ? e.target.files[0] : null)}
-                accept="video/*"
-                disabled={isUploading}
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="thumbnail-file" className="text-right">썸네일</Label>
-            <div className="col-span-3 flex items-center gap-2">
-                <Input id="thumbnail-file" type="file" disabled={isUploading} accept="image/*" />
-                <Button variant="secondary" size="sm" disabled={isUploading}>AI 생성</Button>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">분류</Label>
+              <div className="col-span-3 grid grid-cols-3 gap-2 items-center">
+                <Select value={selectedField || ''} onValueChange={(v) => { setSelectedField(v); setSelectedClassification(null); setSelectedCourseId(null); }} disabled={isUploading}>
+                  <SelectTrigger><SelectValue placeholder="분야" /></SelectTrigger>
+                  <SelectContent>
+                    {fields?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                    <Separator className="my-1" />
+                    <Button variant="ghost" className="w-full justify-start h-8 px-2" onClick={() => openHierarchyDialog('분야')}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> 새로 추가...
+                    </Button>
+                  </SelectContent>
+                </Select>
+                <Select value={selectedClassification || ''} onValueChange={(v) => { setSelectedClassification(v); setSelectedCourseId(null); }} disabled={!selectedField || isUploading}>
+                  <SelectTrigger><SelectValue placeholder="큰분류" /></SelectTrigger>
+                  <SelectContent>
+                    {classifications?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    <Separator className="my-1" />
+                    <Button variant="ghost" className="w-full justify-start h-8 px-2" onClick={() => openHierarchyDialog('큰분류')} disabled={!selectedField}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> 새로 추가...
+                    </Button>
+                  </SelectContent>
+                </Select>
+                <Select value={selectedCourseId || ''} onValueChange={setSelectedCourseId} disabled={!selectedClassification || isUploading}>
+                  <SelectTrigger><SelectValue placeholder="상세분류" /></SelectTrigger>
+                  <SelectContent>
+                    {courses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    <Separator className="my-1" />
+                    <Button variant="ghost" className="w-full justify-start h-8 px-2" onClick={() => openHierarchyDialog('상세분류')} disabled={!selectedClassification}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> 새로 추가...
+                    </Button>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
-          {isUploading && (
-            <div className="col-span-4 mt-2">
-              <Progress value={uploadProgress} />
-              <p className="text-sm text-center text-muted-foreground mt-2">
-                {uploadProgress < 100 ? `업로드 중... ${uploadProgress.toFixed(0)}%` : '업로드 완료, 처리 중...'}
-              </p>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <div />
+              <div className="col-span-3 flex items-center space-x-2">
+                  <Checkbox id="isFree" checked={isFree} onCheckedChange={(checked) => setIsFree(!!checked)} disabled={isUploading} />
+                  <Label htmlFor="isFree">무료 콘텐츠</Label>
+              </div>
             </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isUploading}>취소</Button>
-          <Button type="button" onClick={handleSaveEpisode} disabled={isUploading || !videoFile || !selectedCourseId}>
-            {isUploading ? '저장 중...' : '에피소드 저장'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="video-file" className="text-right">비디오 파일</Label>
+              <Input 
+                  id="video-file" 
+                  type="file" 
+                  className="col-span-3" 
+                  onChange={(e) => setVideoFile(e.target.files ? e.target.files[0] : null)}
+                  accept="video/*"
+                  disabled={isUploading}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="thumbnail-file" className="text-right">썸네일</Label>
+              <div className="col-span-3 flex items-center gap-2">
+                  <Input id="thumbnail-file" type="file" disabled={isUploading} accept="image/*" />
+                  <Button variant="secondary" size="sm" disabled={isUploading}>AI 생성</Button>
+              </div>
+            </div>
+            {isUploading && (
+              <div className="col-span-full mt-2">
+                <Progress value={uploadProgress} />
+                <p className="text-sm text-center text-muted-foreground mt-2">
+                  {uploadProgress < 100 ? `업로드 중... ${uploadProgress.toFixed(0)}%` : '업로드 완료, 처리 중...'}
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isUploading}>취소</Button>
+            <Button type="button" onClick={handleSaveEpisode} disabled={isUploading || !videoFile || !selectedCourseId || isPending}>
+              {isUploading ? '저장 중...' : isPending ? '분류 적용 중...' : '에피소드 저장'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {hierarchyDialogState.isOpen && (
+        <HierarchyItemDialog
+          isOpen={hierarchyDialogState.isOpen}
+          onClose={closeHierarchyDialog}
+          onSave={handleSaveHierarchy}
+          item={hierarchyDialogState.item}
+          itemType={hierarchyDialogState.type}
+        />
+      )}
+    </>
   );
 }
