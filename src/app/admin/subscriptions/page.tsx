@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function AdminSubscriptionsPage() {
   const firestore = useFirestore();
 
+  // 1. firestore 객체가 준비되었을 때만 쿼리를 생성하도록 보장합니다.
   const subscriptionsQuery = useMemoFirebase(
     () => (firestore ? query(collectionGroup(firestore, 'subscriptions'), orderBy('purchasedAt', 'desc')) : null),
     [firestore]
@@ -27,10 +28,12 @@ export default function AdminSubscriptionsPage() {
   const usersQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
   const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
 
+  // 2. 쿼리가 null이 아닐 때만 useCollection 훅을 호출합니다.
   const { data: subscriptions, isLoading: subsLoading } = useCollection<Subscription>(subscriptionsQuery);
   const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
   const { data: classifications, isLoading: classLoading } = useCollection<Classification>(classificationsQuery);
   
+  // 3. 모든 데이터 로딩 상태를 통합하여 관리합니다.
   const isLoading = subsLoading || usersLoading || classLoading;
 
   const getUserName = (userId: string) => users?.find(u => u.id === userId)?.name || '알 수 없음';
