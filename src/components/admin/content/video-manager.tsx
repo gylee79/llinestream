@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -25,10 +24,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, collectionGroup, deleteDoc } from 'firebase/firestore';
+import { collection, doc, query, collectionGroup } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
+import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
 
 export default function VideoManager() {
   const firestore = useFirestore();
@@ -62,20 +62,25 @@ export default function VideoManager() {
   };
 
   const handleDeleteEpisode = async (episode: Episode) => {
-    if (!confirm(`정말로 '${episode.title}' 에피소드를 삭제하시겠습니까?`)) return;
+    if (!confirm(`정말로 '${episode.title}' 에피소드와 관련 비디오 파일을 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
     try {
-        const docRef = doc(firestore, 'courses', episode.courseId, 'episodes', episode.id);
-        await deleteDoc(docRef);
-        toast({
-            title: '삭제 완료',
-            description: `'${episode.title}' 에피소드가 삭제되었습니다.`,
-        });
+        // Pass the entire episode object to the server action
+        const result = await deleteHierarchyItem('episodes', episode.id, episode);
+        if (result.success) {
+            toast({
+                title: '삭제 완료',
+                description: result.message,
+            });
+        } else {
+            throw new Error(result.message);
+        }
     } catch (error) {
         console.error("Failed to delete episode:", error);
+        const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
         toast({
             variant: 'destructive',
             title: '삭제 실패',
-            description: '에피소드 삭제 중 오류가 발생했습니다.',
+            description: errorMessage,
         });
     }
   };
