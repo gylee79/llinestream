@@ -8,7 +8,9 @@ import {
   LogOut,
   Settings,
   User as UserIcon,
-  Clapperboard
+  Clapperboard,
+  Menu,
+  Shield,
 } from 'lucide-react';
 
 import { LlineStreamLogo } from '@/components/icons';
@@ -23,6 +25,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetClose,
+} from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@/firebase';
 import { signOut } from 'firebase/auth';
@@ -31,52 +39,95 @@ const navLinks = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/contents', label: '영상 콘텐츠', icon: Clapperboard },
   { href: '/pricing', label: '가격 안내', icon: CreditCard },
-  { href: '/admin', label: '관리자' },
 ];
+
+const adminLink = { href: '/admin', label: '관리자', icon: Shield };
 
 export default function Header() {
   const pathname = usePathname();
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const isLoggedIn = !!user;
+  const isAdmin = user?.role === 'admin';
 
   const handleLogout = async () => {
-    if(auth) {
+    if (auth) {
       await signOut(auth);
     }
   };
 
+  const NavLink = ({ href, label, icon: Icon, isMobile, ...props }: { href: string, label: string, icon: React.ElementType, isMobile?: boolean }) => (
+    <Link
+      href={href}
+      className={cn(
+        'transition-colors hover:text-foreground/80',
+        pathname === href ? 'text-foreground' : 'text-foreground/60',
+        isMobile && 'flex items-center gap-4 px-2.5 py-2'
+      )}
+      {...props}
+    >
+      {isMobile && <Icon className="h-5 w-5" />}
+      {label}
+    </Link>
+  )
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 max-w-screen-2xl items-center">
-        <Link href="/" className="mr-6 flex items-center space-x-2">
-          <LlineStreamLogo className="h-6 w-auto" />
-        </Link>
-        <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                'transition-colors hover:text-foreground/80',
-                pathname === link.href ? 'text-foreground' : 'text-foreground/60'
-              )}
-            >
-              {link.label}
+        {/* Mobile Menu */}
+        <div className="md:hidden">
+           <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Menu className="h-6 w-6" />
+                <span className="sr-only">Toggle Navigation</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left">
+              <nav className="grid gap-6 text-lg font-medium mt-8">
+                {navLinks.map((link) => (
+                  <SheetClose asChild key={link.href}>
+                    <NavLink {...link} isMobile />
+                  </SheetClose>
+                ))}
+                {isAdmin && (
+                  <SheetClose asChild>
+                    <NavLink {...adminLink} isMobile />
+                  </SheetClose>
+                )}
+              </nav>
+            </SheetContent>
+          </Sheet>
+        </div>
+        
+        {/* Desktop Logo and Navigation */}
+        <div className="flex flex-1 items-center justify-start">
+            <Link href="/" className="ml-4 md:ml-0 mr-6 flex items-center space-x-2">
+            <LlineStreamLogo className="h-6 w-auto" />
             </Link>
-          ))}
-        </nav>
-        <div className="flex flex-1 items-center justify-end space-x-4">
+            <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
+            {navLinks.map((link) => (
+                <NavLink key={link.href} {...link} />
+            ))}
+            {isAdmin && <NavLink {...adminLink} />}
+            </nav>
+        </div>
+
+
+        <div className="flex items-center justify-end space-x-4">
           {isUserLoading ? (
-             <Avatar className="h-8 w-8">
-                <AvatarFallback>?</AvatarFallback>
-             </Avatar>
+            <Avatar className="h-8 w-8">
+              <AvatarFallback>?</AvatarFallback>
+            </Avatar>
           ) : isLoggedIn && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.photoURL || `https://avatar.vercel.sh/${user.uid}.png`} alt={user.displayName || user.email || ''} />
+                    <AvatarImage
+                      src={user.photoURL || `https://avatar.vercel.sh/${user.uid}.png`}
+                      alt={user.displayName || user.email || ''}
+                    />
                     <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
                 </Button>
@@ -84,7 +135,7 @@ export default function Header() {
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user.displayName || 'Unnamed User'}</p>
+                    <p className="text-sm font-medium leading-none">{user.name || 'Unnamed User'}</p>
                     <p className="text-xs leading-none text-muted-foreground">
                       {user.email}
                     </p>
