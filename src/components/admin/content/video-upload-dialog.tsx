@@ -65,6 +65,33 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
   );
   const { data: courses } = useCollection<Course>(coursesQuery);
 
+  const resetForm = () => {
+    setTitle('');
+    setDescription('');
+    setIsFree(false);
+    setSelectedField(null);
+    setSelectedClassification(null);
+    setSelectedCourseId(null);
+    setVideoFile(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+  }
+
+  const getVideoDuration = (file: File): Promise<number> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(video.src);
+        resolve(Math.round(video.duration));
+      };
+      video.onerror = () => {
+        reject('비디오 메타데이터를 읽는 데 실패했습니다.');
+      };
+      video.src = URL.createObjectURL(file);
+    });
+  };
+
   const handleUpload = async () => {
     if (!title || !selectedCourseId || !videoFile) {
       toast({
@@ -78,15 +105,27 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     setIsUploading(true);
     setUploadProgress(0);
 
-    // 1. Create a new document reference in the subcollection to get a unique ID.
-    const newEpisodeDocRef = doc(collection(firestore, 'courses', selectedCourseId, 'episodes'));
+    let duration = 0;
+    try {
+      duration = await getVideoDuration(videoFile);
+    } catch(error) {
+      console.error(error);
+      toast({
+        variant: 'destructive',
+        title: '오류',
+        description: '비디오 파일의 재생 시간을 읽을 수 없습니다.',
+      });
+      setIsUploading(false);
+      return;
+    }
+
+    const courseDocRef = doc(firestore, 'courses', selectedCourseId);
+    const newEpisodeDocRef = doc(collection(courseDocRef, 'episodes'));
     const episodeId = newEpisodeDocRef.id;
 
-    // 2. Create a storage reference using the new document ID.
     const storageRef = ref(storage, `episodes/${selectedCourseId}/${episodeId}/${videoFile.name}`);
     const uploadTask = uploadBytesResumable(storageRef, videoFile);
 
-    // 3. Set up the upload task listeners.
     uploadTask.on('state_changed',
       (snapshot) => {
         const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
@@ -97,26 +136,24 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
         toast({
           variant: 'destructive',
           title: '업로드 실패',
-          description: '파일 업로드 중 오류가 발생했습니다.',
+          description: '파일 업로드 중 오류가 발생했습니다. CORS 설정을 확인해주세요.',
         });
         setIsUploading(false);
       },
       async () => {
-        // 4. On successful upload, get the download URL.
         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
         
-        // 5. Prepare the new episode data object.
-        const newEpisode: Omit<Episode, 'id'> = {
+        const newEpisode: Episode = {
+          id: episodeId,
           courseId: selectedCourseId,
           title,
           description,
-          duration: 0, // Should be extracted from video file metadata on server
+          duration,
           isFree,
           videoUrl: downloadURL,
         };
 
         try {
-          // 6. Use `setDoc` with the reference created in step 1 to save the data.
           await setDoc(newEpisodeDocRef, newEpisode);
 
           toast({
@@ -124,6 +161,7 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
             description: `${title} 에피소드가 성공적으로 추가되었습니다.`
           });
           onOpenChange(false);
+          // 폼 초기화는 useEffect에서 처리
         } catch (error) {
             console.error("Firestore write failed:", error);
             toast({
@@ -131,24 +169,11 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
               title: '저장 실패',
               description: '에피소드 정보를 Firestore에 저장하는 데 실패했습니다.',
             });
-        } finally {
             setIsUploading(false);
         }
       }
     );
   };
-  
-  const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setIsFree(false);
-    setSelectedField(null);
-    setSelectedClassification(null);
-    setSelectedCourseId(null);
-    setVideoFile(null);
-    setUploadProgress(0);
-    setIsUploading(false);
-  }
 
   useEffect(() => {
     if (!open) {
