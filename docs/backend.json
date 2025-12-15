@@ -6,10 +6,6 @@
       "type": "object",
       "description": "Represents a user of the LlineStream application.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the User entity."
-        },
         "name": {
           "type": "string",
           "description": "User's full name."
@@ -39,7 +35,6 @@
         }
       },
       "required": [
-        "id",
         "name",
         "email",
         "phone",
@@ -54,17 +49,12 @@
       "type": "object",
       "description": "Represents a top-level category for content (e.g., Education, Movies).",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Field entity."
-        },
         "name": {
           "type": "string",
           "description": "Name of the field (e.g., Education)."
         }
       },
       "required": [
-        "id",
         "name"
       ]
     },
@@ -74,10 +64,6 @@
       "type": "object",
       "description": "Represents a genre or category that can be subscribed to (e.g., Coding, Action).",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Classification entity."
-        },
         "fieldId": {
           "type": "string",
           "description": "Reference to Field. (Relationship: Field 1:N Classification)"
@@ -102,7 +88,6 @@
         }
       },
       "required": [
-        "id",
         "fieldId",
         "name",
         "description",
@@ -115,10 +100,6 @@
       "type": "object",
       "description": "Represents a video series within a classification (e.g., React Master Class).",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Course entity."
-        },
         "classificationId": {
           "type": "string",
           "description": "Reference to Classification. (Relationship: Classification 1:N Course)"
@@ -142,7 +123,6 @@
         }
       },
       "required": [
-        "id",
         "classificationId",
         "name",
         "description",
@@ -156,10 +136,6 @@
       "type": "object",
       "description": "Represents an individual video within a course.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Episode entity."
-        },
         "courseId": {
           "type": "string",
           "description": "Reference to Course. (Relationship: Course 1:N Episode)"
@@ -183,7 +159,6 @@
         }
       },
       "required": [
-        "id",
         "courseId",
         "title",
         "duration",
@@ -197,10 +172,6 @@
       "type": "object",
       "description": "Represents the legal policies of the application (e.g., Terms of Service, Privacy Policy).",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Policy entity."
-        },
         "slug": {
           "type": "string",
           "enum": ["terms", "privacy", "refund"]
@@ -215,7 +186,6 @@
         }
       },
       "required": [
-        "id",
         "slug",
         "title",
         "content"
@@ -227,10 +197,6 @@
       "type": "object",
       "description": "Represents a user's subscription to a specific classification.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Subscription entity."
-        },
         "userId": {
           "type": "string",
           "description": "Reference to User. (Relationship: User 1:N Subscription)"
@@ -251,7 +217,6 @@
         }
       },
       "required": [
-        "id",
         "userId",
         "classificationId",
         "purchasedAt",

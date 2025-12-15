@@ -6,12 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import type { Field, Classification, Course } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, deleteDoc } from 'firebase/firestore';
-import { setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { collection, query, where, doc, deleteDoc, addDoc } from 'firebase/firestore';
+import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
-import { v4 as uuidv4 } from 'uuid';
 
 const Column = ({ title, items, selectedId, onSelect, onAdd, onEdit, onDelete, isLoading, collectionName }: {
   title: string;
@@ -118,50 +117,48 @@ export default function HierarchyManager() {
 
   const closeDialog = () => setDialogState({ isOpen: false, item: null, type: '분야' });
 
-  const handleSave = (item: HierarchyItem) => {
-    const newId = uuidv4();
-
-    if (dialogState.item) { // Edit mode
+  const handleSave = async (item: HierarchyItem) => {
+    try {
+      if (dialogState.item) { // Edit mode
         const collectionName = dialogState.type === '분야' ? 'fields' : dialogState.type === '큰분류' ? 'classifications' : 'courses';
         updateDocumentNonBlocking(doc(firestore, collectionName, item.id), { name: item.name });
         toast({ title: '성공', description: `${dialogState.type} '${item.name}'이(가) 수정되었습니다.` });
-    } else { // Add mode
-        let collectionName = '';
-        let data: any = { id: newId, name: item.name };
-
+      } else { // Add mode
+        let data: any = { name: item.name };
+        let collectionName: 'fields' | 'classifications' | 'courses' | '' = '';
+  
         if (dialogState.type === '분야') {
-            collectionName = 'fields';
+          collectionName = 'fields';
         } else if (dialogState.type === '큰분류') {
-            collectionName = 'classifications';
-            data.fieldId = selectedField;
-            data.description = "새로운 분류 설명";
-            data.prices = { day1: 0, day30: 0, day60: 0, day90: 0 };
+          collectionName = 'classifications';
+          data.fieldId = selectedField;
+          data.prices = { day1: 0, day30: 0, day60: 0, day90: 0 };
         } else if (dialogState.type === '상세분류') {
-            collectionName = 'courses';
-            data.classificationId = selectedClassification;
-            data.description = "새로운 상세분류 설명";
-            data.thumbnailUrl = `https://picsum.photos/seed/${newId}/600/400`;
-            data.thumbnailHint = 'placeholder image';
+          collectionName = 'courses';
+          data.classificationId = selectedClassification;
         }
         
         if (collectionName) {
-            const docRef = doc(firestore, collectionName, newId);
-            setDocumentNonBlocking(docRef, data, { merge: false });
-            toast({ title: '성공', description: `${dialogState.type} '${item.name}'이(가) 추가되었습니다.` });
+          await addDoc(collection(firestore, collectionName), data);
+          toast({ title: '성공', description: `${dialogState.type} '${item.name}'이(가) 추가되었습니다.` });
         }
+      }
+    } catch (error) {
+      console.error("Error saving document: ", error);
+      toast({ variant: 'destructive', title: '저장 실패', description: '항목 저장 중 오류가 발생했습니다.' });
+    } finally {
+      closeDialog();
     }
-    closeDialog();
   };
-
+  
   const handleDelete = async (collectionName: 'fields' | 'classifications' | 'courses', id: string, name: string) => {
-    if (!confirm(`정말로 '${name}' 항목을 삭제하시겠습니까? 하위 항목이 있는 경우 함께 삭제되지 않으니 주의해주세요. 이 작업은 되돌릴 수 없습니다.`)) return;
+    if (!confirm(`정말로 '${name}' 항목을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
 
     try {
       await deleteDoc(doc(firestore, collectionName, id));
-
-      toast({ title: '삭제 성공', description: `'${name}' 항목이 성공적으로 삭제되었습니다.` });
-
-      // State reset to force re-fetch
+      toast({ title: '삭제 성공', description: `'${name}' 항목이 삭제되었습니다.` });
+      
+      // If the deleted item was the selected one, reset selections
       if (collectionName === 'fields' && selectedField === id) {
           setSelectedField(null);
           setSelectedClassification(null);
@@ -169,10 +166,9 @@ export default function HierarchyManager() {
       if (collectionName === 'classifications' && selectedClassification === id) {
           setSelectedClassification(null);
       }
-
     } catch (error) {
       console.error("Error deleting document: ", error);
-      toast({ variant: 'destructive', title: '삭제 실패', description: '항목 삭제 중 오류가 발생했습니다.' });
+      toast({ variant: 'destructive', title: '삭제 실패', description: `항목 삭제 중 오류가 발생했습니다: ${error}` });
     }
   };
 
