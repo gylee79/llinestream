@@ -23,7 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, query } from 'firebase/firestore';
+import { collection, doc, query, collectionGroup } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
@@ -32,7 +32,7 @@ export default function VideoManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const episodesQuery = useMemoFirebase(() => collection(firestore, 'episodes'), [firestore]);
+  const episodesQuery = useMemoFirebase(() => collectionGroup(firestore, 'episodes'), [firestore]);
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
   
   const coursesQuery = useMemoFirebase(() => collection(firestore, 'courses'), [firestore]);
@@ -45,7 +45,7 @@ export default function VideoManager() {
   };
 
   const toggleFreeStatus = (episode: Episode) => {
-    const docRef = doc(firestore, 'episodes', episode.id);
+    const docRef = doc(firestore, 'courses', episode.courseId, 'episodes', episode.id);
     updateDocumentNonBlocking(docRef, { isFree: !episode.isFree });
     toast({
       title: '상태 변경',
