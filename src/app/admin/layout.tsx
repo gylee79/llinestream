@@ -9,10 +9,13 @@ import {
   Database,
   FolderKanban,
   LayoutDashboard,
+  Menu,
   Users,
 } from 'lucide-react';
 import { LlineStreamLogo } from '@/components/icons';
 import { cn } from '@/lib/utils';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
 
 const adminNavLinks = [
   { href: '/admin/dashboard', label: '대시보드', icon: LayoutDashboard },
@@ -24,6 +27,27 @@ const adminNavLinks = [
   { href: '/admin/settings', label: '설정', icon: Cog },
 ];
 
+const AdminNav = ({ className }: { className?: string }) => (
+  <nav className={cn('flex-1 overflow-auto py-4', className)}>
+    <ul className="grid items-start px-4 text-sm font-medium">
+      {adminNavLinks.map((link) => (
+        <li key={link.href}>
+          <Link
+            href={link.href}
+            className={cn(
+              'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
+              usePathname().startsWith(link.href) && 'bg-muted text-primary'
+            )}
+          >
+            <link.icon className="h-4 w-4" />
+            {link.label}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  </nav>
+);
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
@@ -31,32 +55,33 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="flex min-h-screen w-full">
       <aside className="hidden w-64 flex-col border-r bg-muted/40 md:flex">
         <div className="flex h-16 items-center border-b px-6">
-          <Link href="/admin/dashboard">
+          <Link href="/admin/dashboard" className="flex items-center gap-2 font-semibold">
             <LlineStreamLogo className="h-7 w-auto" />
           </Link>
         </div>
-        <nav className="flex-1 overflow-auto py-4">
-          <ul className="grid items-start px-4 text-sm font-medium">
-            {adminNavLinks.map((link) => (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
-                    pathname.startsWith(link.href) && 'bg-muted text-primary'
-                  )}
-                >
-                  <link.icon className="h-4 w-4" />
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <AdminNav />
       </aside>
       <div className="flex flex-1 flex-col">
-        <header className="flex h-16 items-center justify-end border-b bg-muted/40 px-6">
-          {/* Admin Header Content (e.g., user profile) can go here */}
+        <header className="flex h-16 items-center gap-4 border-b bg-muted/40 px-6">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" className="shrink-0 md:hidden">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Toggle navigation menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="flex flex-col p-0">
+              <div className="flex h-16 items-center border-b px-6">
+                <Link href="/admin/dashboard">
+                  <LlineStreamLogo className="h-7 w-auto" />
+                </Link>
+              </div>
+              <AdminNav />
+            </SheetContent>
+          </Sheet>
+          <div className="flex-1 text-right">
+             {/* Admin Header Content (e.g., user profile) can go here */}
+          </div>
         </header>
         <main className="flex-1 bg-background p-6">{children}</main>
       </div>
