@@ -6,22 +6,21 @@ import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import type { Field, Classification, Course } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, deleteDoc, addDoc } from 'firebase/firestore';
-import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { collection, query, where, doc, addDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
+import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
 
-const Column = ({ title, items, selectedId, onSelect, onAdd, onEdit, onDelete, isLoading, collectionName }: {
+const Column = ({ title, items, selectedId, onSelect, onAdd, onEdit, onDelete, isLoading }: {
   title: string;
   items: { id: string, name: string }[] | null;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onAdd: () => void;
   onEdit: (id: string, name: string) => void;
-  onDelete: (collectionName: 'fields' | 'classifications' | 'courses', id: string, name: string) => void;
+  onDelete: (id: string, name: string) => void;
   isLoading: boolean;
-  collectionName: 'fields' | 'classifications' | 'courses';
 }) => (
   <Card className="flex-1">
     <CardHeader className="flex flex-row items-center justify-between">
@@ -46,7 +45,7 @@ const Column = ({ title, items, selectedId, onSelect, onAdd, onEdit, onDelete, i
                     <span>{item.name}</span>
                     <div className="flex gap-2">
                     <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEdit(item.id, item.name); }}><Pencil className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(collectionName, item.id, item.name); }}><Trash2 className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(item.id, item.name); }}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                 </div>
                 ))}
@@ -119,29 +118,30 @@ export default function HierarchyManager() {
 
   const handleSave = async (item: HierarchyItem) => {
     try {
-      if (dialogState.item) { // Edit mode
-        const collectionName = dialogState.type === '분야' ? 'fields' : dialogState.type === '큰분류' ? 'classifications' : 'courses';
-        updateDocumentNonBlocking(doc(firestore, collectionName, item.id), { name: item.name });
-        toast({ title: '성공', description: `${dialogState.type} '${item.name}'이(가) 수정되었습니다.` });
+      const { type, item: existingItem } = dialogState;
+      let collectionName: 'fields' | 'classifications' | 'courses';
+
+      if (type === '분야') collectionName = 'fields';
+      else if (type === '큰분류') collectionName = 'classifications';
+      else collectionName = 'courses';
+
+      if (existingItem) { // Edit mode
+        await updateDoc(doc(firestore, collectionName, existingItem.id), { name: item.name });
+        toast({ title: '수정 성공', description: `${type} '${item.name}'이(가) 수정되었습니다.` });
       } else { // Add mode
         let data: any = { name: item.name };
-        let collectionName: 'fields' | 'classifications' | 'courses' | '' = '';
-  
-        if (dialogState.type === '분야') {
-          collectionName = 'fields';
-        } else if (dialogState.type === '큰분류') {
-          collectionName = 'classifications';
+        if (type === '큰분류' && selectedField) {
           data.fieldId = selectedField;
-          data.prices = { day1: 0, day30: 0, day60: 0, day90: 0 };
-        } else if (dialogState.type === '상세분류') {
-          collectionName = 'courses';
+           data.prices = { day1: 0, day30: 0, day60: 0, day90: 0 };
+           data.description = "새로운 분류입니다.";
+        } else if (type === '상세분류' && selectedClassification) {
           data.classificationId = selectedClassification;
+          data.description = "새로운 강좌입니다.";
+          data.thumbnailUrl = "https://picsum.photos/seed/default/600/400";
+          data.thumbnailHint = "placeholder";
         }
-        
-        if (collectionName) {
-          await addDoc(collection(firestore, collectionName), data);
-          toast({ title: '성공', description: `${dialogState.type} '${item.name}'이(가) 추가되었습니다.` });
-        }
+        await addDoc(collection(firestore, collectionName), data);
+        toast({ title: '추가 성공', description: `${type} '${item.name}'이(가) 추가되었습니다.` });
       }
     } catch (error) {
       console.error("Error saving document: ", error);
@@ -152,23 +152,26 @@ export default function HierarchyManager() {
   };
   
   const handleDelete = async (collectionName: 'fields' | 'classifications' | 'courses', id: string, name: string) => {
-    if (!confirm(`정말로 '${name}' 항목을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
+    if (!confirm(`정말로 '${name}' 항목과 모든 하위 항목들을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
 
     try {
-      await deleteDoc(doc(firestore, collectionName, id));
-      toast({ title: '삭제 성공', description: `'${name}' 항목이 삭제되었습니다.` });
-      
-      // If the deleted item was the selected one, reset selections
-      if (collectionName === 'fields' && selectedField === id) {
-          setSelectedField(null);
-          setSelectedClassification(null);
-      }
-      if (collectionName === 'classifications' && selectedClassification === id) {
-          setSelectedClassification(null);
+      const result = await deleteHierarchyItem(collectionName, id);
+      if (result.success) {
+        toast({ title: '삭제 성공', description: result.message });
+        // 상태를 리셋하여 UI를 갱신합니다.
+        if (collectionName === 'fields' && selectedField === id) {
+            setSelectedField(null);
+            setSelectedClassification(null);
+        }
+        if (collectionName === 'classifications' && selectedClassification === id) {
+            setSelectedClassification(null);
+        }
+      } else {
+        throw new Error(result.message);
       }
     } catch (error) {
       console.error("Error deleting document: ", error);
-      toast({ variant: 'destructive', title: '삭제 실패', description: `항목 삭제 중 오류가 발생했습니다: ${error}` });
+      toast({ variant: 'destructive', title: '삭제 실패', description: `${error}` });
     }
   };
 
@@ -188,9 +191,8 @@ export default function HierarchyManager() {
               onSelect={handleSelectField}
               onAdd={() => openDialog('분야')}
               onEdit={(id, name) => openDialog('분야', { id, name })}
-              onDelete={handleDelete}
+              onDelete={(id, name) => handleDelete('fields', id, name)}
               isLoading={fieldsLoading}
-              collectionName="fields"
             />
             <Column
               title="큰분류 (Classification)"
@@ -199,9 +201,8 @@ export default function HierarchyManager() {
               onSelect={handleSelectClassification}
               onAdd={() => openDialog('큰분류')}
               onEdit={(id, name) => openDialog('큰분류', { id, name })}
-              onDelete={handleDelete}
+              onDelete={(id, name) => handleDelete('classifications', id, name)}
               isLoading={!selectedField || classificationsLoading}
-              collectionName="classifications"
             />
             <Column
               title="상세분류 (Course)"
@@ -210,9 +211,8 @@ export default function HierarchyManager() {
               onSelect={() => {}}
               onAdd={() => openDialog('상세분류')}
               onEdit={(id, name) => openDialog('상세분류', { id, name })}
-              onDelete={handleDelete}
+              onDelete={(id, name) => handleDelete('courses', id, name)}
               isLoading={!selectedClassification || coursesLoading}
-              collectionName="courses"
             />
           </div>
         </CardContent>

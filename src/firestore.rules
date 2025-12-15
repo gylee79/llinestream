@@ -5,7 +5,7 @@ service cloud.firestore {
     match /{document=**} {
       // 개발 중에는 모든 읽기/쓰기/삭제를 허용합니다.
       // 주의: 프로덕션 배포 전에는 반드시 보안 규칙을 강화해야 합니다.
-      allow read, write, delete: if true;
+      allow read, write: if true;
     }
   }
 }
