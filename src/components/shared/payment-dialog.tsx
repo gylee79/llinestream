@@ -60,15 +60,17 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
         const channelKey = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY;
 
         if (!storeId) {
+            console.error("환경변수 에러: NEXT_PUBLIC_PORTONE_STORE_ID가 설정되지 않았습니다.");
             toast({ variant: 'destructive', title: '설정 오류', description: '스토어 ID가 설정되지 않았습니다. 관리자에게 문의하세요.' });
             return;
         }
         if (!channelKey) {
+            console.error("환경변수 에러: NEXT_PUBLIC_PORTONE_CHANNEL_KEY가 설정되지 않았습니다.");
             toast({ variant: 'destructive', title: '설정 오류', description: '채널 키가 설정되지 않았습니다. 관리자에게 문의하세요.' });
             return;
         }
 
-        const paymentId = `payment-${crypto.randomUUID()}`;
+        const paymentId = `pmt-${crypto.randomUUID().replaceAll('-', '')}`;
 
         const request: PortOnePaymentRequest = {
             storeId,
@@ -104,12 +106,13 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
             // 최종 검증은 /api/payment/complete 에서 이루어집니다.
             console.log("결제 요청 성공 (리다이렉트 전):", response);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("결제 요청 중 예외 발생:", error);
+            const errorMessage = error.message || "결제 요청 중 문제가 발생했습니다. 관리자에게 문의하세요.";
             toast({
                 variant: "destructive",
                 title: "결제 시스템 오류",
-                description: "결제 요청 중 문제가 발생했습니다. 관리자에게 문의하세요.",
+                description: errorMessage,
             });
         }
     }
