@@ -1,6 +1,8 @@
+
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import {
   Table,
   TableBody,
@@ -100,7 +102,12 @@ export default function VideoManager() {
                         </Badge>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-2">
+                       <Button variant="outline" size="sm" asChild>
+                         <Link href={episode.videoUrl} target="_blank" rel="noopener noreferrer" >
+                            시청
+                         </Link>
+                       </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
