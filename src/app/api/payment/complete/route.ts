@@ -1,27 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { doc, getDoc, updateDoc, Timestamp, collection } from 'firebase/firestore';
+import { doc, getDocs, updateDoc, Timestamp, collection, where, query, limit } from 'firebase/firestore';
 import { getFirestore } from 'firebase/firestore/lite';
 import { initializeApp, getApps } from 'firebase/app';
-import type { Classification, User } from '@/lib/types';
+import type { Classification, User, Subscription } from '@/lib/types';
 import type { PortOnePayment } from '@/lib/portone';
 import { firebaseConfig } from '@/firebase/config';
+import * as admin from 'firebase-admin';
 
-// Initialize Firebase App for Server-side usage
-function initializeServerApp() {
-  if (getApps().length) {
-    return getApps()[0];
+// Initialize Firebase Admin SDK for Server-side usage
+function initializeAdminApp() {
+  if (admin.apps.length) {
+    return admin.apps[0];
   }
-  return initializeApp(firebaseConfig);
+  const serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_SDK_CONFIG as string);
+  return admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+  });
 }
 
 // POST /api/payment/complete
 export async function GET(req: NextRequest) {
-    const firestore = getFirestore(initializeServerApp());
+    initializeAdminApp();
+    const firestore = admin.firestore();
     const { searchParams } = new URL(req.url);
     const paymentId = searchParams.get('paymentId');
     const code = searchParams.get('code');
     const message = searchParams.get('message');
-    const pgCode = searchParams.get('pg_code');
     const pgMessage = searchParams.get('pg_message');
 
     // 결제 실패 시 에러 페이지로 리다이렉트
@@ -33,7 +37,9 @@ export async function GET(req: NextRequest) {
     }
     
     if (!paymentId) {
-        return new NextResponse("paymentId가 없습니다.", { status: 400 });
+        const failureUrl = new URL('/pricing', req.url);
+        failureUrl.searchParams.set('error', '결제 ID가 없습니다.');
+        return NextResponse.redirect(failureUrl);
     }
 
     try {
@@ -68,23 +74,16 @@ export async function GET(req: NextRequest) {
         // "코딩 30일 이용권"에서 "코딩" 부분만 추출
         const classificationName = orderName.split(' ')[0];
         
-        // Firestore에서 이름으로 classification을 찾는 것은 비효율적이므로, 실제 프로덕션에서는
-        // customData 필드에 classificationId를 담아 보내는 것이 좋습니다.
-        // 여기서는 예시로 모든 classification을 가져와 필터링합니다.
-        const classificationsSnapshot = await getDoc(collection(firestore, 'classifications') as any);
-        let targetClassification: (Classification & { id: string }) | null = null;
-        if (!classificationsSnapshot.empty) {
-            classificationsSnapshot.forEach((doc: any) => {
-                if (doc.data().name === classificationName) {
-                    targetClassification = { id: doc.id, ...doc.data() } as any;
-                }
-            });
+        const q = query(collection(firestore, 'classifications'), where("name", "==", classificationName), limit(1));
+        const classificationsSnapshot = await getDocs(q as any);
+
+        if (classificationsSnapshot.empty) {
+             throw new Error(`주문명에 해당하는 상품(${classificationName})을 찾을 수 없습니다.`);
         }
         
-        if (!targetClassification) {
-            throw new Error(`주문명에 해당하는 상품(${classificationName})을 찾을 수 없습니다.`);
-        }
-
+        const targetClassificationDoc = classificationsSnapshot.docs[0];
+        const targetClassification = { id: targetClassificationDoc.id, ...targetClassificationDoc.data() } as Classification;
+        
         // 금액 비교 (위변조 검증)
         if (targetClassification.prices.day30 !== paymentData.amount.total) {
             // TODO: 실제 환경에서는 여기서 결제 취소 API를 호출해야 합니다.
@@ -96,11 +95,27 @@ export async function GET(req: NextRequest) {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 30);
         
-        await updateDoc(userRef, {
+        const subscriptionRef = doc(collection(userRef, 'subscriptions'), targetClassification.id);
+
+        const batch = firestore.batch();
+
+        const newSubscription: Omit<Subscription, 'id'> = {
+            userId: userId,
+            classificationId: targetClassification.id,
+            purchasedAt: Timestamp.now(),
+            expiresAt: Timestamp.fromDate(expiresAt),
+        };
+
+        batch.set(subscriptionRef, newSubscription);
+
+        batch.update(userRef, {
             [`activeSubscriptions.${targetClassification.id}`]: {
                 expiresAt: Timestamp.fromDate(expiresAt),
+                purchasedAt: Timestamp.now()
             }
         });
+        
+        await batch.commit();
         
         // --- 5. 결제 성공 페이지로 리다이렉트 ---
         const successUrl = new URL('/contents', req.url); // 성공 시 콘텐츠 페이지로 이동

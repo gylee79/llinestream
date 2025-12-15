@@ -55,12 +55,20 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
             toast({ variant: 'destructive', title: '로그인 필요', description: '결제를 진행하려면 먼저 로그인해주세요.' });
             return;
         }
+        
+        const storeId = process.env.NEXT_PUBLIC_PORTONE_STORE_ID;
+        const channelKey = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY;
+
+        if (!storeId) {
+            toast({ variant: 'destructive', title: '설정 오류', description: '스토어 ID가 설정되지 않았습니다. 관리자에게 문의하세요.' });
+            return;
+        }
 
         const paymentId = `payment-${crypto.randomUUID()}`;
 
         const request: PortOnePaymentRequest = {
-            storeId: process.env.NEXT_PUBLIC_PORTONE_STORE_ID!,
-            channelKey: process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY!,
+            storeId: storeId,
+            channelKey: channelKey,
             paymentId,
             orderName: `${classification.name} 30일 이용권`,
             totalAmount: classification.prices.day30,
@@ -72,7 +80,7 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
                 phoneNumber: user.phone,
                 email: user.email,
             },
-            redirectUrl: `${window.location.origin}/api/payment/complete?paymentId=${paymentId}`,
+            redirectUrl: `${window.location.origin}/api/payment/complete`,
         };
 
         try {
