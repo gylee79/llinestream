@@ -1,3 +1,4 @@
+
 import { Field, Classification, Course, Episode, User, Policy, Subscription } from './types';
 import { Timestamp } from 'firebase/firestore';
 
@@ -152,3 +153,5 @@ LlineStream은 다음의 목적을 위하여 개인정보를 처리합니다. �
 ];
 
 export const getPolicyBySlug = (slug: string) => policies.find(p => p.slug === slug);
+
+    

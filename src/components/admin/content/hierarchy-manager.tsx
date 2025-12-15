@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -170,8 +171,9 @@ export default function HierarchyManager() {
         throw new Error(result.message);
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Error deleting document: ", error);
-      toast({ variant: 'destructive', title: '삭제 실패', description: `${error}` });
+      toast({ variant: 'destructive', title: '삭제 실패', description: errorMessage });
     }
   };
 
@@ -229,3 +231,5 @@ export default function HierarchyManager() {
     </>
   );
 }
+
+    
