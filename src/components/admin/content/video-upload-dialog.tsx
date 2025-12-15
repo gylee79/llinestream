@@ -27,7 +27,7 @@ import { collection, query, where, doc, setDoc } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { v4 as uuidv4 } from 'uuid'; // For unique IDs
+import { v4 as uuidv4 } from 'uuid';
 
 interface VideoUploadDialogProps {
   open: boolean;
@@ -41,7 +41,6 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
   
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -50,7 +49,6 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
   const [selectedClassification, setSelectedClassification] = useState<string | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
-
 
   const fieldsQuery = useMemoFirebase(() => collection(firestore, 'fields'), [firestore]);
   const { data: fields } = useCollection<Field>(fieldsQuery);
@@ -77,8 +75,7 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     setVideoFile(null);
     setUploadProgress(0);
     setIsUploading(false);
-    setDownloadUrl(null);
-  }
+  };
 
   const getVideoDuration = (file: File): Promise<number> => {
     return new Promise((resolve, reject) => {
@@ -95,101 +92,75 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     });
   };
 
-  const handleStorageUploadOnly = async () => {
-    if (!selectedCourseId || !videoFile) {
-        toast({
-            variant: 'destructive',
-            title: '입력 오류',
-            description: '테스트를 위해 소속 상세분류와 비디오 파일을 모두 선택해야 합니다.',
-        });
-        return;
-    }
-    
-    setIsUploading(true);
-    setUploadProgress(0);
-    setDownloadUrl(null);
-
-    const episodeId = uuidv4();
-    const storageRef = ref(storage, `episodes/${selectedCourseId}/${episodeId}/${videoFile.name}`);
-    const uploadTask = uploadBytesResumable(storageRef, videoFile);
-
-    uploadTask.on('state_changed',
-        (snapshot) => {
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            setUploadProgress(progress);
-        },
-        (error) => {
-            console.error("Storage Upload failed:", error);
-            toast({
-                variant: 'destructive',
-                title: '스토리지 업로드 실패',
-                description: '파일 업로드 중 오류가 발생했습니다. CORS나 Storage 규칙을 확인해주세요.',
-            });
-            setIsUploading(false);
-        },
-        async () => {
-            const url = await getDownloadURL(uploadTask.snapshot.ref);
-            setDownloadUrl(url);
-            setIsUploading(false);
-            toast({
-                title: '스토리지 업로드 성공!',
-                description: `파일이 성공적으로 업로드되었습니다.`,
-            });
-            console.log("File available at", url);
-        }
-    );
-  };
-
-
-  const handleUpload = async () => {
-    if (!title || !selectedCourseId || !videoFile || !downloadUrl) {
+  const handleSaveEpisode = async () => {
+    if (!title || !selectedCourseId || !videoFile) {
       toast({
         variant: 'destructive',
         title: '입력 오류',
-        description: '제목, 소속 상세분류를 선택하고 비디오를 먼저 스토리지에 업로드해야 합니다.',
+        description: '제목, 소속 상세분류, 비디오 파일을 모두 입력해야 합니다.',
       });
       return;
     }
 
-    let duration = 0;
-    try {
-        duration = await getVideoDuration(videoFile);
-    } catch(error) {
-        console.error(error);
-        toast({
-            variant: 'destructive',
-            title: '오류',
-            description: '비디오 파일의 재생 시간을 읽을 수 없습니다.',
-        });
-        return;
-    }
-    
-    const newEpisodeDocRef = doc(collection(firestore, 'courses', selectedCourseId, 'episodes'));
-    
-    const newEpisode: Omit<Episode, 'id'> & { id?: string } = {
-        courseId: selectedCourseId,
-        title,
-        description,
-        duration,
-        isFree,
-        videoUrl: downloadUrl,
-    };
+    setIsUploading(true);
+    setUploadProgress(0);
 
     try {
-        await setDoc(newEpisodeDocRef, newEpisode);
+      // 1. Get video duration
+      const duration = await getVideoDuration(videoFile);
 
-        toast({
-          title: '업로드 완료',
-          description: `${title} 에피소드가 성공적으로 추가되었습니다.`
-        });
-        onOpenChange(false);
-    } catch (error) {
-        console.error("Firestore write failed:", error);
-        toast({
-            variant: 'destructive',
-            title: '저장 실패',
-            description: '에피소드 정보를 Firestore에 저장하는 데 실패했습니다.',
-        });
+      // 2. Upload to Storage
+      const episodeId = uuidv4();
+      const storageRef = ref(storage, `episodes/${selectedCourseId}/${episodeId}/${videoFile.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, videoFile);
+
+      // Wait for upload to complete
+      const downloadUrl = await new Promise<string>((resolve, reject) => {
+        uploadTask.on('state_changed',
+          (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            setUploadProgress(progress);
+          },
+          (error) => {
+            console.error("Storage Upload failed:", error);
+            reject(new Error('파일 스토리지 업로드에 실패했습니다. CORS나 Storage 규칙을 확인해주세요.'));
+          },
+          async () => {
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve(url);
+          }
+        );
+      });
+      
+      // 3. Save to Firestore
+      const newEpisodeDocRef = doc(firestore, 'courses', selectedCourseId, 'episodes', episodeId);
+      
+      const newEpisode: Omit<Episode, 'id'> = {
+          courseId: selectedCourseId,
+          title,
+          description,
+          duration,
+          isFree,
+          videoUrl: downloadUrl,
+      };
+
+      await setDoc(newEpisodeDocRef, newEpisode);
+
+      toast({
+        title: '업로드 완료',
+        description: `${title} 에피소드가 성공적으로 추가되었습니다.`
+      });
+      onOpenChange(false); // Close dialog on success
+
+    } catch (error: any) {
+      console.error("Episode save process failed:", error);
+      toast({
+        variant: 'destructive',
+        title: '저장 실패',
+        description: error.message || '에피소드 저장 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -211,24 +182,24 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="title" className="text-right">제목</Label>
-            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" />
+            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" disabled={isUploading} />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="description" className="text-right">설명</Label>
-            <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" />
+            <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" disabled={isUploading} />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label className="text-right">분류</Label>
             <div className="col-span-3 grid grid-cols-3 gap-2 items-center">
-              <Select value={selectedField || ''} onValueChange={(v) => { setSelectedField(v); setSelectedClassification(null); setSelectedCourseId(null); }}>
+              <Select value={selectedField || ''} onValueChange={(v) => { setSelectedField(v); setSelectedClassification(null); setSelectedCourseId(null); }} disabled={isUploading}>
                 <SelectTrigger><SelectValue placeholder="분야" /></SelectTrigger>
                 <SelectContent>{fields?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
               </Select>
-              <Select value={selectedClassification || ''} onValueChange={(v) => { setSelectedClassification(v); setSelectedCourseId(null); }} disabled={!selectedField}>
+              <Select value={selectedClassification || ''} onValueChange={(v) => { setSelectedClassification(v); setSelectedCourseId(null); }} disabled={!selectedField || isUploading}>
                 <SelectTrigger><SelectValue placeholder="큰분류" /></SelectTrigger>
                 <SelectContent>{classifications?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
-              <Select value={selectedCourseId || ''} onValueChange={setSelectedCourseId} disabled={!selectedClassification}>
+              <Select value={selectedCourseId || ''} onValueChange={setSelectedCourseId} disabled={!selectedClassification || isUploading}>
                 <SelectTrigger><SelectValue placeholder="상세분류" /></SelectTrigger>
                 <SelectContent>{courses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
@@ -237,7 +208,7 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
           <div className="grid grid-cols-4 items-center gap-4">
             <div />
             <div className="col-span-3 flex items-center space-x-2">
-                <Checkbox id="isFree" checked={isFree} onCheckedChange={(checked) => setIsFree(!!checked)} />
+                <Checkbox id="isFree" checked={isFree} onCheckedChange={(checked) => setIsFree(!!checked)} disabled={isUploading} />
                 <Label htmlFor="isFree">무료 콘텐츠</Label>
             </div>
           </div>
@@ -255,33 +226,23 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="thumbnail-file" className="text-right">썸네일</Label>
             <div className="col-span-3 flex items-center gap-2">
-                <Input id="thumbnail-file" type="file" disabled={isUploading} />
+                <Input id="thumbnail-file" type="file" disabled={isUploading} accept="image/*" />
                 <Button variant="secondary" size="sm" disabled={isUploading}>AI 생성</Button>
             </div>
           </div>
           {isUploading && (
-            <div className="col-span-4">
+            <div className="col-span-4 mt-2">
               <Progress value={uploadProgress} />
-              <p className="text-sm text-center text-muted-foreground mt-2">{uploadProgress.toFixed(0)}%</p>
-            </div>
-          )}
-          {downloadUrl && !isUploading && (
-            <div className="grid grid-cols-4 items-center gap-4">
-                <div/>
-                <div className="col-span-3 mt-2 p-2 bg-muted rounded-md">
-                    <p className="text-sm font-medium text-green-600">✓ 스토리지 업로드 성공!</p>
-                    <p className="text-xs text-muted-foreground break-all">{downloadUrl}</p>
-                </div>
+              <p className="text-sm text-center text-muted-foreground mt-2">
+                {uploadProgress < 100 ? `업로드 중... ${uploadProgress.toFixed(0)}%` : '업로드 완료, 처리 중...'}
+              </p>
             </div>
           )}
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isUploading}>취소</Button>
-          <Button type="button" variant="secondary" onClick={handleStorageUploadOnly} disabled={isUploading}>
-            {isUploading ? '업로드 중...' : '스토리지 테스트'}
-          </Button>
-          <Button type="submit" onClick={handleUpload} disabled={isUploading || !downloadUrl}>
-            DB에 저장
+          <Button type="button" onClick={handleSaveEpisode} disabled={isUploading || !videoFile || !selectedCourseId}>
+            {isUploading ? '저장 중...' : '에피소드 저장'}
           </Button>
         </DialogFooter>
       </DialogContent>
