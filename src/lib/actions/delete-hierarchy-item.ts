@@ -1,28 +1,22 @@
 'use server';
 
-import { firebaseConfig } from '@/firebase/config';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import {
-  getFirestore,
-  doc,
-  collection,
-  query,
-  where,
-  getDocs,
-  writeBatch,
-} from 'firebase/firestore';
-import { getStorage, ref, deleteObject } from 'firebase/storage';
+import * as admin from 'firebase-admin';
+import { getApps, App } from 'firebase-admin/app';
+import { getFirestore, WriteBatch } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 import type { Episode } from '@/lib/types';
 
-
-let app;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
+// Helper function to initialize Firebase Admin SDK
+function initializeAdminApp(): App {
+  if (getApps().length) {
+    return getApps()[0];
+  }
+  
+  // App Hosting provides GOOGLE_APPLICATION_CREDENTIALS automatically.
+  // When running on App Hosting, admin.initializeApp() will use these
+  // credentials to initialize, giving the server admin privileges.
+  return admin.initializeApp();
 }
-const db = getFirestore(app);
-const storage = getStorage(app);
 
 type DeletionResult = {
   success: boolean;
@@ -30,7 +24,8 @@ type DeletionResult = {
 };
 
 /**
- * Deletes a hierarchy item and all its descendants, including related Storage files.
+ * Deletes a hierarchy item and all its descendants, including related Storage files,
+ * using the Firebase Admin SDK for privileged access.
  * @param collectionName The name of the collection ('fields', 'classifications', 'courses', 'episodes').
  * @param id The ID of the document to delete.
  * @param itemData Optional data of the item, required for 'episodes' to delete storage file.
@@ -41,63 +36,68 @@ export async function deleteHierarchyItem(
   id: string,
   itemData?: any
 ): Promise<DeletionResult> {
-  const batch = writeBatch(db);
-
-  const deleteStorageFile = async (videoUrl: string) => {
-    if (!videoUrl.includes('firebasestorage.googleapis.com')) return;
-    try {
-      const fileRef = ref(storage, videoUrl);
-      await deleteObject(fileRef);
-      console.log(`Storage file deleted: ${videoUrl}`);
-    } catch (error: any) {
-      // If file doesn't exist, it's not a critical error for deletion process.
-      if (error.code === 'storage/object-not-found') {
-        console.warn(`Storage file not found, but proceeding with DB deletion: ${videoUrl}`);
-      } else {
-        // For other errors, we should stop and report.
-        throw new Error(`Failed to delete storage file: ${error.message}`);
-      }
-    }
-  };
-
-  const deleteEpisodes = async (courseId: string) => {
-    const episodesQuery = collection(db, 'courses', courseId, 'episodes');
-    const episodesSnapshot = await getDocs(episodesQuery);
-    for (const episodeDoc of episodesSnapshot.docs) {
-      const episodeData = episodeDoc.data() as Episode;
-      if (episodeData.videoUrl) {
-        await deleteStorageFile(episodeData.videoUrl);
-      }
-      batch.delete(episodeDoc.ref);
-    }
-  };
-
-  const deleteCourses = async (classificationId: string) => {
-     const coursesQuery = query(collection(db, 'courses'), where('classificationId', '==', classificationId));
-      const coursesSnapshot = await getDocs(coursesQuery);
-      for (const courseDoc of coursesSnapshot.docs) {
-        await deleteEpisodes(courseDoc.id);
-        batch.delete(courseDoc.ref);
-      }
-  }
-
   try {
+    const adminApp = initializeAdminApp();
+    const db = getFirestore(adminApp);
+    const storage = getStorage(adminApp);
+    const batch = db.batch();
+
+    const deleteStorageFile = async (videoUrl: string) => {
+      if (!videoUrl || !videoUrl.includes('firebasestorage.googleapis.com')) return;
+      try {
+        // Extract the path from the URL
+        const decodedUrl = decodeURIComponent(videoUrl);
+        const path = decodedUrl.substring(decodedUrl.indexOf('/o/') + 3, decodedUrl.indexOf('?alt=media'));
+        
+        const fileRef = storage.bucket().file(path);
+        await fileRef.delete();
+        console.log(`Admin: Storage file deleted: ${path}`);
+      } catch (error: any) {
+        if (error.code === 404) { // Not Found
+          console.warn(`Admin: Storage file not found, but proceeding with DB deletion: ${videoUrl}`);
+        } else {
+          throw new Error(`Admin: Failed to delete storage file: ${error.message}`);
+        }
+      }
+    };
+
+    const deleteEpisodes = async (courseId: string, currentBatch: WriteBatch) => {
+      const episodesQuery = db.collection('courses').doc(courseId).collection('episodes');
+      const episodesSnapshot = await episodesQuery.get();
+      for (const episodeDoc of episodesSnapshot.docs) {
+        const episodeData = episodeDoc.data() as Episode;
+        if (episodeData.videoUrl) {
+          await deleteStorageFile(episodeData.videoUrl);
+        }
+        currentBatch.delete(episodeDoc.ref);
+      }
+    };
+
+    const deleteCourses = async (classificationId: string, currentBatch: WriteBatch) => {
+       const coursesQuery = db.collection('courses').where('classificationId', '==', classificationId);
+       const coursesSnapshot = await coursesQuery.get();
+       for (const courseDoc of coursesSnapshot.docs) {
+         await deleteEpisodes(courseDoc.id, currentBatch);
+         currentBatch.delete(courseDoc.ref);
+       }
+    }
+
     if (collectionName === 'fields') {
-      const classificationsQuery = query(collection(db, 'classifications'), where('fieldId', '==', id));
-      const classificationsSnapshot = await getDocs(classificationsQuery);
+      const classificationsQuery = db.collection('classifications').where('fieldId', '==', id);
+      const classificationsSnapshot = await classificationsQuery.get();
       for (const classDoc of classificationsSnapshot.docs) {
-        await deleteCourses(classDoc.id);
+        await deleteCourses(classDoc.id, batch);
         batch.delete(classDoc.ref);
       }
-      batch.delete(doc(db, 'fields', id));
+      batch.delete(db.collection('fields').doc(id));
 
     } else if (collectionName === 'classifications') {
-      await deleteCourses(id);
-      batch.delete(doc(db, 'classifications', id));
+      await deleteCourses(id, batch);
+      batch.delete(db.collection('classifications').doc(id));
 
     } else if (collectionName === 'courses') {
-      await deleteEpisodes(id);
-      batch.delete(doc(db, 'courses', id));
+      await deleteEpisodes(id, batch);
+      batch.delete(db.collection('courses').doc(id));
     
     } else if (collectionName === 'episodes') {
       if (!itemData || !itemData.courseId || !itemData.videoUrl) {
@@ -105,14 +105,14 @@ export async function deleteHierarchyItem(
       }
       const episode = itemData as Episode;
       await deleteStorageFile(episode.videoUrl);
-      batch.delete(doc(db, 'courses', episode.courseId, 'episodes', id));
+      batch.delete(db.collection('courses').doc(episode.courseId).collection('episodes').doc(id));
     }
 
     await batch.commit();
     return { success: true, message: '항목 및 모든 관련 파일이 성공적으로 삭제되었습니다.' };
 
   } catch (error) {
-    console.error('Error during batch deletion:', error);
+    console.error('Admin: Error during batch deletion:', error);
     const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
     return { success: false, message: `삭제 실패: ${errorMessage}` };
   }

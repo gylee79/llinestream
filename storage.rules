@@ -1,12 +1,14 @@
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
+    
+    // 모든 경로({allPaths=**})의 파일에 대해 읽기, 쓰기(생성/수정/삭제) 허용
     match /{allPaths=**} {
-      allow read: if true;
-      // 'delete' 권한을 인증 없이 허용하여 서버 액션이 파일을 삭제할 수 있도록 함
-      allow delete: if true;
-      // 업로드(쓰기, 수정)는 여전히 인증된 사용자만 가능
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
+    
   }
 }
+
+
