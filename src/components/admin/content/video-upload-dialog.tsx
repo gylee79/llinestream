@@ -23,10 +23,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
-import { collection, query, where, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, doc, setDoc, collectionGroup } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { v4 as uuidv4 } from 'uuid'; // For unique IDs
 
 interface VideoUploadDialogProps {
   open: boolean;
@@ -40,6 +41,7 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
   
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -75,6 +77,7 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     setVideoFile(null);
     setUploadProgress(0);
     setIsUploading(false);
+    setDownloadUrl(null);
   }
 
   const getVideoDuration = (file: File): Promise<number> => {
@@ -91,6 +94,52 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
       video.src = URL.createObjectURL(file);
     });
   };
+
+  const handleStorageUploadOnly = async () => {
+    if (!selectedCourseId || !videoFile) {
+        toast({
+            variant: 'destructive',
+            title: '입력 오류',
+            description: '테스트를 위해 소속 상세분류와 비디오 파일을 모두 선택해야 합니다.',
+        });
+        return;
+    }
+    
+    setIsUploading(true);
+    setUploadProgress(0);
+    setDownloadUrl(null);
+
+    const episodeId = uuidv4();
+    const storageRef = ref(storage, `episodes/${selectedCourseId}/${episodeId}/${videoFile.name}`);
+    const uploadTask = uploadBytesResumable(storageRef, videoFile);
+
+    uploadTask.on('state_changed',
+        (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            setUploadProgress(progress);
+        },
+        (error) => {
+            console.error("Storage Upload failed:", error);
+            toast({
+                variant: 'destructive',
+                title: '스토리지 업로드 실패',
+                description: '파일 업로드 중 오류가 발생했습니다. CORS나 Storage 규칙을 확인해주세요.',
+            });
+            setIsUploading(false);
+        },
+        async () => {
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            setDownloadUrl(url);
+            setIsUploading(false);
+            toast({
+                title: '스토리지 업로드 성공!',
+                description: `파일이 성공적으로 업로드되었습니다.`,
+            });
+            console.log("File available at", url);
+        }
+    );
+  };
+
 
   const handleUpload = async () => {
     if (!title || !selectedCourseId || !videoFile) {
@@ -122,7 +171,7 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     const courseDocRef = doc(firestore, 'courses', selectedCourseId);
     const newEpisodeDocRef = doc(collection(courseDocRef, 'episodes'));
     const episodeId = newEpisodeDocRef.id;
-
+    
     const storageRef = ref(storage, `episodes/${selectedCourseId}/${episodeId}/${videoFile.name}`);
     const uploadTask = uploadBytesResumable(storageRef, videoFile);
 
@@ -143,8 +192,7 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
       async () => {
         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
         
-        const newEpisode: Episode = {
-          id: episodeId,
+        const newEpisode: Omit<Episode, 'id'> & { id?: string } = {
           courseId: selectedCourseId,
           title,
           description,
@@ -161,7 +209,6 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
             description: `${title} 에피소드가 성공적으로 추가되었습니다.`
           });
           onOpenChange(false);
-          // 폼 초기화는 useEffect에서 처리
         } catch (error) {
             console.error("Firestore write failed:", error);
             toast({
@@ -180,6 +227,11 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
       resetForm();
     }
   }, [open]);
+
+  useEffect(() => {
+    // Dynamically install uuid types if not present.
+    // This is a workaround for the development environment.
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -247,14 +299,29 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
               <p className="text-sm text-center text-muted-foreground mt-2">{uploadProgress.toFixed(0)}%</p>
             </div>
           )}
+          {downloadUrl && (
+            <div className="col-span-4 mt-2 p-2 bg-muted rounded-md">
+                <p className="text-sm font-medium text-foreground">업로드 성공 URL:</p>
+                <p className="text-xs text-muted-foreground break-all">{downloadUrl}</p>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isUploading}>취소</Button>
-          <Button type="submit" onClick={handleUpload} disabled={isUploading}>
-            {isUploading ? '업로드 중...' : '업로드'}
+          <Button type="button" variant="secondary" onClick={handleStorageUploadOnly} disabled={isUploading}>
+            {isUploading ? '업로드 중...' : '스토리지 테스트'}
+          </Button>
+          <Button type="submit" onClick={handleUpload} disabled={isUploading || !downloadUrl}>
+            {isUploading ? '업로드 중...' : 'DB에 저장'}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
+}
+
+// We need to add uuid for unique file paths, so we add the dependency.
+// This is a workaround for the dev environment to ensure types are available.
+declare module 'uuid' {
+    export function v4(): string;
 }
