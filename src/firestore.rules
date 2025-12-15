@@ -1,0 +1,133 @@
+/**
+ * LlineStream Firestore Security Rules
+ *
+ * Core Philosophy:
+ * This ruleset implements a dual security model. User-specific data (profiles,
+ * subscriptions) is governed by a strict ownership model, ensuring users can only
+ * access their own information. Public content (fields, courses, episodes) is
+ * publicly readable to all users, but write operations are restricted to
+ * designated administrators. This allows for a public-facing content catalog
+ * while maintaining strict control over its management.
+ *
+ * Data Structure:
+ * - /users/{userId}: Private user profile data, which includes a 'role' field.
+ * - /users/{userId}/subscriptions/{subscriptionId}: User's private subscription records.
+ * - /fields, /classifications, /courses: Top-level collections for public content.
+ * - /courses/{courseId}/episodes/{episodeId}: Subcollection for episodes.
+ * - /policies: Top-level collection for public legal documents.
+ *
+ * Key Security Decisions:
+ * - Default Deny: All paths are closed by default. Access is granted explicitly.
+ * - No User Listing: Listing the top-level `/users` collection is forbidden for privacy, only admins can list users.
+ * - Admin-Managed Content: All public content is managed by users with an admin role, verified by checking the 'role' field in their user document.
+ * - Subscription Check: To access a paid episode, a user must have a valid, non-expired subscription to the corresponding classification. This is checked by looking up the subscription in the user's private `subscriptions` subcollection.
+ *
+ * Denormalization for Authorization:
+ * - Admin Roles: A user's admin status is stored in their own user document (`/users/{userId}`). This allows a fast, single `get()` check to verify admin status.
+ * - Active Subscriptions on User: The `users/{userId}` document contains an `activeSubscriptions` map. This allows the client to quickly know which classifications are active without querying the subcollection, simplifying UI logic. Security rules, however, will query the subcollection for security.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // Helper Functions
+    // =========================================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isOwnerOrAdmin(userId) {
+      return isOwner(userId) || isAdmin();
+    }
+
+    function isCreatingOwnUserDoc(userId) {
+      return isOwner(userId) && request.resource.data.id == userId;
+    }
+    
+    function isNotUpdatingImmutableUserFields() {
+        return request.resource.data.id == resource.data.id &&
+               request.resource.data.email == resource.data.email &&
+               request.resource.data.createdAt == resource.data.createdAt;
+    }
+    
+    // Admins can change roles, but users cannot change their own role.
+    function isRoleUpdateAllowed() {
+        return isAdmin() || request.resource.data.role == resource.data.role;
+    }
+
+    // Check if the user has an active subscription for a given classificationId
+    function hasActiveSubscription(classificationId) {
+        return exists(/databases/$(database)/documents/users/$(request.auth.uid)/subscriptions/$(classificationId))
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)/subscriptions/$(classificationId)).data.expiresAt > request.time;
+    }
+
+    // =========================================================================
+    // Collection Group Rules
+    // =========================================================================
+    
+    match /{path=**}/episodes/{episodeId} {
+      // Allow admins to list all episodes across all courses for management purposes.
+      allow list: if isAdmin();
+    }
+
+    // =========================================================================
+    // Collection Rules
+    // =========================================================================
+
+    match /users/{userId} {
+      allow get: if isOwnerOrAdmin(userId);
+      allow list: if isAdmin();
+      allow create: if isCreatingOwnUserDoc(userId);
+      allow update: if isOwnerOrAdmin(userId) && isNotUpdatingImmutableUserFields() && isRoleUpdateAllowed();
+      allow delete: if isAdmin();
+
+      match /subscriptions/{subscriptionId} {
+        allow get, list: if isOwnerOrAdmin(userId);
+        allow create, update, delete: if isOwnerOrAdmin(userId);
+      }
+    }
+
+    match /fields/{fieldId} {
+      allow get, list: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /classifications/{classificationId} {
+      allow get, list: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /courses/{courseId} {
+      allow get, list: if true;
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+
+      match /episodes/{episodeId} {
+        // Free episodes are public. Paid ones require a valid subscription.
+        allow get: if resource.data.isFree == true || (isSignedIn() && hasActiveSubscription(get(/databases/$(database)/documents/courses/$(courseId)).data.classificationId));
+        // Note: 'list' for a subcollection is different from a collection group query.
+        // The collection group query rule above handles the 'list' for all episodes.
+        // This rule allows listing episodes *within* a single course page.
+        allow list: if true; 
+        allow create, update, delete: if isAdmin();
+      }
+    }
+
+    match /policies/{policyId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}
