@@ -13,15 +13,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
 import { v4 as uuidv4 } from 'uuid';
 
-const Column = ({ title, items, selectedId, onSelect, onAdd, onEdit, onDelete, isLoading }: {
+const Column = ({ title, items, selectedId, onSelect, onAdd, onEdit, onDelete, isLoading, collectionName }: {
   title: string;
   items: { id: string, name: string }[] | null;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onAdd: () => void;
   onEdit: (id: string, name: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (collectionName: 'fields' | 'classifications' | 'courses', id: string, name: string) => void;
   isLoading: boolean;
+  collectionName: 'fields' | 'classifications' | 'courses';
 }) => (
   <Card className="flex-1">
     <CardHeader className="flex flex-row items-center justify-between">
@@ -46,7 +47,7 @@ const Column = ({ title, items, selectedId, onSelect, onAdd, onEdit, onDelete, i
                     <span>{item.name}</span>
                     <div className="flex gap-2">
                     <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEdit(item.id, item.name); }}><Pencil className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}><Trash2 className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(collectionName, item.id, item.name); }}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                 </div>
                 ))}
@@ -87,21 +88,24 @@ export default function HierarchyManager() {
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
   
   useEffect(() => {
-    if (fields && selectedField && !fields.find(f => f.id === selectedField)) {
-        setSelectedField(null);
+    if (selectedField && fields && !fields.find(f => f.id === selectedField)) {
+      setSelectedField(null);
     }
   }, [fields, selectedField]);
 
   useEffect(() => {
-    if (classifications && selectedClassification && !classifications.find(c => c.id === selectedClassification)) {
-        setSelectedClassification(null);
+    if (selectedClassification && classifications && !classifications.find(c => c.id === selectedClassification)) {
+      setSelectedClassification(null);
     }
   }, [classifications, selectedClassification]);
-
 
   const handleSelectField = (id: string | null) => {
     setSelectedField(id);
     setSelectedClassification(null);
+  };
+
+  const handleSelectClassification = (id: string | null) => {
+    setSelectedClassification(id);
   };
 
   const openDialog = (type: DialogState['type'], item: HierarchyItem | null = null) => {
@@ -115,13 +119,14 @@ export default function HierarchyManager() {
   const closeDialog = () => setDialogState({ isOpen: false, item: null, type: '분야' });
 
   const handleSave = (item: HierarchyItem) => {
+    const newId = uuidv4();
+
     if (dialogState.item) { // Edit mode
         const collectionName = dialogState.type === '분야' ? 'fields' : dialogState.type === '큰분류' ? 'classifications' : 'courses';
         updateDocumentNonBlocking(doc(firestore, collectionName, item.id), { name: item.name });
         toast({ title: '성공', description: `${dialogState.type} '${item.name}'이(가) 수정되었습니다.` });
     } else { // Add mode
         let collectionName = '';
-        const newId = uuidv4();
         let data: any = { id: newId, name: item.name };
 
         if (dialogState.type === '분야') {
@@ -148,20 +153,23 @@ export default function HierarchyManager() {
     closeDialog();
   };
 
-  const handleDelete = async (type: string, collectionName: 'fields' | 'classifications' | 'courses', id: string) => {
-    if (!confirm(`정말로 '${type}' 항목을 삭제하시겠습니까? 하위 항목이 있는 경우 함께 삭제되지 않으니 주의해주세요. 이 작업은 되돌릴 수 없습니다.`)) return;
+  const handleDelete = async (collectionName: 'fields' | 'classifications' | 'courses', id: string, name: string) => {
+    if (!confirm(`정말로 '${name}' 항목을 삭제하시겠습니까? 하위 항목이 있는 경우 함께 삭제되지 않으니 주의해주세요. 이 작업은 되돌릴 수 없습니다.`)) return;
 
     try {
       await deleteDoc(doc(firestore, collectionName, id));
 
+      toast({ title: '삭제 성공', description: `'${name}' 항목이 성공적으로 삭제되었습니다.` });
+
+      // State reset to force re-fetch
       if (collectionName === 'fields' && selectedField === id) {
           setSelectedField(null);
+          setSelectedClassification(null);
       }
       if (collectionName === 'classifications' && selectedClassification === id) {
           setSelectedClassification(null);
       }
 
-      toast({ title: '삭제 성공', description: `${type} 항목이 성공적으로 삭제되었습니다.` });
     } catch (error) {
       console.error("Error deleting document: ", error);
       toast({ variant: 'destructive', title: '삭제 실패', description: '항목 삭제 중 오류가 발생했습니다.' });
@@ -184,18 +192,20 @@ export default function HierarchyManager() {
               onSelect={handleSelectField}
               onAdd={() => openDialog('분야')}
               onEdit={(id, name) => openDialog('분야', { id, name })}
-              onDelete={(id) => handleDelete('분야', 'fields', id)}
+              onDelete={handleDelete}
               isLoading={fieldsLoading}
+              collectionName="fields"
             />
             <Column
               title="큰분류 (Classification)"
               items={classifications}
               selectedId={selectedClassification}
-              onSelect={setSelectedClassification}
+              onSelect={handleSelectClassification}
               onAdd={() => openDialog('큰분류')}
               onEdit={(id, name) => openDialog('큰분류', { id, name })}
-              onDelete={(id) => handleDelete('큰분류', 'classifications', id)}
+              onDelete={handleDelete}
               isLoading={!selectedField || classificationsLoading}
+              collectionName="classifications"
             />
             <Column
               title="상세분류 (Course)"
@@ -204,8 +214,9 @@ export default function HierarchyManager() {
               onSelect={() => {}}
               onAdd={() => openDialog('상세분류')}
               onEdit={(id, name) => openDialog('상세분류', { id, name })}
-              onDelete={(id) => handleDelete('상세분류', 'courses', id)}
+              onDelete={handleDelete}
               isLoading={!selectedClassification || coursesLoading}
+              collectionName="courses"
             />
           </div>
         </CardContent>
