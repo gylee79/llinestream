@@ -63,12 +63,16 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
             toast({ variant: 'destructive', title: '설정 오류', description: '스토어 ID가 설정되지 않았습니다. 관리자에게 문의하세요.' });
             return;
         }
+        if (!channelKey) {
+            toast({ variant: 'destructive', title: '설정 오류', description: '채널 키가 설정되지 않았습니다. 관리자에게 문의하세요.' });
+            return;
+        }
 
         const paymentId = `payment-${crypto.randomUUID()}`;
 
         const request: PortOnePaymentRequest = {
-            storeId: storeId,
-            channelKey: channelKey,
+            storeId,
+            channelKey,
             paymentId,
             orderName: `${classification.name} 30일 이용권`,
             totalAmount: classification.prices.day30,
