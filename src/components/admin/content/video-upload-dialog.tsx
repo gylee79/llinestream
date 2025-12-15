@@ -23,7 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
-import { collection, query, where, doc, setDoc, collectionGroup } from 'firebase/firestore';
+import { collection, query, where, doc, setDoc } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -142,84 +142,59 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
 
 
   const handleUpload = async () => {
-    if (!title || !selectedCourseId || !videoFile) {
+    if (!title || !selectedCourseId || !downloadUrl) {
       toast({
         variant: 'destructive',
         title: '입력 오류',
-        description: '제목, 소속 상세분류, 비디오 파일을 모두 선택해야 합니다.',
+        description: '제목, 소속 상세분류를 선택하고 비디오를 먼저 스토리지에 업로드해야 합니다.',
       });
       return;
     }
-
-    setIsUploading(true);
-    setUploadProgress(0);
 
     let duration = 0;
-    try {
-      duration = await getVideoDuration(videoFile);
-    } catch(error) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: '오류',
-        description: '비디오 파일의 재생 시간을 읽을 수 없습니다.',
-      });
-      setIsUploading(false);
-      return;
+    if (videoFile) {
+        try {
+            duration = await getVideoDuration(videoFile);
+        } catch(error) {
+            console.error(error);
+            toast({
+                variant: 'destructive',
+                title: '오류',
+                description: '비디오 파일의 재생 시간을 읽을 수 없습니다.',
+            });
+            return;
+        }
     }
+
 
     const courseDocRef = doc(firestore, 'courses', selectedCourseId);
     const newEpisodeDocRef = doc(collection(courseDocRef, 'episodes'));
-    const episodeId = newEpisodeDocRef.id;
     
-    const storageRef = ref(storage, `episodes/${selectedCourseId}/${episodeId}/${videoFile.name}`);
-    const uploadTask = uploadBytesResumable(storageRef, videoFile);
+    const newEpisode: Omit<Episode, 'id'> & { id?: string } = {
+        courseId: selectedCourseId,
+        title,
+        description,
+        duration,
+        isFree,
+        videoUrl: downloadUrl,
+    };
 
-    uploadTask.on('state_changed',
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        setUploadProgress(progress);
-      },
-      (error) => {
-        console.error("Upload failed:", error);
+    try {
+        await setDoc(newEpisodeDocRef, newEpisode);
+
         toast({
-          variant: 'destructive',
-          title: '업로드 실패',
-          description: '파일 업로드 중 오류가 발생했습니다. CORS 설정을 확인해주세요.',
+        title: '업로드 완료',
+        description: `${title} 에피소드가 성공적으로 추가되었습니다.`
         });
-        setIsUploading(false);
-      },
-      async () => {
-        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-        
-        const newEpisode: Omit<Episode, 'id'> & { id?: string } = {
-          courseId: selectedCourseId,
-          title,
-          description,
-          duration,
-          isFree,
-          videoUrl: downloadURL,
-        };
-
-        try {
-          await setDoc(newEpisodeDocRef, newEpisode);
-
-          toast({
-            title: '업로드 완료',
-            description: `${title} 에피소드가 성공적으로 추가되었습니다.`
-          });
-          onOpenChange(false);
-        } catch (error) {
-            console.error("Firestore write failed:", error);
-            toast({
-              variant: 'destructive',
-              title: '저장 실패',
-              description: '에피소드 정보를 Firestore에 저장하는 데 실패했습니다.',
-            });
-            setIsUploading(false);
-        }
-      }
-    );
+        onOpenChange(false);
+    } catch (error) {
+        console.error("Firestore write failed:", error);
+        toast({
+            variant: 'destructive',
+            title: '저장 실패',
+            description: '에피소드 정보를 Firestore에 저장하는 데 실패했습니다.',
+        });
+    }
   };
 
   useEffect(() => {

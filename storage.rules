@@ -4,10 +4,7 @@ service firebase.storage {
     // Allow read access to all files by default
     match /{allPaths=**} {
       allow read: if true;
-    }
-    
-    // Restrict write access to authenticated users for the 'episodes' path
-    match /episodes/{courseId}/{episodeId}/{fileName} {
+      // Temporarily allow write for any authenticated user to debug upload issues
       allow write: if request.auth != null;
     }
   }
