@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -18,20 +19,21 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function AdminSubscriptionsPage() {
   const firestore = useFirestore();
 
-  // 모든 사용자의 'subscriptions' 서브 컬렉션을 한 번에 가져옴
+  // 1. firestore가 준비되었을 때만 쿼리를 생성합니다.
   const subscriptionsQuery = useMemoFirebase(
     () => (firestore ? query(collectionGroup(firestore, 'subscriptions'), orderBy('purchasedAt', 'desc')) : null),
     [firestore]
   );
-  const { data: subscriptions, isLoading: subsLoading } = useCollection<Subscription>(subscriptionsQuery);
   
-  // 사용자 및 분류 정보를 매핑하기 위해 가져옴
   const usersQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
-  const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
-
   const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
-  const { data: classifications, isLoading: classLoading } = useCollection<Classification>(classificationsQuery);
 
+  // 2. 쿼리가 유효할 때(null이 아닐 때)만 useCollection 훅을 호출합니다.
+  const { data: subscriptions, isLoading: subsLoading } = useCollection<Subscription>(subscriptionsQuery);
+  const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
+  const { data: classifications, isLoading: classLoading } = useCollection<Classification>(classificationsQuery);
+  
+  // 3. 셋 중 하나라도 로딩 중이면 로딩 상태로 간주합니다.
   const isLoading = subsLoading || usersLoading || classLoading;
 
   const getUserName = (userId: string) => users?.find(u => u.id === userId)?.name || '알 수 없음';
