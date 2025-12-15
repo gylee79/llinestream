@@ -7,6 +7,7 @@ export function LlineStreamLogo(props: SVGProps<SVGSVGElement>) {
       viewBox="0 0 240 50"
       width="120"
       height="30"
+      data-version="1.1" 
       {...props}
     >
       <text
