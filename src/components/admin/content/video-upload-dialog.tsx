@@ -142,7 +142,7 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
 
 
   const handleUpload = async () => {
-    if (!title || !selectedCourseId || !downloadUrl) {
+    if (!title || !selectedCourseId || !videoFile || !downloadUrl) {
       toast({
         variant: 'destructive',
         title: '입력 오류',
@@ -152,23 +152,19 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     }
 
     let duration = 0;
-    if (videoFile) {
-        try {
-            duration = await getVideoDuration(videoFile);
-        } catch(error) {
-            console.error(error);
-            toast({
-                variant: 'destructive',
-                title: '오류',
-                description: '비디오 파일의 재생 시간을 읽을 수 없습니다.',
-            });
-            return;
-        }
+    try {
+        duration = await getVideoDuration(videoFile);
+    } catch(error) {
+        console.error(error);
+        toast({
+            variant: 'destructive',
+            title: '오류',
+            description: '비디오 파일의 재생 시간을 읽을 수 없습니다.',
+        });
+        return;
     }
-
-
-    const courseDocRef = doc(firestore, 'courses', selectedCourseId);
-    const newEpisodeDocRef = doc(collection(courseDocRef, 'episodes'));
+    
+    const newEpisodeDocRef = doc(collection(firestore, 'courses', selectedCourseId, 'episodes'));
     
     const newEpisode: Omit<Episode, 'id'> & { id?: string } = {
         courseId: selectedCourseId,
@@ -183,8 +179,8 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
         await setDoc(newEpisodeDocRef, newEpisode);
 
         toast({
-        title: '업로드 완료',
-        description: `${title} 에피소드가 성공적으로 추가되었습니다.`
+          title: '업로드 완료',
+          description: `${title} 에피소드가 성공적으로 추가되었습니다.`
         });
         onOpenChange(false);
     } catch (error) {
@@ -202,11 +198,6 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
       resetForm();
     }
   }, [open]);
-
-  useEffect(() => {
-    // Dynamically install uuid types if not present.
-    // This is a workaround for the development environment.
-  }, []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -274,10 +265,13 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
               <p className="text-sm text-center text-muted-foreground mt-2">{uploadProgress.toFixed(0)}%</p>
             </div>
           )}
-          {downloadUrl && (
-            <div className="col-span-4 mt-2 p-2 bg-muted rounded-md">
-                <p className="text-sm font-medium text-foreground">업로드 성공 URL:</p>
-                <p className="text-xs text-muted-foreground break-all">{downloadUrl}</p>
+          {downloadUrl && !isUploading && (
+            <div className="grid grid-cols-4 items-center gap-4">
+                <div/>
+                <div className="col-span-3 mt-2 p-2 bg-muted rounded-md">
+                    <p className="text-sm font-medium text-green-600">✓ 스토리지 업로드 성공!</p>
+                    <p className="text-xs text-muted-foreground break-all">{downloadUrl}</p>
+                </div>
             </div>
           )}
         </div>
@@ -287,16 +281,10 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
             {isUploading ? '업로드 중...' : '스토리지 테스트'}
           </Button>
           <Button type="submit" onClick={handleUpload} disabled={isUploading || !downloadUrl}>
-            {isUploading ? '업로드 중...' : 'DB에 저장'}
+            DB에 저장
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-}
-
-// We need to add uuid for unique file paths, so we add the dependency.
-// This is a workaround for the dev environment to ensure types are available.
-declare module 'uuid' {
-    export function v4(): string;
 }
