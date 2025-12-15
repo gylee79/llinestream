@@ -79,13 +79,13 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     courses: [],
   });
 
-  const fieldsQuery = useMemoFirebase(() => collection(firestore, 'fields'), [firestore]);
+  const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: dbFields } = useCollection<Field>(fieldsQuery);
 
-  const classificationsQuery = useMemoFirebase(() => collection(firestore, 'classifications'), [firestore]);
+  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
   const { data: dbClassifications } = useCollection<Classification>(classificationsQuery);
 
-  const coursesQuery = useMemoFirebase(() => collection(firestore, 'courses'), [firestore]);
+  const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
   const { data: dbCourses } = useCollection<Course>(coursesQuery);
   
   const allFields = [
@@ -157,6 +157,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   };
 
   const handleSaveEpisode = async () => {
+    if (!firestore || !storage) return;
+
     if (!title || !selectedCourseId) {
       toast({ variant: 'destructive', title: '입력 오류', description: '제목과 소속 상세분류는 필수입니다.' });
       return;

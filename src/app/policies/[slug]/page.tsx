@@ -1,3 +1,4 @@
+
 'use client';
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function PolicyPage({ params }: { params: { slug: string } }) {
   const firestore = useFirestore();
-  const policyRef = useMemoFirebase(() => doc(firestore, 'policies', params.slug), [firestore, params.slug]);
+  const policyRef = useMemoFirebase(() => (firestore ? doc(firestore, 'policies', params.slug) : null), [firestore, params.slug]);
   const { data: policy, isLoading } = useDoc<Policy>(policyRef);
 
   if (isLoading) {

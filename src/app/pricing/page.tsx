@@ -1,3 +1,4 @@
+
 'use client';
 import PricingCard from '@/components/pricing/pricing-card';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
@@ -8,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function PricingPage() {
   const firestore = useFirestore();
   const classificationsQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'classifications'), where('prices.day30', '>', 0)),
+    firestore ? query(collection(firestore, 'classifications'), where('prices.day30', '>', 0)) : null,
     [firestore]
   );
   const { data: subscribableClassifications, isLoading } = useCollection<Classification>(classificationsQuery);

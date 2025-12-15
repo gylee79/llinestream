@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -38,7 +39,7 @@ interface UserDetailsDialogProps {
 
 export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialogProps) {
     const firestore = useFirestore();
-    const classificationsQuery = useMemoFirebase(() => collection(firestore, 'classifications'), [firestore]);
+    const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
     const { data: classifications } = useCollection<Classification>(classificationsQuery);
 
     const activeSubs = user.activeSubscriptions ? Object.entries(user.activeSubscriptions).map(([id, sub]) => ({
