@@ -1,3 +1,4 @@
+
 /**
  * LlineStream Firestore Security Rules
  *
@@ -5,6 +6,7 @@
  * This ruleset implements a dual security model. User-specific data (profiles,
  * subscriptions) is governed by a strict ownership model, ensuring users can only
  * access their own information. Public content (fields, courses, episodes) is
+
  * publicly readable to all users, but write operations are restricted to
  * designated administrators. This allows for a public-facing content catalog
  * while maintaining strict control over its management.
@@ -99,20 +101,17 @@ service cloud.firestore {
 
     match /fields/{fieldId} {
       allow get, list: if true;
-      allow create, update: if isAdmin();
-      allow delete: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     match /classifications/{classificationId} {
       allow get, list: if true;
-      allow create, update: if isAdmin();
-      allow delete: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     match /courses/{courseId} {
       allow get, list: if true;
-      allow create, update: if isAdmin();
-      allow delete: if isAdmin();
+      allow create, update, delete: if isAdmin();
 
       match /episodes/{episodeId} {
         // Free episodes are public. Paid ones require a valid subscription.
