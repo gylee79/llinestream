@@ -25,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, collectionGroup } from 'firebase/firestore';
+import { collection, doc, query, collectionGroup, deleteDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
@@ -34,13 +34,19 @@ export default function VideoManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const episodesQuery = useMemoFirebase(() => collectionGroup(firestore, 'episodes'), [firestore]);
+  const episodesQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'episodes')), [firestore]);
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
   
   const coursesQuery = useMemoFirebase(() => collection(firestore, 'courses'), [firestore]);
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
   
-  const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [isDialogOpen, setDialogOpen] = useState(false);
+  const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
+
+  const handleOpenDialog = (episode: Episode | null = null) => {
+    setSelectedEpisode(episode);
+    setDialogOpen(true);
+  };
 
   const getCourseName = (courseId: string) => {
     return courses?.find(c => c.id === courseId)?.name || 'N/A';
@@ -55,6 +61,25 @@ export default function VideoManager() {
     });
   };
 
+  const handleDeleteEpisode = async (episode: Episode) => {
+    if (!confirm(`정말로 '${episode.title}' 에피소드를 삭제하시겠습니까?`)) return;
+    try {
+        const docRef = doc(firestore, 'courses', episode.courseId, 'episodes', episode.id);
+        await deleteDoc(docRef);
+        toast({
+            title: '삭제 완료',
+            description: `'${episode.title}' 에피소드가 삭제되었습니다.`,
+        });
+    } catch (error) {
+        console.error("Failed to delete episode:", error);
+        toast({
+            variant: 'destructive',
+            title: '삭제 실패',
+            description: '에피소드 삭제 중 오류가 발생했습니다.',
+        });
+    }
+  };
+
   const isLoading = episodesLoading || coursesLoading;
 
   return (
@@ -65,7 +90,7 @@ export default function VideoManager() {
             <CardTitle>비디오 관리</CardTitle>
             <p className="text-sm text-muted-foreground">개별 에피소드를 업로드하고 관리합니다.</p>
           </div>
-          <Button onClick={() => setUploadDialogOpen(true)}>
+          <Button onClick={() => handleOpenDialog()}>
             <PlusCircle className="mr-2 h-4 w-4" />
             비디오 업로드
           </Button>
@@ -83,7 +108,11 @@ export default function VideoManager() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                        <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
+                    </TableRow>
+                ))
               ) : (
                 episodes?.map((episode) => (
                   <TableRow key={episode.id}>
@@ -116,10 +145,10 @@ export default function VideoManager() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => alert(`수정: ${episode.title}`)}>
+                          <DropdownMenuItem onClick={() => handleOpenDialog(episode)}>
                             수정
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => alert(`삭제: ${episode.title}`)}>
+                          <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteEpisode(episode)}>
                             삭제
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -132,7 +161,12 @@ export default function VideoManager() {
           </Table>
         </CardContent>
       </Card>
-      <VideoUploadDialog open={isUploadDialogOpen} onOpenChange={setUploadDialogOpen} />
+      <VideoUploadDialog 
+        key={selectedEpisode?.id || 'new'} 
+        open={isDialogOpen} 
+        onOpenChange={setDialogOpen} 
+        episode={selectedEpisode}
+      />
     </>
   );
 }
