@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/badge';
 
 export default function AdminUsersPage() {
   const firestore = useFirestore();
-  const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const usersQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
   const { data: users, isLoading } = useCollection<User>(usersQuery);
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
