@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import type { Field, Classification, Course } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, doc, addDoc, updateDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
@@ -153,29 +153,69 @@ export default function HierarchyManager() {
   };
   
   const handleDelete = async (collectionName: 'fields' | 'classifications' | 'courses', id: string, name: string) => {
-    if (!confirm(`정말로 '${name}' 항목과 모든 하위 항목들을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
+    if (!confirm(`정말로 '${name}' 항목을 삭제하시겠습니까? 하위 항목이 있는 경우 서버 액션을 통해 함께 삭제됩니다.`)) return;
+
+    // --- Start: 완전 디버깅 모드 ---
+    console.log("--- DELETE ATTEMPT (DEBUG MODE) ---");
+    console.log("Project ID:", firestore.app.options.projectId);
+    console.log("Target Collection Name:", collectionName);
+    console.log("Target Document ID:", id);
+
+    const docRef = doc(firestore, collectionName, id);
 
     try {
-      const result = await deleteHierarchyItem(collectionName, id);
-      if (result.success) {
-        toast({ title: '삭제 성공', description: result.message });
-        // 상태를 리셋하여 UI를 갱신합니다.
-        if (collectionName === 'fields' && selectedField === id) {
-            setSelectedField(null);
-            setSelectedClassification(null);
+        console.log("Step 1: Checking if document exists at path:", docRef.path);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            console.log("Step 2: Document FOUND. Data:", docSnap.data());
+            
+            // Check for subcollections before deciding deletion strategy
+            const isField = collectionName === 'fields';
+            const isClassification = collectionName === 'classifications';
+            
+            // Fields and Classifications have sub-items, so they need the robust server-side deletion.
+            if (isField || isClassification) {
+                console.log("Step 3: This is a parent item. Using server action for safe recursive deletion.");
+                const result = await deleteHierarchyItem(collectionName, id);
+                if (result.success) {
+                    toast({ title: '서버 액션 성공', description: result.message });
+                    if (collectionName === 'fields' && selectedField === id) setSelectedField(null);
+                    if (collectionName === 'classifications' && selectedClassification === id) setSelectedClassification(null);
+                } else {
+                    throw new Error(result.message);
+                }
+            } else { // 'courses' are leaf nodes in this manager, can be deleted directly or via server action. Let's use server action for consistency.
+                console.log("Step 3: This is a course. Using server action to also delete episodes and files.");
+                const result = await deleteHierarchyItem(collectionName, id);
+                 if (result.success) {
+                    toast({ title: '서버 액션 성공', description: result.message });
+                } else {
+                    throw new Error(result.message);
+                }
+            }
+        } else {
+            console.error("Step 2: Document NOT FOUND at the specified path. Aborting delete.");
+            toast({
+                variant: "destructive",
+                title: "삭제 실패",
+                description: "삭제할 문서를 찾을 수 없습니다. 경로가 잘못되었을 수 있습니다.",
+            });
         }
-        if (collectionName === 'classifications' && selectedClassification === id) {
-            setSelectedClassification(null);
-        }
-      } else {
-        throw new Error(result.message);
-      }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error("Error deleting document: ", error);
-      toast({ variant: 'destructive', title: '삭제 실패', description: errorMessage });
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error("--- DELETE FAILED ---", error);
+        toast({
+            variant: "destructive",
+            title: "삭제 중 오류 발생",
+            description: errorMessage,
+        });
+    } finally {
+        console.log("--- DELETE ATTEMPT FINISHED ---");
     }
+    // --- End: 완전 디버깅 모드 ---
   };
+
 
   return (
     <>
