@@ -22,7 +22,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { useCollection, useFirestore, useStorage } from '@/firebase';
+import { useCollection, useFirestore, useStorage, useMemoFirebase } from '@/firebase';
 import { collection, query, where, doc, setDoc, writeBatch } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -64,15 +64,11 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
   const [selectedClassificationId, setSelectedClassificationId] = useState<string | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 
   const [hierarchyDialogState, setHierarchyDialogState] = useState<HierarchyDialogState>({ isOpen: false, item: null, type: '분야' });
   const [isPending, startTransition] = useTransition();
 
-  // Firestore data
-  const { data: dbFields } = useCollection<Field>(collection(firestore, 'fields'));
-  const { data: dbClassifications } = useCollection<Classification>(collection(firestore, 'classifications'));
-  const { data: dbCourses } = useCollection<Course>(collection(firestore, 'courses'));
-  
   // Local state for temporary items
   const [newHierarchyItems, setNewHierarchyItems] = useState<NewHierarchyItems>({
     fields: [],
@@ -80,6 +76,16 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     courses: [],
   });
 
+  // Firestore data
+  const fieldsQuery = useMemoFirebase(() => collection(firestore, 'fields'), [firestore]);
+  const { data: dbFields } = useCollection<Field>(fieldsQuery);
+
+  const classificationsQuery = useMemoFirebase(() => collection(firestore, 'classifications'), [firestore]);
+  const { data: dbClassifications } = useCollection<Classification>(classificationsQuery);
+
+  const coursesQuery = useMemoFirebase(() => collection(firestore, 'courses'), [firestore]);
+  const { data: dbCourses } = useCollection<Course>(coursesQuery);
+  
   // Combined data (DB + local)
   const allFields = [...(dbFields || []), ...newHierarchyItems.fields];
   const allClassifications = [...(dbClassifications || []), ...newHierarchyItems.classifications];
@@ -99,6 +105,7 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     setUploadProgress(0);
     setIsUploading(false);
     setNewHierarchyItems({ fields: [], classifications: [], courses: [] });
+    setDownloadUrl(null);
   };
 
   const getVideoDuration = (file: File): Promise<number> => {
@@ -138,13 +145,14 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
       const storageRef = ref(storage, `episodes/${selectedCourseId}/${episodeId}/${videoFile.name}`);
       const uploadTask = uploadBytesResumable(storageRef, videoFile);
 
-      const downloadUrl = await new Promise<string>((resolve, reject) => {
+      const uploadedUrl = await new Promise<string>((resolve, reject) => {
         uploadTask.on('state_changed',
           (snapshot) => setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
           (error) => reject(new Error('파일 스토리지 업로드에 실패했습니다. CORS나 Storage 규칙을 확인해주세요.')),
           async () => resolve(await getDownloadURL(uploadTask.snapshot.ref))
         );
       });
+      setDownloadUrl(uploadedUrl);
       
       // 3. Save everything to Firestore in a batch
       const batch = writeBatch(firestore);
@@ -162,7 +170,7 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
           description,
           duration,
           isFree,
-          videoUrl: downloadUrl,
+          videoUrl: uploadedUrl,
       };
       batch.set(newEpisodeDocRef, newEpisode);
 
