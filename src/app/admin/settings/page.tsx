@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,7 +14,7 @@ import { collection } from 'firebase/firestore';
 
 export default function AdminSettingsPage() {
   const firestore = useFirestore();
-  const policiesQuery = useMemoFirebase(() => collection(firestore, 'policies'), [firestore]);
+  const policiesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'policies') : null), [firestore]);
   const { data: policies } = useCollection<Policy>(policiesQuery);
 
   const termsPolicy = policies?.find(p => p.id === 'terms');
