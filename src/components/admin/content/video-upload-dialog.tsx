@@ -22,8 +22,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { useCollection, useFirestore, useMemoFirebase, useStorage } from '@/firebase';
-import { collection, query, where, doc, setDoc, Timestamp } from 'firebase/firestore';
+import { useCollection, useFirestore, useStorage } from '@/firebase';
+import { collection, query, where, doc, setDoc, writeBatch } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -37,10 +37,16 @@ interface VideoUploadDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type DialogState = {
+type HierarchyDialogState = {
   isOpen: boolean;
   item: HierarchyItem | null;
   type: '분야' | '큰분류' | '상세분류';
+};
+
+type NewHierarchyItems = {
+  fields: Field[];
+  classifications: Classification[];
+  courses: Course[];
 };
 
 export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDialogProps) {
@@ -54,39 +60,45 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isFree, setIsFree] = useState(false);
-  const [selectedField, setSelectedField] = useState<string | null>(null);
-  const [selectedClassification, setSelectedClassification] = useState<string | null>(null);
+  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
+  const [selectedClassificationId, setSelectedClassificationId] = useState<string | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
 
-  const [hierarchyDialogState, setHierarchyDialogState] = useState<DialogState>({ isOpen: false, item: null, type: '분야' });
+  const [hierarchyDialogState, setHierarchyDialogState] = useState<HierarchyDialogState>({ isOpen: false, item: null, type: '분야' });
   const [isPending, startTransition] = useTransition();
 
-  const fieldsQuery = useMemoFirebase(() => collection(firestore, 'fields'), [firestore]);
-  const { data: fields } = useCollection<Field>(fieldsQuery);
+  // Firestore data
+  const { data: dbFields } = useCollection<Field>(collection(firestore, 'fields'));
+  const { data: dbClassifications } = useCollection<Classification>(collection(firestore, 'classifications'));
+  const { data: dbCourses } = useCollection<Course>(collection(firestore, 'courses'));
+  
+  // Local state for temporary items
+  const [newHierarchyItems, setNewHierarchyItems] = useState<NewHierarchyItems>({
+    fields: [],
+    classifications: [],
+    courses: [],
+  });
 
-  const classificationsQuery = useMemoFirebase(() => 
-    selectedField ? query(collection(firestore, 'classifications'), where('fieldId', '==', selectedField)) : null, 
-    [firestore, selectedField]
-  );
-  const { data: classifications } = useCollection<Classification>(classificationsQuery);
+  // Combined data (DB + local)
+  const allFields = [...(dbFields || []), ...newHierarchyItems.fields];
+  const allClassifications = [...(dbClassifications || []), ...newHierarchyItems.classifications];
+  const allCourses = [...(dbCourses || []), ...newHierarchyItems.courses];
 
-  const coursesQuery = useMemoFirebase(() => 
-    selectedClassification ? query(collection(firestore, 'courses'), where('classificationId', '==', selectedClassification)) : null, 
-    [firestore, selectedClassification]
-  );
-  const { data: courses } = useCollection<Course>(coursesQuery);
+  const filteredClassifications = allClassifications.filter(c => c.fieldId === selectedFieldId);
+  const filteredCourses = allCourses.filter(c => c.classificationId === selectedClassificationId);
 
   const resetForm = () => {
     setTitle('');
     setDescription('');
     setIsFree(false);
-    setSelectedField(null);
-    setSelectedClassification(null);
+    setSelectedFieldId(null);
+    setSelectedClassificationId(null);
     setSelectedCourseId(null);
     setVideoFile(null);
     setUploadProgress(0);
     setIsUploading(false);
+    setNewHierarchyItems({ fields: [], classifications: [], courses: [] });
   };
 
   const getVideoDuration = (file: File): Promise<number> => {
@@ -126,27 +138,24 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
       const storageRef = ref(storage, `episodes/${selectedCourseId}/${episodeId}/${videoFile.name}`);
       const uploadTask = uploadBytesResumable(storageRef, videoFile);
 
-      // Wait for upload to complete
       const downloadUrl = await new Promise<string>((resolve, reject) => {
         uploadTask.on('state_changed',
-          (snapshot) => {
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            setUploadProgress(progress);
-          },
-          (error) => {
-            console.error("Storage Upload failed:", error);
-            reject(new Error('파일 스토리지 업로드에 실패했습니다. CORS나 Storage 규칙을 확인해주세요.'));
-          },
-          async () => {
-            const url = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve(url);
-          }
+          (snapshot) => setUploadProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
+          (error) => reject(new Error('파일 스토리지 업로드에 실패했습니다. CORS나 Storage 규칙을 확인해주세요.')),
+          async () => resolve(await getDownloadURL(uploadTask.snapshot.ref))
         );
       });
       
-      // 3. Save to Firestore
+      // 3. Save everything to Firestore in a batch
+      const batch = writeBatch(firestore);
+
+      // Add new hierarchy items
+      newHierarchyItems.fields.forEach(item => batch.set(doc(firestore, 'fields', item.id), item));
+      newHierarchyItems.classifications.forEach(item => batch.set(doc(firestore, 'classifications', item.id), item));
+      newHierarchyItems.courses.forEach(item => batch.set(doc(firestore, 'courses', item.id), item));
+
+      // Add the new episode
       const newEpisodeDocRef = doc(firestore, 'courses', selectedCourseId, 'episodes', episodeId);
-      
       const newEpisode: Omit<Episode, 'id'> = {
           courseId: selectedCourseId,
           title,
@@ -155,14 +164,15 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
           isFree,
           videoUrl: downloadUrl,
       };
+      batch.set(newEpisodeDocRef, newEpisode);
 
-      await setDoc(newEpisodeDocRef, newEpisode);
+      await batch.commit();
 
       toast({
         title: '업로드 완료',
         description: `${title} 에피소드가 성공적으로 추가되었습니다.`
       });
-      onOpenChange(false); // Close dialog on success
+      onOpenChange(false);
 
     } catch (error: any) {
       console.error("Episode save process failed:", error);
@@ -176,8 +186,8 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
     }
   };
 
-  const openHierarchyDialog = (type: DialogState['type']) => {
-    if ((type === '큰분류' && !selectedField) || (type === '상세분류' && !selectedClassification)) {
+  const openHierarchyDialog = (type: HierarchyDialogState['type']) => {
+    if ((type === '큰분류' && !selectedFieldId) || (type === '상세분류' && !selectedClassificationId)) {
       toast({ variant: 'destructive', title: '오류', description: '상위 계층을 먼저 선택해주세요.' });
       return;
     }
@@ -185,38 +195,43 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
   };
   const closeHierarchyDialog = () => setHierarchyDialogState({ isOpen: false, item: null, type: '분야' });
 
-  const handleSaveHierarchy = async (item: HierarchyItem) => {
+  const handleSaveHierarchy = (item: HierarchyItem) => {
     const { type } = hierarchyDialogState;
     const newId = uuidv4();
-    let collectionName = '';
-    let data: any = { id: newId, name: item.name, createdAt: Timestamp.now() };
 
-    if (type === '분야') {
-        collectionName = 'fields';
-    } else if (type === '큰분류') {
-        collectionName = 'classifications';
-        data.fieldId = selectedField;
-        data.description = "새로운 분류 설명";
-        data.prices = { day1: 0, day30: 0, day60: 0, day90: 0 };
-    } else if (type === '상세분류') {
-        collectionName = 'courses';
-        data.classificationId = selectedClassification;
-        data.description = "새로운 상세분류 설명";
-        data.thumbnailUrl = `https://picsum.photos/seed/${newId}/600/400`;
-        data.thumbnailHint = 'placeholder image';
-    }
-    
-    if (collectionName) {
-        const docRef = doc(firestore, collectionName, newId);
-        await setDoc(docRef, data);
-        toast({ title: '성공', description: `${type} '${item.name}'이(가) 추가되었습니다.` });
+    startTransition(() => {
+        if (type === '분야') {
+            const newItem: Field = { id: newId, name: item.name };
+            setNewHierarchyItems(prev => ({ ...prev, fields: [...prev.fields, newItem] }));
+            setSelectedFieldId(newId);
+            setSelectedClassificationId(null);
+            setSelectedCourseId(null);
+        } else if (type === '큰분류' && selectedFieldId) {
+            const newItem: Classification = { 
+                id: newId, 
+                name: item.name, 
+                fieldId: selectedFieldId,
+                description: "새로운 분류 설명", 
+                prices: { day1: 0, day30: 0, day60: 0, day90: 0 } 
+            };
+            setNewHierarchyItems(prev => ({ ...prev, classifications: [...prev.classifications, newItem] }));
+            setSelectedClassificationId(newId);
+            setSelectedCourseId(null);
+        } else if (type === '상세분류' && selectedClassificationId) {
+            const newItem: Course = { 
+                id: newId, 
+                name: item.name,
+                classificationId: selectedClassificationId,
+                description: "새로운 상세분류 설명",
+                thumbnailUrl: `https://picsum.photos/seed/${newId}/600/400`,
+                thumbnailHint: 'placeholder image'
+            };
+            setNewHierarchyItems(prev => ({ ...prev, courses: [...prev.courses, newItem] }));
+            setSelectedCourseId(newId);
+        }
+    });
 
-        startTransition(() => {
-          if (type === '분야') setSelectedField(newId);
-          if (type === '큰분류') setSelectedClassification(newId);
-          if (type === '상세분류') setSelectedCourseId(newId);
-        });
-    }
+    toast({ title: '임시 저장됨', description: `'${item.name}' 항목이 추가되었습니다. 최종 저장을 위해 '에피소드 저장' 버튼을 눌러주세요.` });
     closeHierarchyDialog();
   };
 
@@ -248,32 +263,32 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">분류</Label>
               <div className="col-span-3 grid grid-cols-3 gap-2 items-center">
-                <Select value={selectedField || ''} onValueChange={(v) => { setSelectedField(v); setSelectedClassification(null); setSelectedCourseId(null); }} disabled={isUploading}>
+                <Select value={selectedFieldId || ''} onValueChange={(v) => { setSelectedFieldId(v); setSelectedClassificationId(null); setSelectedCourseId(null); }} disabled={isUploading}>
                   <SelectTrigger><SelectValue placeholder="분야" /></SelectTrigger>
                   <SelectContent>
-                    {fields?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                    {allFields?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
                     <Separator className="my-1" />
                     <Button variant="ghost" className="w-full justify-start h-8 px-2" onClick={() => openHierarchyDialog('분야')}>
                         <PlusCircle className="mr-2 h-4 w-4" /> 새로 추가...
                     </Button>
                   </SelectContent>
                 </Select>
-                <Select value={selectedClassification || ''} onValueChange={(v) => { setSelectedClassification(v); setSelectedCourseId(null); }} disabled={!selectedField || isUploading}>
+                <Select value={selectedClassificationId || ''} onValueChange={(v) => { setSelectedClassificationId(v); setSelectedCourseId(null); }} disabled={!selectedFieldId || isUploading}>
                   <SelectTrigger><SelectValue placeholder="큰분류" /></SelectTrigger>
                   <SelectContent>
-                    {classifications?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    {filteredClassifications?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     <Separator className="my-1" />
-                    <Button variant="ghost" className="w-full justify-start h-8 px-2" onClick={() => openHierarchyDialog('큰분류')} disabled={!selectedField}>
+                    <Button variant="ghost" className="w-full justify-start h-8 px-2" onClick={() => openHierarchyDialog('큰분류')} disabled={!selectedFieldId}>
                         <PlusCircle className="mr-2 h-4 w-4" /> 새로 추가...
                     </Button>
                   </SelectContent>
                 </Select>
-                <Select value={selectedCourseId || ''} onValueChange={setSelectedCourseId} disabled={!selectedClassification || isUploading}>
+                <Select value={selectedCourseId || ''} onValueChange={setSelectedCourseId} disabled={!selectedClassificationId || isUploading}>
                   <SelectTrigger><SelectValue placeholder="상세분류" /></SelectTrigger>
                   <SelectContent>
-                    {courses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    {filteredCourses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     <Separator className="my-1" />
-                    <Button variant="ghost" className="w-full justify-start h-8 px-2" onClick={() => openHierarchyDialog('상세분류')} disabled={!selectedClassification}>
+                    <Button variant="ghost" className="w-full justify-start h-8 px-2" onClick={() => openHierarchyDialog('상세분류')} disabled={!selectedClassificationId}>
                         <PlusCircle className="mr-2 h-4 w-4" /> 새로 추가...
                     </Button>
                   </SelectContent>
