@@ -5,9 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import type { Field, Classification, Course } from '@/lib/types';
-import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, doc } from 'firebase/firestore';
-import { deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, where, doc, deleteDoc } from 'firebase/firestore';
+import { setDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
@@ -135,7 +135,7 @@ export default function HierarchyManager() {
             collectionName = 'courses';
             data.classificationId = selectedClassification;
             data.description = "새로운 상세분류 설명";
-            data.thumbnailUrl = `https://picsum.photos/seed/${Math.random()}/600/400`;
+            data.thumbnailUrl = `https://picsum.photos/seed/${newId}/600/400`;
             data.thumbnailHint = 'placeholder image';
         }
         
@@ -148,19 +148,24 @@ export default function HierarchyManager() {
     closeDialog();
   };
 
-  const handleDelete = (type: string, collectionName: 'fields' | 'classifications' | 'courses', id: string) => {
+  const handleDelete = async (type: string, collectionName: 'fields' | 'classifications' | 'courses', id: string) => {
     if (!confirm(`정말로 '${type}' 항목을 삭제하시겠습니까? 하위 항목이 있는 경우 함께 삭제되지 않으니 주의해주세요. 이 작업은 되돌릴 수 없습니다.`)) return;
 
-    deleteDocumentNonBlocking(doc(firestore, collectionName, id));
+    try {
+      await deleteDoc(doc(firestore, collectionName, id));
 
-    if (collectionName === 'fields' && selectedField === id) {
-        setSelectedField(null);
-    }
-    if (collectionName === 'classifications' && selectedClassification === id) {
-        setSelectedClassification(null);
-    }
+      if (collectionName === 'fields' && selectedField === id) {
+          setSelectedField(null);
+      }
+      if (collectionName === 'classifications' && selectedClassification === id) {
+          setSelectedClassification(null);
+      }
 
-    toast({ title: '성공', description: `${type} 항목이 삭제되었습니다.` });
+      toast({ title: '삭제 성공', description: `${type} 항목이 성공적으로 삭제되었습니다.` });
+    } catch (error) {
+      console.error("Error deleting document: ", error);
+      toast({ variant: 'destructive', title: '삭제 실패', description: '항목 삭제 중 오류가 발생했습니다.' });
+    }
   };
 
   return (
