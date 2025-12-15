@@ -23,7 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore, useStorage, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -86,10 +86,22 @@ export default function VideoUploadDialog({ open, onOpenChange }: VideoUploadDia
   const coursesQuery = useMemoFirebase(() => collection(firestore, 'courses'), [firestore]);
   const { data: dbCourses } = useCollection<Course>(coursesQuery);
   
-  // Combined data (DB + local)
-  const allFields = [...(dbFields || []), ...newHierarchyItems.fields];
-  const allClassifications = [...(dbClassifications || []), ...newHierarchyItems.classifications];
-  const allCourses = [...(dbCourses || []), ...newHierarchyItems.courses];
+  // Combined data (DB + local) with duplicate removal
+  const allFields = [
+    ...(dbFields?.filter(dbItem => !newHierarchyItems.fields.some(newItem => newItem.id === dbItem.id)) || []),
+    ...newHierarchyItems.fields
+  ];
+
+  const allClassifications = [
+      ...(dbClassifications?.filter(dbItem => !newHierarchyItems.classifications.some(newItem => newItem.id === dbItem.id)) || []),
+      ...newHierarchyItems.classifications
+  ];
+
+  const allCourses = [
+      ...(dbCourses?.filter(dbItem => !newHierarchyItems.courses.some(newItem => newItem.id === dbItem.id)) || []),
+      ...newHierarchyItems.courses
+  ];
+
 
   const filteredClassifications = allClassifications.filter(c => c.fieldId === selectedFieldId);
   const filteredCourses = allCourses.filter(c => c.classificationId === selectedClassificationId);
