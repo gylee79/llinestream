@@ -20,16 +20,16 @@ export default function AdminSubscriptionsPage() {
 
   // 모든 사용자의 'subscriptions' 서브 컬렉션을 한 번에 가져옴
   const subscriptionsQuery = useMemoFirebase(
-    () => query(collectionGroup(firestore, 'subscriptions'), orderBy('purchasedAt', 'desc')),
+    () => (firestore ? query(collectionGroup(firestore, 'subscriptions'), orderBy('purchasedAt', 'desc')) : null),
     [firestore]
   );
   const { data: subscriptions, isLoading: subsLoading } = useCollection<Subscription>(subscriptionsQuery);
   
   // 사용자 및 분류 정보를 매핑하기 위해 가져옴
-  const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const usersQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
   const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
 
-  const classificationsQuery = useMemoFirebase(() => collection(firestore, 'classifications'), [firestore]);
+  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
   const { data: classifications, isLoading: classLoading } = useCollection<Classification>(classificationsQuery);
 
   const isLoading = subsLoading || usersLoading || classLoading;
