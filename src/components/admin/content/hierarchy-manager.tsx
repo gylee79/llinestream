@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import type { Field, Classification, Course } from '@/lib/types';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, doc } from 'firebase/firestore';
-import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
+import { v4 as uuidv4 } from 'uuid';
 
 const Column = ({ title, items, selectedId, onSelect, onAdd, onEdit, onDelete, isLoading }: {
   title: string;
@@ -120,7 +121,8 @@ export default function HierarchyManager() {
         toast({ title: '성공', description: `${dialogState.type} '${item.name}'이(가) 수정되었습니다.` });
     } else { // Add mode
         let collectionName = '';
-        let data: any = { name: item.name };
+        const newId = uuidv4();
+        let data: any = { id: newId, name: item.name };
 
         if (dialogState.type === '분야') {
             collectionName = 'fields';
@@ -138,7 +140,8 @@ export default function HierarchyManager() {
         }
         
         if (collectionName) {
-            addDocumentNonBlocking(collection(firestore, collectionName), data);
+            const docRef = doc(firestore, collectionName, newId);
+            setDocumentNonBlocking(docRef, data, { merge: false });
             toast({ title: '성공', description: `${dialogState.type} '${item.name}'이(가) 추가되었습니다.` });
         }
     }
