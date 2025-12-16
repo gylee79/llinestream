@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -63,25 +64,12 @@ export function useCollection<T = any>(
 
   useEffect(() => {
     // --- Start: Guard Clauses ---
-    // 1. 쿼리 객체 자체가 없는 경우, 아무것도 하지 않습니다.
+    // 1. If the query object itself is missing, do nothing.
     if (!memoizedTargetRefOrQuery) {
       setData(null);
       setIsLoading(false);
       setError(null);
       return;
-    }
-
-    // 2. 쿼리 객체는 있지만, 실제 경로가 비어있거나 유효하지 않은 경우를 확인합니다.
-    const path = (memoizedTargetRefOrQuery.type === 'collection')
-      ? (memoizedTargetRefOrQuery as CollectionReference).path
-      : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query?.path?.canonicalString();
-
-    // 경로가 비어있거나 루트('/') 경로인 경우, 요청을 보내지 않고 종료합니다.
-    if (!path || path.trim() === '' || path.trim() === '/') {
-        setData(null);
-        setIsLoading(false);
-        setError(null); // 에러가 아닌 정상적인 상태로 간주
-        return;
     }
     // --- End: Guard Clauses ---
 
@@ -100,9 +88,14 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
+        // This path is difficult to determine for collectionGroup queries, so we'll provide a generic one.
+        const path = (memoizedTargetRefOrQuery.type === 'collection')
+            ? (memoizedTargetRefOrQuery as CollectionReference).path
+            : 'unknown collection group';
+
         const contextualError = new FirestorePermissionError({
           operation: 'list',
-          path: path, // 위에서 추출한 경로 사용
+          path: path, 
         })
 
         setError(contextualError)

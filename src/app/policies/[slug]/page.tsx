@@ -7,7 +7,11 @@ import { doc } from 'firebase/firestore';
 import type { Policy } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export default function PolicyPage({ params }: { params: { slug: string } }) {
+interface PolicyPageProps {
+  params: { slug: string };
+}
+
+export default function PolicyPage({ params }: PolicyPageProps) {
   const firestore = useFirestore();
   const policyRef = useMemoFirebase(() => (firestore ? doc(firestore, 'policies', params.slug) : null), [firestore, params.slug]);
   const { data: policy, isLoading } = useDoc<Policy>(policyRef);
@@ -49,5 +53,3 @@ export default function PolicyPage({ params }: { params: { slug: string } }) {
     </div>
   );
 }
-
-    
