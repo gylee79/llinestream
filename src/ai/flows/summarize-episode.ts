@@ -42,8 +42,9 @@ const summarizeEpisodeFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await summarizeEpisodePrompt(input);
-    return {
-      ...output,
-    };
+    if (!output?.summary) {
+        throw new Error('Failed to generate summary.');
+    }
+    return output;
   }
 );

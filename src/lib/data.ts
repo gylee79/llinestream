@@ -88,17 +88,18 @@ export const episodes: Episode[] = [
 ];
 
 export const subscriptions: Subscription[] = [
-    { id: 'sub-001', userId: 'user-02', classificationId: 'class-001', purchasedAt: Timestamp.fromDate(new Date('2024-05-01')), expiresAt: Timestamp.fromDate(new Date('2024-05-31')) },
-    { id: 'sub-002', userId: 'user-03', classificationId: 'class-002', purchasedAt: Timestamp.fromDate(new Date('2024-05-10')), expiresAt: Timestamp.fromDate(new Date('2024-06-10')) },
-    { id: 'sub-003', userId: 'user-02', classificationId: 'class-003', purchasedAt: Timestamp.fromDate(new Date('2024-05-15')), expiresAt: Timestamp.fromDate(new Date('2024-08-15')) },
-    { id: 'sub-004', userId: 'user-04', classificationId: 'class-001', purchasedAt: Timestamp.fromDate(new Date('2024-05-20')), expiresAt: Timestamp.fromDate(new Date('2024-06-20')) },
-    { id: 'sub-005', userId: 'user-05', classificationId: 'class-005', purchasedAt: Timestamp.fromDate(new Date('2024-05-25')), expiresAt: Timestamp.fromDate(new Date('2024-06-25')) },
-    { id: 'sub-006', userId: 'user-06', classificationId: 'class-006', purchasedAt: Timestamp.fromDate(new Date('2024-06-01')), expiresAt: Timestamp.fromDate(new Date('2024-07-01')) },
-    { id: 'sub-007', userId: 'admin-user-01', classificationId: 'class-001', purchasedAt: Timestamp.fromDate(new Date('2024-01-01')), expiresAt: Timestamp.fromDate(new Date('2099-12-31')) },
-    { id: 'sub-008', userId: 'admin-user-01', classificationId: 'class-002', purchasedAt: Timestamp.fromDate(new Date('2024-01-01')), expiresAt: Timestamp.fromDate(new Date('2099-12-31')) },
-    { id: 'sub-009', userId: 'user-07', classificationId: 'class-001', purchasedAt: Timestamp.fromDate(new Date('2024-06-05')), expiresAt: Timestamp.fromDate(new Date('2024-07-05')) },
-    { id: 'sub-010', userId: 'user-08', classificationId: 'class-003', purchasedAt: Timestamp.fromDate(new Date('2024-06-10')), expiresAt: Timestamp.fromDate(new Date('2024-09-10')) },
+    { id: 'sub-001', userId: 'user-02', classificationId: 'class-001', purchasedAt: Timestamp.fromDate(new Date('2024-05-01')), expiresAt: Timestamp.fromDate(new Date('2024-05-31')), amount: 9900, orderName: '코딩 30일 이용권', paymentId: 'pmt-mock-001', status: 'PAID', method: 'CARD' },
+    { id: 'sub-002', userId: 'user-03', classificationId: 'class-002', purchasedAt: Timestamp.fromDate(new Date('2024-05-10')), expiresAt: Timestamp.fromDate(new Date('2024-06-10')), amount: 12900, orderName: '액션 30일 이용권', paymentId: 'pmt-mock-002', status: 'PAID', method: 'CARD' },
+    { id: 'sub-003', userId: 'user-02', classificationId: 'class-003', purchasedAt: Timestamp.fromDate(new Date('2024-05-15')), expiresAt: Timestamp.fromDate(new Date('2024-08-15')), amount: 14000, orderName: '홈트레이닝 60일 이용권', paymentId: 'pmt-mock-003', status: 'PAID', method: 'CARD' },
+    { id: 'sub-004', userId: 'user-04', classificationId: 'class-001', purchasedAt: Timestamp.fromDate(new Date('2024-05-20')), expiresAt: Timestamp.fromDate(new Date('2024-06-20')), amount: 9900, orderName: '코딩 30일 이용권', paymentId: 'pmt-mock-004', status: 'PAID', method: 'CARD' },
+    { id: 'sub-005', userId: 'user-05', classificationId: 'class-005', purchasedAt: Timestamp.fromDate(new Date('2024-05-25')), expiresAt: Timestamp.fromDate(new Date('2024-06-25')), amount: 8900, orderName: '외국어 30일 이용권', paymentId: 'pmt-mock-005', status: 'PAID', method: 'CARD' },
+    { id: 'sub-006', userId: 'user-06', classificationId: 'class-006', purchasedAt: Timestamp.fromDate(new Date('2024-06-01')), expiresAt: Timestamp.fromDate(new Date('2024-07-01')), amount: 6900, orderName: '요리 30일 이용권', paymentId: 'pmt-mock-006', status: 'PAID', method: 'CARD' },
+    { id: 'sub-007', userId: 'admin-user-01', classificationId: 'class-001', purchasedAt: Timestamp.fromDate(new Date('2024-01-01')), expiresAt: Timestamp.fromDate(new Date('2099-12-31')), amount: 0, orderName: '코딩 영구 이용권', paymentId: 'pmt-mock-admin-001', status: 'PAID', method: 'INTERNAL' },
+    { id: 'sub-008', userId: 'admin-user-01', classificationId: 'class-002', purchasedAt: Timestamp.fromDate(new Date('2024-01-01')), expiresAt: Timestamp.fromDate(new Date('2099-12-31')), amount: 0, orderName: '액션 영구 이용권', paymentId: 'pmt-mock-admin-002', status: 'PAID', method: 'INTERNAL' },
+    { id: 'sub-009', userId: 'user-07', classificationId: 'class-001', purchasedAt: Timestamp.fromDate(new Date('2024-06-05')), expiresAt: Timestamp.fromDate(new Date('2024-07-05')), amount: 9900, orderName: '코딩 30일 이용권', paymentId: 'pmt-mock-007', status: 'PAID', method: 'CARD' },
+    { id: 'sub-010', userId: 'user-08', classificationId: 'class-003', purchasedAt: Timestamp.fromDate(new Date('2024-06-10')), expiresAt: Timestamp.fromDate(new Date('2024-09-10')), amount: 14000, orderName: '홈트레이닝 60일 이용권', paymentId: 'pmt-mock-008', status: 'PAID', method: 'CARD' },
 ];
+
 
 export const policies: Policy[] = [
     {
@@ -153,5 +154,3 @@ LlineStream은 다음의 목적을 위하여 개인정보를 처리합니다. �
 ];
 
 export const getPolicyBySlug = (slug: string) => policies.find(p => p.slug === slug);
-
-    

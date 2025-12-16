@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { doc, getDocs, updateDoc, Timestamp, collection, where, query, limit, writeBatch } from 'firebase/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 import type { Classification, Subscription } from '@/lib/types';
 import type { PortOnePayment, PortOneWebhookRequest } from '@/lib/portone';
 import * as admin from 'firebase-admin';
@@ -13,8 +13,6 @@ function initializeAdminApp() {
   const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
   if (!serviceAccountEnv || serviceAccountEnv === '여기에_json_붙여넣기') {
     console.error("FIREBASE_ADMIN_SDK_CONFIG is not set or is a placeholder. Server-side features will fail.");
-    // In a real scenario, you might want to throw an error, but here we'll let it fail later
-    // to avoid crashing the server on startup if the env var is missing.
     return null;
   }
 
@@ -101,8 +99,8 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
     }
     
     const classificationName = orderName.split(' ')[0];
-    const q = query(collection(firestore, 'classifications'), where("name", "==", classificationName), limit(1));
-    const classificationsSnapshot = await getDocs(q as any);
+    const q = firestore.collection('classifications').where("name", "==", classificationName).limit(1);
+    const classificationsSnapshot = await q.get();
 
     if (classificationsSnapshot.empty) {
          await cancelPayment(paymentId, "주문 상품을 찾을 수 없음");
@@ -117,11 +115,11 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
         return { success: false, message: `결제 금액 불일치. 주문 금액: ${targetClassification.prices.day30}, 실제 결제액: ${paymentData.amount.total}` };
     }
 
-    const userRef = doc(firestore, 'users', userId);
+    const userRef = firestore.doc(`users/${userId}`);
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30); // 30일 이용권
     
-    const subscriptionRef = doc(collection(userRef, 'subscriptions'), targetClassification.id);
+    const subscriptionRef = userRef.collection('subscriptions').doc(targetClassification.id);
 
     const batch = firestore.batch();
 
@@ -207,5 +205,3 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, message: e.message || '웹훅 처리 중 알 수 없는 오류 발생' }, { status: 500 });
     }
 }
-
-    

@@ -36,7 +36,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { useUser, useAuth } from '@/firebase';
+import { useUser, useAuth, useFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 
 const navLinks = [
@@ -50,6 +50,7 @@ const adminLink = { href: '/admin', label: '관리자', icon: Shield };
 export default function Header() {
   const pathname = usePathname();
   const { user, isUserLoading } = useUser();
+  const { authUser } = useFirebase();
   const auth = useAuth();
   const isLoggedIn = !!user;
   const isAdmin = user?.role === 'admin';
@@ -130,14 +131,14 @@ export default function Header() {
             <Avatar className="h-8 w-8">
               <AvatarFallback>?</AvatarFallback>
             </Avatar>
-          ) : isLoggedIn && user ? (
+          ) : isLoggedIn && user && authUser ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
                     <AvatarImage
-                      src={user.photoURL || `https://avatar.vercel.sh/${user.uid}.png`}
-                      alt={user.displayName || user.email || ''}
+                      src={authUser.photoURL || `https://avatar.vercel.sh/${authUser.uid}.png`}
+                      alt={authUser.displayName || authUser.email || ''}
                     />
                     <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
