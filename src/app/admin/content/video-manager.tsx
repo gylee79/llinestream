@@ -17,7 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, PlusCircle } from 'lucide-react';
 import type { Episode, Course } from '@/lib/types';
-import VideoUploadDialog from './video-upload-dialog';
+import VideoUploadDialog from '@/components/admin/content/video-upload-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,

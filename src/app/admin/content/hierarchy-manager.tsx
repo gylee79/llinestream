@@ -10,7 +10,7 @@ import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where, doc, addDoc, updateDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
+import HierarchyItemDialog, { type HierarchyItem } from '@/components/admin/content/hierarchy-item-dialog';
 import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
 
 const Column = ({ title, items, selectedId, onSelect, onAdd, onEdit, onDelete, isLoading }: {
