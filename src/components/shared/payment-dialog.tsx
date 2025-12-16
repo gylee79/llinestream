@@ -88,7 +88,10 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
                 phoneNumber: user.phone,
                 email: user.email,
             },
-            redirectUrl: `${window.location.origin}/api/payment/complete`, // 결제 완료 후 사용자가 돌아올 주소
+            // 포트원 권장: 서버가 결제 이벤트를 직접 수신할 웹훅 URL
+            noticeUrls: [`${window.location.origin}/api/webhook/portone`],
+            // 사용자가 결제 완료 후 돌아올 주소
+            redirectUrl: `${window.location.origin}/api/payment/complete`,
         };
 
         try {
@@ -129,8 +132,6 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
           <DialogTitle className="font-headline">{classification.name} 구독</DialogTitle>
           <DialogDescription>
             {'결제를 진행하여 \''}{classification.name}{'\' 카테고리의 모든 콘텐츠를 무제한으로 이용하세요.'}
-            <br/><br/>
-            <span className="font-bold text-destructive">중요: </span> 포트원 대시보드의 웹훅 URL을 <code className="bg-muted px-1 py-0.5 rounded-sm text-sm">{`${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhook/portone`}</code> (으)로 설정해주세요.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
