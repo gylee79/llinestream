@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -34,10 +35,10 @@ export default function VideoManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const episodesQuery = useMemoFirebase(() => query(collectionGroup(firestore, 'episodes')), [firestore]);
+  const episodesQuery = useMemoFirebase(() => (firestore ? query(collectionGroup(firestore, 'episodes')) : null), [firestore]);
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
   
-  const coursesQuery = useMemoFirebase(() => collection(firestore, 'courses'), [firestore]);
+  const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
   
   const [isDialogOpen, setDialogOpen] = useState(false);
@@ -53,6 +54,7 @@ export default function VideoManager() {
   };
 
   const toggleFreeStatus = (episode: Episode) => {
+    if (!firestore) return;
     const docRef = doc(firestore, 'courses', episode.courseId, 'episodes', episode.id);
     updateDocumentNonBlocking(docRef, { isFree: !episode.isFree });
     toast({
@@ -175,3 +177,5 @@ export default function VideoManager() {
     </>
   );
 }
+
+    

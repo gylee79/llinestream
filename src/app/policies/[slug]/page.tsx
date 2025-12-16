@@ -49,3 +49,5 @@ export default function PolicyPage({ params }: { params: { slug: string } }) {
     </div>
   );
 }
+
+    

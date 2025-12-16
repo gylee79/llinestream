@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -23,7 +24,7 @@ export default function PricingManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const classificationsQuery = useMemoFirebase(() => collection(firestore, 'classifications'), [firestore]);
+  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
   const { data: classifications, isLoading } = useCollection<Classification>(classificationsQuery);
 
   // We need a local state to handle input changes before saving to Firestore
@@ -50,7 +51,7 @@ export default function PricingManager() {
   };
   
   const handleSave = (classId: string) => {
-    if (!localClassifications) return;
+    if (!firestore || !localClassifications) return;
     const classification = localClassifications.find(c => c.id === classId);
     if (!classification) return;
 
@@ -137,3 +138,5 @@ export default function PricingManager() {
     </Card>
   );
 }
+
+    

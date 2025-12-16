@@ -1,3 +1,4 @@
+
 'use client';
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
@@ -16,17 +17,17 @@ export default function CourseDetailPage() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  const courseRef = useMemoFirebase(() => doc(firestore, 'courses', params.courseId), [firestore, params.courseId]);
+  const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', params.courseId) : null), [firestore, params.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
 
   const episodesQuery = useMemoFirebase(() => 
-    course ? query(collection(firestore, 'courses', course.id, 'episodes')) : null, 
+    firestore && course ? query(collection(firestore, 'courses', course.id, 'episodes')) : null, 
     [firestore, course]
   );
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
   
   const classificationRef = useMemoFirebase(() => 
-    course ? doc(firestore, 'classifications', course.classificationId) : null,
+    firestore && course ? doc(firestore, 'classifications', course.classificationId) : null,
     [firestore, course]
   );
   const { data: classification, isLoading: classificationLoading } = useDoc<Classification>(classificationRef);
@@ -157,3 +158,5 @@ export default function CourseDetailPage() {
     </div>
   );
 }
+
+    

@@ -71,17 +71,17 @@ export default function HierarchyManager() {
 
   const [dialogState, setDialogState] = useState<DialogState>({ isOpen: false, item: null, type: '분야' });
 
-  const fieldsQuery = useMemoFirebase(() => collection(firestore, 'fields'), [firestore]);
+  const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
 
   const classificationsQuery = useMemoFirebase(() =>
-    selectedField ? query(collection(firestore, 'classifications'), where('fieldId', '==', selectedField)) : null,
+    firestore && selectedField ? query(collection(firestore, 'classifications'), where('fieldId', '==', selectedField)) : null,
     [firestore, selectedField]
   );
   const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
 
   const coursesQuery = useMemoFirebase(() =>
-    selectedClassification ? query(collection(firestore, 'courses'), where('classificationId', '==', selectedClassification)) : null,
+    firestore && selectedClassification ? query(collection(firestore, 'courses'), where('classificationId', '==', selectedClassification)) : null,
     [firestore, selectedClassification]
   );
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
@@ -118,6 +118,7 @@ export default function HierarchyManager() {
   const closeDialog = () => setDialogState({ isOpen: false, item: null, type: '분야' });
 
   const handleSave = async (item: HierarchyItem) => {
+    if (!firestore) return;
     try {
       const { type, item: existingItem } = dialogState;
       let collectionName: 'fields' | 'classifications' | 'courses';
@@ -153,6 +154,7 @@ export default function HierarchyManager() {
   };
   
   const handleDelete = async (collectionName: 'fields' | 'classifications' | 'courses', id: string, name: string) => {
+    if (!firestore) return;
     if (!confirm(`정말로 '${name}' 항목을 삭제하시겠습니까? 하위 항목이 있는 경우 서버 액션을 통해 함께 삭제됩니다.`)) return;
 
     // --- Start: 완전 디버깅 모드 ---
@@ -271,3 +273,5 @@ export default function HierarchyManager() {
     </>
   );
 }
+
+    
