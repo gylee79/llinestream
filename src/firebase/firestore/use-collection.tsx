@@ -88,10 +88,12 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
-        // This path is difficult to determine for collectionGroup queries, so we'll provide a generic one.
+        // For collectionGroup queries, the path can be complex.
+        // It's safer to provide a generic path than to risk crashing the server
+        // trying to access internal properties that may not exist.
         const path = (memoizedTargetRefOrQuery.type === 'collection')
             ? (memoizedTargetRefOrQuery as CollectionReference).path
-            : 'unknown collection group';
+            : 'unknown collection or collection group';
 
         const contextualError = new FirestorePermissionError({
           operation: 'list',
