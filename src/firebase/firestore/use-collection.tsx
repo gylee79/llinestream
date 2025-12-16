@@ -76,16 +76,16 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (err: FirestoreError) => {
-        // Create a contextual error without trying to access unstable internal properties.
+        // Create a contextual error that is safe for all query types.
         const contextualError = new FirestorePermissionError({
           operation: 'list',
-          // Providing a generic path is safer than causing a server crash.
+          // Providing a generic path is safer than causing a server crash with unstable internal properties.
           path: 'a collection or collection group', 
-        })
+        });
 
-        setError(contextualError)
-        setData(null)
-        setIsLoading(false)
+        setError(contextualError);
+        setData(null);
+        setIsLoading(false);
 
         // trigger global error propagation
         errorEmitter.emit('permission-error', contextualError);
