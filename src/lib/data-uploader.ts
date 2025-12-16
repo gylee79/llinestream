@@ -4,8 +4,7 @@
 import * as admin from 'firebase-admin';
 import { getApps, App } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { fields as mockFields, classifications as mockClassifications, courses as mockCourses, episodes as mockEpisodes, users as mockUsers, subscriptions as mockSubscriptions } from '@/lib/data';
-import { policies as mockPolicies } from '@/lib/policies';
+import { fields as mockFields, classifications as mockClassifications, courses as mockCourses, episodes as mockEpisodes, users as mockUsers, subscriptions as mockSubscriptions, policies as mockPolicies } from '@/lib/data';
 
 // Helper function to initialize Firebase Admin SDK
 function initializeAdminApp(): App {
