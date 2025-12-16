@@ -68,7 +68,7 @@ export default function PricingManager() {
     <Card>
       <CardHeader>
         <CardTitle>분류 및 가격 관리</CardTitle>
-        <p className="text-sm text-muted-foreground">각 '큰분류'별 이용권 가격을 설정합니다.</p>
+        <p className="text-sm text-muted-foreground">각 &apos;큰분류&apos;별 이용권 가격을 설정합니다.</p>
       </CardHeader>
       <CardContent>
         <Table>

@@ -127,7 +127,7 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
         <DialogHeader>
           <DialogTitle className="font-headline">{classification.name} 구독</DialogTitle>
           <DialogDescription>
-            결제를 진행하여 '{classification.name}' 카테고리의 모든 콘텐츠를 무제한으로 이용하세요.
+            {'결제를 진행하여 \''}{classification.name}{'\' 카테고리의 모든 콘텐츠를 무제한으로 이용하세요.'}
             <br/><br/>
             <span className="font-bold text-destructive">중요: </span> 포트원 대시보드의 웹훅 URL을 <code className="bg-muted px-1 py-0.5 rounded-sm text-sm">{`${typeof window !== 'undefined' ? window.location.origin : ''}/api/payment/complete`}</code> (으)로 설정해주세요.
           </DialogDescription>
