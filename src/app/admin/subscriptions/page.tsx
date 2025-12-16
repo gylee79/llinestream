@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useRouter } from 'next/navigation';
 import {
   Table,
   TableBody,
@@ -10,6 +11,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { Subscription, User, Classification } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
@@ -18,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AdminSubscriptionsPage() {
   const firestore = useFirestore();
+  const router = useRouter();
 
   // 1. firestore 객체가 준비되었을 때만 쿼리를 생성하도록 보장합니다.
   const subscriptionsQuery = useMemoFirebase(
@@ -47,6 +51,10 @@ export default function AdminSubscriptionsPage() {
       </Badge>
     );
   };
+  
+  const handleRefresh = () => {
+    router.refresh();
+  };
 
   return (
     <div>
@@ -54,11 +62,17 @@ export default function AdminSubscriptionsPage() {
       <p className="text-muted-foreground">전체 사용자 구독 및 결제 내역을 최신순으로 관리합니다.</p>
       
       <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>전체 구독 내역</CardTitle>
-          <CardDescription>
-            사용자가 결제를 완료하면 해당 내역이 여기에 실시간으로 표시됩니다.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>전체 구독 내역</CardTitle>
+              <CardDescription>
+                사용자가 결제를 완료하면 해당 내역이 여기에 실시간으로 표시됩니다.
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleRefresh}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              새로고침
+            </Button>
         </CardHeader>
         <CardContent>
           <Table>
