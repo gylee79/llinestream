@@ -5,7 +5,7 @@ import Hero from '@/components/home/hero';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCollection, useMemoFirebase } from '@/firebase';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, limit } from 'firebase/firestore';
+import { collection, query, where, limit, collectionGroup } from 'firebase/firestore';
 import { Course, Classification, Episode } from '@/lib/types';
 
 export default function Home() {
@@ -17,7 +17,7 @@ export default function Home() {
   const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
   const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
 
-  const episodesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'episodes') : null), [firestore]);
+  const episodesQuery = useMemoFirebase(() => (firestore ? collectionGroup(firestore, 'episodes') : null), [firestore]);
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
 
   const heroCourseQuery = useMemoFirebase(() => 
