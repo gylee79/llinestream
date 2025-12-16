@@ -2,58 +2,70 @@
 'use server';
 
 import * as admin from 'firebase-admin';
-import { getApps, App } from 'firebase-admin/app';
-import type { Policy } from './types';
+import { App, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import type { Policy } from '@/lib/types';
 
-// This function initializes the Firebase Admin SDK.
-// It's safe to call multiple times.
 function initializeAdminApp(): App {
-  // If already initialized, return the existing app.
-  if (getApps().length) {
-    return getApps()[0];
+  const alreadyInitialized = getApps();
+  if (alreadyInitialized.length > 0) {
+    return alreadyInitialized[0];
   }
-  
-  // App Hosting provides GOOGLE_APPLICATION_CREDENTIALS automatically.
-  // When running on App Hosting, admin.initializeApp() will use these
-  // credentials to initialize, giving the server admin privileges.
+
+  // 배포 환경 (App Hosting) - GOOGLE_APPLICATION_CREDENTIALS가 자동으로 설정됨
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    console.log('Initializing Firebase Admin with App Hosting credentials...');
     return admin.initializeApp();
   }
 
-  // If App Hosting credentials are not available (e.g., local development),
-  // fall back to using the service account from environment variables.
+  // 로컬 개발 환경 - .env 파일에서 서비스 계정 키 사용
   const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
   if (serviceAccountEnv) {
-      try {
-        const serviceAccount = JSON.parse(serviceAccountEnv);
-        return admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount)
-        });
-      } catch (error) {
-         console.error("Failed to parse FIREBASE_ADMIN_SDK_CONFIG. Make sure it's a valid JSON string.", error);
-         throw new Error("Firebase Admin SDK initialization failed due to invalid config.");
-      }
+    try {
+      // 환경 변수 문자열을 JSON 객체로 파싱
+      const serviceAccount = JSON.parse(serviceAccountEnv);
+      console.log('Initializing Firebase Admin with service account from .env...');
+      return admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+    } catch (e: any) {
+      throw new Error(`Failed to parse FIREBASE_ADMIN_SDK_CONFIG. Make sure it's a valid JSON string. Error: ${e.message}`);
+    }
   }
 
-  throw new Error("Firebase Admin SDK could not be initialized. Set either GOOGLE_APPLICATION_CREDENTIALS (for App Hosting) or FIREBASE_ADMIN_SDK_CONFIG (for local development).");
+  // 어떤 초기화 방법도 사용할 수 없는 경우
+  throw new Error(
+    'Firebase Admin SDK initialization failed. Set either GOOGLE_APPLICATION_CREDENTIALS (for deployment) or FIREBASE_ADMIN_SDK_CONFIG (for local development) environment variables.'
+  );
 }
 
-
-// This is a server-side function to fetch policy data from Firestore.
+/**
+ * Fetches a policy document from Firestore by its slug using the Admin SDK.
+ * @param slug The slug of the policy to fetch ('terms', 'privacy', 'refund').
+ * @returns The policy data or null if not found.
+ */
 export async function getPolicyBySlug(slug: string): Promise<Policy | null> {
   try {
     const adminApp = initializeAdminApp();
-    const db = admin.firestore(adminApp);
-    const policyDoc = await db.collection('policies').doc(slug).get();
+    const db = getFirestore(adminApp);
+    const policyRef = db.collection('policies').doc(slug);
+    const docSnap = await policyRef.get();
 
-    if (!policyDoc.exists) {
+    if (!docSnap.exists) {
+      console.warn(`Policy with slug "${slug}" not found in Firestore.`);
       return null;
     }
-    return policyDoc.data() as Policy;
+
+    // Firestore 문서 데이터를 반환하기 전에 Policy 타입으로 캐스팅
+    const policyData = docSnap.data() as Omit<Policy, 'slug'>;
+    return {
+      ...policyData,
+      slug: docSnap.id as 'terms' | 'privacy' | 'refund', // slug를 문서 ID로 설정
+    };
+
   } catch (error) {
-    console.error(`Failed to fetch policy for slug "${slug}":`, error);
-    // In a production app, you might want to handle this more gracefully.
-    // For now, we'll return null to allow the page to render a "not found" state.
+    console.error(`Error fetching policy "${slug}":`, error);
+    // In case of error (e.g., config issue), return null to allow the page to show "not found".
     return null;
   }
 }

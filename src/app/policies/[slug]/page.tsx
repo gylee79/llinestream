@@ -2,20 +2,15 @@
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getPolicyBySlug } from '@/lib/policies';
-import type { Policy } from '@/lib/types';
 
 interface PolicyPageProps {
-  params: Promise<{
-    slug: string;
-  }>;
+  params: Promise<{ slug: string }>;
 }
 
-// This is now a React Server Component. It fetches data on the server.
 export default async function PolicyPage({ params }: PolicyPageProps) {
   const { slug } = await params;
   const policy = await getPolicyBySlug(slug);
 
-  // If no policy is found for the given slug, render a 404 page.
   if (!policy) {
     notFound();
   }
@@ -35,13 +30,4 @@ export default async function PolicyPage({ params }: PolicyPageProps) {
       </Card>
     </div>
   );
-}
-
-// This function tells Next.js which slugs are available and should be pre-rendered at build time.
-export function generateStaticParams() {
-  return [
-    { slug: 'terms' },
-    { slug: 'privacy' },
-    { slug: 'refund' },
-  ];
 }
