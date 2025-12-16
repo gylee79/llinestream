@@ -65,4 +65,10 @@ export interface Subscription {
     classificationId: string;
     purchasedAt: Timestamp;
     expiresAt: Timestamp;
+    // For record-keeping
+    amount: number;
+    orderName: string;
+    paymentId: string;
+    status: string;
+    method: string;
 }

@@ -72,6 +72,13 @@ export interface PortOnePayment {
     total: number;
     // ... 기타 금액 정보
   };
+  customer?: {
+    id?: string;
+    // ... 기타 고객 정보
+  };
+  method?: {
+    name?: string;
+  };
   orderName: string;
   // ... 기타 결제 정보
 }

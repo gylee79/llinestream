@@ -16,11 +16,50 @@ function initializeAdminApp() {
   });
 }
 
+// PortOne V2 API Access Token 발급 함수
+// 실제 프로덕션 환경에서는 이 토큰을 캐싱하여 재사용하는 것이 좋습니다.
+async function getPortOneAccessToken(): Promise<string> {
+    const response = await fetch('https://api.portone.io/login/api-secret', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiSecret: process.env.PORTONE_V2_API_SECRET }),
+    });
+    if (!response.ok) {
+        const errorBody = await response.json();
+        throw new Error(`PortOne Access Token 발급 실패: ${errorBody.message}`);
+    }
+    const { accessToken } = await response.json();
+    return accessToken;
+}
+
+// 결제 취소 함수
+async function cancelPayment(paymentId: string, reason: string): Promise<void> {
+    const accessToken = await getPortOneAccessToken();
+    const response = await fetch(`https://api.portone.io/payments/${paymentId}/cancel`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ reason }),
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.json();
+        // 취소 실패는 심각한 문제이므로 별도 로깅/알림 처리가 필요합니다.
+        console.error(`[PAYMENT_CANCEL_FAILED] PaymentId: ${paymentId}, Reason: ${reason}, Error: ${errorBody.message}`);
+    } else {
+        console.log(`[PAYMENT_CANCEL_SUCCESS] PaymentId: ${paymentId}
+Reason: ${reason}`);
+    }
+}
+
+
 // --- 1. 핵심 검증 로직을 별도 함수로 분리 ---
 async function verifyAndProcessPayment(paymentId: string): Promise<{ success: boolean, message: string, classificationName?: string }> {
     const firestore = admin.firestore();
 
-    // 1-1. 포트원 결제내역 단건조회 API 호출
+    // 1-1. 포트원 결제내역 단건조회 API 호출 (V1 API 사용, 시크릿 키 직접 사용)
     const paymentResponse = await fetch(
         `https://api.portone.io/payments/${encodeURIComponent(paymentId)}`,
         { headers: { Authorization: `PortOne ${process.env.PORTONE_V2_API_SECRET}` } },
@@ -37,8 +76,8 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
     
     // 1-2. 실제 결제 상태 및 금액 검증
     if (paymentData.status !== 'PAID') {
-        const message = `결제가 완료되지 않았습니다. (상태: ${paymentData.status})`;
-        // 가상계좌 발급 등은 PAID 상태가 아니므로 로그만 남기고 일단 성공 처리할 수 있음 (여기서는 에러로 처리)
+        // 가상계좌 발급 등은 PAID 상태가 아니므로 여기서는 에러로 처리하지 않고 로그만 남깁니다.
+        const message = `결제가 완료된 상태가 아닙니다. (상태: ${paymentData.status})`;
         console.warn(`[PAYMENT_NOT_PAID] ${message}`, paymentData);
         return { success: false, message };
     }
@@ -69,7 +108,10 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
     if (targetClassification.prices.day30 !== paymentData.amount.total) {
         const message = `결제 금액 불일치. 주문 금액: ${targetClassification.prices.day30}, 실제 결제액: ${paymentData.amount.total}`;
         console.error(`[PAYMENT_AMOUNT_MISMATCH] ${message}`, paymentData);
-        // TODO: 실제 환경에서는 여기서 결제 취소 API를 호출해야 합니다.
+        
+        // 중요: 금액 위변조 시도 시, 즉시 결제를 취소합니다.
+        await cancelPayment(paymentId, "결제 금액 불일치 자동 취소");
+        
         return { success: false, message };
     }
 
@@ -86,8 +128,14 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
     const newSubscription: Omit<Subscription, 'id'> = {
         userId: userId,
         classificationId: targetClassification.id,
-        purchasedAt: Timestamp.now(),
+        purchasedAt: Timestamp.now(), // paidAt 대신 purchasedAt 사용 및 추가
         expiresAt: Timestamp.fromDate(expiresAt),
+        // 요청하신 추가 필드들
+        amount: paymentData.amount.total,
+        orderName: paymentData.orderName,
+        paymentId: paymentData.id,
+        status: paymentData.status,
+        method: paymentData.method?.name || 'UNKNOWN',
     };
 
     // 구독 정보 생성 또는 업데이트
