@@ -6,12 +6,13 @@ import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { Policy } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { FC } from 'react';
 
 interface PolicyPageProps {
   params: { slug: string };
 }
 
-export default function PolicyPage({ params }: PolicyPageProps) {
+const PolicyPage: FC<PolicyPageProps> = ({ params }) => {
   const firestore = useFirestore();
   const policyRef = useMemoFirebase(() => (firestore ? doc(firestore, 'policies', params.slug) : null), [firestore, params.slug]);
   const { data: policy, isLoading } = useDoc<Policy>(policyRef);
@@ -53,3 +54,5 @@ export default function PolicyPage({ params }: PolicyPageProps) {
     </div>
   );
 }
+
+export default PolicyPage;
