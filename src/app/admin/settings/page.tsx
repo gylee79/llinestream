@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import type { Policy } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, updateDoc } from 'firebase/firestore';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from 'react';
 
@@ -35,7 +35,7 @@ export default function AdminSettingsPage() {
   const handleSaveChanges = async () => {
     if (!firestore) return;
     try {
-      const batch = firestore.batch();
+      const batch = writeBatch(firestore);
       localPolicies.forEach(policy => {
         const docRef = doc(firestore, 'policies', policy.slug);
         batch.update(docRef, { content: policy.content });
