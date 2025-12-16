@@ -4,7 +4,8 @@
 import * as admin from 'firebase-admin';
 import { getApps, App } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { fields as mockFields, classifications as mockClassifications, courses as mockCourses, episodes as mockEpisodes, users as mockUsers, subscriptions as mockSubscriptions, policies as mockPolicies } from '@/lib/data';
+import { fields as mockFields, classifications as mockClassifications, courses as mockCourses, episodes as mockEpisodes, users as mockUsers, subscriptions as mockSubscriptions } from '@/lib/data';
+import { policies as mockPolicies } from '@/lib/policies';
 
 // Helper function to initialize Firebase Admin SDK
 function initializeAdminApp(): App {
@@ -95,10 +96,9 @@ export async function uploadMockData() {
     // Upload Policies
     console.log(`Uploading ${mockPolicies.length} policies...`);
     for (const item of mockPolicies) {
-      const { id: oldId, ...data } = item;
       // Policies have meaningful slug-based IDs, so we keep them
-      const docRef = firestore.collection('policies').doc(oldId);
-      batch.set(docRef, data);
+      const docRef = firestore.collection('policies').doc(item.slug);
+      batch.set(docRef, item);
     }
 
     // Commit all structural data first

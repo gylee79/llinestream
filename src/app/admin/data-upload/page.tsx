@@ -43,7 +43,7 @@ export default function DataUploadPage() {
         <CardHeader>
           <CardTitle>목업 데이터 Firestore에 업로드</CardTitle>
           <CardDescription>
-            이 버튼을 클릭하면 `src/lib/data.ts`에 정의된 모든 목업 데이터(분야, 분류, 강좌, 에피소드)가 Firestore 데이터베이스에 업로드됩니다.
+            이 버튼을 클릭하면 `src/lib/data.ts`에 정의된 모든 목업 데이터(분야, 분류, 강좌, 에피소드 등)가 Firestore 데이터베이스에 업로드됩니다.
             이 작업은 데이터베이스를 덮어쓰지 않으며, 동일한 ID의 문서가 이미 있는 경우 해당 문서를 업데이트합니다.
             앱을 처음 설정할 때 한 번만 실행하는 것이 좋습니다.
           </CardDescription>

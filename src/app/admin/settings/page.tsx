@@ -10,23 +10,65 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import type { Policy } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, doc, updateDoc } from 'firebase/firestore';
+import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from 'react';
 
 export default function AdminSettingsPage() {
   const firestore = useFirestore();
+  const { toast } = useToast();
   const policiesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'policies') : null), [firestore]);
-  const { data: policies } = useCollection<Policy>(policiesQuery);
+  const { data: policies, isLoading } = useCollection<Policy>(policiesQuery);
+  
+  const [localPolicies, setLocalPolicies] = useState<Policy[]>([]);
 
-  const termsPolicy = policies?.find(p => p.id === 'terms');
-  const privacyPolicy = policies?.find(p => p.id === 'privacy');
-  const refundPolicy = policies?.find(p => p.id === 'refund');
+  useEffect(() => {
+    if (policies) {
+      setLocalPolicies(policies);
+    }
+  }, [policies]);
+
+  const handlePolicyChange = (slug: string, content: string) => {
+    setLocalPolicies(prev => prev.map(p => p.slug === slug ? { ...p, content } : p));
+  };
+
+  const handleSaveChanges = async () => {
+    if (!firestore) return;
+    try {
+      const batch = firestore.batch();
+      localPolicies.forEach(policy => {
+        const docRef = doc(firestore, 'policies', policy.slug);
+        batch.update(docRef, { content: policy.content });
+      });
+      await batch.commit();
+      toast({
+        title: "저장 완료",
+        description: "약관 및 정책이 성공적으로 업데이트되었습니다.",
+      });
+    } catch (error) {
+      console.error("Failed to save policies: ", error);
+      toast({
+        variant: "destructive",
+        title: "저장 실패",
+        description: "정책 저장 중 오류가 발생했습니다.",
+      });
+    }
+  };
+
+  const getPolicyContent = (slug: 'terms' | 'privacy' | 'refund') => {
+    return localPolicies.find(p => p.slug === slug)?.content || '';
+  }
+  
+  const getPolicyTitle = (slug: 'terms' | 'privacy' | 'refund') => {
+    return policies?.find(p => p.slug === slug)?.title || '로딩 중...';
+  }
 
   return (
     <div>
       <h1 className="text-3xl font-bold tracking-tight font-headline">설정</h1>
       <p className="text-muted-foreground">앱의 전반적인 설정을 관리합니다.</p>
 
-      <Tabs defaultValue="general" className="mt-6">
+      <Tabs defaultValue="policies" className="mt-6">
         <TabsList>
           <TabsTrigger value="general">일반</TabsTrigger>
           <TabsTrigger value="footer">푸터</TabsTrigger>
@@ -69,25 +111,38 @@ export default function AdminSettingsPage() {
         <Card>
             <CardHeader><CardTitle>약관 및 정책 수정</CardTitle></CardHeader>
             <CardContent className="space-y-6">
-                {termsPolicy && (
-                  <div>
-                      <Label htmlFor="terms-editor">{termsPolicy.title}</Label>
-                      <Textarea id="terms-editor" defaultValue={termsPolicy.content} rows={10} />
-                  </div>
+                {isLoading ? ( <p>로딩 중...</p> ) : (
+                  <>
+                    <div>
+                        <Label htmlFor="terms-editor">{getPolicyTitle('terms')}</Label>
+                        <Textarea 
+                          id="terms-editor" 
+                          value={getPolicyContent('terms')} 
+                          onChange={(e) => handlePolicyChange('terms', e.target.value)}
+                          rows={10} 
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="privacy-editor">{getPolicyTitle('privacy')}</Label>
+                        <Textarea 
+                          id="privacy-editor" 
+                          value={getPolicyContent('privacy')}
+                          onChange={(e) => handlePolicyChange('privacy', e.target.value)}
+                          rows={10} 
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="refund-editor">{getPolicyTitle('refund')}</Label>
+                        <Textarea 
+                          id="refund-editor" 
+                          value={getPolicyContent('refund')}
+                          onChange={(e) => handlePolicyChange('refund', e.target.value)}
+                          rows={10} 
+                        />
+                    </div>
+                  </>
                 )}
-                {privacyPolicy && (
-                  <div>
-                      <Label htmlFor="privacy-editor">{privacyPolicy.title}</Label>
-                      <Textarea id="privacy-editor" defaultValue={privacyPolicy.content} rows={10} />
-                  </div>
-                )}
-                {refundPolicy && (
-                  <div>
-                      <Label htmlFor="refund-editor">{refundPolicy.title}</Label>
-                      <Textarea id="refund-editor" defaultValue={refundPolicy.content} rows={10} />
-                  </div>
-                )}
-                <Button>저장</Button>
+                <Button onClick={handleSaveChanges}>저장</Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -95,5 +150,3 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
-
-    
