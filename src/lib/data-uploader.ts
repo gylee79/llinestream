@@ -1,22 +1,33 @@
+
 'use server';
 
-import { writeBatch, collection, doc, getFirestore } from 'firebase/firestore';
+import * as admin from 'firebase-admin';
+import { getApps, App } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import { fields as mockFields, classifications as mockClassifications, courses as mockCourses, episodes as mockEpisodes, users as mockUsers, subscriptions as mockSubscriptions, policies as mockPolicies } from '@/lib/data';
-import { initializeApp, getApps } from 'firebase/app';
-import { firebaseConfig } from '@/firebase/config';
+
+// Helper function to initialize Firebase Admin SDK
+function initializeAdminApp(): App {
+  if (getApps().length) {
+    return getApps()[0];
+  }
+  
+  // App Hosting provides GOOGLE_APPLICATION_CREDENTIALS automatically.
+  // When running on App Hosting, admin.initializeApp() will use these
+  // credentials to initialize, giving the server admin privileges.
+  // When running locally, you must set the GOOGLE_APPLICATION_CREDENTIALS
+  // environment variable.
+  return admin.initializeApp();
+}
+
 
 export async function uploadMockData() {
   console.log('Starting data upload...');
   
-  let app;
-  if (!getApps().length) {
-    app = initializeApp(firebaseConfig);
-  } else {
-    app = getApps()[0];
-  }
-  const firestore = getFirestore(app);
-
-  const batch = writeBatch(firestore);
+  const adminApp = initializeAdminApp();
+  const firestore = getFirestore(adminApp);
+  
+  const batch = firestore.batch();
 
   try {
     // Keep track of new IDs
@@ -29,7 +40,7 @@ export async function uploadMockData() {
     console.log(`Uploading ${mockUsers.length} users...`);
     for (const item of mockUsers) {
       const { id: oldId, ...data } = item;
-      const docRef = doc(collection(firestore, 'users'));
+      const docRef = firestore.collection('users').doc();
       batch.set(docRef, data);
       userIdMap.set(oldId, docRef.id);
     }
@@ -38,7 +49,7 @@ export async function uploadMockData() {
     console.log(`Uploading ${mockFields.length} fields...`);
     for (const item of mockFields) {
       const { id: oldId, ...data } = item;
-      const docRef = doc(collection(firestore, 'fields'));
+      const docRef = firestore.collection('fields').doc();
       batch.set(docRef, data);
       fieldIdMap.set(oldId, docRef.id);
     }
@@ -51,7 +62,7 @@ export async function uploadMockData() {
       if (!newFieldId) {
         throw new Error(`Could not find new field ID for old fieldId: ${oldFieldId}`);
       }
-      const docRef = doc(collection(firestore, 'classifications'));
+      const docRef = firestore.collection('classifications').doc();
       batch.set(docRef, { ...data, fieldId: newFieldId });
       classificationIdMap.set(oldId, docRef.id);
     }
@@ -64,7 +75,7 @@ export async function uploadMockData() {
       if (!newClassificationId) {
         throw new Error(`Could not find new classification ID for old classificationId: ${oldClassificationId}`);
       }
-      const docRef = doc(collection(firestore, 'courses'));
+      const docRef = firestore.collection('courses').doc();
       batch.set(docRef, { ...data, classificationId: newClassificationId });
       courseIdMap.set(oldId, docRef.id);
     }
@@ -77,7 +88,7 @@ export async function uploadMockData() {
       if (!newCourseId) {
         throw new Error(`Could not find new course ID for old courseId: ${oldCourseId}`);
       }
-      const episodeRef = doc(collection(firestore, `courses/${newCourseId}/episodes`));
+      const episodeRef = firestore.collection(`courses/${newCourseId}/episodes`).doc();
       batch.set(episodeRef, { ...data, courseId: newCourseId });
     }
     
@@ -86,7 +97,7 @@ export async function uploadMockData() {
     for (const item of mockPolicies) {
       const { id: oldId, ...data } = item;
       // Policies have meaningful slug-based IDs, so we keep them
-      const docRef = doc(firestore, 'policies', oldId);
+      const docRef = firestore.collection('policies').doc(oldId);
       batch.set(docRef, data);
     }
 
@@ -94,7 +105,7 @@ export async function uploadMockData() {
     await batch.commit();
 
     // --- Start a new batch for user-related updates that depend on the IDs above ---
-    const userBatch = writeBatch(firestore);
+    const userBatch = firestore.batch();
 
     // Upload Subscriptions
     console.log(`Uploading ${mockSubscriptions.length} subscriptions...`);
@@ -108,7 +119,7 @@ export async function uploadMockData() {
             continue;
         }
 
-        const subRef = doc(collection(firestore, 'users', newUserId, 'subscriptions'), newClassificationId);
+        const subRef = firestore.collection('users').doc(newUserId).collection('subscriptions').doc(newClassificationId);
         userBatch.set(subRef, { 
             ...data, 
             userId: newUserId, 
@@ -116,7 +127,7 @@ export async function uploadMockData() {
         });
 
         // Also update the denormalized activeSubscriptions map on the user document
-        const userRef = doc(firestore, 'users', newUserId);
+        const userRef = firestore.collection('users').doc(newUserId);
         userBatch.update(userRef, {
             [`activeSubscriptions.${newClassificationId}`]: {
                 expiresAt: data.expiresAt
