@@ -1,4 +1,8 @@
-import { Timestamp } from 'firebase/firestore';
+import type { Timestamp as FirebaseTimestamp } from 'firebase/firestore';
+
+// We use the client-side Timestamp for all client-facing components and types.
+// For server-side operations (like in `complete/route.ts`), we will convert as needed.
+export type Timestamp = FirebaseTimestamp;
 
 export interface User {
   id: string;
@@ -10,6 +14,7 @@ export interface User {
   activeSubscriptions?: {
     [classificationId: string]: {
       expiresAt: Timestamp;
+      purchasedAt: Timestamp; // Keep this consistent
     };
   };
   createdAt: Timestamp;

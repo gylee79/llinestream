@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Timestamp } from 'firebase-admin/firestore';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import type { Classification, Subscription } from '@/lib/types';
 import type { PortOnePayment, PortOneWebhookRequest } from '@/lib/portone';
 import * as admin from 'firebase-admin';
@@ -123,11 +123,14 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
 
     const batch = firestore.batch();
 
-    const newSubscription: Omit<Subscription, 'id'> = {
+    const purchasedAtTimestamp = Timestamp.now();
+    const expiresAtTimestamp = Timestamp.fromDate(expiresAt);
+
+    const newSubscriptionData = {
         userId: userId,
         classificationId: targetClassification.id,
-        purchasedAt: Timestamp.now(),
-        expiresAt: Timestamp.fromDate(expiresAt),
+        purchasedAt: purchasedAtTimestamp,
+        expiresAt: expiresAtTimestamp,
         amount: paymentData.amount.total,
         orderName: paymentData.orderName,
         paymentId: paymentData.id,
@@ -135,11 +138,11 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
         method: paymentData.method?.name || 'UNKNOWN',
     };
 
-    batch.set(subscriptionRef, newSubscription, { merge: true });
+    batch.set(subscriptionRef, newSubscriptionData, { merge: true });
     batch.update(userRef, {
         [`activeSubscriptions.${targetClassification.id}`]: {
-            expiresAt: Timestamp.fromDate(expiresAt),
-            purchasedAt: Timestamp.now()
+            expiresAt: expiresAtTimestamp,
+            purchasedAt: purchasedAtTimestamp
         }
     });
     
