@@ -1,38 +1,61 @@
 
-'use client';
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
 import type { Policy } from '@/lib/types';
-import { Skeleton } from '@/components/ui/skeleton';
-import type { FC } from 'react';
+import * as admin from 'firebase-admin';
+
+// Helper function to initialize Firebase Admin SDK
+function initializeAdminApp(): admin.app.App {
+  if (admin.apps.length) {
+    return admin.apps[0] as admin.app.App;
+  }
+  
+  const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
+  if (!serviceAccountEnv) {
+    throw new Error("FIREBASE_ADMIN_SDK_CONFIG is not set. Server-side features will fail.");
+  }
+  try {
+    const serviceAccount = JSON.parse(serviceAccountEnv);
+    return admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+  } catch (error) {
+     console.error("Failed to parse FIREBASE_ADMIN_SDK_CONFIG.", error);
+     throw new Error("Failed to initialize Firebase Admin SDK. Check server logs.");
+  }
+}
+
+async function getPolicy(slug: string): Promise<Policy | null> {
+    try {
+        const adminApp = initializeAdminApp();
+        const firestore = admin.firestore(adminApp);
+        const policyRef = firestore.collection('policies').doc(slug);
+        const docSnap = await policyRef.get();
+
+        if (!docSnap.exists) {
+            return null;
+        }
+        
+        const data = docSnap.data() as Omit<Policy, 'id'>;
+        return {
+            id: docSnap.id,
+            ...data,
+        } as Policy;
+
+    } catch (error) {
+        console.error(`Failed to fetch policy for slug: ${slug}`, error);
+        return null;
+    }
+}
+
 
 interface PolicyPageProps {
   params: { slug: string };
 }
 
-const PolicyPage: FC<PolicyPageProps> = ({ params }) => {
-  const firestore = useFirestore();
-  const policyRef = useMemoFirebase(() => (firestore ? doc(firestore, 'policies', params.slug) : null), [firestore, params.slug]);
-  const { data: policy, isLoading } = useDoc<Policy>(policyRef);
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto max-w-4xl py-12">
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-10 w-3/4" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-5/6" />
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+// This is now a React Server Component
+export default async function PolicyPage({ params }: PolicyPageProps) {
+  const policy = await getPolicy(params.slug);
 
   if (!policy) {
     notFound();
@@ -54,5 +77,3 @@ const PolicyPage: FC<PolicyPageProps> = ({ params }) => {
     </div>
   );
 }
-
-export default PolicyPage;
