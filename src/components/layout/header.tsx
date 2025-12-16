@@ -33,6 +33,7 @@ import {
   SheetClose,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useUser, useAuth } from '@/firebase';
@@ -88,10 +89,11 @@ export default function Header() {
             </SheetTrigger>
             <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm">
                 <SheetHeader className="border-b pb-4">
-                    <SheetTitle className="sr-only">메뉴</SheetTitle>
                     <Link href="/" className="self-start">
                         <LlineStreamLogo className="h-6 w-auto" />
                     </Link>
+                    <SheetTitle className="sr-only">메뉴</SheetTitle>
+                    <SheetDescription className="sr-only">메인 네비게이션 메뉴</SheetDescription>
                 </SheetHeader>
                 <nav className="grid gap-4 py-6 text-lg font-medium">
                     {navLinks.map((link) => (

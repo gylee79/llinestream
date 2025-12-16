@@ -57,7 +57,9 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="font-headline">{user.name || user.email}</DialogTitle>
-          <DialogDescription>{user.email}</DialogDescription>
+          <DialogDescription>
+            사용자의 정보를 수정하고 구독 내역을 관리합니다. 이메일: {user.email}
+          </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="info" className="mt-4">
           <TabsList>
@@ -120,5 +122,3 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
     </Dialog>
   );
 }
-
-    
