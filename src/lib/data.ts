@@ -1,5 +1,5 @@
 
-import { Field, Classification, Course, Episode, User, Policy, Subscription } from './types';
+import { Field, Classification, Course, Episode, User, Subscription } from './types';
 import { Timestamp } from 'firebase/firestore';
 
 // Mock Users

@@ -13,12 +13,20 @@ function initializeAdminApp(): App {
     return getApps()[0];
   }
   
-  // App Hosting provides GOOGLE_APPLICATION_CREDENTIALS automatically.
-  // When running on App Hosting, admin.initializeApp() will use these
-  // credentials to initialize, giving the server admin privileges.
-  // When running locally, you must set the GOOGLE_APPLICATION_CREDENTIALS
-  // environment variable.
-  return admin.initializeApp();
+  const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
+  if (!serviceAccountEnv) {
+    throw new Error("FIREBASE_ADMIN_SDK_CONFIG is not set. Server-side features will fail.");
+  }
+
+  try {
+    const serviceAccount = JSON.parse(serviceAccountEnv);
+     return admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+  } catch (error) {
+     console.error("Failed to parse FIREBASE_ADMIN_SDK_CONFIG. Make sure it's a valid JSON string.", error);
+     throw new Error("Firebase Admin SDK initialization failed.");
+  }
 }
 
 
@@ -96,7 +104,7 @@ export async function uploadMockData() {
     // Upload Policies
     console.log(`Uploading ${mockPolicies.length} policies...`);
     for (const item of mockPolicies) {
-      // Policies have meaningful slug-based IDs, so we keep them
+      // Policies have meaningful slug-based IDs, so we use the slug as the document ID.
       const docRef = firestore.collection('policies').doc(item.slug);
       batch.set(docRef, item);
     }

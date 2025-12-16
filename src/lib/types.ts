@@ -1,3 +1,4 @@
+
 import type { Timestamp as FirebaseTimestamp } from 'firebase/firestore';
 
 // We use the client-side Timestamp for all client-facing components and types.
@@ -34,6 +35,7 @@ export interface Classification {
     day1: number;
     day30: number;
     day60: number;
+ADC-NHDev:~/project/studio-6929130257{main}$ 
     day90: number;
   };
 }
@@ -58,7 +60,6 @@ export interface Episode {
 }
 
 export interface Policy {
-  id: string;
   slug: 'terms' | 'privacy' | 'refund';
   title: string;
   content: string;

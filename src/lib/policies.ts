@@ -1,10 +1,45 @@
 
+'use server';
+
+import * as admin from 'firebase-admin';
+import { getApps, App } from 'firebase-admin/app';
+
 export interface Policy {
   slug: 'terms' | 'privacy' | 'refund';
   title: string;
   content: string;
 }
 
+// This function initializes the Firebase Admin SDK.
+// It's safe to call multiple times.
+function initializeAdminApp(): App {
+  if (getApps().length) {
+    return getApps()[0];
+  }
+  
+  const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
+
+  // If App Hosting credentials are not available (e.g., local development),
+  // fall back to using the service account from environment variables.
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS && serviceAccountEnv) {
+      try {
+        const serviceAccount = JSON.parse(serviceAccountEnv);
+        return admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount)
+        });
+      } catch (error) {
+         console.error("Failed to parse FIREBASE_ADMIN_SDK_CONFIG. Make sure it's a valid JSON string.", error);
+         throw new Error("Firebase Admin SDK initialization failed due to invalid config.");
+      }
+  }
+
+  // App Hosting provides GOOGLE_APPLICATION_CREDENTIALS automatically.
+  // When running on App Hosting, admin.initializeApp() will use these
+  // credentials to initialize, giving the server admin privileges.
+  return admin.initializeApp();
+}
+
+// This data will be used by the data-uploader script.
 export const policies: Policy[] = [
     {
         slug: 'terms',
@@ -54,6 +89,21 @@ LlineStream은 다음의 목적을 위하여 개인정보를 처리합니다. �
     }
 ];
 
-export const getPolicyBySlug = (slug: string): Policy | undefined => {
-  return policies.find(p => p.slug === slug);
-};
+// This is a server-side function to fetch policy data from Firestore.
+export async function getPolicyBySlug(slug: string): Promise<Policy | null> {
+  try {
+    const adminApp = initializeAdminApp();
+    const db = admin.firestore(adminApp);
+    const policyDoc = await db.collection('policies').doc(slug).get();
+
+    if (!policyDoc.exists) {
+      return null;
+    }
+    return policyDoc.data() as Policy;
+  } catch (error) {
+    console.error(`Failed to fetch policy for slug "${slug}":`, error);
+    // In a production app, you might want to handle this more gracefully.
+    // For now, we'll return null to allow the page to render a "not found" state.
+    return null;
+  }
+}

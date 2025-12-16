@@ -2,6 +2,7 @@
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getPolicyBySlug } from '@/lib/policies';
+import type { Policy } from '@/lib/policies';
 
 interface PolicyPageProps {
   params: {
@@ -10,8 +11,8 @@ interface PolicyPageProps {
 }
 
 // This is now a React Server Component. It fetches data on the server.
-export default function PolicyPage({ params }: PolicyPageProps) {
-  const policy = getPolicyBySlug(params.slug);
+export default async function PolicyPage({ params }: PolicyPageProps) {
+  const policy = await getPolicyBySlug(params.slug);
 
   // If no policy is found for the given slug, render a 404 page.
   if (!policy) {
