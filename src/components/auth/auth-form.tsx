@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -24,9 +25,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth, useFirestore, setDocumentNonBlocking } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, Timestamp } from 'firebase/firestore';
+import { doc, Timestamp, setDoc } from 'firebase/firestore';
 
 const loginSchema = z.object({
   email: z.string().email({ message: '유효한 이메일을 입력해주세요.' }),
@@ -88,7 +89,7 @@ export default function AuthForm() {
         createdAt: Timestamp.now(),
       };
       
-      setDocumentNonBlocking(userRef, newUser, { merge: false });
+      await setDoc(userRef, newUser, { merge: false });
 
       toast({ title: '회원가입 성공', description: '로그인 탭에서 로그인해주세요.' });
       registerForm.reset();

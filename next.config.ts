@@ -14,10 +14,8 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    // 👇 아래 주석을 달면 빨간 줄이 사라지고 정상 작동합니다.
-    // @ts-ignore
     allowedDevOrigins: [
-      "localhost:9002",
+      "http://localhost:9002",
       ".cloudworkstations.dev",
     ],
   },

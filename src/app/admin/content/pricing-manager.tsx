@@ -16,8 +16,7 @@ import { Button } from '@/components/ui/button';
 import type { Classification } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
-import { updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function PricingManager() {
@@ -50,14 +49,14 @@ export default function PricingManager() {
     );
   };
   
-  const handleSave = (classId: string) => {
+  const handleSave = async (classId: string) => {
     if (!firestore || !localClassifications) return;
     const classification = localClassifications.find(c => c.id === classId);
     if (!classification) return;
 
     const docRef = doc(firestore, 'classifications', classId);
     // We only update the prices field
-    updateDocumentNonBlocking(docRef, { prices: classification.prices });
+    await updateDoc(docRef, { prices: classification.prices });
 
     toast({
       title: '저장 완료',
@@ -138,5 +137,3 @@ export default function PricingManager() {
     </Card>
   );
 }
-
-    

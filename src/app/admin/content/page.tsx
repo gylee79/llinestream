@@ -1,7 +1,8 @@
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import HierarchyManager from "@/components/admin/content/hierarchy-manager";
-import PricingManager from "@/components/admin/content/pricing-manager";
-import VideoManager from "@/components/admin/content/video-manager";
+import HierarchyManager from "./hierarchy-manager";
+import PricingManager from "./pricing-manager";
+import VideoManager from "./video-manager";
 
 export default function AdminContentPage() {
   return (

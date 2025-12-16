@@ -25,9 +25,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, collectionGroup } from 'firebase/firestore';
+import { collection, doc, query, collectionGroup, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
 
@@ -53,10 +52,10 @@ export default function VideoManager() {
     return courses?.find(c => c.id === courseId)?.name || 'N/A';
   };
 
-  const toggleFreeStatus = (episode: Episode) => {
+  const toggleFreeStatus = async (episode: Episode) => {
     if (!firestore) return;
     const docRef = doc(firestore, 'courses', episode.courseId, 'episodes', episode.id);
-    updateDocumentNonBlocking(docRef, { isFree: !episode.isFree });
+    await updateDoc(docRef, { isFree: !episode.isFree });
     toast({
       title: '상태 변경',
       description: `${episode.title}의 무료 상태가 변경되었습니다.`,
@@ -177,5 +176,3 @@ export default function VideoManager() {
     </>
   );
 }
-
-    
