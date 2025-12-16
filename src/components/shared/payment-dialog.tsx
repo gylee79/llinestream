@@ -17,6 +17,7 @@ import type { Classification } from "@/lib/types"
 import type { PortOnePaymentRequest, PortOnePaymentResponse } from "@/lib/portone";
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/firebase"
+import { v4 as uuidv4 } from "uuid";
 
 declare global {
   interface Window {
@@ -71,7 +72,7 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
             return;
         }
 
-        const paymentId = `pmt-${crypto.randomUUID().replaceAll('-', '')}`;
+        const paymentId = `pmt-${uuidv4().replaceAll('-', '')}`;
 
         const request: PortOnePaymentRequest = {
             storeId,
@@ -98,13 +99,13 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
                 toast({
                     variant: "destructive",
                     title: "결제 오류",
-                    description: `[${response.code}] ${response.message}`,
+                    description: `[${response.code}] ${response.message || '결제가 완료되지 않았습니다.'}`,
                 });
                 return;
             }
 
             // `redirectUrl`을 사용하므로, 이 부분은 일반적으로 실행되지 않습니다.
-            // 최종 검증은 /api/payment/complete 에서 이루어집니다.
+            // 최종 검증은 /api/webhook/portone 과 /api/payment/complete 에서 이루어집니다.
             console.log("결제 요청 성공 (리다이렉트 전):", response);
 
         } catch (error: any) {
@@ -129,7 +130,7 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
           <DialogDescription>
             {'결제를 진행하여 \''}{classification.name}{'\' 카테고리의 모든 콘텐츠를 무제한으로 이용하세요.'}
             <br/><br/>
-            <span className="font-bold text-destructive">중요: </span> 포트원 대시보드의 웹훅 URL을 <code className="bg-muted px-1 py-0.5 rounded-sm text-sm">{`${typeof window !== 'undefined' ? window.location.origin : ''}/api/payment/complete`}</code> (으)로 설정해주세요.
+            <span className="font-bold text-destructive">중요: </span> 포트원 대시보드의 웹훅 URL을 <code className="bg-muted px-1 py-0.5 rounded-sm text-sm">{`${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhook/portone`}</code> (으)로 설정해주세요.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">

@@ -1,210 +1,36 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Timestamp, FieldValue } from 'firebase-admin/firestore';
-import type { Classification, Subscription } from '@/lib/types';
-import type { PortOnePayment, PortOneWebhookRequest } from '@/lib/portone';
-import * as admin from 'firebase-admin';
 
-// Initialize Firebase Admin SDK for Server-side usage
-function initializeAdminApp() {
-  if (admin.apps.length) {
-    return admin.apps[0];
-  }
-  const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
-  if (!serviceAccountEnv || serviceAccountEnv === '여기에_json_붙여넣기') {
-    console.error("FIREBASE_ADMIN_SDK_CONFIG is not set or is a placeholder. Server-side features will fail.");
-    return null;
-  }
-
-  try {
-    const serviceAccount = JSON.parse(serviceAccountEnv);
-     return admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-  } catch (error) {
-     console.error("Failed to parse FIREBASE_ADMIN_SDK_CONFIG. Make sure it's a valid JSON string.", error);
-     return null;
-  }
-}
-
-// PortOne V2 API Access Token 발급 함수
-async function getPortOneAccessToken(): Promise<string> {
-    const apiSecret = process.env.PORTONE_V2_API_SECRET;
-    if (!apiSecret) throw new Error("PORTONE_V2_API_SECRET is not defined.");
-    
-    const response = await fetch('https://api.portone.io/login/api-secret', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiSecret }),
-    });
-    if (!response.ok) {
-        const errorBody = await response.json();
-        throw new Error(`PortOne Access Token 발급 실패: ${errorBody.message}`);
-    }
-    const { accessToken } = await response.json();
-    return accessToken;
-}
-
-// 결제 취소 함수
-async function cancelPayment(paymentId: string, reason: string): Promise<void> {
-    try {
-        const accessToken = await getPortOneAccessToken();
-        const response = await fetch(`https://api.portone.io/payments/${paymentId}/cancel`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`,
-            },
-            body: JSON.stringify({ reason }),
-        });
-
-        if (!response.ok) {
-            const errorBody = await response.json();
-            console.error(`[PAYMENT_CANCEL_FAILED] PaymentId: ${paymentId}, Reason: ${reason}, Error: ${JSON.stringify(errorBody)}`);
-        } else {
-            console.log(`[PAYMENT_CANCEL_SUCCESS] PaymentId: ${paymentId}, Reason: ${reason}`);
-        }
-    } catch (error) {
-        console.error(`[PAYMENT_CANCEL_EXCEPTION] PaymentId: ${paymentId}`, error);
-    }
-}
-
-async function verifyAndProcessPayment(paymentId: string): Promise<{ success: boolean, message: string, classificationName?: string }> {
-    const adminApp = initializeAdminApp();
-    if (!adminApp) return { success: false, message: '서버 설정 오류: Firebase Admin SDK 초기화 실패' };
-    const firestore = admin.firestore();
-
-    const paymentResponse = await fetch(
-        `https://api.portone.io/payments/${encodeURIComponent(paymentId)}`,
-        { headers: { Authorization: `PortOne ${process.env.PORTONE_V2_API_SECRET}` } },
-    );
-
-    if (!paymentResponse.ok) {
-        const errorBody = await paymentResponse.json();
-        return { success: false, message: `결제내역 조회 실패: ${errorBody.message || '알 수 없는 오류'}` };
-    }
-    
-    const paymentData: PortOnePayment = await paymentResponse.json();
-    
-    if (paymentData.status !== 'PAID') {
-        return { success: false, message: `결제가 완료된 상태가 아닙니다. (상태: ${paymentData.status})` };
-    }
-
-    const userId = paymentData.customer?.id;
-    const orderName = paymentData.orderName;
-
-    if (!userId || !orderName) {
-        await cancelPayment(paymentId, "사용자 또는 주문 정보 누락");
-        return { success: false, message: '사용자 또는 주문 정보가 없어 결제 처리가 불가능합니다.' };
-    }
-    
-    const classificationName = orderName.split(' ')[0];
-    const q = firestore.collection('classifications').where("name", "==", classificationName).limit(1);
-    const classificationsSnapshot = await q.get();
-
-    if (classificationsSnapshot.empty) {
-         await cancelPayment(paymentId, "주문 상품을 찾을 수 없음");
-         return { success: false, message: `주문명에 해당하는 상품(${classificationName})을 찾을 수 없습니다.` };
-    }
-    
-    const targetClassificationDoc = classificationsSnapshot.docs[0];
-    const targetClassification = { id: targetClassificationDoc.id, ...targetClassificationDoc.data() } as Classification;
-    
-    if (targetClassification.prices.day30 !== paymentData.amount.total) {
-        await cancelPayment(paymentId, "결제 금액 불일치 자동 취소");
-        return { success: false, message: `결제 금액 불일치. 주문 금액: ${targetClassification.prices.day30}, 실제 결제액: ${paymentData.amount.total}` };
-    }
-
-    const userRef = firestore.doc(`users/${userId}`);
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30); // 30일 이용권
-    
-    const subscriptionRef = userRef.collection('subscriptions').doc(targetClassification.id);
-
-    const batch = firestore.batch();
-
-    const purchasedAtTimestamp = Timestamp.now();
-    const expiresAtTimestamp = Timestamp.fromDate(expiresAt);
-
-    const newSubscriptionData = {
-        userId: userId,
-        classificationId: targetClassification.id,
-        purchasedAt: purchasedAtTimestamp,
-        expiresAt: expiresAtTimestamp,
-        amount: paymentData.amount.total,
-        orderName: paymentData.orderName,
-        paymentId: paymentData.id,
-        status: paymentData.status,
-        method: paymentData.method?.name || 'UNKNOWN',
-    };
-
-    batch.set(subscriptionRef, newSubscriptionData, { merge: true });
-    batch.update(userRef, {
-        [`activeSubscriptions.${targetClassification.id}`]: {
-            expiresAt: expiresAtTimestamp,
-            purchasedAt: purchasedAtTimestamp
-        }
-    });
-    
-    await batch.commit();
-
-    return { success: true, message: '결제가 성공적으로 처리되었습니다.', classificationName };
-}
-
+/**
+ * 이 핸들러는 PortOne 결제 완료 후 사용자가 리디렉션되는 엔드포인트입니다.
+ * 
+ * 중요: 이 핸들러는 더 이상 결제 검증이나 데이터베이스 쓰기를 직접 수행하지 않습니다.
+ * 모든 중요한 서버 로직은 이제 /api/webhook/portone 엔드포인트에서 비동기적으로 처리됩니다.
+ * 
+ * 이 핸들러의 역할:
+ * 1. PortOne이 리디렉션 시 함께 보낸 쿼리 파라미터를 확인합니다.
+ * 2. 결제가 성공적으로 시작되었는지(code가 없는 경우), 아니면 실패했는지(code가 있는 경우) 판단합니다.
+ * 3. 결과에 따라 사용자를 적절한 최종 페이지(성공 또는 실패 페이지)로 리디렉션합니다.
+ */
 export async function GET(req: NextRequest) {
-    const { searchParams } = new URL(req.url);
-    const paymentId = searchParams.get('paymentId');
-    const code = searchParams.get('code');
-    const message = searchParams.get('message');
+  const { searchParams } = new URL(req.url);
+  const paymentId = searchParams.get('paymentId');
+  const code = searchParams.get('code');
+  const message = searchParams.get('message');
 
-    if (code || !paymentId) {
-        const failureUrl = new URL('/pricing', req.url);
-        failureUrl.searchParams.set('error', message || '결제에 실패했거나 ID가 없습니다.');
-        return NextResponse.redirect(failureUrl);
-    }
+  // 결제 실패 또는 사용자가 결제 창을 닫은 경우
+  if (code || !paymentId) {
+    const failureUrl = new URL('/pricing', req.url);
+    failureUrl.searchParams.set('error', message || '결제를 완료하지 못했습니다.');
+    return NextResponse.redirect(failureUrl);
+  }
 
-    try {
-        const result = await verifyAndProcessPayment(paymentId);
-        
-        if (result.success) {
-            const successUrl = new URL('/contents', req.url);
-            successUrl.searchParams.set('payment_success', 'true');
-            successUrl.searchParams.set('classification_name', result.classificationName || '');
-            return NextResponse.redirect(successUrl);
-        } else {
-            throw new Error(result.message);
-        }
-
-    } catch (e: any) {
-        const failureUrl = new URL('/pricing', req.url);
-        failureUrl.searchParams.set('error', e.message || '결제 처리 중 오류가 발생했습니다.');
-        return NextResponse.redirect(failureUrl);
-    }
-}
-
-export async function POST(req: NextRequest) {
-    try {
-        const webhookData: PortOneWebhookRequest = await req.json();
-        const { paymentId, status } = webhookData;
-
-        if (!paymentId) {
-            return NextResponse.json({ success: false, message: 'paymentId가 없습니다.' }, { status: 400 });
-        }
-
-        if (status === 'PAID') {
-            const result = await verifyAndProcessPayment(paymentId);
-            if (result.success) {
-                return NextResponse.json({ success: true });
-            } else {
-                return NextResponse.json({ success: false, message: result.message }, { status: 500 });
-            }
-        } else {
-            console.log(`[WEBHOOK_RECEIVED] Non-PAID status: ${status} for paymentId: ${paymentId}`);
-            return NextResponse.json({ success: true, message: `Webhook for status '${status}' received.` });
-        }
-
-    } catch (e: any) {
-        console.error('웹훅 처리 중 오류 발생 (POST):', e);
-        return NextResponse.json({ success: false, message: e.message || '웹훅 처리 중 알 수 없는 오류 발생' }, { status: 500 });
-    }
+  // 결제 성공 (또는 성공적으로 시작됨)
+  // 실제 데이터 처리는 웹훅이 담당하므로, 여기서는 사용자에게 즉시 긍정적인 피드백을 주고 성공 페이지로 보냅니다.
+  const successUrl = new URL('/contents', req.url);
+  successUrl.searchParams.set('payment_success', 'true');
+  successUrl.searchParams.set('message', '결제가 성공적으로 요청되었습니다. 잠시 후 구독 내역이 반영됩니다.');
+  
+  // 사용자를 최종 성공 페이지로 리디렉션합니다.
+  return NextResponse.redirect(successUrl);
 }

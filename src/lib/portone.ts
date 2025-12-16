@@ -1,3 +1,4 @@
+
 /**
  * @file PortOne V2 SDK의 타입 정의 파일
  * @see https://developers.portone.io/docs/ko/sdk/javascript-sdk/types
@@ -53,10 +54,18 @@ export interface PortOnePaymentResponse {
 /**
  * @interface PortOneWebhookRequest
  * @see https://developers.portone.io/docs/ko/api/webhook#request-%EB%B0%94%EB%94%94
+ * This interface is for the newer webhook version (2024-04-25).
  */
 export interface PortOneWebhookRequest {
-  paymentId: string;
-  status: 'PAID' | 'FAILED' | 'CANCELLED' | 'VIRTUAL_ACCOUNT_ISSUED';
+  id: string; // The event ID, which corresponds to paymentId for transaction events
+  type: string; // e.g., "Transaction.Paid"
+  status?: 'PAID' | 'FAILED' | 'CANCELLED' | 'VIRTUAL_ACCOUNT_ISSUED'; // Legacy or included for compatibility
+  timestamp: string;
+  data: {
+    storeId: string;
+    paymentId: string;
+    // ... other properties depending on event type
+  };
 }
 
 /**
