@@ -106,9 +106,10 @@ export function useCollection<T = any>(
     );
 
     return () => unsubscribe();
-  }, [memoizedTargetRefOrQuery]); // Re-run if the target query/reference changes.
+  }, [(memoizedTargetRefOrQuery as InternalQuery)?._query?.path?.toString()]); 
+  
   if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
-    throw new Error(memoizedTargetRefOrQuery + ' was not properly memoized using useMemoFirebase');
+    throw new Error('Query was not properly memoized using useMemoFirebase: ' + (memoizedTargetRefOrQuery as InternalQuery)?._query?.path?.toString());
   }
   return { data, isLoading, error };
 }
