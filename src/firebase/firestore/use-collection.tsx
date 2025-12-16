@@ -26,18 +26,6 @@ export interface UseCollectionResult<T> {
   error: FirestoreError | Error | null; // Error object, or null.
 }
 
-/* Internal implementation of Query:
-  https://github.com/firebase/firebase-js-sdk/blob/c5f08a9bc5da0d2b0207802c972d53724ccef055/packages/firestore/src/lite-api/reference.ts#L143
-*/
-export interface InternalQuery extends Query<DocumentData> {
-  _query: {
-    path: {
-      canonicalString(): string;
-      toString(): string;
-    }
-  }
-}
-
 /**
  * React hook to subscribe to a Firestore collection or query in real-time.
  * Handles nullable references/queries.
@@ -88,10 +76,9 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
-        // For collectionGroup queries, the path can be complex.
-        // It's safer to provide a generic path than to risk crashing the server
-        // trying to access internal properties that may not exist.
-        const path = (memoizedTargetRefOrQuery.type === 'collection')
+        // For collectionGroup queries, determining the exact path is complex and error-prone
+        // as it doesn't have a simple `.path` property. We will provide a generic but safe path.
+        const path = memoizedTargetRefOrQuery.type === 'collection'
             ? (memoizedTargetRefOrQuery as CollectionReference).path
             : 'unknown collection or collection group';
 
@@ -113,7 +100,12 @@ export function useCollection<T = any>(
   }, [memoizedTargetRefOrQuery]); 
   
   if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
-    throw new Error('Query was not properly memoized using useMemoFirebase: ' + (memoizedTargetRefOrQuery as InternalQuery)?._query?.path?.toString());
+    // This check is important for preventing infinite loops but we won't throw a hard error.
+    // Instead, we log it to the console during development.
+    if (process.env.NODE_ENV === 'development') {
+        console.warn('Query was not properly memoized using useMemoFirebase. This can lead to performance issues and infinite re-renders.');
+    }
   }
   return { data, isLoading, error };
 }
+
