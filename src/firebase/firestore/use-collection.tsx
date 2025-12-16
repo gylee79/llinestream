@@ -59,6 +59,20 @@ export function useCollection<T = any>(
       setError(null);
       return;
     }
+    
+    // 2. Add robust guard clauses to prevent invalid queries from reaching onSnapshot.
+    // This prevents "INTERNAL ASSERTION FAILED: Unexpected state" errors.
+    const internalQuery = (memoizedTargetRefOrQuery as any)._query;
+    const path = internalQuery?.path;
+
+    if (!path || path.length === 0) {
+        // Path is invalid or points to the root, which is not a collection.
+        // Silently ignore this query to prevent SDK crashes.
+        setData(null);
+        setIsLoading(false);
+        setError(null);
+        return;
+    }
     // --- End: Guard Clauses ---
 
     setIsLoading(true);
@@ -76,11 +90,11 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (err: FirestoreError) => {
-        // Create a contextual error that is safe for all query types.
+        // 2. Improve error messaging by including the actual query path for easier debugging.
+        const pathString = (memoizedTargetRefOrQuery as any)._query?.path?.toString() || 'unknown collection';
         const contextualError = new FirestorePermissionError({
           operation: 'list',
-          // Providing a generic path is safer than causing a server crash with unstable internal properties.
-          path: 'a collection or collection group', 
+          path: pathString, 
         });
 
         setError(contextualError);
