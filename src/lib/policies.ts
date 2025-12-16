@@ -13,15 +13,22 @@ export interface Policy {
 // This function initializes the Firebase Admin SDK.
 // It's safe to call multiple times.
 function initializeAdminApp(): App {
+  // If already initialized, return the existing app.
   if (getApps().length) {
     return getApps()[0];
   }
   
-  const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
+  // App Hosting provides GOOGLE_APPLICATION_CREDENTIALS automatically.
+  // When running on App Hosting, admin.initializeApp() will use these
+  // credentials to initialize, giving the server admin privileges.
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    return admin.initializeApp();
+  }
 
   // If App Hosting credentials are not available (e.g., local development),
   // fall back to using the service account from environment variables.
-  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS && serviceAccountEnv) {
+  const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
+  if (serviceAccountEnv) {
       try {
         const serviceAccount = JSON.parse(serviceAccountEnv);
         return admin.initializeApp({
@@ -33,10 +40,7 @@ function initializeAdminApp(): App {
       }
   }
 
-  // App Hosting provides GOOGLE_APPLICATION_CREDENTIALS automatically.
-  // When running on App Hosting, admin.initializeApp() will use these
-  // credentials to initialize, giving the server admin privileges.
-  return admin.initializeApp();
+  throw new Error("Firebase Admin SDK could not be initialized. Set either GOOGLE_APPLICATION_CREDENTIALS (for App Hosting) or FIREBASE_ADMIN_SDK_CONFIG (for local development).");
 }
 
 // This data will be used by the data-uploader script.

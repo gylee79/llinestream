@@ -35,7 +35,6 @@ export interface Classification {
     day1: number;
     day30: number;
     day60: number;
-ADC-NHDev:~/project/studio-6929130257{main}$ 
     day90: number;
   };
 }
