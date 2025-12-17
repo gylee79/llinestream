@@ -35,6 +35,7 @@ export interface PortOnePaymentRequest {
     phoneNumber?: string;
     email?: string;
   };
+  noticeUrls?: string[];
   redirectUrl?: string;
   appScheme?: string;
 }
