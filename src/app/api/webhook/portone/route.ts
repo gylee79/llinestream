@@ -6,7 +6,6 @@ import { Timestamp } from 'firebase-admin/firestore';
 import type { Classification } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
-import type { Payment as PortOnePaymentType } from '@portone/server-sdk/dist/generated/payment';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,13 +84,11 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
         return { success: false, message: `결제내역 조회 실패: paymentId ${paymentId}에 해당하는 내역이 없습니다.` };
     }
     
-    // We only process PAID payments here. Other statuses are ignored.
     if (paymentResponse.status !== 'PAID') {
         console.log(`[DEBUG] 3b. [PROCESS_IGNORED] Payment status is not 'PAID'. Current status: ${String(paymentResponse.status)}`);
         return { success: true, message: `결제 상태가 PAID가 아니므로 처리를 건너뜁니다: ${String(paymentResponse.status)}` };
     }
     
-    // Now we know paymentResponse is of type PaidPayment
     const paymentData: PortOne.Payment.PaidPayment = paymentResponse;
     console.log(`[DEBUG] 3b. PortOne GetPayment API successful. Status: ${String(paymentData.status)}`);
 
@@ -155,7 +152,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
                 orderName: paymentData.orderName,
                 paymentId: paymentData.id,
                 status: paymentData.status,
-                method: paymentData.method?.name || (typeof paymentData.method === 'string' ? paymentData.method : 'UNKNOWN'),
+                method: paymentData.method?.provider || 'UNKNOWN',
             };
 
             transaction.set(subscriptionRef, newSubscriptionData);
@@ -204,11 +201,11 @@ export async function POST(req: NextRequest) {
       
       const webhook = await PortOne.Webhook.verify(webhookSecret, rawBody, headersObject);
 
-      console.log('[DEBUG] 2. Webhook verification successful. Event ID:', webhook.id);
+      console.log('[DEBUG] 2. Webhook verification successful.');
 
-      if ("payment" in webhook) {
-          const payment: PortOnePaymentType = webhook.payment;
-          console.log(`[DEBUG] 2a. Event is a payment event. Status: ${String(payment.status)}, PaymentId: ${payment.id}`);
+      if ('payment' in webhook) {
+          const payment = webhook.payment;
+          console.log(`[DEBUG] 2a. Event is a payment event. Status: ${payment.status}, PaymentId: ${payment.id}`);
           
           if (payment.status === 'PAID') {
               console.log(`[DEBUG] 3. Status is 'PAID'. Proceeding to process payment.`);
@@ -222,8 +219,8 @@ export async function POST(req: NextRequest) {
                   return NextResponse.json({ success: false, message: result.message }, { status: 200 });
               }
           } else {
-              console.log(`[DEBUG] 3. [IGNORED_RESPONSE] Status is '${String(payment.status)}', not 'PAID'. Acknowledging with 200 OK.`);
-              return NextResponse.json({ success: true, message: `Status '${String(payment.status)}' event acknowledged.` });
+              console.log(`[DEBUG] 3. [IGNORED_RESPONSE] Status is '${payment.status}', not 'PAID'. Acknowledging with 200 OK.`);
+              return NextResponse.json({ success: true, message: `Status '${payment.status}' event acknowledged.` });
           }
       } else {
           console.log(`[DEBUG] 2a. [IGNORED_RESPONSE] Non-payment event received. Acknowledging with 200 OK.`);
