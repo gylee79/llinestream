@@ -13,7 +13,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  experimental: {},
+  experimental: {
+    asyncWebAssembly: true,
+  },
 };
 
 export default nextConfig;
