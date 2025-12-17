@@ -153,7 +153,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
                 orderName: paymentData.orderName,
                 paymentId: paymentData.id,
                 status: String(paymentData.status),
-                method: paymentData.pg.provider || 'UNKNOWN',
+                method: paymentData.pgProvider || 'UNKNOWN',
             };
 
             transaction.set(subscriptionRef, newSubscriptionData);
