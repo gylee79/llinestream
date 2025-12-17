@@ -1,9 +1,9 @@
-'use client';
+import 'server-only';
 import * as admin from 'firebase-admin';
 import { App, getApps } from 'firebase-admin/app';
 import { config } from 'dotenv';
 
-// Load environment variables from .env file
+// Load environment variables from .env file for local development
 config();
 
 /**

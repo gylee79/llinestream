@@ -1,4 +1,4 @@
-
+import 'server-only';
 import * as admin from 'firebase-admin';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import type { Policy } from '@/lib/types';
