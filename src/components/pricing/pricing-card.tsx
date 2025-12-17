@@ -42,7 +42,8 @@ export default function PricingCard({ classification }: PricingCardProps) {
     day60: '60일',
     day90: '90일',
   };
-  const selectedLabel = durationLabels[selectedDuration];
+  const selectedLabelForDisplay = durationLabels[selectedDuration];
+  const selectedPlanLabel = plans.find(p => p.duration === selectedDuration)?.label || '이용권';
 
 
   return (
@@ -54,7 +55,7 @@ export default function PricingCard({ classification }: PricingCardProps) {
       <CardContent className="flex-grow">
         <div className="text-4xl font-bold">
           ₩{formatPrice(selectedPrice)}
-          <span className="ml-1 text-base font-normal text-muted-foreground">/ {selectedLabel}</span>
+          <span className="ml-1 text-base font-normal text-muted-foreground">/ {selectedLabelForDisplay}</span>
         </div>
         <RadioGroup 
           defaultValue="day30" 
@@ -71,7 +72,12 @@ export default function PricingCard({ classification }: PricingCardProps) {
         </RadioGroup>
       </CardContent>
       <CardFooter>
-        <PaymentDialog classification={classification}>
+        <PaymentDialog 
+            classification={classification}
+            selectedDuration={selectedDuration}
+            selectedPrice={selectedPrice}
+            selectedLabel={selectedPlanLabel}
+        >
             <Button className="w-full">지금 구독하기</Button>
         </PaymentDialog>
       </CardFooter>

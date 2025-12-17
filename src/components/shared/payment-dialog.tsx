@@ -26,11 +26,20 @@ declare global {
 }
 
 interface PaymentDialogProps {
-    children: React.ReactNode
-    classification: Classification
+    children: React.ReactNode;
+    classification: Classification;
+    selectedDuration: keyof Classification['prices'];
+    selectedPrice: number;
+    selectedLabel: string;
 }
 
-export default function PaymentDialog({ children, classification }: PaymentDialogProps) {
+export default function PaymentDialog({ 
+    children, 
+    classification,
+    selectedDuration,
+    selectedPrice,
+    selectedLabel
+}: PaymentDialogProps) {
     const { toast } = useToast();
     const { user } = useUser();
     const [isSdkReady, setSdkReady] = useState(false);
@@ -78,8 +87,8 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
             storeId,
             channelKey,
             paymentId,
-            orderName: `${classification.name} 30일 이용권`,
-            totalAmount: classification.prices.day30,
+            orderName: `${classification.name} ${selectedLabel}`,
+            totalAmount: selectedPrice,
             currency: 'KRW',
             payMethod: 'CARD',
             customer: {
@@ -88,9 +97,7 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
                 phoneNumber: user.phone,
                 email: user.email,
             },
-            // 포트원 권장: 서버가 결제 이벤트를 직접 수신할 웹훅 URL
             noticeUrls: [`${window.location.origin}/api/webhook/portone`],
-            // 사용자가 결제 완료 후 돌아올 주소
             redirectUrl: `${window.location.origin}/api/payment/complete`,
         };
 
@@ -98,7 +105,6 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
             const response: PortOnePaymentResponse = await window.PortOne.requestPayment(request);
 
             if (response.code != null) {
-                // 사용자가 결제창을 닫거나, 오류 발생
                 toast({
                     variant: "destructive",
                     title: "결제 오류",
@@ -107,8 +113,6 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
                 return;
             }
 
-            // `redirectUrl`을 사용하므로, 이 부분은 일반적으로 실행되지 않습니다.
-            // 최종 검증은 /api/webhook/portone 과 /api/payment/complete 에서 이루어집니다.
             console.log("결제 요청 성공 (리다이렉트 전):", response);
 
         } catch (error: any) {
@@ -135,8 +139,8 @@ export default function PaymentDialog({ children, classification }: PaymentDialo
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
-            <p className="font-semibold">결제 금액 (30일 이용권)</p>
-            <p className="text-2xl font-bold">₩{new Intl.NumberFormat('ko-KR').format(classification.prices.day30)}</p>
+            <p className="font-semibold">{`결제 금액 (${selectedLabel})`}</p>
+            <p className="text-2xl font-bold">₩{new Intl.NumberFormat('ko-KR').format(selectedPrice)}</p>
             <p className="text-sm text-muted-foreground mt-4">버튼 클릭 시 포트원 결제창으로 이동합니다.</p>
         </div>
         <DialogFooter>
