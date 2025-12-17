@@ -68,7 +68,12 @@ export default function CourseDetailPage() {
               <Lock className="w-12 h-12 mx-auto mb-4"/>
               <h2 className="text-2xl font-bold">이용권이 필요한 콘텐츠입니다.</h2>
               <p className="mt-2 mb-6 text-white/80">이 콘텐츠를 시청하려면 이용권을 구매해주세요.</p>
-              <PaymentDialog classification={classification}>
+              <PaymentDialog 
+                classification={classification}
+                selectedDuration="day30"
+                selectedPrice={classification.prices.day30}
+                selectedLabel="30일 이용권"
+              >
                 <Button size="lg">이용권 구매하러 가기</Button>
               </PaymentDialog>
             </div>

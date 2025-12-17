@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
-import type { Classification } from '@/lib/types';
+import type { Classification, PortOnePayment } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
 
@@ -77,7 +77,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
     }
     const firestore = admin.firestore();
 
-    const portone = new PortOne.PortOneClient({ apiSecret: process.env.PORTONE_V2_API_SECRET! });
+    const portone = PortOne.PortOneClient({ secret: process.env.PORTONE_V2_API_SECRET! });
     const paymentResponse = await portone.payment.getPayment({ paymentId });
 
     if (!paymentResponse) {
@@ -86,7 +86,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
     }
     console.log(`[DEBUG] 3b. PortOne GetPayment API successful. Status: ${paymentResponse.status}`);
 
-    const paymentData: PortOne.Payment = paymentResponse;
+    const paymentData: PortOnePayment = paymentResponse;
 
     if (paymentData.status !== 'PAID') {
         console.log(`[DEBUG] 3c. [PROCESS_IGNORED] Payment status is not 'PAID'. Current status: ${paymentData.status}`);
@@ -98,6 +98,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
 
     if (!userId || !orderName) {
         console.error(`[DEBUG] 3d. [PROCESS_FAILED] Missing userId or orderName. Cancelling payment.`);
+        // await cancelPayment(paymentData.id, '사용자 또는 주문 정보 누락'); // 일단 주석처리
         return { success: false, message: '사용자 또는 주문 정보가 없어 결제 처리가 불가능합니다.' };
     }
     
@@ -115,6 +116,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
 
     if (classificationsSnapshot.empty) {
         console.error(`[DEBUG] 3e. [PROCESS_FAILED] Classification not found in DB: ${classificationName}. Cancelling payment.`);
+        // await cancelPayment(paymentData.id, `상품(${classificationName})을 찾을 수 없음`); // 일단 주석처리
         return { success: false, message: `주문명에 해당하는 상품(${classificationName})을 찾을 수 없습니다.` };
     }
     
@@ -176,6 +178,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
     } catch (error) {
         console.error(`[FATAL_DB_ERROR] Firestore transaction failed for user ${userId}. Please check manually. PaymentId: ${paymentId}`, error);
         const errorMessage = error instanceof Error ? error.message : "알 수 없는 서버 오류";
+        // await cancelPayment(paymentData.id, `데이터베이스 처리 실패: ${errorMessage}`); // 일단 주석처리
         return { success: false, message: `데이터베이스 처리 실패: ${errorMessage}` };
     }
 }
@@ -192,17 +195,21 @@ export async function POST(req: NextRequest) {
       }
 
       const rawBody = await req.text();
+      const headersObject: Record<string, string> = {};
+      req.headers.forEach((value, key) => {
+        headersObject[key] = value;
+      });
       console.log('[DEBUG] 1b. Received Raw Body:', rawBody.substring(0, 500) + '...');
       
-      const webhook = await PortOne.Webhook.verify(webhookSecret, rawBody, req.headers);
+      const webhook = await PortOne.Webhook.verify(webhookSecret, rawBody, headersObject);
       console.log('[DEBUG] 2. Webhook verification successful. Event ID:', webhook.id);
 
-      if ("paymentId" in webhook.data) {
-          console.log(`[DEBUG] 2a. Event is a payment event. Status: ${webhook.status}, PaymentId: ${webhook.data.paymentId}`);
+      if (webhook.payment) {
+          console.log(`[DEBUG] 2a. Event is a payment event. Status: ${webhook.payment.status}, PaymentId: ${webhook.payment.id}`);
           
-          if (webhook.status === 'PAID') {
+          if (webhook.payment.status === 'PAID') {
               console.log(`[DEBUG] 3. Status is 'PAID'. Proceeding to process payment.`);
-              const result = await verifyAndProcessPayment(webhook.data.paymentId);
+              const result = await verifyAndProcessPayment(webhook.payment.id);
               
               if (result.success) {
                   console.log(`[DEBUG] 4. [SUCCESS_RESPONSE] Processed successfully. Responding 200 OK.`);
@@ -212,8 +219,8 @@ export async function POST(req: NextRequest) {
                   return NextResponse.json({ success: false, message: result.message }, { status: 200 });
               }
           } else {
-              console.log(`[DEBUG] 3. [IGNORED_RESPONSE] Status is '${webhook.status}', not 'PAID'. Acknowledging with 200 OK.`);
-              return NextResponse.json({ success: true, message: `Status '${webhook.status}' event acknowledged.` });
+              console.log(`[DEBUG] 3. [IGNORED_RESPONSE] Status is '${webhook.payment.status}', not 'PAID'. Acknowledging with 200 OK.`);
+              return NextResponse.json({ success: true, message: `Status '${webhook.payment.status}' event acknowledged.` });
           }
       } else {
           console.log(`[DEBUG] 2a. [IGNORED_RESPONSE] Non-payment event received. Acknowledging with 200 OK.`);
@@ -230,3 +237,5 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: e.message || '웹훅 처리 중 알 수 없는 서버 오류 발생' }, { status: 500 });
   }
 }
+
+    
