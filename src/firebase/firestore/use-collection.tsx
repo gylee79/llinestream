@@ -67,7 +67,7 @@ export function useCollection<T = any>(
         const contextualError = new FirestorePermissionError({
           operation: 'list',
           path: pathString, 
-        }, authUser);
+        }, authUser?.uid || null);
 
         setError(contextualError);
         setData(null);

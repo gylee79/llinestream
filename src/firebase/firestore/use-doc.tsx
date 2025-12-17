@@ -51,11 +51,11 @@ export function useDoc<T = any>(
         setError(null);
         setIsLoading(false);
       },
-      (error: FirestoreError) => {
+      (err: FirestoreError) => {
         const contextualError = new FirestorePermissionError({
           operation: 'get',
           path: memoizedDocRef.path,
-        }, authUser);
+        }, authUser?.uid || null);
 
         setError(contextualError)
         setData(null)

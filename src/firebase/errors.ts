@@ -1,5 +1,4 @@
 'use client';
-import type { User } from 'firebase/auth';
 
 type SecurityRuleContext = {
   path: string;
@@ -7,26 +6,8 @@ type SecurityRuleContext = {
   requestResourceData?: any;
 };
 
-interface FirebaseAuthToken {
-  name: string | null;
-  email: string | null;
-  email_verified: boolean;
-  phone_number: string | null;
-  sub: string;
-  firebase: {
-    identities: Record<string, string[]>;
-    sign_in_provider: string;
-    tenant: string | null;
-  };
-}
-
-interface FirebaseAuthObject {
-  uid: string;
-  token: FirebaseAuthToken;
-}
-
 interface SecurityRuleRequest {
-  auth: FirebaseAuthObject | null;
+  auth: { uid: string } | null; // Simplified auth object
   method: string;
   path: string;
   resource?: {
@@ -34,40 +15,9 @@ interface SecurityRuleRequest {
   };
 }
 
-function buildAuthObject(currentUser: User | null): FirebaseAuthObject | null {
-  if (!currentUser) {
-    return null;
-  }
-
-  const token: FirebaseAuthToken = {
-    name: currentUser.displayName,
-    email: currentUser.email,
-    email_verified: currentUser.emailVerified,
-    phone_number: currentUser.phoneNumber,
-    sub: currentUser.uid,
-    firebase: {
-      identities: currentUser.providerData.reduce((acc, p) => {
-        if (p.providerId) {
-          acc[p.providerId] = [p.uid];
-        }
-        return acc;
-      }, {} as Record<string, string[]>),
-      sign_in_provider: currentUser.providerData[0]?.providerId || 'custom',
-      tenant: currentUser.tenantId,
-    },
-  };
-
+function buildRequestObject(context: SecurityRuleContext, uid: string | null): SecurityRuleRequest {
   return {
-    uid: currentUser.uid,
-    token: token,
-  };
-}
-
-function buildRequestObject(context: SecurityRuleContext, currentUser: User | null): SecurityRuleRequest {
-  const authObject = buildAuthObject(currentUser);
-
-  return {
-    auth: authObject,
+    auth: uid ? { uid } : null,
     method: context.operation,
     path: `/databases/(default)/documents/${context.path}`,
     resource: context.requestResourceData ? { data: context.requestResourceData } : undefined,
@@ -75,17 +25,21 @@ function buildRequestObject(context: SecurityRuleContext, currentUser: User | nu
 }
 
 function buildErrorMessage(requestObject: SecurityRuleRequest): string {
-  return `Missing or insufficient permissions: The following request was denied by Firestore Security Rules:
-${JSON.stringify(requestObject, null, 2)}`;
+  // Simplified error message for stability
+  return `FirebaseError: Missing or insufficient permissions. Request details: ${JSON.stringify({
+    path: requestObject.path,
+    method: requestObject.method,
+    auth: requestObject.auth,
+  })}`;
 }
 
 export class FirestorePermissionError extends Error {
   public readonly request: SecurityRuleRequest;
 
-  constructor(context: SecurityRuleContext, currentUser: User | null = null) {
-    const requestObject = buildRequestObject(context, currentUser);
+  constructor(context: SecurityRuleContext, uid: string | null = null) {
+    const requestObject = buildRequestObject(context, uid);
     super(buildErrorMessage(requestObject));
-    this.name = 'FirebaseError';
+    this.name = 'FirestorePermissionError'; // Changed name to be more specific
     this.request = requestObject;
   }
 }
