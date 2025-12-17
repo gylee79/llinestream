@@ -52,27 +52,31 @@ export interface PortOnePaymentResponse {
   pgMessage?: string;
 }
 
-/**
- * @interface PortOneWebhookRequest
- * @see https://developers.portone.io/docs/ko/api/webhook#request-%EB%B0%94%EB%94%94
- * This interface is for the newer webhook version (2024-04-25).
- */
-export interface PortOneWebhookRequest {
-  id: string; // The event ID, which corresponds to paymentId for transaction events
-  type: string; // e.g., "Transaction.Paid"
-  status?: 'PAID' | 'FAILED' | 'CANCELLED' | 'VIRTUAL_ACCOUNT_ISSUED'; // Legacy or included for compatibility
-  timestamp: string;
-  data: {
-    storeId: string;
+
+export interface PortOneWebhookData {
     paymentId: string;
-    // ... other properties depending on event type
-  };
+    status: 'PAID' | 'FAILED' | 'CANCELLED' | 'VIRTUAL_ACCOUNT_ISSUED';
+    // ... 다른 필드들이 있을 수 있음
 }
 
 /**
+ * @interface PortOneWebhookRequest
+ * @description 포트원 서버-SDK 웹훅 객체 타입
+ * @see https://github.com/portone-io/portone-nodejs-sdk/blob/main/src/webhook.ts
+ */
+export interface PortOneWebhookRequest {
+  id: string; // Event ID
+  paymentId: string;
+  status: 'PAID' | 'FAILED' | 'CANCELLED' | 'VIRTUAL_ACCOUNT_ISSUED';
+  timestamp: string;
+  data: PortOneWebhookData;
+}
+
+
+/**
  * @interface PortOnePayment
- * @description 포트원 결제내역 단건조회 API 응답 타입
- * @see https://developers.portone.io/docs/ko/api/payment-api/payment-lookup#response-%EB%B0%94%EB%94%94
+ * @description 포트원 결제내역 단건조회 API 응답 타입 (서버 SDK)
+ * @see https://github.com/portone-io/portone-nodejs-sdk/blob/main/src/v2/payment.ts#L199
  */
 export interface PortOnePayment {
   id: string;
@@ -84,7 +88,9 @@ export interface PortOnePayment {
   };
   customer?: {
     id?: string;
-    // ... 기타 고객 정보
+    name?: string;
+    email?: string;
+    phoneNumber?: string;
   };
   method?: {
     name?: string;
