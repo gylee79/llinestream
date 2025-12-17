@@ -124,7 +124,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
     console.log(`[DEBUG] 3e. Found classification in DB: ${targetClassificationId}`);
     
     const userRef = firestore.doc(`users/${userId}`);
-    const subscriptionRef = userRef.collection('subscriptions').doc(paymentId);
+    const subscriptionRef = userRef.collection('subscriptions').doc(paymentData.id);
 
     try {
         await firestore.runTransaction(async (transaction) => {
@@ -132,7 +132,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
             const subDoc = await transaction.get(subscriptionRef);
 
             if (subDoc.exists) {
-                console.log(`[DEBUG] 3f. [PROCESS_IGNORED] This paymentId has already been processed. paymentId: ${paymentId}`);
+                console.log(`[DEBUG] 3f. [PROCESS_IGNORED] This paymentId has already been processed. paymentId: ${paymentData.id}`);
                 return;
             }
 
@@ -152,7 +152,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
                 orderName: paymentData.orderName,
                 paymentId: paymentData.id,
                 status: paymentData.status,
-                method: paymentData.method?.provider || 'UNKNOWN',
+                method: paymentData.pgProvider || 'UNKNOWN',
             };
 
             transaction.set(subscriptionRef, newSubscriptionData);
@@ -175,9 +175,11 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
         return { success: true, message: '결제가 성공적으로 처리되었습니다.' };
 
     } catch (error) {
-        console.error(`[FATAL_DB_ERROR] Firestore transaction failed for user ${userId}. Please check manually. PaymentId: ${paymentId}`, error);
+        console.error(`[FATAL_DB_ERROR] Firestore transaction failed for user ${userId}. Please check manually. PaymentId: ${paymentData.id}`, error);
         const errorMessage = error instanceof Error ? error.message : "알 수 없는 서버 오류";
-        await cancelPayment(paymentData.id, `데이터베이스 처리 실패: ${errorMessage}`);
+        // NOTE: Temporarily disabling auto-cancellation for debugging purposes.
+        // await cancelPayment(paymentData.id, `데이터베이스 처리 실패: ${errorMessage}`);
+        console.error(`[PAYMENT_NOT_CANCELLED] Payment for ${paymentData.id} was NOT automatically cancelled due to DB error. Please check manually.`);
         return { success: false, message: `데이터베이스 처리 실패: ${errorMessage}` };
     }
 }
@@ -204,7 +206,7 @@ export async function POST(req: NextRequest) {
       console.log('[DEBUG] 2. Webhook verification successful.');
 
       if ('payment' in webhook) {
-          const payment = webhook.payment;
+          const payment: any = webhook.payment;
           console.log(`[DEBUG] 2a. Event is a payment event. Status: ${payment.status}, PaymentId: ${payment.id}`);
           
           if (payment.status === 'PAID') {
