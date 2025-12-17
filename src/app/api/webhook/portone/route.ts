@@ -6,7 +6,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import type { Classification } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
-import type { PaidPayment } from "@portone/server-sdk";
+import type { PaidPayment } from '@portone/server-sdk';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
