@@ -93,7 +93,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
 
     if (!userId || !orderName) {
         console.error(`[DEBUG] 3d. [PROCESS_FAILED] Missing userId or orderName. Cancelling payment.`);
-        await cancelPayment(paymentId, "사용자 또는 주문 정보 누락");
+        // await cancelPayment(paymentId, "사용자 또는 주문 정보 누락"); // 임시 비활성화
         return { success: false, message: '사용자 또는 주문 정보가 없어 결제 처리가 불가능합니다.' };
     }
     
@@ -112,7 +112,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
 
     if (classificationsSnapshot.empty) {
         console.error(`[DEBUG] 3e. [PROCESS_FAILED] Classification not found in DB: ${classificationName}. Cancelling payment.`);
-        await cancelPayment(paymentId, "주문 상품을 찾을 수 없음");
+        // await cancelPayment(paymentId, "주문 상품을 찾을 수 없음"); // 임시 비활성화
         return { success: false, message: `주문명에 해당하는 상품(${classificationName})을 찾을 수 없습니다.` };
     }
     
@@ -168,8 +168,8 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
         return { success: true, message: '결제가 성공적으로 처리되었습니다.' };
 
     } catch (error) {
-        console.error(`[DEBUG] 3h. [TRANSACTION_FAILED] Failed to commit subscription for user ${userId}. Error:`, error);
-        await cancelPayment(paymentId, "서버 내부 데이터 처리 실패");
+        console.error(`[FATAL_DB_ERROR] Firestore transaction failed for user ${userId}. Payment NOT cancelled automatically. Please check manually. PaymentId: ${paymentId}`, error);
+        // await cancelPayment(paymentId, "서버 내부 데이터 처리 실패"); // 임시 비활성화
         const errorMessage = error instanceof Error ? error.message : "알 수 없는 서버 오류";
         return { success: false, message: `데이터베이스 처리 실패: ${errorMessage}` };
     }
