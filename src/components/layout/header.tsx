@@ -12,6 +12,7 @@ import {
   Menu,
   Shield,
   X,
+  ShoppingCart,
 } from 'lucide-react';
 
 import { LlineStreamLogo } from '@/components/icons';
@@ -38,6 +39,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useUser, useAuth, useFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
+import { useCart } from '@/context/cart-context';
+import { Badge } from '../ui/badge';
 
 const navLinks = [
   { href: '/', label: 'Home', icon: Home },
@@ -52,6 +55,7 @@ export default function Header() {
   const { user, isUserLoading } = useUser();
   const { authUser } = useFirebase();
   const auth = useAuth();
+  const { openCart, items } = useCart();
   const isLoggedIn = !!user;
   const isAdmin = user?.role === 'admin';
 
@@ -126,7 +130,17 @@ export default function Header() {
         </div>
 
 
-        <div className="flex items-center justify-end space-x-4">
+        <div className="flex items-center justify-end space-x-2">
+           <Button variant="ghost" size="icon" className="relative" onClick={openCart}>
+                <ShoppingCart className="h-5 w-5" />
+                {items.length > 0 && (
+                    <Badge variant="destructive" className="absolute -right-2 -top-2 h-5 w-5 justify-center rounded-full p-0">
+                        {items.length}
+                    </Badge>
+                )}
+                <span className="sr-only">장바구니 열기</span>
+            </Button>
+
           {isUserLoading ? (
             <Avatar className="h-8 w-8">
               <AvatarFallback>?</AvatarFallback>

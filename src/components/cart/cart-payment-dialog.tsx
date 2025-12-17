@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useState, useEffect } from "react"
@@ -13,11 +12,12 @@ import {
   DialogClose
 } from "@/components/ui/dialog"
 import { Button } from "../ui/button"
-import type { Classification } from "@/lib/types"
 import type { PortOnePaymentRequest, PortOnePaymentResponse } from "@/lib/portone";
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/firebase"
 import { v4 as uuidv4 } from "uuid";
+import { useCart } from "@/context/cart-context";
+import { formatPrice } from "@/lib/utils";
 
 declare global {
   interface Window {
@@ -25,23 +25,14 @@ declare global {
   }
 }
 
-interface PaymentDialogProps {
+interface CartPaymentDialogProps {
     children: React.ReactNode;
-    classification: Classification;
-    selectedDuration: keyof Classification['prices'];
-    selectedPrice: number;
-    selectedLabel: string;
 }
 
-export default function PaymentDialog({ 
-    children, 
-    classification,
-    selectedDuration,
-    selectedPrice,
-    selectedLabel
-}: PaymentDialogProps) {
+export default function CartPaymentDialog({ children }: CartPaymentDialogProps) {
     const { toast } = useToast();
     const { user } = useUser();
+    const { items, totalAmount, clearCart } = useCart();
     const [isSdkReady, setSdkReady] = useState(false);
 
     useEffect(() => {
@@ -66,6 +57,11 @@ export default function PaymentDialog({
             toast({ variant: 'destructive', title: '로그인 필요', description: '결제를 진행하려면 먼저 로그인해주세요.' });
             return;
         }
+
+        if (items.length === 0) {
+            toast({ variant: 'destructive', title: '장바구니 비어있음', description: '결제할 상품이 없습니다.' });
+            return;
+        }
         
         const storeId = process.env.NEXT_PUBLIC_PORTONE_STORE_ID;
         const channelKey = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY;
@@ -77,13 +73,17 @@ export default function PaymentDialog({
         }
 
         const paymentId = `pmt-${uuidv4().replaceAll('-', '')}`;
+        const orderName = items.length > 1 
+            ? `${items[0].name} ${items[0].durationLabel} 이용권 외 ${items.length - 1}건` 
+            : `${items[0].name} ${items[0].durationLabel} 이용권`;
+
 
         const request: PortOnePaymentRequest = {
             storeId,
             channelKey,
             paymentId,
-            orderName: `${classification.name} ${selectedLabel}`,
-            totalAmount: selectedPrice,
+            orderName: orderName,
+            totalAmount: totalAmount,
             currency: 'KRW',
             payMethod: 'CARD',
             customer: {
@@ -92,9 +92,7 @@ export default function PaymentDialog({
                 phoneNumber: user.phone,
                 email: user.email,
             },
-            // 포트원 권장: 서버가 결제 이벤트를 직접 수신할 웹훅 URL
             noticeUrls: [`${window.location.origin}/api/webhook/portone`],
-            // 사용자가 결제 완료 후 돌아올 주소
             redirectUrl: `${window.location.origin}/api/payment/complete`,
         };
 
@@ -111,6 +109,9 @@ export default function PaymentDialog({
             }
 
             console.log("결제 요청 성공 (리다이렉트 전):", response);
+            // 성공 시 장바구니 비우기
+            // 실제 데이터 처리는 웹훅에서 하므로, 여기서는 UI상에서만 비워줍니다.
+            clearCart();
 
         } catch (error: any) {
             console.error("결제 요청 중 예외 발생:", error);
@@ -130,21 +131,21 @@ export default function PaymentDialog({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="font-headline">{classification.name} 구독</DialogTitle>
+          <DialogTitle className="font-headline">장바구니 결제</DialogTitle>
           <DialogDescription>
-            {'결제를 진행하여 \''}{classification.name}{'\' 카테고리의 모든 콘텐츠를 무제한으로 이용하세요.'}
+            선택하신 상품에 대한 결제를 진행합니다.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
-            <p className="font-semibold">{`결제 금액 (${selectedLabel})`}</p>
-            <p className="text-2xl font-bold">₩{new Intl.NumberFormat('ko-KR').format(selectedPrice)}</p>
+            <p className="font-semibold">{`총 결제 금액 (${items.length}개 상품)`}</p>
+            <p className="text-2xl font-bold">{formatPrice(totalAmount)}</p>
             <p className="text-sm text-muted-foreground mt-4">버튼 클릭 시 포트원 결제창으로 이동합니다.</p>
         </div>
         <DialogFooter>
             <DialogClose asChild>
                 <Button variant="outline">취소</Button>
             </DialogClose>
-            <Button onClick={handlePayment} disabled={!isSdkReady}>
+            <Button onClick={handlePayment} disabled={!isSdkReady || items.length === 0}>
                 {isSdkReady ? '결제하기' : '결제 모듈 로딩 중...'}
             </Button>
         </DialogFooter>

@@ -5,6 +5,8 @@ import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/layout/header';
 import Footer from '@/components/layout/footer';
 import { FirebaseClientProvider } from '@/firebase';
+import { CartProvider } from '@/context/cart-context';
+import CartSidebar from '@/components/cart/cart-sidebar';
 
 export const metadata: Metadata = {
   title: 'LlineStream',
@@ -26,12 +28,15 @@ export default function RootLayout({
       </head>
       <body className={cn('min-h-screen bg-background font-body antialiased')}>
         <FirebaseClientProvider>
-          <div className="relative flex min-h-dvh flex-col bg-background">
-            <Header />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
-          <Toaster />
+          <CartProvider>
+            <div className="relative flex min-h-dvh flex-col bg-background">
+              <Header />
+              <main className="flex-1">{children}</main>
+              <Footer />
+              <CartSidebar />
+            </div>
+            <Toaster />
+          </CartProvider>
         </FirebaseClientProvider>
       </body>
     </html>
