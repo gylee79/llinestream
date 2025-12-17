@@ -12,7 +12,7 @@ import { App, getApps } from 'firebase-admin/app';
  * 2. Local Development: Uses the `FIREBASE_ADMIN_SDK_CONFIG` environment variable.
  *
  * @returns The initialized Firebase Admin App instance.
- * @throws {Error} If initialization fails in a local environment due to a missing or invalid config.
+ * @throws {Error} If initialization fails because no credentials can be found.
  */
 export function initializeAdminApp(): App {
   // If the app is already initialized, return the existing instance.
@@ -20,32 +20,34 @@ export function initializeAdminApp(): App {
     return getApps()[0];
   }
 
-  // In a managed environment (like App Hosting), GOOGLE_APPLICATION_CREDENTIALS
-  // is set automatically. `initializeApp()` will use it.
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.log("Initializing Firebase Admin with Application Default Credentials.");
+  try {
+    // In a managed environment (like App Hosting), GOOGLE_APPLICATION_CREDENTIALS
+    // is set automatically. `initializeApp()` with no arguments will use it.
+    console.log("Attempting to initialize Firebase Admin with Application Default Credentials.");
     return admin.initializeApp();
-  }
+  } catch (error: any) {
+    console.warn("Automatic initialization failed. Trying fallback method.", error.message);
 
-  // For local development, use the service account from environment variables.
-  const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
-  if (serviceAccountEnv) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountEnv);
-      console.log("Initializing Firebase Admin with service account from env var.");
-      return admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
-    } catch (error) {
-      console.error("Failed to parse FIREBASE_ADMIN_SDK_CONFIG. Make sure it's a valid JSON string.", error);
-      throw new Error("Firebase Admin SDK initialization failed due to invalid configuration.");
+    // Fallback for local development using the service account from environment variables.
+    const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
+    if (serviceAccountEnv) {
+      try {
+        const serviceAccount = JSON.parse(serviceAccountEnv);
+        console.log("Initializing Firebase Admin with service account from env var.");
+        return admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+        });
+      } catch (parseError: any) {
+        console.error("Failed to parse FIREBASE_ADMIN_SDK_CONFIG. Make sure it's a valid JSON string.", parseError);
+        throw new Error("Firebase Admin SDK initialization failed due to invalid configuration.");
+      }
     }
-  }
 
-  // If no credentials can be found, throw a clear error.
-  throw new Error(
-    'Firebase Admin SDK initialization failed. ' +
-    'Could not find Application Default Credentials or FIREBASE_ADMIN_SDK_CONFIG. ' +
-    'Please ensure your environment is set up correctly.'
-  );
+    // If no credentials can be found by any method, throw a clear error.
+    throw new Error(
+      'Firebase Admin SDK initialization failed. ' +
+      'Could not find Application Default Credentials or a valid FIREBASE_ADMIN_SDK_CONFIG. ' +
+      'Please ensure your server environment is set up correctly.'
+    );
+  }
 }
