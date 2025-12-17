@@ -77,3 +77,14 @@ export interface Subscription {
     status: string;
     method: string;
 }
+
+export interface FooterSettings {
+  appName: string;
+  slogan: string;
+  copyright: string;
+  representative: string;
+  businessNumber: string;
+  address: string;
+  supportPhone: string;
+  supportHours: string;
+}

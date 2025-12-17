@@ -222,6 +222,32 @@
         "purchasedAt",
         "expiresAt"
       ]
+    },
+    "FooterSettings": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FooterSettings",
+      "type": "object",
+      "description": "Stores the application's footer information.",
+      "properties": {
+        "appName": { "type": "string" },
+        "slogan": { "type": "string" },
+        "copyright": { "type": "string" },
+        "representative": { "type": "string" },
+        "businessNumber": { "type": "string" },
+        "address": { "type": "string" },
+        "supportPhone": { "type": "string" },
+        "supportHours": { "type": "string" }
+      },
+      "required": [
+        "appName",
+        "slogan",
+        "copyright",
+        "representative",
+        "businessNumber",
+        "address",
+        "supportPhone",
+        "supportHours"
+      ]
     }
   },
   "auth": {
@@ -345,8 +371,17 @@
             }
           ]
         }
+      },
+      {
+        "path": "/settings/footer",
+        "definition": {
+          "entityName": "FooterSettings",
+          "schema": { "$ref": "#/entities/FooterSettings" },
+          "description": "Stores footer settings. It is a single document, not a collection.",
+          "isSingleDoc": true
+        }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support LlineStream's video streaming and subscription model. User roles are managed via the `role` field within the `users` document for secure and efficient admin checks in security rules. User data is self-contained. Content is structured hierarchically (Field -> Classification -> Course -> Episode) for easy browsing and management. Subscriptions are stored under each user to easily query a user's entitlements."
+    "reasoning": "The Firestore structure is designed to support LlineStream's video streaming and subscription model. User roles are managed via the `role` field within the `users` document for secure and efficient admin checks in security rules. User data is self-contained. Content is structured hierarchically (Field -> Classification -> Course -> Episode) for easy browsing and management. Subscriptions are stored under each user to easily query a user's entitlements. A single document in a 'settings' collection holds global configurations like footer info."
   }
 }
