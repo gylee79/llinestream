@@ -6,10 +6,8 @@ import { Timestamp } from 'firebase-admin/firestore';
 import type { Classification } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
-import type { PortOnePayment } from '@/lib/portone';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 function initializeAdminApp() {
   if (admin.apps.length) {
@@ -85,14 +83,16 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
         console.error(`[DEBUG] 3b. [PROCESS_FAILED] PortOne GetPayment API returned null for paymentId: ${paymentId}`);
         return { success: false, message: `결제내역 조회 실패: paymentId ${paymentId}에 해당하는 내역이 없습니다.` };
     }
-    console.log(`[DEBUG] 3b. PortOne GetPayment API successful. Status: ${String(paymentResponse.status)}`);
-
-    const paymentData: PortOnePayment = paymentResponse;
-
-    if (paymentData.status !== 'PAID') {
-        console.log(`[DEBUG] 3c. [PROCESS_IGNORED] Payment status is not 'PAID'. Current status: ${paymentData.status}`);
-        return { success: true, message: `결제 상태가 PAID가 아니므로 처리를 건너뜁니다: ${paymentData.status}` };
+    
+    // We only process PAID payments here. Other statuses are ignored.
+    if (paymentResponse.status !== 'PAID') {
+        console.log(`[DEBUG] 3b. [PROCESS_IGNORED] Payment status is not 'PAID'. Current status: ${String(paymentResponse.status)}`);
+        return { success: true, message: `결제 상태가 PAID가 아니므로 처리를 건너뜁니다: ${paymentResponse.status}` };
     }
+    
+    // Now we know paymentResponse is of type PaidPayment
+    const paymentData: PortOne.Payment.PaidPayment = paymentResponse;
+    console.log(`[DEBUG] 3b. PortOne GetPayment API successful. Status: ${paymentData.status}`);
 
     const userId = paymentData.customer?.id;
     const orderName = paymentData.orderName;
@@ -154,7 +154,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
                 orderName: paymentData.orderName,
                 paymentId: paymentData.id,
                 status: paymentData.status,
-                method: paymentData.method?.name || 'UNKNOWN',
+                method: paymentData.method.name || 'UNKNOWN',
             };
 
             transaction.set(subscriptionRef, newSubscriptionData);
@@ -184,7 +184,6 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
     }
 }
 
-
 export async function POST(req: NextRequest) {
   console.log('---');
   console.log(`[DEBUG] 1. Webhook endpoint /api/webhook/portone was hit at ${new Date().toISOString()}`);
@@ -206,9 +205,9 @@ export async function POST(req: NextRequest) {
 
       console.log('[DEBUG] 2. Webhook verification successful. Event ID:', webhook.id);
 
-      if ('payment' in webhook) {
-          const payment = webhook.payment;
-          console.log(`[DEBUG] 2a. Event is a payment event. Status: ${payment.status}, PaymentId: ${payment.id}`);
+      if ("payment" in webhook) {
+          const payment: PortOne.Payment.Entity = webhook.payment;
+          console.log(`[DEBUG] 2a. Event is a payment event. Status: ${String(payment.status)}, PaymentId: ${payment.id}`);
           
           if (payment.status === 'PAID') {
               console.log(`[DEBUG] 3. Status is 'PAID'. Proceeding to process payment.`);
@@ -222,8 +221,8 @@ export async function POST(req: NextRequest) {
                   return NextResponse.json({ success: false, message: result.message }, { status: 200 });
               }
           } else {
-              console.log(`[DEBUG] 3. [IGNORED_RESPONSE] Status is '${payment.status}', not 'PAID'. Acknowledging with 200 OK.`);
-              return NextResponse.json({ success: true, message: `Status '${payment.status}' event acknowledged.` });
+              console.log(`[DEBUG] 3. [IGNORED_RESPONSE] Status is '${String(payment.status)}', not 'PAID'. Acknowledging with 200 OK.`);
+              return NextResponse.json({ success: true, message: `Status '${String(payment.status)}' event acknowledged.` });
           }
       } else {
           console.log(`[DEBUG] 2a. [IGNORED_RESPONSE] Non-payment event received. Acknowledging with 200 OK.`);

@@ -71,30 +71,3 @@ export interface PortOneWebhookRequest {
   timestamp: string;
   data: PortOneWebhookData;
 }
-
-
-/**
- * @interface PortOnePayment
- * @description 포트원 결제내역 단건조회 API 응답 타입 (서버 SDK)
- * @see https://github.com/portone-io/portone-nodejs-sdk/blob/main/src/v2/payment.ts#L199
- */
-export interface PortOnePayment {
-  id: string;
-  storeId: string;
-  status: 'PAID' | 'READY' | 'FAILED' | 'CANCELLED' | 'VIRTUAL_ACCOUNT_ISSUED';
-  amount: {
-    total: number;
-    // ... 기타 금액 정보
-  };
-  customer?: {
-    id?: string;
-    name?: string;
-    email?: string;
-    phoneNumber?: string;
-  };
-  method?: {
-    name?: string;
-  };
-  orderName: string;
-  // ... 기타 결제 정보
-}
