@@ -6,6 +6,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import type { Classification } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
+import type { Payment as PortOnePaymentType } from '@portone/server-sdk/dist/generated/payment';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,19 +88,19 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
     // We only process PAID payments here. Other statuses are ignored.
     if (paymentResponse.status !== 'PAID') {
         console.log(`[DEBUG] 3b. [PROCESS_IGNORED] Payment status is not 'PAID'. Current status: ${String(paymentResponse.status)}`);
-        return { success: true, message: `결제 상태가 PAID가 아니므로 처리를 건너뜁니다: ${paymentResponse.status}` };
+        return { success: true, message: `결제 상태가 PAID가 아니므로 처리를 건너뜁니다: ${String(paymentResponse.status)}` };
     }
     
     // Now we know paymentResponse is of type PaidPayment
     const paymentData: PortOne.Payment.PaidPayment = paymentResponse;
-    console.log(`[DEBUG] 3b. PortOne GetPayment API successful. Status: ${paymentData.status}`);
+    console.log(`[DEBUG] 3b. PortOne GetPayment API successful. Status: ${String(paymentData.status)}`);
 
     const userId = paymentData.customer?.id;
     const orderName = paymentData.orderName;
 
     if (!userId || !orderName) {
         console.error(`[DEBUG] 3d. [PROCESS_FAILED] Missing userId or orderName. Cancelling payment.`);
-        // await cancelPayment(paymentData.id, '사용자 또는 주문 정보 누락');
+        await cancelPayment(paymentData.id, '사용자 또는 주문 정보 누락');
         return { success: false, message: '사용자 또는 주문 정보가 없어 결제 처리가 불가능합니다.' };
     }
     
@@ -117,7 +118,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
 
     if (classificationsSnapshot.empty) {
         console.error(`[DEBUG] 3e. [PROCESS_FAILED] Classification not found in DB: ${classificationName}. Cancelling payment.`);
-        // await cancelPayment(paymentData.id, `상품(${classificationName})을 찾을 수 없음`);
+        await cancelPayment(paymentData.id, `상품(${classificationName})을 찾을 수 없음`);
         return { success: false, message: `주문명에 해당하는 상품(${classificationName})을 찾을 수 없습니다.` };
     }
     
@@ -154,7 +155,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
                 orderName: paymentData.orderName,
                 paymentId: paymentData.id,
                 status: paymentData.status,
-                method: paymentData.method.name || 'UNKNOWN',
+                method: paymentData.method?.name || (typeof paymentData.method === 'string' ? paymentData.method : 'UNKNOWN'),
             };
 
             transaction.set(subscriptionRef, newSubscriptionData);
@@ -179,7 +180,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
     } catch (error) {
         console.error(`[FATAL_DB_ERROR] Firestore transaction failed for user ${userId}. Please check manually. PaymentId: ${paymentId}`, error);
         const errorMessage = error instanceof Error ? error.message : "알 수 없는 서버 오류";
-        // await cancelPayment(paymentData.id, `데이터베이스 처리 실패: ${errorMessage}`);
+        await cancelPayment(paymentData.id, `데이터베이스 처리 실패: ${errorMessage}`);
         return { success: false, message: `데이터베이스 처리 실패: ${errorMessage}` };
     }
 }
@@ -206,7 +207,7 @@ export async function POST(req: NextRequest) {
       console.log('[DEBUG] 2. Webhook verification successful. Event ID:', webhook.id);
 
       if ("payment" in webhook) {
-          const payment: PortOne.Payment.Entity = webhook.payment;
+          const payment: PortOnePaymentType = webhook.payment;
           console.log(`[DEBUG] 2a. Event is a payment event. Status: ${String(payment.status)}, PaymentId: ${payment.id}`);
           
           if (payment.status === 'PAID') {
