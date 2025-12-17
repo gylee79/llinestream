@@ -153,7 +153,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
                 orderName: paymentData.orderName,
                 paymentId: paymentData.id,
                 status: String(paymentData.status),
-                method: paymentData.pgProvider || 'UNKNOWN',
+                method: paymentData.pgResult.provider || 'UNKNOWN',
             };
 
             transaction.set(subscriptionRef, newSubscriptionData);
@@ -223,8 +223,8 @@ export async function POST(req: NextRequest) {
                   return NextResponse.json({ success: false, message: result.message }, { status: 200 });
               }
           } else {
-              console.log(`[DEBUG] 3. [IGNORED_RESPONSE] Status is '${payment.status}', not 'PAID'. Acknowledging with 200 OK.`);
-              return NextResponse.json({ success: true, message: `Status '${payment.status}' event acknowledged.` });
+              console.log(`[DEBUG] 3. [IGNORED_RESPONSE] Status is '${String(payment.status)}', not 'PAID'. Acknowledging with 200 OK.`);
+              return NextResponse.json({ success: true, message: `Status '${String(payment.status)}' event acknowledged.` });
           }
       } else {
           console.log(`[DEBUG] 2a. [IGNORED_RESPONSE] Non-payment event received. Acknowledging with 200 OK.`);
