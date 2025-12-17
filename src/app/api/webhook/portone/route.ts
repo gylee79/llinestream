@@ -6,6 +6,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import type { Classification } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
+import type { PaidPayment } from '@portone/server-sdk/dist/payment';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,7 +90,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
         return { success: true, message: `결제 상태가 PAID가 아니므로 처리를 건너뜁니다: ${String(paymentResponse.status)}` };
     }
     
-    const paymentData: PortOne.Payment.PaidPayment = paymentResponse;
+    const paymentData: PaidPayment = paymentResponse;
     console.log(`[DEBUG] 3b. PortOne GetPayment API successful. Status: ${String(paymentData.status)}`);
 
     const userId = paymentData.customer?.id;
@@ -152,7 +153,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
                 orderName: paymentData.orderName,
                 paymentId: paymentData.id,
                 status: paymentData.status,
-                method: paymentData.pgProvider || 'UNKNOWN',
+                method: paymentData.pg.provider || 'UNKNOWN',
             };
 
             transaction.set(subscriptionRef, newSubscriptionData);
@@ -199,6 +200,7 @@ export async function POST(req: NextRequest) {
       req.headers.forEach((value, key) => {
         headersObject[key] = value;
       });
+      
       console.log('[DEBUG] 1b. Received Raw Body:', rawBody.substring(0, 500) + '...');
       
       const webhook = await PortOne.Webhook.verify(webhookSecret, rawBody, headersObject);
