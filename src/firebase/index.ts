@@ -1,4 +1,3 @@
-
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
@@ -46,6 +45,7 @@ export function initializeFirebase(): FirebaseServices {
   };
 }
 
+// Re-exporting all necessary hooks and providers
 export * from './provider';
 export * from './client-provider';
 export * from './firestore/use-collection';

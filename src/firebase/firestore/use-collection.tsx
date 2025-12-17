@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { useFirebase } from '@/firebase/provider'; // Use useFirebase to get authUser
 
 /** Utility type to add an 'id' field to a given type T. */
 export type WithId<T> = T & { id: string };
@@ -46,6 +47,7 @@ export function useCollection<T = any>(
   type ResultItemType = WithId<T>;
   type StateDataType = ResultItemType[] | null;
 
+  const { authUser } = useFirebase(); // Get the auth user from context
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
@@ -90,12 +92,11 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (err: FirestoreError) => {
-        // 2. Improve error messaging by including the actual query path for easier debugging.
         const pathString = (memoizedTargetRefOrQuery as any)._query?.path?.toString() || 'unknown collection';
         const contextualError = new FirestorePermissionError({
           operation: 'list',
           path: pathString, 
-        });
+        }, authUser); // Pass the current user
 
         setError(contextualError);
         setData(null);
@@ -107,11 +108,9 @@ export function useCollection<T = any>(
     );
 
     return () => unsubscribe();
-  }, [memoizedTargetRefOrQuery]); 
+  }, [memoizedTargetRefOrQuery, authUser]); 
   
   if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
-    // This check is important for preventing infinite loops but we won't throw a hard error.
-    // Instead, we log it to the console during development.
     if (process.env.NODE_ENV === 'development') {
         console.warn('Query was not properly memoized using useMemoFirebase. This can lead to performance issues and infinite re-renders.');
     }

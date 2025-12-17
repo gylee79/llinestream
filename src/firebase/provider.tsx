@@ -7,8 +7,8 @@ import { Firestore, doc } from 'firebase/firestore';
 import { Auth, User as AuthUser, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseStorage } from 'firebase/storage';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
-import { useDoc } from './firestore/use-doc';
-import type { User } from '@/lib/types';
+import { useDoc as useFirestoreDoc } from './firestore/use-doc'; // Renamed to avoid conflict
+import type { User as AppUser } from '@/lib/types'; // Renamed to avoid conflict
 
 
 interface FirebaseProviderProps {
@@ -52,7 +52,7 @@ export interface FirebaseServicesAndUser {
 
 // Return type for useUser() - specific to user auth state
 export interface UserHookResult {
-  user: User | null; // Firestore user profile
+  user: AppUser | null; // Firestore user profile
   isUserLoading: boolean;
   userError: Error | null;
 }
@@ -198,7 +198,7 @@ export const useUser = (): UserHookResult => {
     return null;
   }, [firestore, authUser]);
 
-  const { data: userProfile, isLoading: isProfileLoading, error: profileError } = useDoc<User>(userDocRef);
+  const { data: userProfile, isLoading: isProfileLoading, error: profileError } = useFirestoreDoc<AppUser>(userDocRef);
 
   const isUserLoading = isAuthLoading || (!!authUser && isProfileLoading);
   const userError = authError || profileError;
