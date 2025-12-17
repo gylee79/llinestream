@@ -241,3 +241,5 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: e.message || '웹훅 처리 중 알 수 없는 서버 오류 발생' }, { status: 500 });
   }
 }
+
+    
