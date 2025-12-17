@@ -18,6 +18,7 @@ import { useCart, type CartItem } from '@/context/cart-context';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/utils';
 import { ShoppingCart } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface PricingCardProps {
   classification: Classification;
@@ -26,7 +27,7 @@ interface PricingCardProps {
 export default function PricingCard({ classification }: PricingCardProps) {
   const [selectedDuration, setSelectedDuration] = useState<keyof Classification['prices']>('day30');
   const { toast } = useToast();
-  const { addToCart } = useCart();
+  const { addToCart, items } = useCart();
   
   const plans = [
     { duration: 'day1', label: '1일 이용권', price: classification.prices.day1 },
@@ -44,17 +45,29 @@ export default function PricingCard({ classification }: PricingCardProps) {
     day90: '90일',
   };
   const selectedLabelForDisplay = durationLabels[selectedDuration];
+  const currentCartItemId = `${classification.id}-${selectedDuration}`;
+  const isInCart = items.some(item => item.id === currentCartItemId);
 
   const handleAddToCart = () => {
     const selectedPlan = plans.find(p => p.duration === selectedDuration);
-    if (!selectedPlan) return;
+    if (!selectedPlan || isInCart) {
+        if(isInCart) {
+            toast({
+              variant: 'destructive',
+              title: '이미 추가된 상품',
+              description: `이미 장바구니에 담겨있는 상품입니다.`,
+            });
+        }
+        return;
+    }
+
 
     const itemToAdd: CartItem = {
       id: `${classification.id}-${selectedDuration}`,
       classificationId: classification.id,
       name: classification.name,
       price: selectedPlan.price,
-      quantity: 1,
+      quantity: 1, // Quantity is always 1 for subscriptions
       duration: selectedDuration,
       durationLabel: selectedPlan.label,
       thumbnailUrl: `https://picsum.photos/seed/${classification.id}/100/100` // Placeholder thumbnail
@@ -83,19 +96,30 @@ export default function PricingCard({ classification }: PricingCardProps) {
           className="mt-6 space-y-3"
           onValueChange={(value) => setSelectedDuration(value as keyof Classification['prices'])}
         >
-          {plans.map((plan) => (
-            <Label key={plan.duration} htmlFor={`${classification.id}-${plan.duration}`} className="flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">
-              <RadioGroupItem value={plan.duration} id={`${classification.id}-${plan.duration}`} className="sr-only" />
-              <span>{plan.label}</span>
-              <span className="font-bold text-foreground">{formatPrice(plan.price)}</span>
-            </Label>
-          ))}
+          {plans.map((plan) => {
+             const cartItemId = `${classification.id}-${plan.duration}`;
+             const isCurrentInCart = items.some(item => item.id === cartItemId);
+            return (
+              <Label 
+                key={plan.duration} 
+                htmlFor={`${classification.id}-${plan.duration}`} 
+                className={cn(
+                    "flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer",
+                    isCurrentInCart && "border-primary/50 bg-muted/50 cursor-not-allowed opacity-70"
+                )}
+              >
+                <RadioGroupItem value={plan.duration} id={`${classification.id}-${plan.duration}`} className="sr-only" disabled={isCurrentInCart} />
+                <span>{plan.label}</span>
+                <span className="font-bold text-foreground">{formatPrice(plan.price)}</span>
+              </Label>
+            )
+          })}
         </RadioGroup>
       </CardContent>
       <CardFooter>
-        <Button className="w-full" onClick={handleAddToCart}>
+        <Button className="w-full" onClick={handleAddToCart} disabled={isInCart}>
             <ShoppingCart className="mr-2 h-4 w-4" />
-            장바구니에 담기
+            {isInCart ? '장바구니에 담김' : '장바구니에 담기'}
         </Button>
       </CardFooter>
     </Card>

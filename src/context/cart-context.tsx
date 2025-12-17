@@ -36,15 +36,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prevItems) => {
       const existingItem = prevItems.find((item) => item.id === itemToAdd.id);
       if (existingItem) {
-        return prevItems.map((item) =>
-          item.id === itemToAdd.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
+        // If item already exists, maybe just highlight it or show a toast, but don't add again.
+        // For simplicity, we'll allow re-adding to show toast again, but won't change quantity.
+        return prevItems.map(item => item.id === itemToAdd.id ? { ...item, quantity: 1 } : item);
       }
       return [...prevItems, { ...itemToAdd, quantity: 1 }];
     });
-    setIsCartOpen(true); // Open cart when item is added
+    // setIsCartOpen(true); // Don't open cart automatically
   };
 
   const removeFromCart = (itemId: string) => {
