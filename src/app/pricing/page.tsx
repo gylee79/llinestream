@@ -17,7 +17,7 @@ export default function PricingPage() {
   return (
     <div className="container mx-auto py-12">
       <header className="mb-12 text-center">
-        <h1 className="font-headline text-4xl font-bold tracking-tight">요금제 안내</h1>
+        <h1 className="font-headline text-4xl font-bold tracking-tight">구독 안내</h1>
         <p className="mt-2 text-lg text-muted-foreground">
           관심 있는 분야를 구독하고 모든 콘텐츠를 무제한으로 즐겨보세요.
         </p>
