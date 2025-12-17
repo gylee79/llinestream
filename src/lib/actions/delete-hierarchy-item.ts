@@ -1,22 +1,9 @@
 'use server';
 
 import * as admin from 'firebase-admin';
-import { getApps, App } from 'firebase-admin/app';
-import { getFirestore, WriteBatch } from 'firebase-admin/firestore';
-import { getStorage } from 'firebase-admin/storage';
+import { WriteBatch } from 'firebase-admin/firestore';
+import { initializeAdminApp } from '@/lib/firebase-admin';
 import type { Episode } from '@/lib/types';
-
-// Helper function to initialize Firebase Admin SDK
-function initializeAdminApp(): App {
-  if (getApps().length) {
-    return getApps()[0];
-  }
-  
-  // App Hosting provides GOOGLE_APPLICATION_CREDENTIALS automatically.
-  // When running on App Hosting, admin.initializeApp() will use these
-  // credentials to initialize, giving the server admin privileges.
-  return admin.initializeApp();
-}
 
 type DeletionResult = {
   success: boolean;
@@ -38,8 +25,8 @@ export async function deleteHierarchyItem(
 ): Promise<DeletionResult> {
   try {
     const adminApp = initializeAdminApp();
-    const db = getFirestore(adminApp);
-    const storage = getStorage(adminApp);
+    const db = admin.firestore(adminApp);
+    const storage = admin.storage(adminApp);
     const batch = db.batch();
 
     const deleteStorageFile = async (videoUrl: string) => {

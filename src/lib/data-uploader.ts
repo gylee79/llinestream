@@ -1,39 +1,15 @@
-
 'use server';
 
 import * as admin from 'firebase-admin';
-import { getApps, App } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { initializeAdminApp } from '@/lib/firebase-admin';
 import { fields as mockFields, classifications as mockClassifications, courses as mockCourses, episodes as mockEpisodes, users as mockUsers, subscriptions as mockSubscriptions, policies as mockPolicies } from '@/lib/data';
-
-// Helper function to initialize Firebase Admin SDK
-function initializeAdminApp(): App {
-  if (getApps().length) {
-    return getApps()[0];
-  }
-  
-  const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
-  if (!serviceAccountEnv) {
-    throw new Error("FIREBASE_ADMIN_SDK_CONFIG is not set. Server-side features will fail.");
-  }
-
-  try {
-    const serviceAccount = JSON.parse(serviceAccountEnv);
-     return admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-  } catch (error) {
-     console.error("Failed to parse FIREBASE_ADMIN_SDK_CONFIG. Make sure it's a valid JSON string.", error);
-     throw new Error("Firebase Admin SDK initialization failed.");
-  }
-}
 
 
 export async function uploadMockData() {
   console.log('Starting data upload...');
   
   const adminApp = initializeAdminApp();
-  const firestore = getFirestore(adminApp);
+  const firestore = admin.firestore(adminApp);
   
   const batch = firestore.batch();
 

@@ -1,34 +1,11 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
+import { initializeAdminApp } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-function initializeAdminApp() {
-  if (admin.apps.length) {
-    return admin.apps[0];
-  }
-  const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
-  if (!serviceAccountEnv) {
-    // Throwing an error here can cause an unhandled exception and an Internal Server Error.
-    // It's better to log the warning and let the function that uses the SDK handle the null case.
-    console.warn("[CRITICAL_WARNING] FIREBASE_ADMIN_SDK_CONFIG is not set. Server-side features like webhook processing will fail.");
-    return null; // Return null instead of throwing
-  }
-  try {
-    const serviceAccount = JSON.parse(serviceAccountEnv);
-    return admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-  } catch (error) {
-    console.error("Failed to parse FIREBASE_ADMIN_SDK_CONFIG.", error);
-    // Also return null on parsing failure
-    return null;
-  }
-}
 
 async function getPortOneAccessToken(): Promise<string> {
   const apiSecret = process.env.PORTONE_V2_API_SECRET;
@@ -72,63 +49,60 @@ async function cancelPayment(paymentId: string, reason: string): Promise<void> {
 
 async function verifyAndProcessPayment(paymentId: string): Promise<{ success: boolean, message: string }> {
     console.log(`[DEBUG] 3a. Starting verifyAndProcessPayment for paymentId: ${paymentId}`);
-    const adminApp = initializeAdminApp();
-    if (!adminApp) {
-        return { success: false, message: 'Firebase Admin SDK 초기화에 실패했습니다. 서버 로그를 확인하세요.' };
-    }
-    const firestore = admin.firestore();
-
-    const portone = PortOne.PortOneClient({ secret: process.env.PORTONE_V2_API_SECRET! });
-    const paymentResponse = await portone.payment.getPayment({ paymentId });
-
-    if (!paymentResponse) {
-        console.error(`[DEBUG] 3b. [PROCESS_FAILED] PortOne GetPayment API returned null for paymentId: ${paymentId}`);
-        return { success: false, message: `결제내역 조회 실패: paymentId ${paymentId}에 해당하는 내역이 없습니다.` };
-    }
-    
-    if (paymentResponse.status !== 'PAID') {
-        console.log(`[DEBUG] 3b. [PROCESS_IGNORED] Payment status is not 'PAID'. Current status: ${String(paymentResponse.status)}`);
-        return { success: true, message: `결제 상태가 PAID가 아니므로 처리를 건너뜁니다: ${String(paymentResponse.status)}` };
-    }
-    
-    const paymentData: PortOne.Payment.PaidPayment = paymentResponse;
-    console.log(`[DEBUG] 3b. PortOne GetPayment API successful. Status: ${String(paymentData.status)}`);
-
-    const userId = paymentData.customer?.id;
-    const orderName = paymentData.orderName;
-
-    if (!userId || !orderName) {
-        console.error(`[DEBUG] 3d. [PROCESS_FAILED] Missing userId or orderName. Cancelling payment.`);
-        await cancelPayment(paymentData.id, '사용자 또는 주문 정보 누락');
-        return { success: false, message: '사용자 또는 주문 정보가 없어 결제 처리가 불가능합니다.' };
-    }
-    
-    const orderItems = orderName.split(' 외 ')[0]; 
-    const nameParts = orderItems.split(' ');
-    const classificationName = nameParts.slice(0, -2).join(' ');
-    const durationLabel = nameParts.slice(-2).join(' ');
-    console.log(`[DEBUG] 3d. Parsed classificationName: ${classificationName}, durationLabel: ${durationLabel}`);
-
-    const durationMap: { [key: string]: number } = { "1일 이용권": 1, "30일 이용권": 30, "60일 이용권": 60, "90일 이용권": 90 };
-    const durationDays = durationMap[durationLabel] || 30;
-
-    const q = firestore.collection('classifications').where("name", "==", classificationName).limit(1);
-    const classificationsSnapshot = await q.get();
-
-    if (classificationsSnapshot.empty) {
-        console.error(`[DEBUG] 3e. [PROCESS_FAILED] Classification not found in DB: ${classificationName}. Cancelling payment.`);
-        await cancelPayment(paymentData.id, `상품(${classificationName})을 찾을 수 없음`);
-        return { success: false, message: `주문명에 해당하는 상품(${classificationName})을 찾을 수 없습니다.` };
-    }
-    
-    const targetClassificationDoc = classificationsSnapshot.docs[0];
-    const targetClassificationId = targetClassificationDoc.id;
-    console.log(`[DEBUG] 3e. Found classification in DB: ${targetClassificationId}`);
-    
-    const userRef = firestore.doc(`users/${userId}`);
-    const subscriptionRef = userRef.collection('subscriptions').doc(paymentData.id);
-
     try {
+        const adminApp = initializeAdminApp();
+        const firestore = admin.firestore(adminApp);
+
+        const portone = PortOne.PortOneClient({ secret: process.env.PORTONE_V2_API_SECRET! });
+        const paymentResponse = await portone.payment.getPayment({ paymentId });
+
+        if (!paymentResponse) {
+            console.error(`[DEBUG] 3b. [PROCESS_FAILED] PortOne GetPayment API returned null for paymentId: ${paymentId}`);
+            return { success: false, message: `결제내역 조회 실패: paymentId ${paymentId}에 해당하는 내역이 없습니다.` };
+        }
+        
+        if (paymentResponse.status !== 'PAID') {
+            console.log(`[DEBUG] 3b. [PROCESS_IGNORED] Payment status is not 'PAID'. Current status: ${String(paymentResponse.status)}`);
+            return { success: true, message: `결제 상태가 PAID가 아니므로 처리를 건너뜁니다: ${String(paymentResponse.status)}` };
+        }
+        
+        const paymentData: PortOne.Payment.PaidPayment = paymentResponse;
+        console.log(`[DEBUG] 3b. PortOne GetPayment API successful. Status: ${String(paymentData.status)}`);
+
+        const userId = paymentData.customer?.id;
+        const orderName = paymentData.orderName;
+
+        if (!userId || !orderName) {
+            console.error(`[DEBUG] 3d. [PROCESS_FAILED] Missing userId or orderName. Cancelling payment.`);
+            await cancelPayment(paymentData.id, '사용자 또는 주문 정보 누락');
+            return { success: false, message: '사용자 또는 주문 정보가 없어 결제 처리가 불가능합니다.' };
+        }
+        
+        const orderItems = orderName.split(' 외 ')[0]; 
+        const nameParts = orderItems.split(' ');
+        const classificationName = nameParts.slice(0, -2).join(' ');
+        const durationLabel = nameParts.slice(-2).join(' ');
+        console.log(`[DEBUG] 3d. Parsed classificationName: ${classificationName}, durationLabel: ${durationLabel}`);
+
+        const durationMap: { [key: string]: number } = { "1일 이용권": 1, "30일 이용권": 30, "60일 이용권": 60, "90일 이용권": 90 };
+        const durationDays = durationMap[durationLabel] || 30;
+
+        const q = firestore.collection('classifications').where("name", "==", classificationName).limit(1);
+        const classificationsSnapshot = await q.get();
+
+        if (classificationsSnapshot.empty) {
+            console.error(`[DEBUG] 3e. [PROCESS_FAILED] Classification not found in DB: ${classificationName}. Cancelling payment.`);
+            await cancelPayment(paymentData.id, `상품(${classificationName})을 찾을 수 없음`);
+            return { success: false, message: `주문명에 해당하는 상품(${classificationName})을 찾을 수 없습니다.` };
+        }
+        
+        const targetClassificationDoc = classificationsSnapshot.docs[0];
+        const targetClassificationId = targetClassificationDoc.id;
+        console.log(`[DEBUG] 3e. Found classification in DB: ${targetClassificationId}`);
+        
+        const userRef = firestore.doc(`users/${userId}`);
+        const subscriptionRef = userRef.collection('subscriptions').doc(paymentData.id);
+
         await firestore.runTransaction(async (transaction) => {
             const userDoc = await transaction.get(userRef);
             const subDoc = await transaction.get(subscriptionRef);
@@ -177,11 +151,11 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
         return { success: true, message: '결제가 성공적으로 처리되었습니다.' };
 
     } catch (error) {
-        console.error(`[FATAL_DB_ERROR] Firestore transaction failed for user ${userId}. Please check manually. PaymentId: ${paymentData.id}`, error);
+        console.error(`[FATAL_ERROR] Webhook processing failed for PaymentId: ${paymentId}`, error);
         const errorMessage = error instanceof Error ? error.message : "알 수 없는 서버 오류";
         // NOTE: Temporarily disabling auto-cancellation for debugging purposes.
-        // await cancelPayment(paymentData.id, `데이터베이스 처리 실패: ${errorMessage}`);
-        console.error(`[PAYMENT_NOT_CANCELLED] Payment for ${paymentData.id} was NOT automatically cancelled due to DB error. Please check manually.`);
+        // await cancelPayment(paymentId, `데이터베이스 처리 실패: ${errorMessage}`);
+        console.error(`[PAYMENT_NOT_CANCELLED] Payment for ${paymentId} was NOT automatically cancelled due to DB error. Please check manually.`);
         return { success: false, message: `데이터베이스 처리 실패: ${errorMessage}` };
     }
 }

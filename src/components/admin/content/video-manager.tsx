@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -17,7 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, PlusCircle } from 'lucide-react';
 import type { Episode, Course } from '@/lib/types';
-import VideoUploadDialog from './video-upload-dialog';
+import VideoUploadDialog from '@/components/admin/content/video-upload-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,9 +26,10 @@ import {
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, collectionGroup } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
+import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+
 
 export default function VideoManager() {
   const firestore = useFirestore();
@@ -177,5 +177,3 @@ export default function VideoManager() {
     </>
   );
 }
-
-    

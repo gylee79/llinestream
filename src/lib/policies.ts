@@ -1,22 +1,8 @@
-
 'use server';
 
 import * as admin from 'firebase-admin';
-import { App, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { initializeAdminApp } from '@/lib/firebase-admin';
 import type { Policy } from '@/lib/types';
-
-function initializeAdminApp(): App {
-  const alreadyInitialized = getApps();
-  if (alreadyInitialized.length > 0) {
-    return alreadyInitialized[0];
-  }
-
-  // App Hosting provides GOOGLE_APPLICATION_CREDENTIALS automatically.
-  // When running on App Hosting, admin.initializeApp() will use these
-  // credentials to initialize, giving the server admin privileges.
-  return admin.initializeApp();
-}
 
 /**
  * Fetches a policy document from Firestore by its slug using the Admin SDK.
@@ -26,7 +12,7 @@ function initializeAdminApp(): App {
 export async function getPolicyBySlug(slug: string): Promise<Policy | null> {
   try {
     const adminApp = initializeAdminApp();
-    const db = getFirestore(adminApp);
+    const db = admin.firestore(adminApp);
     const policyRef = db.collection('policies').doc(slug);
     const docSnap = await policyRef.get();
 
