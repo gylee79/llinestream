@@ -12,31 +12,10 @@ function initializeAdminApp(): App {
     return alreadyInitialized[0];
   }
 
-  // 배포 환경 (App Hosting) - GOOGLE_APPLICATION_CREDENTIALS가 자동으로 설정됨
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.log('Initializing Firebase Admin with App Hosting credentials...');
-    return admin.initializeApp();
-  }
-
-  // 로컬 개발 환경 - .env 파일에서 서비스 계정 키 사용
-  const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
-  if (serviceAccountEnv) {
-    try {
-      // 환경 변수 문자열을 JSON 객체로 파싱
-      const serviceAccount = JSON.parse(serviceAccountEnv);
-      console.log('Initializing Firebase Admin with service account from .env...');
-      return admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
-    } catch (e: any) {
-      throw new Error(`Failed to parse FIREBASE_ADMIN_SDK_CONFIG. Make sure it's a valid JSON string. Error: ${e.message}`);
-    }
-  }
-
-  // 어떤 초기화 방법도 사용할 수 없는 경우
-  throw new Error(
-    'Firebase Admin SDK initialization failed. Set either GOOGLE_APPLICATION_CREDENTIALS (for deployment) or FIREBASE_ADMIN_SDK_CONFIG (for local development) environment variables.'
-  );
+  // App Hosting provides GOOGLE_APPLICATION_CREDENTIALS automatically.
+  // When running on App Hosting, admin.initializeApp() will use these
+  // credentials to initialize, giving the server admin privileges.
+  return admin.initializeApp();
 }
 
 /**
