@@ -6,7 +6,6 @@ import { Timestamp } from 'firebase-admin/firestore';
 import type { Classification } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
-import type { PaidPayment } from '@portone/server-sdk';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -91,7 +90,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
         return { success: true, message: `결제 상태가 PAID가 아니므로 처리를 건너뜁니다: ${String(paymentResponse.status)}` };
     }
     
-    const paymentData: PaidPayment = paymentResponse;
+    const paymentData: PortOne.Payment.PaidPayment = paymentResponse;
     console.log(`[DEBUG] 3b. PortOne GetPayment API successful. Status: ${String(paymentData.status)}`);
 
     const userId = paymentData.customer?.id;
