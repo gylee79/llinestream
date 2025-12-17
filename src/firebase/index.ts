@@ -6,6 +6,19 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage';
 
+function getSdks(firebaseApp: FirebaseApp) {
+  const firestore = getFirestore(firebaseApp);
+  const auth = getAuth(firebaseApp);
+  const storage = getStorage(firebaseApp);
+  return {
+    firebaseApp,
+    auth,
+    firestore,
+    storage
+  };
+}
+
+
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
   if (!getApps().length) {
@@ -33,17 +46,7 @@ export function initializeFirebase() {
   return getSdks(getApp());
 }
 
-export function getSdks(firebaseApp: FirebaseApp) {
-  const firestore = getFirestore(firebaseApp);
-  const auth = getAuth(firebaseApp);
-  const storage = getStorage(firebaseApp);
-  return {
-    firebaseApp,
-    auth,
-    firestore,
-    storage
-  };
-}
+
 
 export * from './provider';
 export * from './client-provider';
