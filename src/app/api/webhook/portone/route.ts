@@ -1,9 +1,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 import type { Classification } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
+
+// The 'force-dynamic' option ensures that the request body is not pre-parsed.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // Initialize Firebase Admin SDK for Server-side usage
 function initializeAdminApp() {
@@ -159,10 +163,16 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
             transaction.set(subscriptionRef, newSubscriptionData);
             
             // 사용자의 활성 구독 정보 업데이트
+            const currentUserData = userDoc.data() || {};
+            const existingSubscriptions = currentUserData.activeSubscriptions || {};
+
             transaction.update(userRef, {
-                [`activeSubscriptions.${targetClassificationId}`]: {
+                activeSubscriptions: {
+                  ...existingSubscriptions,
+                  [targetClassificationId]: {
                     expiresAt: expiresAt,
                     purchasedAt: purchasedAt
+                  }
                 }
             });
         });
@@ -192,7 +202,7 @@ export async function POST(req: NextRequest) {
       const rawBody = await req.text();
       console.log('[DEBUG] 1b. Received Raw Body:', rawBody.substring(0, 500) + '...');
       
-      const webhook = await PortOne.Webhook.verify(webhookSecret, rawBody, req.headers);
+      const webhook = await PortOne.Webhook.verify(req.headers, rawBody, webhookSecret);
       console.log('[DEBUG] 2. Webhook verification successful. Event ID:', webhook.id);
 
       if ("paymentId" in webhook.data) {
@@ -230,3 +240,5 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: e.message || '웹훅 처리 중 알 수 없는 서버 오류 발생' }, { status: 500 });
   }
 }
+
+    
