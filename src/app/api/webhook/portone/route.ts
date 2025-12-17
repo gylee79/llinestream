@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Timestamp } from 'firebase-admin/firestore';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import type { Classification } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
@@ -68,98 +68,113 @@ async function cancelPayment(paymentId: string, reason: string): Promise<void> {
 }
 
 async function verifyAndProcessPayment(paymentId: string): Promise<{ success: boolean, message: string }> {
-  console.log(`[DEBUG] 3a. Starting verifyAndProcessPayment for paymentId: ${paymentId}`);
-  const adminApp = initializeAdminApp();
-  const firestore = admin.firestore();
-  
-  // 1. 포트원 서버 API로 결제 내역 직접 조회 (교차 검증)
-  const portone = new PortOne.PortOneClient({ apiSecret: process.env.PORTONE_V2_API_SECRET! });
-  const paymentResponse = await portone.payment.getPayment({ paymentId });
+    console.log(`[DEBUG] 3a. Starting verifyAndProcessPayment for paymentId: ${paymentId}`);
+    const adminApp = initializeAdminApp();
+    const firestore = admin.firestore();
 
-  if (!paymentResponse) {
-      console.error(`[DEBUG] 3b. [PROCESS_FAILED] PortOne GetPayment API returned null for paymentId: ${paymentId}`);
-      return { success: false, message: `결제내역 조회 실패: paymentId ${paymentId}에 해당하는 내역이 없습니다.` };
-  }
-  console.log(`[DEBUG] 3b. PortOne GetPayment API successful. Status: ${paymentResponse.status}`);
-  
-  const paymentData: PortOne.Payment = paymentResponse;
-  
-  // 2. 결제 상태 확인
-  if (paymentData.status !== 'PAID') {
-      console.log(`[DEBUG] 3c. [PROCESS_IGNORED] Payment status is not 'PAID'. Current status: ${paymentData.status}`);
-      return { success: true, message: `결제 상태가 PAID가 아니므로 처리를 건너뜁니다: ${paymentData.status}` };
-  }
+    const portone = new PortOne.PortOneClient({ apiSecret: process.env.PORTONE_V2_API_SECRET! });
+    const paymentResponse = await portone.payment.getPayment({ paymentId });
 
-  const userId = paymentData.customer?.id;
-  const orderName = paymentData.orderName;
+    if (!paymentResponse) {
+        console.error(`[DEBUG] 3b. [PROCESS_FAILED] PortOne GetPayment API returned null for paymentId: ${paymentId}`);
+        return { success: false, message: `결제내역 조회 실패: paymentId ${paymentId}에 해당하는 내역이 없습니다.` };
+    }
+    console.log(`[DEBUG] 3b. PortOne GetPayment API successful. Status: ${paymentResponse.status}`);
 
-  if (!userId || !orderName) {
-      console.error(`[DEBUG] 3d. [PROCESS_FAILED] Missing userId or orderName. Cancelling payment.`);
-      await cancelPayment(paymentId, "사용자 또는 주문 정보 누락");
-      return { success: false, message: '사용자 또는 주문 정보가 없어 결제 처리가 불가능합니다.' };
-  }
-  
-  // 3. 주문 정보 파싱 및 상품 조회
-  const orderItems = orderName.split(' 외 ')[0]; // "A상품 외 2건" -> "A상품"
-  const classificationName = orderItems.split(' ')[0]; // "코딩 30일 이용권" -> "코딩"
-  console.log(`[DEBUG] 3d. Parsed classificationName: ${classificationName}`);
+    const paymentData: PortOne.Payment = paymentResponse;
 
-  const q = firestore.collection('classifications').where("name", "==", classificationName).limit(1);
-  const classificationsSnapshot = await q.get();
+    if (paymentData.status !== 'PAID') {
+        console.log(`[DEBUG] 3c. [PROCESS_IGNORED] Payment status is not 'PAID'. Current status: ${paymentData.status}`);
+        return { success: true, message: `결제 상태가 PAID가 아니므로 처리를 건너뜁니다: ${paymentData.status}` };
+    }
 
-  if (classificationsSnapshot.empty) {
-       console.error(`[DEBUG] 3e. [PROCESS_FAILED] Classification not found in DB: ${classificationName}. Cancelling payment.`);
-       await cancelPayment(paymentId, "주문 상품을 찾을 수 없음");
-       return { success: false, message: `주문명에 해당하는 상품(${classificationName})을 찾을 수 없습니다.` };
-  }
-  
-  const targetClassificationDoc = classificationsSnapshot.docs[0];
-  const targetClassification = { id: targetClassificationDoc.id, ...targetClassificationDoc.data() } as Classification;
-  console.log(`[DEBUG] 3e. Found classification in DB: ${targetClassification.id}`);
-  
-  const orderPrice = paymentData.amount.total;
-  
-  const userRef = firestore.doc(`users/${userId}`);
-  const subscriptionRef = userRef.collection('subscriptions').doc(targetClassification.id);
+    const userId = paymentData.customer?.id;
+    const orderName = paymentData.orderName;
 
-  // 4. 이미 처리된 결제인지 확인 (멱등성 확보)
-  const existingSub = await subscriptionRef.get();
-  if (existingSub.exists && existingSub.data()?.paymentId === paymentId) {
-      console.log(`[DEBUG] 3f. [PROCESS_IGNORED] This paymentId has already been processed. paymentId: ${paymentId}`);
-      return { success: true, message: '이미 처리된 결제입니다.' };
-  }
+    if (!userId || !orderName) {
+        console.error(`[DEBUG] 3d. [PROCESS_FAILED] Missing userId or orderName. Cancelling payment.`);
+        await cancelPayment(paymentId, "사용자 또는 주문 정보 누락");
+        return { success: false, message: '사용자 또는 주문 정보가 없어 결제 처리가 불가능합니다.' };
+    }
+    
+    // 이 예제에서는 주문명에서 첫 번째 상품 이름과 기간을 파싱한다고 가정합니다.
+    const orderItems = orderName.split(' 외 ')[0]; 
+    const nameParts = orderItems.split(' ');
+    const classificationName = nameParts.slice(0, -2).join(' '); // "코딩 30일 이용권" -> "코딩"
+    const durationLabel = nameParts.slice(-2).join(' '); // "30일 이용권"
+    console.log(`[DEBUG] 3d. Parsed classificationName: ${classificationName}, durationLabel: ${durationLabel}`);
 
-  // 5. DB에 구독 정보 저장
-  const purchasedAt = Timestamp.now();
-  const DURATION_DAYS = 30; // 예시로 30일 고정
-  const expiresAt = Timestamp.fromMillis(purchasedAt.toMillis() + DURATION_DAYS * 24 * 60 * 60 * 1000);
+    const durationMap: { [key: string]: number } = { "1일 이용권": 1, "30일 이용권": 30, "60일 이용권": 60, "90일 이용권": 90 };
+    const durationDays = durationMap[durationLabel] || 30; // 기본값 30일
 
-  const batch = firestore.batch();
-  const newSubscriptionData = {
-      userId: userId,
-      classificationId: targetClassification.id,
-      purchasedAt: purchasedAt,
-      expiresAt: expiresAt,
-      amount: paymentData.amount.total,
-      orderName: paymentData.orderName,
-      paymentId: paymentData.id,
-      status: paymentData.status,
-      method: paymentData.method?.name || 'UNKNOWN',
-  };
+    const q = firestore.collection('classifications').where("name", "==", classificationName).limit(1);
+    const classificationsSnapshot = await q.get();
 
-  batch.set(subscriptionRef, newSubscriptionData, { merge: true });
-  batch.update(userRef, {
-      [`activeSubscriptions.${targetClassification.id}`]: {
-          expiresAt: expiresAt,
-          purchasedAt: purchasedAt
-      }
-  });
-  
-  await batch.commit();
-  console.log(`[DEBUG] 3g. [PROCESS_SUCCESS] Successfully committed subscription to DB for user ${userId}.`);
+    if (classificationsSnapshot.empty) {
+        console.error(`[DEBUG] 3e. [PROCESS_FAILED] Classification not found in DB: ${classificationName}. Cancelling payment.`);
+        await cancelPayment(paymentId, "주문 상품을 찾을 수 없음");
+        return { success: false, message: `주문명에 해당하는 상품(${classificationName})을 찾을 수 없습니다.` };
+    }
+    
+    const targetClassificationDoc = classificationsSnapshot.docs[0];
+    const targetClassificationId = targetClassificationDoc.id;
+    console.log(`[DEBUG] 3e. Found classification in DB: ${targetClassificationId}`);
+    
+    const userRef = firestore.doc(`users/${userId}`);
+    // 구독 정보는 이제 paymentId로 저장하여 고유성을 보장합니다.
+    const subscriptionRef = userRef.collection('subscriptions').doc(paymentId);
 
-  return { success: true, message: '결제가 성공적으로 처리되었습니다.' };
+    try {
+        await firestore.runTransaction(async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            const subDoc = await transaction.get(subscriptionRef);
+
+            if (subDoc.exists) {
+                console.log(`[DEBUG] 3f. [PROCESS_IGNORED] This paymentId has already been processed. paymentId: ${paymentId}`);
+                return; // 트랜잭션 종료
+            }
+
+            if (!userDoc.exists) {
+                throw new Error(`User with ID ${userId} not found.`);
+            }
+            
+            const purchasedAt = Timestamp.now();
+            const expiresAt = Timestamp.fromMillis(purchasedAt.toMillis() + durationDays * 24 * 60 * 60 * 1000);
+
+            const newSubscriptionData = {
+                userId: userId,
+                classificationId: targetClassificationId,
+                purchasedAt,
+                expiresAt,
+                amount: paymentData.amount.total,
+                orderName: paymentData.orderName,
+                paymentId: paymentData.id,
+                status: paymentData.status,
+                method: paymentData.method?.name || 'UNKNOWN',
+            };
+
+            transaction.set(subscriptionRef, newSubscriptionData);
+            
+            // 사용자의 활성 구독 정보 업데이트
+            transaction.update(userRef, {
+                [`activeSubscriptions.${targetClassificationId}`]: {
+                    expiresAt: expiresAt,
+                    purchasedAt: purchasedAt
+                }
+            });
+        });
+
+        console.log(`[DEBUG] 3g. [PROCESS_SUCCESS] Successfully committed subscription to DB for user ${userId}.`);
+        return { success: true, message: '결제가 성공적으로 처리되었습니다.' };
+
+    } catch (error) {
+        console.error(`[DEBUG] 3h. [TRANSACTION_FAILED] Failed to commit subscription for user ${userId}. Error:`, error);
+        await cancelPayment(paymentId, "서버 내부 데이터 처리 실패");
+        const errorMessage = error instanceof Error ? error.message : "알 수 없는 서버 오류";
+        return { success: false, message: `데이터베이스 처리 실패: ${errorMessage}` };
+    }
 }
+
 
 export async function POST(req: NextRequest) {
   console.log('---');
