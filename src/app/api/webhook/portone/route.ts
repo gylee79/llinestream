@@ -1,6 +1,4 @@
 
-'use server';
-
 import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
 import type { Classification } from '@/lib/types';
@@ -16,7 +14,10 @@ function initializeAdminApp() {
   }
   const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
   if (!serviceAccountEnv) {
-    throw new Error("FIREBASE_ADMIN_SDK_CONFIG is not set. Server-side features will fail.");
+    // Throwing an error here can cause an unhandled exception and an Internal Server Error.
+    // It's better to log the warning and let the function that uses the SDK handle the null case.
+    console.warn("[CRITICAL_WARNING] FIREBASE_ADMIN_SDK_CONFIG is not set. Server-side features like webhook processing will fail.");
+    return null; // Return null instead of throwing
   }
   try {
     const serviceAccount = JSON.parse(serviceAccountEnv);
@@ -25,7 +26,8 @@ function initializeAdminApp() {
     });
   } catch (error) {
     console.error("Failed to parse FIREBASE_ADMIN_SDK_CONFIG.", error);
-    throw new Error("Firebase Admin SDK initialization failed.");
+    // Also return null on parsing failure
+    return null;
   }
 }
 
@@ -73,11 +75,11 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
     console.log(`[DEBUG] 3a. Starting verifyAndProcessPayment for paymentId: ${paymentId}`);
     const adminApp = initializeAdminApp();
     if (!adminApp) {
-        return { success: false, message: 'Firebase Admin SDK 초기화에 실패했습니다.' };
+        return { success: false, message: 'Firebase Admin SDK 초기화에 실패했습니다. 서버 로그를 확인하세요.' };
     }
     const firestore = admin.firestore();
 
-    const portone = PortOne.PortOneClient({ secret: process.env.PORTONE_V2_API_SECRET! });
+    const portone = new PortOne.PortOneClient({ secret: process.env.PORTONE_V2_API_SECRET! });
     const paymentResponse = await portone.payment.getPayment({ paymentId });
 
     if (!paymentResponse) {
