@@ -13,7 +13,6 @@ interface FirebaseServices {
   storage: FirebaseStorage;
 }
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase(): FirebaseServices {
   if (getApps().length) {
     const app = getApp();
@@ -27,13 +26,11 @@ export function initializeFirebase(): FirebaseServices {
 
   let firebaseApp: FirebaseApp;
   try {
-    // App Hosting은 프로덕션에서 환경 변수를 자동으로 제공합니다.
     firebaseApp = initializeApp();
   } catch (e) {
     if (process.env.NODE_ENV === 'production') {
       console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
     }
-    // 로컬 개발 환경에서는 config 객체를 사용합니다.
     firebaseApp = initializeApp(firebaseConfig);
   }
 
@@ -45,7 +42,6 @@ export function initializeFirebase(): FirebaseServices {
   };
 }
 
-// Re-exporting all necessary hooks and providers
 export * from './provider';
 export * from './client-provider';
 export * from './firestore/use-collection';

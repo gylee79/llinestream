@@ -24,12 +24,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, collectionGroup } from 'firebase/firestore';
+import { collection, doc, query, collectionGroup, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
-import { updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-
 
 export default function VideoManager() {
   const firestore = useFirestore();
@@ -53,10 +51,10 @@ export default function VideoManager() {
     return courses?.find(c => c.id === courseId)?.name || 'N/A';
   };
 
-  const toggleFreeStatus = (episode: Episode) => {
+  const toggleFreeStatus = async (episode: Episode) => {
     if (!firestore) return;
     const docRef = doc(firestore, 'courses', episode.courseId, 'episodes', episode.id);
-    updateDocumentNonBlocking(docRef, { isFree: !episode.isFree });
+    await updateDoc(docRef, { isFree: !episode.isFree });
     toast({
       title: '상태 변경',
       description: `${episode.title}의 무료 상태가 변경되었습니다.`,
@@ -66,7 +64,6 @@ export default function VideoManager() {
   const handleDeleteEpisode = async (episode: Episode) => {
     if (!confirm(`정말로 '${episode.title}' 에피소드와 관련 비디오 파일을 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
     try {
-        // Pass the entire episode object to the server action
         const result = await deleteHierarchyItem('episodes', episode.id, episode);
         if (result.success) {
             toast({
