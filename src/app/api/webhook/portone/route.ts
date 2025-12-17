@@ -1,7 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
-import type { Classification } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
 
@@ -79,7 +78,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
     }
     const firestore = admin.firestore();
 
-    const portone = new PortOne.PortOneClient({ secret: process.env.PORTONE_V2_API_SECRET! });
+    const portone = PortOne.PortOneClient({ secret: process.env.PORTONE_V2_API_SECRET! });
     const paymentResponse = await portone.payment.getPayment({ paymentId });
 
     if (!paymentResponse) {
