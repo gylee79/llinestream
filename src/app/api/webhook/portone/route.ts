@@ -6,6 +6,8 @@ import { Timestamp } from 'firebase-admin/firestore';
 import type { Classification } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
+import type { PaidPayment } from '@portone/server-sdk/dist/payment';
+
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -153,7 +155,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
                 orderName: paymentData.orderName,
                 paymentId: paymentData.id,
                 status: String(paymentData.status),
-                method: paymentData.pgResult.provider || 'UNKNOWN',
+                method: paymentData.channel.provider || 'UNKNOWN',
             };
 
             transaction.set(subscriptionRef, newSubscriptionData);
