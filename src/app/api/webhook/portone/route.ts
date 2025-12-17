@@ -6,9 +6,10 @@ import { Timestamp } from 'firebase-admin/firestore';
 import type { Classification } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
-import type { PaidPayment } from '@portone/server-sdk/dist/payment';
+import type { PaidPayment } from "@portone/server-sdk";
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 function initializeAdminApp() {
   if (admin.apps.length) {
@@ -152,7 +153,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
                 amount: paymentData.amount.total,
                 orderName: paymentData.orderName,
                 paymentId: paymentData.id,
-                status: paymentData.status,
+                status: String(paymentData.status),
                 method: paymentData.pg.provider || 'UNKNOWN',
             };
 
@@ -241,5 +242,3 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: e.message || '웹훅 처리 중 알 수 없는 서버 오류 발생' }, { status: 500 });
   }
 }
-
-    
