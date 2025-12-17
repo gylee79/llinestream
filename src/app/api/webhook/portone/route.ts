@@ -1,15 +1,15 @@
 
+'use server';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { Timestamp } from 'firebase-admin/firestore';
 import type { Classification } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
 
-// The 'force-dynamic' option ensures that the request body is not pre-parsed.
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Initialize Firebase Admin SDK for Server-side usage
 function initializeAdminApp() {
   if (admin.apps.length) {
     return admin.apps[0];
@@ -29,7 +29,6 @@ function initializeAdminApp() {
   }
 }
 
-// PortOne V2 API Access Token 발급 함수 (취소 로직용)
 async function getPortOneAccessToken(): Promise<string> {
   const apiSecret = process.env.PORTONE_V2_API_SECRET;
   if (!apiSecret) throw new Error("PORTONE_V2_API_SECRET is not defined.");
@@ -47,7 +46,6 @@ async function getPortOneAccessToken(): Promise<string> {
   return accessToken;
 }
 
-// 결제 취소 함수
 async function cancelPayment(paymentId: string, reason: string): Promise<void> {
   try {
       const accessToken = await getPortOneAccessToken();
@@ -100,26 +98,23 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
 
     if (!userId || !orderName) {
         console.error(`[DEBUG] 3d. [PROCESS_FAILED] Missing userId or orderName. Cancelling payment.`);
-        // await cancelPayment(paymentId, "사용자 또는 주문 정보 누락"); // 임시 비활성화
         return { success: false, message: '사용자 또는 주문 정보가 없어 결제 처리가 불가능합니다.' };
     }
     
-    // 이 예제에서는 주문명에서 첫 번째 상품 이름과 기간을 파싱한다고 가정합니다.
     const orderItems = orderName.split(' 외 ')[0]; 
     const nameParts = orderItems.split(' ');
-    const classificationName = nameParts.slice(0, -2).join(' '); // "코딩 30일 이용권" -> "코딩"
-    const durationLabel = nameParts.slice(-2).join(' '); // "30일 이용권"
+    const classificationName = nameParts.slice(0, -2).join(' ');
+    const durationLabel = nameParts.slice(-2).join(' ');
     console.log(`[DEBUG] 3d. Parsed classificationName: ${classificationName}, durationLabel: ${durationLabel}`);
 
     const durationMap: { [key: string]: number } = { "1일 이용권": 1, "30일 이용권": 30, "60일 이용권": 60, "90일 이용권": 90 };
-    const durationDays = durationMap[durationLabel] || 30; // 기본값 30일
+    const durationDays = durationMap[durationLabel] || 30;
 
     const q = firestore.collection('classifications').where("name", "==", classificationName).limit(1);
     const classificationsSnapshot = await q.get();
 
     if (classificationsSnapshot.empty) {
         console.error(`[DEBUG] 3e. [PROCESS_FAILED] Classification not found in DB: ${classificationName}. Cancelling payment.`);
-        // await cancelPayment(paymentId, "주문 상품을 찾을 수 없음"); // 임시 비활성화
         return { success: false, message: `주문명에 해당하는 상품(${classificationName})을 찾을 수 없습니다.` };
     }
     
@@ -128,7 +123,6 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
     console.log(`[DEBUG] 3e. Found classification in DB: ${targetClassificationId}`);
     
     const userRef = firestore.doc(`users/${userId}`);
-    // 구독 정보는 이제 paymentId로 저장하여 고유성을 보장합니다.
     const subscriptionRef = userRef.collection('subscriptions').doc(paymentId);
 
     try {
@@ -138,7 +132,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
 
             if (subDoc.exists) {
                 console.log(`[DEBUG] 3f. [PROCESS_IGNORED] This paymentId has already been processed. paymentId: ${paymentId}`);
-                return; // 트랜잭션 종료
+                return;
             }
 
             if (!userDoc.exists) {
@@ -162,7 +156,6 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
 
             transaction.set(subscriptionRef, newSubscriptionData);
             
-            // 사용자의 활성 구독 정보 업데이트
             const currentUserData = userDoc.data() || {};
             const existingSubscriptions = currentUserData.activeSubscriptions || {};
 
@@ -181,8 +174,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
         return { success: true, message: '결제가 성공적으로 처리되었습니다.' };
 
     } catch (error) {
-        console.error(`[FATAL_DB_ERROR] Firestore transaction failed for user ${userId}. Payment NOT cancelled automatically. Please check manually. PaymentId: ${paymentId}`, error);
-        // await cancelPayment(paymentId, "서버 내부 데이터 처리 실패"); // 임시 비활성화
+        console.error(`[FATAL_DB_ERROR] Firestore transaction failed for user ${userId}. Please check manually. PaymentId: ${paymentId}`, error);
         const errorMessage = error instanceof Error ? error.message : "알 수 없는 서버 오류";
         return { success: false, message: `데이터베이스 처리 실패: ${errorMessage}` };
     }
@@ -202,7 +194,7 @@ export async function POST(req: NextRequest) {
       const rawBody = await req.text();
       console.log('[DEBUG] 1b. Received Raw Body:', rawBody.substring(0, 500) + '...');
       
-      const webhook = await PortOne.Webhook.verify(req.headers, rawBody, webhookSecret);
+      const webhook = await PortOne.Webhook.verify(webhookSecret, rawBody, req.headers);
       console.log('[DEBUG] 2. Webhook verification successful. Event ID:', webhook.id);
 
       if ("paymentId" in webhook.data) {
@@ -217,7 +209,6 @@ export async function POST(req: NextRequest) {
                   return NextResponse.json({ success: true, message: result.message });
               } else {
                   console.error(`[DEBUG] 4a. [ERROR_RESPONSE] Business logic failed: ${result.message}. Responding 200 OK to prevent retry.`);
-                  // 실패하더라도 200을 응답해야 포트원에서 재전송을 멈춥니다.
                   return NextResponse.json({ success: false, message: result.message }, { status: 200 });
               }
           } else {
@@ -232,7 +223,6 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
       if (e instanceof PortOne.Webhook.WebhookVerificationError) {
         console.error('[DEBUG] 2. [VERIFICATION_FAILED] Webhook verification failed:', e.message);
-        // 검증 실패 시 400 오류를 반환합니다.
         return NextResponse.json({ success: false, message: '웹훅 검증에 실패했습니다.' }, { status: 400 });
       }
       
@@ -240,5 +230,3 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: e.message || '웹훅 처리 중 알 수 없는 서버 오류 발생' }, { status: 500 });
   }
 }
-
-    
