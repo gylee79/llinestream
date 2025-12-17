@@ -1,6 +1,10 @@
-
+'use client';
 import * as admin from 'firebase-admin';
 import { App, getApps } from 'firebase-admin/app';
+import { config } from 'dotenv';
+
+// Load environment variables from .env file
+config();
 
 /**
  * Initializes the Firebase Admin SDK, ensuring it's a singleton.
@@ -25,7 +29,7 @@ export function initializeAdminApp(): App {
     console.log("Attempting to initialize Firebase Admin with Application Default Credentials.");
     return admin.initializeApp();
   } catch (error: any) {
-    console.warn("Automatic initialization failed. Trying fallback method.", error.message);
+    console.warn("Automatic initialization failed. Trying fallback method for local development.", error.message);
 
     // Fallback for local development using the service account from environment variables.
     const serviceAccountEnv = process.env.FIREBASE_ADMIN_SDK_CONFIG;
