@@ -70,6 +70,9 @@ async function cancelPayment(paymentId: string, reason: string): Promise<void> {
 async function verifyAndProcessPayment(paymentId: string): Promise<{ success: boolean, message: string }> {
     console.log(`[DEBUG] 3a. Starting verifyAndProcessPayment for paymentId: ${paymentId}`);
     const adminApp = initializeAdminApp();
+    if (!adminApp) {
+        return { success: false, message: 'Firebase Admin SDK 초기화에 실패했습니다.' };
+    }
     const firestore = admin.firestore();
 
     const portone = new PortOne.PortOneClient({ apiSecret: process.env.PORTONE_V2_API_SECRET! });
@@ -204,6 +207,7 @@ export async function POST(req: NextRequest) {
                   return NextResponse.json({ success: true, message: result.message });
               } else {
                   console.error(`[DEBUG] 4a. [ERROR_RESPONSE] Business logic failed: ${result.message}. Responding 200 OK to prevent retry.`);
+                  // 실패하더라도 200을 응답해야 포트원에서 재전송을 멈춥니다.
                   return NextResponse.json({ success: false, message: result.message }, { status: 200 });
               }
           } else {
@@ -218,6 +222,7 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
       if (e instanceof PortOne.Webhook.WebhookVerificationError) {
         console.error('[DEBUG] 2. [VERIFICATION_FAILED] Webhook verification failed:', e.message);
+        // 검증 실패 시 400 오류를 반환합니다.
         return NextResponse.json({ success: false, message: '웹훅 검증에 실패했습니다.' }, { status: 400 });
       }
       
