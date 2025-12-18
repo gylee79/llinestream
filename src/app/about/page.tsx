@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -91,19 +92,22 @@ export default function AboutPage() {
         <section>
           <h2 className="text-3xl font-bold tracking-tight text-center">엘라인 아카데미 핵심 교육 과정</h2>
           <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-            {curriculum.map((item, index) => (
-              <Card key={index} className="flex flex-col text-center items-center">
-                <CardHeader>
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <item.icon className="h-8 w-8" />
-                  </div>
-                  <CardTitle className="mt-4 font-headline">{item.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p className="text-muted-foreground">{item.description}</p>
-                </CardContent>
-              </Card>
-            ))}
+            {curriculum.map((item, index) => {
+              const IconComponent = item.icon;
+              return (
+                <Card key={index} className="flex flex-col text-center items-center">
+                  <CardHeader>
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <IconComponent className="h-8 w-8" />
+                    </div>
+                    <CardTitle className="mt-4 font-headline">{item.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                    <p className="text-muted-foreground">{item.description}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </section>
 
