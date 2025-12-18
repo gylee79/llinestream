@@ -92,13 +92,14 @@ export interface FooterSettings {
   kakaoTalkUrl?: string;
 }
 
+export interface HeroContent {
+  url?: string;
+  hint?: string;
+  title?: string;
+  description?: string;
+}
+
 export interface HeroImageSettings {
-  home: {
-    url: string;
-    hint: string;
-  };
-  about: {
-    url: string;
-    hint: string;
-  };
+  home: HeroContent;
+  about: HeroContent;
 }

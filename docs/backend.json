@@ -252,6 +252,18 @@
         "supportHours"
       ]
     },
+    "HeroContent": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "HeroContent",
+      "type": "object",
+      "description": "Defines the content for a hero section.",
+      "properties": {
+        "url": { "type": "string", "format": "uri", "description": "The URL for the background image." },
+        "hint": { "type": "string", "description": "A hint for AI image generation or search." },
+        "title": { "type": "string", "description": "The main headline for the hero section." },
+        "description": { "type": "string", "description": "The descriptive subtext for the hero section." }
+      }
+    },
     "HeroImageSettings": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "HeroImageSettings",
@@ -259,18 +271,10 @@
       "description": "Stores the URLs and hints for hero section images.",
       "properties": {
         "home": {
-          "type": "object",
-          "properties": {
-            "url": { "type": "string", "format": "uri" },
-            "hint": { "type": "string" }
-          }
+          "$ref": "#/entities/HeroContent"
         },
         "about": {
-          "type": "object",
-          "properties": {
-            "url": { "type": "string", "format": "uri" },
-            "hint": { "type": "string" }
-          }
+          "$ref": "#/entities/HeroContent"
         }
       },
        "required": ["home", "about"]

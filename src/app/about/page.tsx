@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Award, BrainCircuit, HandHeart, Users } from 'lucide-react';
 import Image from 'next/image';
@@ -10,6 +10,7 @@ import { doc } from 'firebase/firestore';
 import type { HeroImageSettings } from '@/lib/types';
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { motion } from 'framer-motion';
 
 const curriculum = [
   {
@@ -60,6 +61,10 @@ export default function AboutPage() {
   const heroImagesRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
   const { data: heroImagesData, isLoading: heroImagesLoading } = useDoc<HeroImageSettings>(heroImagesRef);
 
+  const heroTitle = heroImagesData?.about?.title || '뷰티 비즈니스, 기술만 배운다고 성공할까요?';
+  const heroDescription = heroImagesData?.about?.description || '림프 전문 테크닉부터 AI 상담 솔루션까지, 엘라인이 뷰티 전문가의 기준을 바꿉니다.';
+
+
   return (
     <div className="bg-background text-foreground">
       {/* Hero Section */}
@@ -75,16 +80,21 @@ export default function AboutPage() {
                 data-ai-hint={heroImagesData?.about?.hint || "bright modern beauty academy"}
             />
         )}
-        <div className="relative z-10 p-4 max-w-4xl mx-auto">
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            className="relative z-10 p-4 max-w-4xl mx-auto"
+        >
           <h1 className="font-headline text-4xl md:text-5xl font-bold tracking-tight">
-            뷰티 비즈니스, 기술만 배운다고 성공할까요?
-            <br />
-            <span className="text-accent">시스템과 데이터를 배우세요.</span>
+            {heroTitle.split('\n').map((line, index) => (
+                index === 1 ? <span key={index} className="text-accent">{line}</span> : <span key={index}>{line}<br/></span>
+            ))}
           </h1>
           <p className="mt-6 text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
-            림프 전문 테크닉부터 AI 상담 솔루션까지, 엘라인이 뷰티 전문가의 기준을 바꿉니다.
+            {heroDescription}
           </p>
-        </div>
+        </motion.div>
       </section>
 
       <div className="container mx-auto py-16 md:py-24 space-y-16 md:space-y-24">

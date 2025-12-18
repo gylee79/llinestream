@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import type { Policy, FooterSettings, HeroImageSettings } from '@/lib/types';
+import type { Policy, FooterSettings, HeroImageSettings, HeroContent } from '@/lib/types';
 import { useCollection, useDoc, useFirestore, useFirebase, errorEmitter, useStorage } from '@/firebase';
 import { collection, doc, writeBatch, setDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -17,6 +17,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { FirestorePermissionError } from "@/firebase/errors";
 import Image from "next/image";
+import { Separator } from "@/components/ui/separator";
 
 function HeroImageManager() {
     const firestore = useFirestore();
@@ -26,7 +27,7 @@ function HeroImageManager() {
     const heroImagesRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
     const { data: heroImageData, isLoading } = useDoc<HeroImageSettings>(heroImagesRef);
 
-    const [settings, setSettings] = useState<Partial<HeroImageSettings>>({});
+    const [settings, setSettings] = useState<Partial<HeroImageSettings>>({ home: {}, about: {} });
     const [files, setFiles] = useState<{ home?: File, about?: File }>({});
     const [isSaving, setIsSaving] = useState(false);
 
@@ -35,26 +36,33 @@ function HeroImageManager() {
             setSettings(heroImageData);
         }
     }, [heroImageData]);
-
+    
     const handleFileChange = (type: 'home' | 'about', file: File | null) => {
         if (file) {
             setFiles(prev => ({ ...prev, [type]: file }));
-            // Show preview
             const reader = new FileReader();
             reader.onloadend = () => {
                 setSettings(prev => ({
                     ...prev,
-                    [type]: { ...prev[type], url: reader.result as string }
+                    [type]: { ...(prev[type] || {}), url: reader.result as string }
                 }));
             };
             reader.readAsDataURL(file);
         }
     };
+    
+    const handleTextChange = (type: 'home' | 'about', field: 'title' | 'description' | 'hint', value: string) => {
+      setSettings(prev => ({
+        ...prev,
+        [type]: { ...(prev[type] || {}), [field]: value }
+      }));
+    };
 
     const handleSave = async () => {
         if (!firestore || !storage) return;
         setIsSaving(true);
-        let updatedUrls = { ...settings };
+        
+        let updatedSettings: Partial<HeroImageSettings> = JSON.parse(JSON.stringify(settings));
 
         try {
             for (const key of Object.keys(files) as Array<'home' | 'about'>) {
@@ -69,22 +77,23 @@ function HeroImageManager() {
                             async () => resolve(await getDownloadURL(uploadTask.snapshot.ref))
                         );
                     });
-                    updatedUrls[key] = { ...updatedUrls[key], url: downloadUrl };
+                    if (!updatedSettings[key]) updatedSettings[key] = {};
+                    updatedSettings[key]!.url = downloadUrl;
                 }
             }
 
-            await setDoc(doc(firestore, 'settings', 'heroImages'), updatedUrls, { merge: true });
+            await setDoc(doc(firestore, 'settings', 'heroImages'), updatedSettings, { merge: true });
             
             toast({
                 title: '저장 완료',
-                description: '히어로 이미지가 성공적으로 업데이트되었습니다.',
+                description: '히어로 정보가 성공적으로 업데이트되었습니다.',
             });
             setFiles({});
         } catch (error) {
             const contextualError = new FirestorePermissionError({
                 path: 'settings/heroImages',
                 operation: 'update',
-                requestResourceData: updatedUrls,
+                requestResourceData: updatedSettings,
             }, authUser);
             errorEmitter.emit('permission-error', contextualError);
         } finally {
@@ -96,19 +105,46 @@ function HeroImageManager() {
         return <CardContent className="space-y-6">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-40 w-full" />)}</CardContent>;
     }
 
+    const renderManagerFor = (type: 'home' | 'about') => (
+      <div className="space-y-4 rounded-lg border p-4">
+          <h4 className="font-semibold text-lg">{type === 'home' ? '홈페이지' : '아카데미 소개'} 히어로</h4>
+          <div className="space-y-2">
+              <Label>제목</Label>
+              <Input 
+                  value={settings[type]?.title || ''}
+                  onChange={e => handleTextChange(type, 'title', e.target.value)}
+                  placeholder={`${type === 'home' ? '온라인 동영상 강의' : '뷰티 비즈니스...'}`}
+              />
+          </div>
+          <div className="space-y-2">
+              <Label>설명</Label>
+              <Textarea 
+                  value={settings[type]?.description || ''}
+                  onChange={e => handleTextChange(type, 'description', e.target.value)}
+                  placeholder={`${type === 'home' ? '온라인에서 고품질 강의를 만나보세요' : '엘라인이 뷰티 전문가의 기준을...'}`}
+              />
+          </div>
+          <div className="space-y-2">
+              <Label>배경 이미지</Label>
+              {settings[type]?.url && <Image src={settings[type]!.url!} alt={`${type} hero preview`} width={500} height={200} className="rounded-md object-cover"/>}
+              <Input type="file" onChange={e => handleFileChange(type, e.target.files?.[0] || null)} accept="image/*" />
+          </div>
+          <div className="space-y-2">
+              <Label>이미지 검색 힌트 (AI용)</Label>
+              <Input
+                  value={settings[type]?.hint || ''}
+                  onChange={e => handleTextChange(type, 'hint', e.target.value)}
+                  placeholder="e.g., modern laptop"
+              />
+          </div>
+      </div>
+  );
+
     return (
         <CardContent className="space-y-6">
-            <div className="space-y-2">
-                <Label>홈페이지 히어로 이미지</Label>
-                {settings.home?.url && <Image src={settings.home.url} alt="Home hero preview" width={500} height={200} className="rounded-md object-cover"/>}
-                <Input type="file" onChange={e => handleFileChange('home', e.target.files?.[0] || null)} accept="image/*" />
-            </div>
-            <div className="space-y-2">
-                <Label>아카데미 소개 히어로 이미지</Label>
-                {settings.about?.url && <Image src={settings.about.url} alt="About hero preview" width={500} height={200} className="rounded-md object-cover"/>}
-                <Input type="file" onChange={e => handleFileChange('about', e.target.files?.[0] || null)} accept="image/*" />
-            </div>
-            <Button onClick={handleSave} disabled={isSaving}>{isSaving ? '저장 중...' : '저장'}</Button>
+            {renderManagerFor('home')}
+            {renderManagerFor('about')}
+            <Button onClick={handleSave} disabled={isSaving}>{isSaving ? '저장 중...' : '히어로 정보 저장'}</Button>
         </CardContent>
     );
 }
@@ -282,7 +318,7 @@ export default function AdminSettingsPage() {
       <h1 className="text-3xl font-bold tracking-tight font-headline">설정</h1>
       <p className="text-muted-foreground">앱의 전반적인 설정을 관리합니다.</p>
 
-      <Tabs defaultValue="policies" className="mt-6">
+      <Tabs defaultValue="general" className="mt-6">
         <TabsList>
           <TabsTrigger value="general">일반</TabsTrigger>
           <TabsTrigger value="footer">푸터</TabsTrigger>
@@ -290,7 +326,10 @@ export default function AdminSettingsPage() {
         </TabsList>
         <TabsContent value="general" className="mt-4">
             <Card>
-                <CardHeader><CardTitle>히어로 이미지 설정</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle>히어로 섹션 관리</CardTitle>
+                  <p className="text-sm text-muted-foreground">홈페이지 및 소개 페이지의 상단 이미지와 문구를 수정합니다.</p>
+                </CardHeader>
                 <HeroImageManager />
             </Card>
             <Card className="mt-6">

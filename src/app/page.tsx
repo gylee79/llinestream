@@ -4,7 +4,7 @@ import ContentCarousel from '@/components/shared/content-carousel';
 import Hero from '@/components/home/hero';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCollection, useDoc, useFirestore } from '@/firebase';
-import { collection, query, limit, collectionGroup, doc } from 'firebase/firestore';
+import { collection, query, collectionGroup, doc } from 'firebase/firestore';
 import { Course, Classification, Episode, HeroImageSettings } from '@/lib/types';
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,13 +21,6 @@ export default function Home() {
   const episodesQuery = useMemo(() => (firestore ? collectionGroup(firestore, 'episodes') : null), [firestore]);
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
 
-  const heroCourseQuery = useMemo(() => 
-    firestore ? query(collection(firestore, 'courses'), limit(1)) : null, 
-    [firestore]
-  );
-  const { data: heroCourseData } = useCollection<Course>(heroCourseQuery);
-  const heroCourse = heroCourseData?.[0];
-
   const heroImagesRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
   const { data: heroImagesData, isLoading: heroImagesLoading } = useDoc<HeroImageSettings>(heroImagesRef);
 
@@ -36,7 +29,7 @@ export default function Home() {
   if (isLoading) {
       return (
           <div>
-            <Skeleton className="h-[60vh] w-full" />
+            <Skeleton className="h-[50vh] w-full" />
             <div className="container mx-auto py-12 text-center">
                 <p>Loading...</p>
             </div>
@@ -68,13 +61,12 @@ export default function Home() {
 
   return (
     <div className="flex-1">
-      {heroCourse && (
-        <Hero 
-          course={heroCourse}
+      <Hero 
+          title={heroImagesData?.home?.title}
+          description={heroImagesData?.home?.description}
           imageUrl={heroImagesData?.home?.url}
           imageHint={heroImagesData?.home?.hint}
         />
-      )}
       <div className="container mx-auto space-y-12 py-12">
         {watchedCourses.length > 0 && <ContentCarousel title="나의 시청 동영상" courses={watchedCourses} />}
         {freeCourses && freeCourses.length > 0 && <ContentCarousel title="무료 영상" courses={freeCourses} />}
