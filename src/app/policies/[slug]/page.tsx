@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDoc, useFirestore } from '@/firebase';
+import { doc } from 'firebase/firestore';
 import type { Policy } from '@/lib/types';
 
 export default function PolicyPage() {
