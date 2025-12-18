@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, BrainCircuit, HeartHand, Award, Users } from 'lucide-react';
+import { ArrowRight, BrainCircuit, HeartHand, Award, Users, Layout } from 'lucide-react';
 import Image from 'next/image';
 
 const curriculum = [
