@@ -13,6 +13,7 @@ import {
   Shield,
   X,
   ShoppingCart,
+  Info,
 } from 'lucide-react';
 
 import { LlineStreamLogo } from '@/components/icons';
@@ -37,13 +38,14 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { useUser, useAuth, useFirebase } from '@/firebase';
+import { useUser, useAuth } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useCart } from '@/context/cart-context';
 import { Badge } from '../ui/badge';
 
 const navLinks = [
   { href: '/', label: 'Home', icon: Home },
+  { href: '/about', label: '엘라인아카데미소개', icon: Info },
   { href: '/contents', label: '영상 콘텐츠', icon: Clapperboard },
   { href: '/pricing', label: '가격 안내', icon: CreditCard },
 ];
@@ -53,7 +55,6 @@ const adminLink = { href: '/admin', label: '관리자', icon: Shield };
 export default function Header() {
   const pathname = usePathname();
   const { user, isUserLoading } = useUser();
-  const { authUser } = useFirebase();
   const auth = useAuth();
   const { openCart, items } = useCart();
   const isLoggedIn = !!user;
@@ -145,14 +146,14 @@ export default function Header() {
             <Avatar className="h-8 w-8">
               <AvatarFallback>?</AvatarFallback>
             </Avatar>
-          ) : isLoggedIn && user && authUser ? (
+          ) : isLoggedIn && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
                     <AvatarImage
-                      src={authUser.photoURL || `https://avatar.vercel.sh/${authUser.uid}.png`}
-                      alt={authUser.displayName || authUser.email || ''}
+                      src={user.authUser?.photoURL || `https://avatar.vercel.sh/${user.id}.png`}
+                      alt={user.name || user.email || ''}
                     />
                     <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
