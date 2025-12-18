@@ -140,8 +140,7 @@ export default function AboutPage() {
             <div>
                 <h2 className="text-3xl font-bold tracking-tight">엘라인은 교육 방식부터 다릅니다.</h2>
                 <p className="mt-4 text-muted-foreground text-lg">
-                    AI 성향 분석을 통한 맞춤형 레시피 추천, 스마트 디스펜서를 활용한 정밀 조향 실습까지.
-                    데이터에 기반한 스마트 뷰티 교육으로 당신의 경쟁력을 완성하세요.
+온라인 영상시청과 실제 강의를 하였던 강사님과 연결을 통해 궁금한부분 추가 현장 교육의 기회를 만들어 드립니다.
                 </p>
             </div>
         </section>
