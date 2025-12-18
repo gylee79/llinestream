@@ -3,25 +3,29 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Award, BrainCircuit, HandHeart, Users } from 'lucide-react';
 import Image from 'next/image';
 
 const curriculum = [
   {
     title: '국가자격증 반',
     description: '체계적인 이론과 실습으로 합격률 90% 이상을 달성하는 피부/바디 기초 완성 과정입니다.',
+    icon: Award,
   },
   {
     title: '림프 마스터 반 (Signature)',
     description: "'림프온'의 독보적인 재활/순환 테크닉을 전수받아 고객 만족도를 극대화하세요.",
+    icon: HandHeart,
   },
   {
     title: 'AI & 감정 아로마 반',
     description: 'AI 진단과 도테라 오일을 활용한 멘탈 케어 및 조향 클래스로 차별화된 서비스를 제공합니다.',
+    icon: BrainCircuit,
   },
   {
     title: '직원 위탁 교육 시스템',
     description: '원장님을 대신하여 신입 직원을 3일 만에 실무형 인재로 육성하는 가장 효율적인 솔루션입니다.',
+    icon: Users,
   },
 ];
 
@@ -86,18 +90,20 @@ export default function AboutPage() {
 
         {/* Curriculum Section */}
         <section>
-          <h2 className="text-3xl font-bold tracking-tight text-center">엘라인 아카데미 핵심 교육 과정</h2>
-          <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+          <h2 className="text-3xl font-bold tracking-tight text-center mb-12">엘라인 아카데미 핵심 교육 과정</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10 max-w-4xl mx-auto">
             {curriculum.map((item, index) => {
+              const IconComponent = item.icon;
               return (
-                <Card key={index} className="flex flex-col text-center items-center">
-                  <CardHeader>
-                    <CardTitle className="mt-4 font-headline">{item.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex-grow">
-                    <p className="text-muted-foreground">{item.description}</p>
-                  </CardContent>
-                </Card>
+                <div key={index} className="flex items-start gap-6">
+                  <div className="flex-shrink-0 flex items-center justify-center h-20 w-20 rounded-full border-2 border-accent bg-accent/10 text-accent">
+                    <IconComponent className="h-10 w-10" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold font-headline text-primary">{item.title}</h3>
+                    <p className="mt-2 text-muted-foreground">{item.description}</p>
+                  </div>
+                </div>
               );
             })}
           </div>
