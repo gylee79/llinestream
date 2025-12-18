@@ -165,18 +165,6 @@ export default function AboutPage() {
             </div>
         </section>
       </div>
-
-       {/* Footer & CTA Section */}
-       <section className="bg-primary text-primary-foreground">
-        <div className="container mx-auto py-16 text-center">
-            <h2 className="text-3xl font-bold">당신의 뷰티 비즈니스, 엘라인이 러닝메이트가 되겠습니다.</h2>
-            <p className="mt-4 text-lg opacity-80">지금 바로 상담을 통해 성공의 첫 걸음을 내딛어 보세요.</p>
-            <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
-                <Button variant="secondary" size="lg">전화 상담: 010-1234-5678</Button>
-                <Button variant="ghost" size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">카카오톡 상담</Button>
-            </div>
-        </div>
-      </section>
     </div>
   );
 }
