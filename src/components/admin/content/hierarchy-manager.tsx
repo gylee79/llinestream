@@ -157,52 +157,26 @@ export default function HierarchyManager() {
     if (!firestore) return;
     if (!confirm(`정말로 '${name}' 항목을 삭제하시겠습니까? 하위 항목이 있는 경우 서버 액션을 통해 함께 삭제됩니다.`)) return;
 
-    // --- Start: 완전 디버깅 모드 ---
-    console.log("--- DELETE ATTEMPT (DEBUG MODE) ---");
-    console.log("Project ID:", firestore.app.options.projectId);
-    console.log("Target Collection Name:", collectionName);
-    console.log("Target Document ID:", id);
-
-    const docRef = doc(firestore, collectionName, id);
-
     try {
-        console.log("Step 1: Checking if document exists at path:", docRef.path);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-            console.log("Step 2: Document FOUND. Data:", docSnap.data());
-            
-            // Check for subcollections before deciding deletion strategy
-            const isField = collectionName === 'fields';
-            const isClassification = collectionName === 'classifications';
-            
-            // Fields and Classifications have sub-items, so they need the robust server-side deletion.
-            if (isField || isClassification) {
-                console.log("Step 3: This is a parent item. Using server action for safe recursive deletion.");
-                const result = await deleteHierarchyItem(collectionName, id);
-                if (result.success) {
-                    toast({ title: '서버 액션 성공', description: result.message });
-                    if (collectionName === 'fields' && selectedField === id) setSelectedField(null);
-                    if (collectionName === 'classifications' && selectedClassification === id) setSelectedClassification(null);
-                } else {
-                    throw new Error(result.message);
-                }
-            } else { // 'courses' are leaf nodes in this manager, can be deleted directly or via server action. Let's use server action for consistency.
-                console.log("Step 3: This is a course. Using server action to also delete episodes and files.");
-                const result = await deleteHierarchyItem(collectionName, id);
-                 if (result.success) {
-                    toast({ title: '서버 액션 성공', description: result.message });
-                } else {
-                    throw new Error(result.message);
-                }
+        const isField = collectionName === 'fields';
+        const isClassification = collectionName === 'classifications';
+        
+        if (isField || isClassification) {
+            const result = await deleteHierarchyItem(collectionName, id);
+            if (result.success) {
+                toast({ title: '서버 액션 성공', description: result.message });
+                if (collectionName === 'fields' && selectedField === id) setSelectedField(null);
+                if (collectionName === 'classifications' && selectedClassification === id) setSelectedClassification(null);
+            } else {
+                throw new Error(result.message);
             }
         } else {
-            console.error("Step 2: Document NOT FOUND at the specified path. Aborting delete.");
-            toast({
-                variant: "destructive",
-                title: "삭제 실패",
-                description: "삭제할 문서를 찾을 수 없습니다. 경로가 잘못되었을 수 있습니다.",
-            });
+            const result = await deleteHierarchyItem(collectionName, id);
+             if (result.success) {
+                toast({ title: '서버 액션 성공', description: result.message });
+            } else {
+                throw new Error(result.message);
+            }
         }
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -212,10 +186,7 @@ export default function HierarchyManager() {
             title: "삭제 중 오류 발생",
             description: errorMessage,
         });
-    } finally {
-        console.log("--- DELETE ATTEMPT FINISHED ---");
     }
-    // --- End: 완전 디버깅 모드 ---
   };
 
 
@@ -224,7 +195,7 @@ export default function HierarchyManager() {
       <Card>
         <CardHeader>
           <CardTitle>계층 구조 관리</CardTitle>
-          <p className="text-sm text-muted-foreground">분야 > 큰분류 > 상세분류 순서로 콘텐츠 계층을 관리합니다.</p>
+          <p className="text-sm text-muted-foreground">분야 &gt; 큰분류 &gt; 상세분류 순서로 콘텐츠 계층을 관리합니다.</p>
         </CardHeader>
         <CardContent>
           <div className="flex gap-4">
