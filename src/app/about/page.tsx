@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, BrainCircuit, HeartHand, Award, Users, Layout } from 'lucide-react';
+import { ArrowRight, BrainCircuit, HeartHand, Award, Users } from 'lucide-react';
 import Image from 'next/image';
 
 const curriculum = [
@@ -114,7 +114,7 @@ export default function AboutPage() {
         {/* Differentiation Section */}
         <section className="grid md:grid-cols-2 gap-8 items-center bg-muted rounded-lg p-8 md:p-12">
             <div className="relative aspect-video rounded-lg overflow-hidden">
-                <Image src="https://picsum.photos/seed/ai-beauty/800/600" alt="AI 기반 교육" layout="fill" objectFit="cover" data-ai-hint="futuristic beauty technology"/>
+                <Image src="https://picsum.photos/seed/ai-beauty/800/600" alt="AI 기반 교육" fill style={{objectFit: "cover"}} data-ai-hint="futuristic beauty technology"/>
             </div>
             <div>
                 <h2 className="text-3xl font-bold tracking-tight">엘라인은 교육 방식부터 다릅니다.</h2>
@@ -159,3 +159,5 @@ export default function AboutPage() {
     </div>
   );
 }
+
+    
