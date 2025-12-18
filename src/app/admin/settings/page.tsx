@@ -9,11 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import type { Policy, FooterSettings, HeroImageSettings, HeroContent } from '@/lib/types';
-import { useCollection, useDoc, useFirestore, useFirebase, errorEmitter, useStorage } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useFirebase, errorEmitter, useStorage, useUser } from '@/firebase';
 import { collection, doc, writeBatch, setDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { FirestorePermissionError } from "@/firebase/errors";
 import Image from "next/image";
@@ -30,10 +30,18 @@ function HeroImageManager() {
     const [settings, setSettings] = useState<Partial<HeroImageSettings>>({ home: {}, about: {} });
     const [files, setFiles] = useState<{ home?: File, about?: File }>({});
     const [isSaving, setIsSaving] = useState(false);
+    
+    // useRef to store original URLs
+    const originalUrls = useRef<{ home?: string, about?: string }>({});
 
     useEffect(() => {
         if (heroImageData) {
             setSettings(heroImageData);
+            // Store original URLs when data loads
+            originalUrls.current = {
+                home: heroImageData.home?.url,
+                about: heroImageData.about?.url
+            };
         }
     }, [heroImageData]);
     
@@ -49,6 +57,21 @@ function HeroImageManager() {
             };
             reader.readAsDataURL(file);
         }
+    };
+    
+    const handleCancelFileChange = (type: 'home' | 'about') => {
+        // Remove the staged file
+        setFiles(prev => {
+            const newFiles = { ...prev };
+            delete newFiles[type];
+            return newFiles;
+        });
+
+        // Revert the URL to the original one from Firestore
+        setSettings(prev => ({
+            ...prev,
+            [type]: { ...(prev[type] || {}), url: originalUrls.current[type] }
+        }));
     };
     
     const handleTextChange = (type: 'home' | 'about', field: 'title' | 'description' | 'hint', value: string) => {
@@ -125,9 +148,16 @@ function HeroImageManager() {
               />
           </div>
           <div className="space-y-2">
-              <Label>배경 이미지</Label>
-              {settings[type]?.url && <Image src={settings[type]!.url!} alt={`${type} hero preview`} width={500} height={200} className="rounded-md object-cover"/>}
-              <Input type="file" onChange={e => handleFileChange(type, e.target.files?.[0] || null)} accept="image/*" />
+            <Label>배경 이미지</Label>
+            {settings[type]?.url && <Image src={settings[type]!.url!} alt={`${type} hero preview`} width={500} height={200} className="rounded-md object-cover"/>}
+            <div className="flex items-center gap-2">
+              <Input type="file" onChange={e => handleFileChange(type, e.target.files?.[0] || null)} accept="image/*" className="flex-1" />
+              {files[type] && (
+                <Button variant="outline" size="sm" onClick={() => handleCancelFileChange(type)}>
+                  취소
+                </Button>
+              )}
+            </div>
           </div>
           <div className="space-y-2">
               <Label>이미지 검색 힌트 (AI용)</Label>
@@ -364,3 +394,5 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
+
+    
