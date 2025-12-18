@@ -38,7 +38,7 @@ function FooterSettingsManager() {
     if (!firestore || Object.keys(settings).length === 0) return;
     setIsSaving(true);
     try {
-      await setDoc(doc(firestore, 'settings', 'footer'), settings, { merge: true });
+      await setDoc(doc(firestore, 'settings', 'footer'), { ...settings, companyName: settings.companyName || '하라생활건강' }, { merge: true });
       toast({
         title: "저장 완료",
         description: "푸터 정보가 성공적으로 업데이트되었습니다.",
@@ -64,6 +64,7 @@ function FooterSettingsManager() {
       <div><Label>앱 이름</Label><Input value={settings.appName || ''} onChange={e => handleChange('appName', e.target.value)} /></div>
       <div><Label>슬로건</Label><Input value={settings.slogan || ''} onChange={e => handleChange('slogan', e.target.value)} /></div>
       <div><Label>저작권</Label><Input value={settings.copyright || ''} onChange={e => handleChange('copyright', e.target.value)} /></div>
+      <div><Label>상호</Label><Input value={settings.companyName || ''} onChange={e => handleChange('companyName', e.target.value)} /></div>
       <div><Label>대표자명</Label><Input value={settings.representative || ''} onChange={e => handleChange('representative', e.target.value)} /></div>
       <div><Label>사업자등록번호</Label><Input value={settings.businessNumber || ''} onChange={e => handleChange('businessNumber', e.target.value)} /></div>
       <div><Label>주소</Label><Input value={settings.address || ''} onChange={e => handleChange('address', e.target.value)} /></div>

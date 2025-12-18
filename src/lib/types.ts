@@ -82,6 +82,7 @@ export interface FooterSettings {
   appName: string;
   slogan: string;
   copyright: string;
+  companyName: string;
   representative: string;
   businessNumber: string;
   address: string;
