@@ -15,7 +15,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import type { Classification } from '@/lib/types';
 import { useCart, type CartItem } from '@/context/cart-context';
-import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/utils';
 import { ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -26,7 +25,6 @@ interface PricingCardProps {
 
 export default function PricingCard({ classification }: PricingCardProps) {
   const [selectedDuration, setSelectedDuration] = useState<keyof Classification['prices']>('day30');
-  const { toast } = useToast();
   const { addToCart, items } = useCart();
   
   const plans = [
@@ -51,16 +49,8 @@ export default function PricingCard({ classification }: PricingCardProps) {
   const handleAddToCart = () => {
     const selectedPlan = plans.find(p => p.duration === selectedDuration);
     if (!selectedPlan || isInCart) {
-        if(isInCart) {
-            toast({
-              variant: 'destructive',
-              title: '이미 추가된 상품',
-              description: `이미 장바구니에 담겨있는 상품입니다.`,
-            });
-        }
         return;
     }
-
 
     const itemToAdd: CartItem = {
       id: `${classification.id}-${selectedDuration}`,
@@ -74,10 +64,6 @@ export default function PricingCard({ classification }: PricingCardProps) {
     };
 
     addToCart(itemToAdd);
-    toast({
-      title: '장바구니 추가',
-      description: `"${classification.name} ${selectedPlan.label}" 상품이 장바구니에 담겼습니다.`,
-    });
   };
 
   return (
