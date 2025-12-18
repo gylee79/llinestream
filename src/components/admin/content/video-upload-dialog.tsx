@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useEffect, useTransition, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { useCollection, useFirestore, useStorage, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useStorage } from '@/firebase';
 import { collection, doc, writeBatch, updateDoc } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -79,13 +79,13 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     courses: [],
   });
 
-  const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
+  const fieldsQuery = useMemo(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: dbFields } = useCollection<Field>(fieldsQuery);
 
-  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
+  const classificationsQuery = useMemo(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
   const { data: dbClassifications } = useCollection<Classification>(classificationsQuery);
 
-  const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
+  const coursesQuery = useMemo(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
   const { data: dbCourses } = useCollection<Course>(coursesQuery);
   
   const allFields = [
@@ -382,5 +382,3 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     </>
   );
 }
-
-    

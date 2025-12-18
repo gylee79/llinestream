@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import type { Field, Classification, Course } from '@/lib/types';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, addDoc, updateDoc, getDoc, deleteDoc } from 'firebase/firestore';
+import { useCollection, useFirestore } from '@/firebase';
+import { collection, query, where, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
@@ -71,16 +71,16 @@ export default function HierarchyManager() {
 
   const [dialogState, setDialogState] = useState<DialogState>({ isOpen: false, item: null, type: '분야' });
 
-  const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
+  const fieldsQuery = useMemo(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
 
-  const classificationsQuery = useMemoFirebase(() =>
+  const classificationsQuery = useMemo(() =>
     firestore && selectedField ? query(collection(firestore, 'classifications'), where('fieldId', '==', selectedField)) : null,
     [firestore, selectedField]
   );
   const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
 
-  const coursesQuery = useMemoFirebase(() =>
+  const coursesQuery = useMemo(() =>
     firestore && selectedClassification ? query(collection(firestore, 'courses'), where('classificationId', '==', selectedClassification)) : null,
     [firestore, selectedClassification]
   );
@@ -224,7 +224,7 @@ export default function HierarchyManager() {
       <Card>
         <CardHeader>
           <CardTitle>계층 구조 관리</CardTitle>
-          <p className="text-sm text-muted-foreground">분야 &gt; 큰분류 &gt; 상세분류 순서로 콘텐츠 계층을 관리합니다.</p>
+          <p className="text-sm text-muted-foreground">분야 > 큰분류 > 상세분류 순서로 콘텐츠 계층을 관리합니다.</p>
         </CardHeader>
         <CardContent>
           <div className="flex gap-4">
@@ -273,5 +273,3 @@ export default function HierarchyManager() {
     </>
   );
 }
-
-    
