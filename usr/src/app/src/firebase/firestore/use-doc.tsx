@@ -8,6 +8,7 @@ import {
   FirestoreError,
   DocumentSnapshot,
 } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useFirebase } from '@/firebase/provider'; 
 
@@ -23,7 +24,7 @@ export function useDoc<T = any>(
   memoizedDocRef: DocumentReference<DocumentData> | null | undefined,
 ): UseDocResult<T> {
   type StateDataType = WithId<T> | null;
-  const { authUser } = useFirebase(); // Changed from useUser() to useFirebase()
+  const { authUser } = useFirebase();
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
@@ -54,11 +55,13 @@ export function useDoc<T = any>(
         const contextualError = new FirestorePermissionError({
           operation: 'get',
           path: memoizedDocRef.path,
-        });
+        }, authUser);
 
         setError(contextualError)
         setData(null)
         setIsLoading(false)
+
+        errorEmitter.emit('permission-error', contextualError);
       }
     );
 

@@ -9,6 +9,7 @@ import {
   QuerySnapshot,
   CollectionReference,
 } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useFirebase } from '@/firebase/provider'; 
 
@@ -21,12 +22,12 @@ export interface UseCollectionResult<T> {
 }
 
 export function useCollection<T = any>(
-    memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & {__memo?: boolean})  | null | undefined,
+    memoizedTargetRefOrQuery: CollectionReference<DocumentData> | Query<DocumentData> | null | undefined,
 ): UseCollectionResult<T> {
   type ResultItemType = WithId<T>;
   type StateDataType = ResultItemType[] | null;
 
-  const { authUser } = useFirebase(); // Changed from useUser() to useFirebase()
+  const { authUser } = useFirebase();
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
@@ -39,8 +40,11 @@ export function useCollection<T = any>(
       return;
     }
     
+    // Firestore's internal query object representation
     const internalQuery = (memoizedTargetRefOrQuery as any)._query;
-    if (!internalQuery?.path || internalQuery.path.length === 0) {
+    // If the internal query path is missing or empty, it's not a valid query to execute.
+    // This prevents requests for "unknown collection".
+    if (!internalQuery?.path || internalQuery.path.segments.length === 0) {
         setData(null);
         setIsLoading(false);
         setError(null);
@@ -66,21 +70,18 @@ export function useCollection<T = any>(
         const contextualError = new FirestorePermissionError({
           operation: 'list',
           path: pathString, 
-        });
+        }, authUser);
 
         setError(contextualError);
         setData(null);
         setIsLoading(false);
+
+        errorEmitter.emit('permission-error', contextualError);
       }
     );
 
     return () => unsubscribe();
   }, [memoizedTargetRefOrQuery, authUser]); 
   
-  if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
-    if (process.env.NODE_ENV === 'development') {
-        console.warn('Query was not properly memoized using useMemoFirebase. This can lead to performance issues and infinite re-renders.');
-    }
-  }
   return { data, isLoading, error };
 }
