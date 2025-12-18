@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Table,
@@ -23,7 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore } from '@/firebase';
 import { collection, doc, query, collectionGroup, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -33,10 +33,10 @@ export default function VideoManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const episodesQuery = useMemoFirebase(() => (firestore ? query(collectionGroup(firestore, 'episodes')) : null), [firestore]);
+  const episodesQuery = useMemo(() => (firestore ? query(collectionGroup(firestore, 'episodes')) : null), [firestore]);
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
   
-  const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
+  const coursesQuery = useMemo(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
   
   const [isDialogOpen, setDialogOpen] = useState(false);
@@ -51,25 +51,23 @@ export default function VideoManager() {
     return courses?.find(c => c.id === courseId)?.name || 'N/A';
   };
 
-  const toggleFreeStatus = (episode: Episode) => {
+  const toggleFreeStatus = async (episode: Episode) => {
     if (!firestore) return;
     const docRef = doc(firestore, 'courses', episode.courseId, 'episodes', episode.id);
-    // Use updateDoc without await for a non-blocking UI update
-    updateDoc(docRef, { isFree: !episode.isFree })
-      .then(() => {
-        toast({
-          title: '상태 변경',
-          description: `${episode.title}의 무료 상태가 변경되었습니다.`,
-        });
-      })
-      .catch((error) => {
-        console.error("Failed to toggle free status:", error);
+    try {
+      await updateDoc(docRef, { isFree: !episode.isFree });
+      toast({
+        title: '상태 변경',
+        description: `${episode.title}의 무료 상태가 변경되었습니다.`,
+      });
+    } catch (error) {
+       console.error("Failed to toggle free status:", error);
         toast({
           variant: 'destructive',
           title: '업데이트 실패',
           description: '상태 변경 중 오류가 발생했습니다.',
         });
-      });
+    }
   };
 
   const handleDeleteEpisode = async (episode: Episode) => {
