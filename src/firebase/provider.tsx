@@ -48,6 +48,7 @@ export interface FirebaseServicesAndUser {
 
 export interface UserHookResult {
   user: AppUser | null;
+  authUser: AuthUser | null;
   isUserLoading: boolean;
   userError: Error | null;
 }
@@ -167,16 +168,9 @@ export const useUser = (): UserHookResult => {
   const isUserLoading = isAuthLoading || (!!authUser && isProfileLoading);
   const userError = authError || profileError;
 
-  const userWithAuth = useMemo(() => {
-    if (userProfile) {
-      return { ...userProfile, authUser: authUser };
-    }
-    return null;
-  }, [userProfile, authUser]);
-
-
   return { 
-    user: userWithAuth,
+    user: userProfile,
+    authUser,
     isUserLoading, 
     userError 
   };

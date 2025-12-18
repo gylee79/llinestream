@@ -39,7 +39,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { useUser, useAuth, useDoc, useFirestore } from '@/firebase';
+import { useUser, useAuth, useDoc, useFirestore, useFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useCart } from '@/context/cart-context';
 import { Badge } from '../ui/badge';
@@ -59,7 +59,7 @@ const adminLink = { href: '/admin', label: '관리자', icon: Shield };
 export default function Header() {
   const pathname = usePathname();
   const firestore = useFirestore();
-  const { user, isUserLoading } = useUser();
+  const { user, authUser, isUserLoading } = useUser();
   const auth = useAuth();
   const { openCart, items } = useCart();
   const isLoggedIn = !!user;
@@ -155,13 +155,13 @@ export default function Header() {
             <Avatar className="h-8 w-8">
               <AvatarFallback>?</AvatarFallback>
             </Avatar>
-          ) : isLoggedIn && user ? (
+          ) : isLoggedIn && user && authUser ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
                     <AvatarImage
-                      src={user.authUser?.photoURL || `https://avatar.vercel.sh/${user.id}.png`}
+                      src={authUser.photoURL || `https://avatar.vercel.sh/${user.id}.png`}
                       alt={user.name || user.email || ''}
                     />
                     <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
