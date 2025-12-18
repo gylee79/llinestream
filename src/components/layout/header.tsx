@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -38,10 +39,13 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { useUser, useAuth } from '@/firebase';
+import { useUser, useAuth, useDoc, useFirestore } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useCart } from '@/context/cart-context';
 import { Badge } from '../ui/badge';
+import { useMemo } from 'react';
+import type { FooterSettings } from '@/lib/types';
+import { doc } from 'firebase/firestore';
 
 const navLinks = [
   { href: '/', label: 'Home', icon: Home },
@@ -54,11 +58,16 @@ const adminLink = { href: '/admin', label: '관리자', icon: Shield };
 
 export default function Header() {
   const pathname = usePathname();
+  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const { openCart, items } = useCart();
   const isLoggedIn = !!user;
   const isAdmin = user?.role === 'admin';
+
+  const footerRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
+  const { data: settings } = useDoc<FooterSettings>(footerRef);
+  const appName = settings?.appName || 'LlineStream';
 
   const handleLogout = async () => {
     if (auth) {
@@ -96,7 +105,7 @@ export default function Header() {
             <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm">
                 <SheetHeader className="border-b pb-4">
                     <Link href="/" className="self-start">
-                        <LlineStreamLogo className="h-6 w-auto" />
+                        <LlineStreamLogo appName={appName} />
                     </Link>
                     <SheetTitle className="sr-only">메뉴</SheetTitle>
                     <SheetDescription className="sr-only">메인 네비게이션 메뉴</SheetDescription>
@@ -120,7 +129,7 @@ export default function Header() {
         {/* Desktop Logo and Navigation */}
         <div className="flex flex-1 items-center justify-start">
             <Link href="/" className="ml-4 md:ml-0 mr-6 flex items-center space-x-2">
-            <LlineStreamLogo className="h-6 w-auto" />
+            <LlineStreamLogo appName={appName} />
             </Link>
             <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
             {navLinks.map((link) => (

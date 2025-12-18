@@ -1,11 +1,14 @@
+
 import type { SVGProps } from 'react';
 
-export function LlineStreamLogo(props: SVGProps<SVGSVGElement>) {
+export function LlineStreamLogo({ appName = "LlineStream", ...props }: SVGProps<SVGSVGElement> & { appName?: string }) {
+  // A rough approximation to adjust viewBox based on text length
+  const estimatedWidth = (appName.length * 18) + 20; 
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 240 50"
-      width="120"
+      viewBox={`0 0 ${estimatedWidth} 50`}
+      width={estimatedWidth / 2} // Keep aspect ratio
       height="30"
       data-version="1.1" 
       {...props}
@@ -19,7 +22,7 @@ export function LlineStreamLogo(props: SVGProps<SVGSVGElement>) {
         fill="hsl(var(--primary))"
         className="dark:fill-primary"
       >
-        LlineStream
+        {appName}
       </text>
     </svg>
   );

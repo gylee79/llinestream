@@ -58,7 +58,7 @@ export default function Footer() {
       <div className="container mx-auto px-6 py-12">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
           <div>
-            <LlineStreamLogo className="h-7 w-auto" />
+            <LlineStreamLogo appName={settings.appName} />
             <p className="mt-4 text-sm text-muted-foreground">{settings.slogan}</p>
             <p className="mt-4 text-xs text-muted-foreground">{settings.copyright}</p>
           </div>
@@ -109,5 +109,3 @@ export default function Footer() {
     </footer>
   );
 }
-
-    

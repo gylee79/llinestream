@@ -1,7 +1,9 @@
+
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useMemo } from 'react';
 import {
   BarChart3,
   Cog,
@@ -16,6 +18,10 @@ import { LlineStreamLogo } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { useDoc, useFirestore } from '@/firebase';
+import type { FooterSettings } from '@/lib/types';
+import { doc } from 'firebase/firestore';
+
 
 const adminNavLinks = [
   { href: '/admin/dashboard', label: '대시보드', icon: LayoutDashboard },
@@ -52,12 +58,17 @@ const AdminNav = ({ className }: { className?: string }) => {
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const firestore = useFirestore();
+  const footerRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
+  const { data: settings } = useDoc<FooterSettings>(footerRef);
+  const appName = settings?.appName || 'LlineStream';
+
   return (
     <div className="flex min-h-screen w-full">
       <aside className="hidden w-64 flex-col border-r bg-muted/40 md:flex">
         <div className="flex h-16 items-center border-b px-6">
           <Link href="/admin/dashboard" className="flex items-center gap-2 font-semibold">
-            <LlineStreamLogo className="h-7 w-auto" />
+            <LlineStreamLogo appName={appName} />
           </Link>
         </div>
         <AdminNav />
@@ -74,7 +85,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <SheetContent side="left" className="flex flex-col p-0">
               <SheetHeader className="flex h-16 flex-row items-center justify-between border-b px-6">
                 <Link href="/admin/dashboard">
-                  <LlineStreamLogo className="h-7 w-auto" />
+                  <LlineStreamLogo appName={appName} />
                 </Link>
                 <SheetTitle className="sr-only">Admin Menu</SheetTitle>
               </SheetHeader>
