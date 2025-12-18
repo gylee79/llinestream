@@ -3,27 +3,23 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, BrainCircuit, HeartHand, Award, Users } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 
 const curriculum = [
   {
-    icon: Award,
     title: '국가자격증 반',
     description: '체계적인 이론과 실습으로 합격률 90% 이상을 달성하는 피부/바디 기초 완성 과정입니다.',
   },
   {
-    icon: HeartHand,
     title: '림프 마스터 반 (Signature)',
     description: "'림프온'의 독보적인 재활/순환 테크닉을 전수받아 고객 만족도를 극대화하세요.",
   },
   {
-    icon: BrainCircuit,
     title: 'AI & 감정 아로마 반',
     description: 'AI 진단과 도테라 오일을 활용한 멘탈 케어 및 조향 클래스로 차별화된 서비스를 제공합니다.',
   },
   {
-    icon: Users,
     title: '직원 위탁 교육 시스템',
     description: '원장님을 대신하여 신입 직원을 3일 만에 실무형 인재로 육성하는 가장 효율적인 솔루션입니다.',
   },
@@ -93,13 +89,9 @@ export default function AboutPage() {
           <h2 className="text-3xl font-bold tracking-tight text-center">엘라인 아카데미 핵심 교육 과정</h2>
           <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
             {curriculum.map((item, index) => {
-              const IconComponent = item.icon;
               return (
                 <Card key={index} className="flex flex-col text-center items-center">
                   <CardHeader>
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <IconComponent className="h-8 w-8" />
-                    </div>
                     <CardTitle className="mt-4 font-headline">{item.title}</CardTitle>
                   </CardHeader>
                   <CardContent className="flex-grow">
@@ -159,5 +151,3 @@ export default function AboutPage() {
     </div>
   );
 }
-
-    
