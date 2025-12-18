@@ -39,6 +39,17 @@ export function useCollection<T = any>(
       setError(null);
       return;
     }
+    
+    // Firestore's internal query object representation
+    const internalQuery = (memoizedTargetRefOrQuery as any)._query;
+    // If the internal query path is missing or empty, it's not a valid query to execute.
+    // This prevents requests for "unknown collection".
+    if (!internalQuery?.path || internalQuery.path.segments.length === 0) {
+        setData(null);
+        setIsLoading(false);
+        setError(null);
+        return;
+    }
 
     setIsLoading(true);
     setError(null);
