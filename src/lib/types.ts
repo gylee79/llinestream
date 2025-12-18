@@ -88,4 +88,7 @@ export interface FooterSettings {
   address: string;
   supportPhone: string;
   supportHours: string;
+  kakaoTalkUrl?: string;
 }
+
+    

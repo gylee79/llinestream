@@ -81,9 +81,11 @@ export default function Footer() {
             <div className="mt-4 space-y-2 text-sm text-muted-foreground">
               <p>전화번호: {settings.supportPhone}</p>
               <p>상담시간: {settings.supportHours}</p>
-              <Button variant="ghost" className="h-auto p-0 justify-start text-sm text-muted-foreground hover:text-foreground">
-                <KakaoIcon className="mr-2" />
-                카카오톡 상담
+              <Button asChild variant="ghost" className="h-auto p-0 justify-start text-sm text-muted-foreground hover:text-foreground">
+                <Link href={settings.kakaoTalkUrl || '#'} target="_blank" rel="noopener noreferrer">
+                  <KakaoIcon className="mr-2" />
+                  카카오톡 상담
+                </Link>
               </Button>
             </div>
           </div>
@@ -107,3 +109,5 @@ export default function Footer() {
     </footer>
   );
 }
+
+    

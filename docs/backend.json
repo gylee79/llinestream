@@ -237,7 +237,8 @@
         "businessNumber": { "type": "string" },
         "address": { "type": "string" },
         "supportPhone": { "type": "string" },
-        "supportHours": { "type": "string" }
+        "supportHours": { "type": "string" },
+        "kakaoTalkUrl": { "type": "string", "format": "uri" }
       },
       "required": [
         "appName",
@@ -387,3 +388,4 @@
     "reasoning": "The Firestore structure is designed to support LlineStream's video streaming and subscription model. User roles are managed via the `role` field within the `users` document for secure and efficient admin checks in security rules. User data is self-contained. Content is structured hierarchically (Field -> Classification -> Course -> Episode) for easy browsing and management. Subscriptions are stored under each user to easily query a user's entitlements. A single document in a 'settings' collection holds global configurations like footer info."
   }
 }
+    
