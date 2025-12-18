@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import type { Policy, FooterSettings, HeroImageSettings, HeroContent } from '@/lib/types';
-import { useCollection, useDoc, useFirestore, useFirebase, errorEmitter, useStorage, useUser } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useFirebase, errorEmitter, useStorage } from '@/firebase';
 import { collection, doc, writeBatch, setDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
@@ -82,7 +82,7 @@ function HeroImageManager() {
     };
 
     const handleSave = async () => {
-        if (!firestore || !storage) return;
+        if (!firestore || !storage || !authUser) return;
         setIsSaving(true);
         
         let updatedSettings: Partial<HeroImageSettings> = JSON.parse(JSON.stringify(settings));
@@ -104,8 +104,17 @@ function HeroImageManager() {
                     updatedSettings[key]!.url = downloadUrl;
                 }
             }
-
-            await setDoc(doc(firestore, 'settings', 'heroImages'), updatedSettings, { merge: true });
+            
+            const docRef = doc(firestore, 'settings', 'heroImages');
+            await setDoc(docRef, updatedSettings, { merge: true })
+            .catch((serverError) => {
+                const contextualError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'update',
+                    requestResourceData: updatedSettings,
+                }, authUser);
+                throw contextualError;
+            });
             
             toast({
                 title: '저장 완료',
@@ -113,12 +122,16 @@ function HeroImageManager() {
             });
             setFiles({});
         } catch (error) {
-            const contextualError = new FirestorePermissionError({
-                path: 'settings/heroImages',
-                operation: 'update',
-                requestResourceData: updatedSettings,
-            }, authUser);
-            errorEmitter.emit('permission-error', contextualError);
+            if (error instanceof FirestorePermissionError) {
+                 errorEmitter.emit('permission-error', error);
+            } else {
+                console.error("Error saving hero images: ", error);
+                 toast({
+                    variant: 'destructive',
+                    title: '저장 실패',
+                    description: '히어로 정보 저장 중 오류가 발생했습니다.',
+                });
+            }
         } finally {
             setIsSaving(false);
         }
@@ -200,7 +213,7 @@ function FooterSettingsManager() {
   };
 
   const handleSave = async () => {
-    if (!firestore || Object.keys(settings).length === 0) return;
+    if (!firestore || Object.keys(settings).length === 0 || !authUser) return;
     setIsSaving(true);
     
     const docRef = doc(firestore, 'settings', 'footer');
@@ -394,5 +407,3 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
-
-    
