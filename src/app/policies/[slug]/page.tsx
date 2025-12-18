@@ -1,14 +1,40 @@
-import { notFound } from 'next/navigation';
+'use client';
+
+import { useParams, notFound } from 'next/navigation';
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getPolicyBySlug } from '@/lib/policies';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDoc, useFirestore } from '@/firebase';
+import type { Policy } from '@/lib/types';
 
-interface PolicyPageProps {
-  params: Promise<{ slug: string }>;
-}
+export default function PolicyPage() {
+  const params = useParams<{ slug: string }>();
+  const firestore = useFirestore();
+  const slug = params.slug;
 
-export default async function PolicyPage({ params }: PolicyPageProps) {
-  const { slug } = await params;
-  const policy = await getPolicyBySlug(slug);
+  const policyRef = useMemo(
+    () => (firestore && slug ? doc(firestore, 'policies', slug) : null),
+    [firestore, slug]
+  );
+
+  const { data: policy, isLoading } = useDoc<Policy>(policyRef);
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto max-w-4xl py-12">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-9 w-1/2" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-4/5" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!policy) {
     notFound();
