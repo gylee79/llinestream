@@ -53,7 +53,7 @@ function FooterSettingsManager() {
       .catch((serverError) => {
         const contextualError = new FirestorePermissionError({
           path: docRef.path,
-          operation: 'update', // or 'create' depending on logic
+          operation: 'update',
           requestResourceData: dataToSave,
         }, authUser);
         errorEmitter.emit('permission-error', contextualError);
