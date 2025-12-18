@@ -29,7 +29,7 @@ export default function Hero({ course, imageUrl, imageHint }: HeroProps) {
         <Skeleton className="h-full w-full" />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent" />
-      <div className="relative z-10 flex h-full items-end">
+      <div className="absolute inset-0 z-10 flex h-full items-end">
         <div className="container mx-auto px-6 py-12 text-white">
           <div className="max-w-2xl">
             <h1 className="font-headline text-4xl font-bold md:text-6xl">
