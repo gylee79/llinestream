@@ -140,7 +140,7 @@ export default function AboutPage() {
             <div>
                 <h2 className="text-3xl font-bold tracking-tight">엘라인은 교육 방식부터 다릅니다.</h2>
                 <p className="mt-4 text-muted-foreground text-lg">
-온라인 영상시청과 실제 강의를 하였던 강사님과 연결을 통해 궁금한부분 추가 현장 교육의 기회를 만들어 드립니다.
+온라인 영상시청,커뮤니티방,실제 현업의 전문가와 연결을 통해 현장 교육의 기회를 만들어 드립니다.
                 </p>
             </div>
         </section>
