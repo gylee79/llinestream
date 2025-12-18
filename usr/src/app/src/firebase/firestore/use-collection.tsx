@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -10,51 +9,29 @@ import {
   QuerySnapshot,
   CollectionReference,
 } from 'firebase/firestore';
-import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { useUser } from '@/firebase/provider';
+import { useFirebase } from '@/firebase/provider'; 
 
-/** Utility type to add an 'id' field to a given type T. */
 export type WithId<T> = T & { id: string };
 
-/**
- * Interface for the return value of the useCollection hook.
- * @template T Type of the document data.
- */
 export interface UseCollectionResult<T> {
-  data: WithId<T>[] | null; // Document data with ID, or null.
-  isLoading: boolean;       // True if loading.
-  error: FirestoreError | Error | null; // Error object, or null.
+  data: WithId<T>[] | null;
+  isLoading: boolean;
+  error: FirestoreError | Error | null;
 }
 
-/**
- * React hook to subscribe to a Firestore collection or query in real-time.
- * Handles nullable references/queries.
- * 
- *
- * IMPORTANT! YOU MUST MEMOIZE the inputted memoizedTargetRefOrQuery or BAD THINGS WILL HAPPEN
- * use useMemo to memoize it per React guidence.  Also make sure that it's dependencies are stable
- * references
- *  
- * @template T Optional type for document data. Defaults to any.
- * @param {CollectionReference<DocumentData> | Query<DocumentData> | null | undefined} targetRefOrQuery -
- * The Firestore CollectionReference or Query. Waits if null/undefined.
- * @returns {UseCollectionResult<T>} Object with data, isLoading, error.
- */
 export function useCollection<T = any>(
     memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & {__memo?: boolean})  | null | undefined,
 ): UseCollectionResult<T> {
   type ResultItemType = WithId<T>;
   type StateDataType = ResultItemType[] | null;
 
-  const { authUser } = useUser(); // Get the auth user from context
+  const { authUser } = useFirebase(); // Changed from useUser() to useFirebase()
   const [data, setData] = useState<StateDataType>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
-    // --- Start: Guard Clauses ---
-    // 1. If the query object itself is missing, do nothing.
     if (!memoizedTargetRefOrQuery) {
       setData(null);
       setIsLoading(false);
@@ -62,20 +39,13 @@ export function useCollection<T = any>(
       return;
     }
     
-    // 2. Add robust guard clauses to prevent invalid queries from reaching onSnapshot.
-    // This prevents "INTERNAL ASSERTION FAILED: Unexpected state" errors.
     const internalQuery = (memoizedTargetRefOrQuery as any)._query;
-    const path = internalQuery?.path;
-
-    if (!path || path.length === 0) {
-        // Path is invalid or points to the root, which is not a collection.
-        // Silently ignore this query to prevent SDK crashes.
+    if (!internalQuery?.path || internalQuery.path.length === 0) {
         setData(null);
         setIsLoading(false);
         setError(null);
         return;
     }
-    // --- End: Guard Clauses ---
 
     setIsLoading(true);
     setError(null);
@@ -96,14 +66,11 @@ export function useCollection<T = any>(
         const contextualError = new FirestorePermissionError({
           operation: 'list',
           path: pathString, 
-        }, authUser); // Pass the current user
+        });
 
         setError(contextualError);
         setData(null);
         setIsLoading(false);
-
-        // trigger global error propagation
-        errorEmitter.emit('permission-error', contextualError);
       }
     );
 
