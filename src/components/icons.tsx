@@ -3,7 +3,7 @@ import type { SVGProps } from 'react';
 
 export function LlineStreamLogo({ appName = "LlineStream", ...props }: SVGProps<SVGSVGElement> & { appName?: string }) {
   // A rough approximation to adjust viewBox based on text length. Increased multiplier for wider characters.
-  const estimatedWidth = (appName.length * 24) + 20; 
+  const estimatedWidth = (appName.length * 35) + 20; 
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
