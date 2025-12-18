@@ -1,3 +1,4 @@
+
 'use client';
 import Link from 'next/link';
 import { useMemo } from 'react';
@@ -66,9 +67,9 @@ export default function Footer() {
             <h3 className="font-semibold text-foreground">사업자 정보</h3>
             <div className="mt-4 space-y-2 text-sm text-muted-foreground">
               <p>
-                <span>상호: {settings.companyName}</span>
+                <span>{settings.companyName}</span>
                 <span className="mx-2">|</span>
-                <span>대표자명: {settings.representative}</span>
+                <span>{settings.representative}</span>
               </p>
               <p>사업자등록번호: {settings.businessNumber}</p>
               <p>주소: {settings.address}</p>
