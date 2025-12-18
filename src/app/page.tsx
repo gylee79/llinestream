@@ -3,11 +3,11 @@
 import ContentCarousel from '@/components/shared/content-carousel';
 import Hero from '@/components/home/hero';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useCollection } from '@/firebase';
-import { useFirestore } from '@/firebase';
-import { collection, query, limit, collectionGroup } from 'firebase/firestore';
-import { Course, Classification, Episode } from '@/lib/types';
+import { useCollection, useDoc, useFirestore } from '@/firebase';
+import { collection, query, limit, collectionGroup, doc } from 'firebase/firestore';
+import { Course, Classification, Episode, HeroImageSettings } from '@/lib/types';
 import { useMemo } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Home() {
   const firestore = useFirestore();
@@ -28,12 +28,18 @@ export default function Home() {
   const { data: heroCourseData } = useCollection<Course>(heroCourseQuery);
   const heroCourse = heroCourseData?.[0];
 
-  const isLoading = coursesLoading || classificationsLoading || episodesLoading;
+  const heroImagesRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
+  const { data: heroImagesData, isLoading: heroImagesLoading } = useDoc<HeroImageSettings>(heroImagesRef);
+
+  const isLoading = coursesLoading || classificationsLoading || episodesLoading || heroImagesLoading;
   
   if (isLoading) {
       return (
-          <div className="container mx-auto py-12 text-center">
-             <p>Loading...</p>
+          <div>
+            <Skeleton className="h-[60vh] w-full" />
+            <div className="container mx-auto py-12 text-center">
+                <p>Loading...</p>
+            </div>
           </div>
       )
   }
@@ -62,7 +68,13 @@ export default function Home() {
 
   return (
     <div className="flex-1">
-      {heroCourse && <Hero course={heroCourse} />}
+      {heroCourse && (
+        <Hero 
+          course={heroCourse}
+          imageUrl={heroImagesData?.home?.url}
+          imageHint={heroImagesData?.home?.hint}
+        />
+      )}
       <div className="container mx-auto space-y-12 py-12">
         {watchedCourses.length > 0 && <ContentCarousel title="나의 시청 동영상" courses={watchedCourses} />}
         {freeCourses && freeCourses.length > 0 && <ContentCarousel title="무료 영상" courses={freeCourses} />}

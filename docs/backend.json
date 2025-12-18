@@ -251,6 +251,29 @@
         "supportPhone",
         "supportHours"
       ]
+    },
+    "HeroImageSettings": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "HeroImageSettings",
+      "type": "object",
+      "description": "Stores the URLs and hints for hero section images.",
+      "properties": {
+        "home": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string", "format": "uri" },
+            "hint": { "type": "string" }
+          }
+        },
+        "about": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string", "format": "uri" },
+            "hint": { "type": "string" }
+          }
+        }
+      },
+       "required": ["home", "about"]
     }
   },
   "auth": {
@@ -321,23 +344,23 @@
               "name": "courseId",
               "description": "The unique identifier for the course."
             }
-          ]
-        },
-        "subcollections": [
-          {
-            "path": "/episodes/{episodeId}",
-            "definition": {
-              "entityName": "Episode",
-              "schema": {
-                "$ref": "#/entities/Episode"
-              },
-              "description": "Stores individual videos within a course. Authorization: Read access requires subscription, write access for admins.",
-              "params": [
-                { "name": "episodeId", "description": "The unique identifier for the episode." }
-              ]
+          ],
+          "subcollections": [
+            {
+              "path": "/episodes/{episodeId}",
+              "definition": {
+                "entityName": "Episode",
+                "schema": {
+                  "$ref": "#/entities/Episode"
+                },
+                "description": "Stores individual videos within a course. Authorization: Read access requires subscription, write access for admins.",
+                "params": [
+                  { "name": "episodeId", "description": "The unique identifier for the episode." }
+                ]
+              }
             }
-          }
-        ]
+          ]
+        }
       },
       {
         "path": "/policies/{policyId}",
@@ -383,9 +406,17 @@
           "description": "Stores footer settings. It is a single document, not a collection.",
           "isSingleDoc": true
         }
+      },
+      {
+        "path": "/settings/heroImages",
+        "definition": {
+          "entityName": "HeroImageSettings",
+          "schema": { "$ref": "#/entities/HeroImageSettings" },
+          "description": "Stores hero image settings for various pages. It is a single document.",
+          "isSingleDoc": true
+        }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support LlineStream's video streaming and subscription model. User roles are managed via the `role` field within the `users` document for secure and efficient admin checks in security rules. User data is self-contained. Content is structured hierarchically (Field -> Classification -> Course -> Episode) for easy browsing and management. Subscriptions are stored under each user to easily query a user's entitlements. A single document in a 'settings' collection holds global configurations like footer info."
+    "reasoning": "The Firestore structure is designed to support LlineStream's video streaming and subscription model. User roles are managed via the `role` field within the `users` document for secure and efficient admin checks in security rules. User data is self-contained. Content is structured hierarchically (Field -> Classification -> Course -> Episode) for easy browsing and management. Subscriptions are stored under each user to easily query a user's entitlements. A 'settings' collection holds global configurations like footer info and hero images as single documents for easy access."
   }
 }
-    

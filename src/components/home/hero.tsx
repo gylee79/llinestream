@@ -4,26 +4,29 @@ import { Play } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import type { Course } from '@/lib/types';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { Skeleton } from '../ui/skeleton';
 
 interface HeroProps {
   course: Course;
+  imageUrl?: string;
+  imageHint?: string;
 }
 
-export default function Hero({ course }: HeroProps) {
-  const heroImage = PlaceHolderImages.find(img => img.id === 'hero-bg');
+export default function Hero({ course, imageUrl, imageHint }: HeroProps) {
 
   return (
     <div className="relative h-[60vh] min-h-[400px] w-full">
-      {heroImage && (
+      {imageUrl ? (
         <Image
-          src={heroImage.imageUrl}
-          alt={heroImage.description}
-          data-ai-hint={heroImage.imageHint}
+          src={imageUrl}
+          alt={imageHint || course.name}
+          data-ai-hint={imageHint}
           fill
           className="object-cover"
           priority
         />
+      ) : (
+        <Skeleton className="h-full w-full" />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent" />
       <div className="relative z-10 flex h-full items-end">

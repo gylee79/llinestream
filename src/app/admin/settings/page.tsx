@@ -8,13 +8,110 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import type { Policy, FooterSettings } from '@/lib/types';
-import { useCollection, useDoc, useFirestore, useFirebase, errorEmitter } from '@/firebase';
+import type { Policy, FooterSettings, HeroImageSettings } from '@/lib/types';
+import { useCollection, useDoc, useFirestore, useFirebase, errorEmitter, useStorage } from '@/firebase';
 import { collection, doc, writeBatch, setDoc } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useMemo } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { FirestorePermissionError } from "@/firebase/errors";
+import Image from "next/image";
+
+function HeroImageManager() {
+    const firestore = useFirestore();
+    const storage = useStorage();
+    const { authUser } = useFirebase();
+    const { toast } = useToast();
+    const heroImagesRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
+    const { data: heroImageData, isLoading } = useDoc<HeroImageSettings>(heroImagesRef);
+
+    const [settings, setSettings] = useState<Partial<HeroImageSettings>>({});
+    const [files, setFiles] = useState<{ home?: File, about?: File }>({});
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (heroImageData) {
+            setSettings(heroImageData);
+        }
+    }, [heroImageData]);
+
+    const handleFileChange = (type: 'home' | 'about', file: File | null) => {
+        if (file) {
+            setFiles(prev => ({ ...prev, [type]: file }));
+            // Show preview
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setSettings(prev => ({
+                    ...prev,
+                    [type]: { ...prev[type], url: reader.result as string }
+                }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleSave = async () => {
+        if (!firestore || !storage) return;
+        setIsSaving(true);
+        let updatedUrls = { ...settings };
+
+        try {
+            for (const key of Object.keys(files) as Array<'home' | 'about'>) {
+                const file = files[key];
+                if (file) {
+                    const storageRef = ref(storage, `settings/hero-${key}/${file.name}`);
+                    const uploadTask = uploadBytesResumable(storageRef, file);
+                    const downloadUrl = await new Promise<string>((resolve, reject) => {
+                        uploadTask.on('state_changed',
+                            () => {}, // progress
+                            (error) => reject(error),
+                            async () => resolve(await getDownloadURL(uploadTask.snapshot.ref))
+                        );
+                    });
+                    updatedUrls[key] = { ...updatedUrls[key], url: downloadUrl };
+                }
+            }
+
+            await setDoc(doc(firestore, 'settings', 'heroImages'), updatedUrls, { merge: true });
+            
+            toast({
+                title: '저장 완료',
+                description: '히어로 이미지가 성공적으로 업데이트되었습니다.',
+            });
+            setFiles({});
+        } catch (error) {
+            const contextualError = new FirestorePermissionError({
+                path: 'settings/heroImages',
+                operation: 'update',
+                requestResourceData: updatedUrls,
+            }, authUser);
+            errorEmitter.emit('permission-error', contextualError);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+    
+    if (isLoading) {
+        return <CardContent className="space-y-6">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-40 w-full" />)}</CardContent>;
+    }
+
+    return (
+        <CardContent className="space-y-6">
+            <div className="space-y-2">
+                <Label>홈페이지 히어로 이미지</Label>
+                {settings.home?.url && <Image src={settings.home.url} alt="Home hero preview" width={500} height={200} className="rounded-md object-cover"/>}
+                <Input type="file" onChange={e => handleFileChange('home', e.target.files?.[0] || null)} accept="image/*" />
+            </div>
+            <div className="space-y-2">
+                <Label>아카데미 소개 히어로 이미지</Label>
+                {settings.about?.url && <Image src={settings.about.url} alt="About hero preview" width={500} height={200} className="rounded-md object-cover"/>}
+                <Input type="file" onChange={e => handleFileChange('about', e.target.files?.[0] || null)} accept="image/*" />
+            </div>
+            <Button onClick={handleSave} disabled={isSaving}>{isSaving ? '저장 중...' : '저장'}</Button>
+        </CardContent>
+    );
+}
 
 function FooterSettingsManager() {
   const firestore = useFirestore();
@@ -193,7 +290,11 @@ export default function AdminSettingsPage() {
         </TabsList>
         <TabsContent value="general" className="mt-4">
             <Card>
-                <CardHeader><CardTitle>일반 설정</CardTitle></CardHeader>
+                <CardHeader><CardTitle>히어로 이미지 설정</CardTitle></CardHeader>
+                <HeroImageManager />
+            </Card>
+            <Card className="mt-6">
+                <CardHeader><CardTitle>유지보수 모드</CardTitle></CardHeader>
                 <CardContent className="space-y-6">
                     <div className="flex items-center justify-between rounded-lg border p-4">
                         <div>

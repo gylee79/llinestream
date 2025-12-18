@@ -88,7 +88,17 @@ export interface FooterSettings {
   address: string;
   supportPhone: string;
   supportHours: string;
+
   kakaoTalkUrl?: string;
 }
 
-    
+export interface HeroImageSettings {
+  home: {
+    url: string;
+    hint: string;
+  };
+  about: {
+    url: string;
+    hint: string;
+  };
+}

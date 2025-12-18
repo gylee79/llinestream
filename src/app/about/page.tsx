@@ -5,6 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Award, BrainCircuit, HandHeart, Users } from 'lucide-react';
 import Image from 'next/image';
+import { useDoc, useFirestore } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import type { HeroImageSettings } from '@/lib/types';
+import { useMemo } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const curriculum = [
   {
@@ -51,17 +56,25 @@ const ecosystem = [
 ]
 
 export default function AboutPage() {
+  const firestore = useFirestore();
+  const heroImagesRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
+  const { data: heroImagesData, isLoading: heroImagesLoading } = useDoc<HeroImageSettings>(heroImagesRef);
+
   return (
     <div className="bg-background text-foreground">
       {/* Hero Section */}
       <section className="relative h-[70vh] min-h-[500px] w-full flex items-center justify-center text-center text-white">
-        <Image
-          src="https://picsum.photos/seed/smart-beauty/1600/900"
-          alt="스마트 뷰티 교육"
-          fill
-          className="object-cover brightness-50"
-          data-ai-hint="bright modern beauty academy"
-        />
+        {heroImagesLoading ? (
+            <Skeleton className="absolute inset-0" />
+        ) : (
+            <Image
+                src={heroImagesData?.about?.url || "https://picsum.photos/seed/smart-beauty/1600/900"}
+                alt="스마트 뷰티 교육"
+                fill
+                className="object-cover brightness-50"
+                data-ai-hint={heroImagesData?.about?.hint || "bright modern beauty academy"}
+            />
+        )}
         <div className="relative z-10 p-4 max-w-4xl mx-auto">
           <h1 className="font-headline text-4xl md:text-5xl font-bold tracking-tight">
             뷰티 비즈니스, 기술만 배운다고 성공할까요?
