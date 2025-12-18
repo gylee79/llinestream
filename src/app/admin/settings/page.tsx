@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import type { Policy, FooterSettings } from '@/lib/types';
-import { useCollection, useDoc, useFirestore, useUser, errorEmitter } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useFirebase, errorEmitter } from '@/firebase';
 import { collection, doc, writeBatch, setDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useMemo } from 'react';
@@ -18,7 +18,7 @@ import { FirestorePermissionError } from "@/firebase/errors";
 
 function FooterSettingsManager() {
   const firestore = useFirestore();
-  const { authUser } = useUser();
+  const { authUser } = useFirebase();
   const { toast } = useToast();
   const footerRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
   const { data: footerData, isLoading } = useDoc<FooterSettings>(footerRef);
