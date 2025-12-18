@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect, DependencyList } from 'react';
+import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore, doc } from 'firebase/firestore';
 import { Auth, User as AuthUser, onAuthStateChanged } from 'firebase/auth';
@@ -47,6 +48,7 @@ export interface FirebaseServicesAndUser {
 
 export interface UserHookResult {
   user: AppUser | null;
+  authUser: AuthUser | null;
   isUserLoading: boolean;
   userError: Error | null;
 }
@@ -167,7 +169,8 @@ export const useUser = (): UserHookResult => {
   const userError = authError || profileError;
 
   return { 
-    user: userProfile, 
+    user: userProfile,
+    authUser: authUser,
     isUserLoading, 
     userError 
   };

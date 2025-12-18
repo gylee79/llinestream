@@ -9,14 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import type { Policy, FooterSettings } from '@/lib/types';
-import { useCollection, useDoc, useFirestore } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useUser, errorEmitter } from '@/firebase';
 import { collection, doc, writeBatch, setDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useMemo } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 function FooterSettingsManager() {
   const firestore = useFirestore();
+  const { authUser } = useUser();
   const { toast } = useToast();
   const footerRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
   const { data: footerData, isLoading } = useDoc<FooterSettings>(footerRef);
@@ -37,22 +39,28 @@ function FooterSettingsManager() {
   const handleSave = async () => {
     if (!firestore || Object.keys(settings).length === 0) return;
     setIsSaving(true);
-    try {
-      await setDoc(doc(firestore, 'settings', 'footer'), { ...settings, companyName: settings.companyName || '하라생활건강' }, { merge: true });
-      toast({
-        title: "저장 완료",
-        description: "푸터 정보가 성공적으로 업데이트되었습니다.",
+    
+    const docRef = doc(firestore, 'settings', 'footer');
+    const dataToSave = { ...settings, companyName: settings.companyName || '하라생활건강' };
+
+    setDoc(docRef, dataToSave, { merge: true })
+      .then(() => {
+        toast({
+          title: "저장 완료",
+          description: "푸터 정보가 성공적으로 업데이트되었습니다.",
+        });
+      })
+      .catch((serverError) => {
+        const contextualError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'update', // or 'create' depending on logic
+          requestResourceData: dataToSave,
+        }, authUser);
+        errorEmitter.emit('permission-error', contextualError);
+      })
+      .finally(() => {
+        setIsSaving(false);
       });
-    } catch (error) {
-      console.error("Failed to save footer settings:", error);
-      toast({
-        variant: "destructive",
-        title: "저장 실패",
-        description: "푸터 정보 저장 중 오류가 발생했습니다.",
-      });
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   if (isLoading) {
@@ -216,5 +224,3 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
-
-    
