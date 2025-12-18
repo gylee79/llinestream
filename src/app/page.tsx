@@ -3,24 +3,25 @@
 import ContentCarousel from '@/components/shared/content-carousel';
 import Hero from '@/components/home/hero';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection } from '@/firebase';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, limit, collectionGroup } from 'firebase/firestore';
+import { collection, query, limit, collectionGroup } from 'firebase/firestore';
 import { Course, Classification, Episode } from '@/lib/types';
+import { useMemo } from 'react';
 
 export default function Home() {
   const firestore = useFirestore();
 
-  const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
+  const coursesQuery = useMemo(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
 
-  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
+  const classificationsQuery = useMemo(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
   const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
 
-  const episodesQuery = useMemoFirebase(() => (firestore ? collectionGroup(firestore, 'episodes') : null), [firestore]);
+  const episodesQuery = useMemo(() => (firestore ? collectionGroup(firestore, 'episodes') : null), [firestore]);
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
 
-  const heroCourseQuery = useMemoFirebase(() => 
+  const heroCourseQuery = useMemo(() => 
     firestore ? query(collection(firestore, 'courses'), limit(1)) : null, 
     [firestore]
   );
@@ -82,5 +83,3 @@ export default function Home() {
     </div>
   );
 }
-
-    

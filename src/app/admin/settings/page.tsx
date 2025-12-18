@@ -9,16 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import type { Policy, FooterSettings } from '@/lib/types';
-import { useCollection, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useDoc, useFirestore } from '@/firebase';
 import { collection, doc, writeBatch, setDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
 
 function FooterSettingsManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const footerRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
+  const footerRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
   const { data: footerData, isLoading } = useDoc<FooterSettings>(footerRef);
 
   const [settings, setSettings] = useState<Partial<FooterSettings>>({});
@@ -77,7 +77,7 @@ function FooterSettingsManager() {
 function PolicySettingsManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const policiesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'policies') : null), [firestore]);
+  const policiesQuery = useMemo(() => (firestore ? collection(firestore, 'policies') : null), [firestore]);
   const { data: policies, isLoading } = useCollection<Policy>(policiesQuery);
   
   const [localPolicies, setLocalPolicies] = useState<Policy[]>([]);

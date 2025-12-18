@@ -1,6 +1,6 @@
 'use client';
 
-import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
+import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect, DependencyList } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore, doc } from 'firebase/firestore';
 import { Auth, User as AuthUser, onAuthStateChanged } from 'firebase/auth';
@@ -151,22 +151,10 @@ export const useFirebaseApp = (): FirebaseApp => {
   return firebaseApp;
 };
 
-type MemoFirebase <T> = T & {__memo?: boolean};
-
-export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const memoized = useMemo(factory, deps);
-  
-  if(typeof memoized !== 'object' || memoized === null) return memoized;
-  (memoized as MemoFirebase<T>).__memo = true;
-  
-  return memoized;
-}
-
 export const useUser = (): UserHookResult => {
   const { firestore, authUser, isAuthLoading, authError } = useFirebase();
   
-  const userDocRef = useMemoFirebase(() => {
+  const userDocRef = useMemo(() => {
     if (firestore && authUser) {
       return doc(firestore, 'users', authUser.uid);
     }

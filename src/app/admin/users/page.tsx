@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -16,14 +16,14 @@ import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import type { User } from '@/lib/types';
 import { UserDetailsDialog } from '@/components/admin/users/user-details-dialog';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
 export default function AdminUsersPage() {
   const firestore = useFirestore();
-  const usersQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
+  const usersQuery = useMemo(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
   const { data: users, isLoading } = useCollection<User>(usersQuery);
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -121,5 +121,3 @@ export default function AdminUsersPage() {
     </>
   );
 }
-
-    

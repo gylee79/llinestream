@@ -22,7 +22,7 @@ export interface UseCollectionResult<T> {
 }
 
 export function useCollection<T = any>(
-    memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & {__memo?: boolean})  | null | undefined,
+    memoizedTargetRefOrQuery: CollectionReference<DocumentData> | Query<DocumentData> | null | undefined,
 ): UseCollectionResult<T> {
   type ResultItemType = WithId<T>;
   type StateDataType = ResultItemType[] | null;
@@ -38,14 +38,6 @@ export function useCollection<T = any>(
       setIsLoading(false);
       setError(null);
       return;
-    }
-    
-    const internalQuery = (memoizedTargetRefOrQuery as any)._query;
-    if (!internalQuery?.path || internalQuery.path.length === 0) {
-        setData(null);
-        setIsLoading(false);
-        setError(null);
-        return;
     }
 
     setIsLoading(true);
@@ -80,10 +72,5 @@ export function useCollection<T = any>(
     return () => unsubscribe();
   }, [memoizedTargetRefOrQuery, authUser]); 
   
-  if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
-    if (process.env.NODE_ENV === 'development') {
-        console.warn('Query was not properly memoized using useMemoFirebase. This can lead to performance issues and infinite re-renders.');
-    }
-  }
   return { data, isLoading, error };
 }

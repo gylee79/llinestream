@@ -1,16 +1,17 @@
 
 'use client';
 import PricingCard from '@/components/pricing/pricing-card';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { useCollection, useFirestore, useUser } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import type { Classification } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCart } from '@/context/cart-context';
 import { formatPrice } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { X, ShoppingCart } from 'lucide-react';
+import { X } from 'lucide-react';
 import CartPaymentDialog from '@/components/cart/cart-payment-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useMemo } from 'react';
 
 function CartSummary() {
   const { items, totalAmount, removeFromCart } = useCart();
@@ -64,7 +65,7 @@ function CartSummary() {
 
 export default function PricingPage() {
   const firestore = useFirestore();
-  const classificationsQuery = useMemoFirebase(() => 
+  const classificationsQuery = useMemo(() => 
     firestore ? query(collection(firestore, 'classifications'), where('prices.day30', '>', 0)) : null,
     [firestore]
   );

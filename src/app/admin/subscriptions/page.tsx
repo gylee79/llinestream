@@ -2,6 +2,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -15,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { Subscription, User, Classification } from '@/lib/types';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore } from '@/firebase';
 import { collection, collectionGroup, query, orderBy } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -24,13 +25,13 @@ export default function AdminSubscriptionsPage() {
   const router = useRouter();
 
   // 1. firestore 객체가 준비되었을 때만 쿼리를 생성하도록 보장합니다.
-  const subscriptionsQuery = useMemoFirebase(
+  const subscriptionsQuery = useMemo(
     () => (firestore ? query(collectionGroup(firestore, 'subscriptions'), orderBy('purchasedAt', 'desc')) : null),
     [firestore]
   );
   
-  const usersQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
-  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
+  const usersQuery = useMemo(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
+  const classificationsQuery = useMemo(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
 
   // 2. 쿼리가 null이 아닐 때만 useCollection 훅을 호출합니다.
   const { data: subscriptions, isLoading: subsLoading } = useCollection<Subscription>(subscriptionsQuery);
