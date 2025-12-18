@@ -28,11 +28,11 @@ function CartSummary() {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 100 }}
         transition={{ duration: 0.3 }}
-        className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-[0_-4px_16px_rgba(0,0,0,0.1)] z-40"
+        className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-[0_-4px_16px_rgba(0,0,0,0.1)] z-50"
       >
         <div className="container mx-auto p-4 flex items-center justify-between">
-          <div className="flex-1">
-            <h3 className="font-semibold text-lg">장바구니 요약</h3>
+          <div className="flex-1 overflow-hidden">
+            <h3 className="font-semibold text-lg hidden md:block">장바구니 요약</h3>
             <div className="flex gap-4 mt-2 overflow-x-auto pb-2">
               {items.map(item => (
                 <div key={item.id} className="bg-muted p-2 rounded-md flex items-center gap-2 text-sm whitespace-nowrap">
@@ -45,13 +45,13 @@ function CartSummary() {
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-6 pl-6">
+          <div className="flex items-center gap-4 md:gap-6 pl-4 md:pl-6 border-l ml-4">
             <div className="text-right">
-              <span className="text-muted-foreground">총 금액</span>
-              <p className="font-bold text-2xl">{formatPrice(totalAmount)}</p>
+              <span className="text-muted-foreground text-sm">총 금액</span>
+              <p className="font-bold text-lg md:text-2xl whitespace-nowrap">{formatPrice(totalAmount)}</p>
             </div>
             <CartPaymentDialog>
-                <Button size="lg" disabled={!user}>
+                <Button size="lg" disabled={!user} className="whitespace-nowrap">
                     {user ? "결제하기" : "로그인 후 결제"}
                 </Button>
             </CartPaymentDialog>
