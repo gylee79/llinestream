@@ -103,7 +103,6 @@ export async function deleteHierarchyItem(
     return { success: true, message: '항목 및 모든 관련 파일이 성공적으로 삭제되었습니다.' };
 
   } catch (error) {
-    console.error('Error during batch deletion:', error);
     const errorMessage = error instanceof Error ? error.message : '알 수 없는 서버 오류가 발생했습니다.';
     return { success: false, message: `삭제 실패: ${errorMessage}` };
   }
