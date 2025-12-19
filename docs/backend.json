@@ -85,13 +85,24 @@
             "day60": { "type": "number" },
             "day90": { "type": "number" }
           }
+        },
+        "thumbnailUrl": {
+          "type": "string",
+          "description": "URL of the classification thumbnail image.",
+          "format": "uri"
+        },
+        "thumbnailHint": {
+          "type": "string",
+          "description": "Hint for AI to find a relevant image."
         }
       },
       "required": [
         "fieldId",
         "name",
         "description",
-        "prices"
+        "prices",
+        "thumbnailUrl",
+        "thumbnailHint"
       ]
     },
     "Course": {

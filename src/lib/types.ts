@@ -37,6 +37,8 @@ export interface Classification {
     day60: number;
     day90: number;
   };
+  thumbnailUrl: string;
+  thumbnailHint: string;
 }
 
 export interface Course {

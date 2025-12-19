@@ -19,16 +19,16 @@ export const users: User[] = [
 export const fields: Field[] = [
   { id: 'field-01', name: '교육' },
   { id: 'field-02', name: '영화' },
-  { id: 'field-03', name: '라이프스타일' },
+  { id: 'field-03', name: '각 카테고리,분류의' },
 ];
 
-export const classifications: Classification[] = [
-  { id: 'class-001', fieldId: 'field-01', name: '코딩', description: '기초부터 실전까지, 다양한 프로그래밍 언어와 기술을 배워보세요.', prices: { day1: 1000, day30: 9900, day60: 18000, day90: 25000 } },
-  { id: 'class-002', fieldId: 'field-02', name: '액션', description: '숨막히는 추격전과 화려한 액션을 즐겨보세요.', prices: { day1: 1500, day30: 12900, day60: 24000, day90: 34000 } },
-  { id: 'class-003', fieldId: 'field-03', name: '홈트레이닝', description: '집에서 편안하게 전문적인 피트니스 프로그램을 경험하세요.', prices: { day1: 800, day30: 7900, day60: 14000, day90: 20000 } },
-  { id: 'class-004', fieldId: 'field-02', name: '다큐멘터리', description: '세상의 다양한 지식과 감동적인 이야기를 만나보세요.', prices: { day1: 0, day30: 0, day60: 0, day90: 0 } },
-  { id: 'class-005', fieldId: 'field-01', name: '외국어', description: '영어, 중국어, 일본어 등 새로운 언어의 문을 열어보세요.', prices: { day1: 900, day30: 8900, day60: 16000, day90: 23000 } },
-  { id: 'class-006', fieldId: 'field-03', name: '요리', description: '세계 각국의 요리를 배우고 나만의 레시피를 만들어보세요.', prices: { day1: 700, day30: 6900, day60: 12000, day90: 18000 } },
+export const classifications: Omit<Classification, 'id'>[] = [
+  { fieldId: 'field-01', name: '코딩', description: '기초부터 실전까지, 다양한 프로그래밍 언어와 기술을 배워보세요.', prices: { day1: 1000, day30: 9900, day60: 18000, day90: 25000 }, thumbnailUrl: 'https://picsum.photos/seed/coding/600/400', thumbnailHint: 'abstract code' },
+  { fieldId: 'field-02', name: '액션', description: '숨막히는 추격전과 화려한 액션을 즐겨보세요.', prices: { day1: 1500, day30: 12900, day60: 24000, day90: 34000 }, thumbnailUrl: 'https://picsum.photos/seed/action/600/400', thumbnailHint: 'action movie explosion' },
+  { fieldId: 'field-03', name: '홈트레이닝', description: '집에서 편안하게 전문적인 피트니스 프로그램을 경험하세요.', prices: { day1: 800, day30: 7900, day60: 14000, day90: 20000 }, thumbnailUrl: 'https://picsum.photos/seed/hometraining/600/400', thumbnailHint: 'home workout' },
+  { fieldId: 'field-02', name: '다큐멘터리', description: '세상의 다양한 지식과 감동적인 이야기를 만나보세요.', prices: { day1: 0, day30: 0, day60: 0, day90: 0 }, thumbnailUrl: 'https://picsum.photos/seed/documentary/600/400', thumbnailHint: 'nature landscape' },
+  { fieldId: 'field-01', name: '외국어', description: '영어, 중국어, 일본어 등 새로운 언어의 문을 열어보세요.', prices: { day1: 900, day30: 8900, day60: 16000, day90: 23000 }, thumbnailUrl: 'https://picsum.photos/seed/language/600/400', thumbnailHint: 'foreign language books' },
+  { fieldId: 'field-03', name: '요리', description: '세계 각국의 요리를 배우고 나만의 레시피를 만들어보세요.', prices: { day1: 700, day30: 6900, day60: 12000, day90: 18000 }, thumbnailUrl: 'https://picsum.photos/seed/cooking/600/400', thumbnailHint: 'gourmet cooking' },
 ];
 
 export const courses: Course[] = [
