@@ -1,10 +1,9 @@
 'use server';
 
-import 'server-only';
-import * as admin from 'firebase-admin';
-import { WriteBatch } from 'firebase-admin/firestore';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import type { Episode } from '@/lib/types';
+import * as admin from 'firebase-admin';
+import { WriteBatch } from 'firebase-admin/firestore';
 
 type DeletionResult = {
   success: boolean;
@@ -103,7 +102,6 @@ export async function deleteHierarchyItem(
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '알 수 없는 서버 오류가 발생했습니다.';
-    console.error('[deleteHierarchyItem Action Error]', errorMessage);
     return { success: false, message: `삭제 실패: ${errorMessage}` };
   }
 }

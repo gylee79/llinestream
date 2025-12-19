@@ -1,4 +1,3 @@
-
 import * as admin from 'firebase-admin';
 import { App, getApps } from 'firebase-admin/app';
 import serviceAccount from './service-account.json';
