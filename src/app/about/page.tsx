@@ -147,7 +147,7 @@ export default function AboutPage() {
 
         {/* Ecosystem Hub Section */}
         <section className="text-center">
-            <h2 className="text-3xl font-bold tracking-tight">엘라인 그룹의 비즈니스 생태계</h2>
+            <h2 className="text-3xl font-bold tracking-tight">엘라인아카데미 협력 패밀리</h2>
             <p className="mt-4 text-muted-foreground text-lg max-w-2xl mx-auto">
                 교육에서 끝나지 않습니다. 창업, 제품, 고객 관리까지 이어지는 성공의 선순환을 경험하세요.
             </p>
