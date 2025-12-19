@@ -238,18 +238,20 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
 
     startTransition(() => {
         if (type === '분야') {
-            const newItem: Field = { id: newId, name: item.name };
+            const newItem: Field = { id: newId, name: item.name, thumbnailUrl: `https://picsum.photos/seed/${newId}/100/100`, thumbnailHint: 'placeholder' };
             setNewHierarchyItems(prev => ({ ...prev, fields: [...prev.fields, newItem] }));
             setSelectedFieldId(newId);
             setSelectedClassificationId(null);
             setSelectedCourseId(null);
         } else if (type === '큰분류' && selectedFieldId) {
-            const newItem: Classification = { 
+            const newItem: Classification = {
                 id: newId, 
                 name: item.name, 
                 fieldId: selectedFieldId,
                 description: "새로운 분류 설명", 
-                prices: { day1: 0, day30: 0, day60: 0, day90: 0 } 
+                prices: { day1: 0, day30: 0, day60: 0, day90: 0 },
+                thumbnailUrl: `https://picsum.photos/seed/${newId}/100/100`,
+                thumbnailHint: 'placeholder'
             };
             setNewHierarchyItems(prev => ({ ...prev, classifications: [...prev.classifications, newItem] }));
             setSelectedClassificationId(newId);

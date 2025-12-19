@@ -17,9 +17,9 @@ export const users: User[] = [
 ];
 
 export const fields: Field[] = [
-  { id: 'field-01', name: '교육' },
-  { id: 'field-02', name: '영화' },
-  { id: 'field-03', name: '각 카테고리,분류의' },
+  { id: 'field-01', name: '교육', thumbnailUrl: 'https://picsum.photos/seed/education/100/100', thumbnailHint: 'education' },
+  { id: 'field-02', name: '영화', thumbnailUrl: 'https://picsum.photos/seed/movie/100/100', thumbnailHint: 'movie' },
+  { id: 'field-03', name: '각 카테고리,분류의', thumbnailUrl: 'https://picsum.photos/seed/misc/100/100', thumbnailHint: 'abstract' },
 ];
 
 export const classifications: Omit<Classification, 'id'>[] = [
