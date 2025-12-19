@@ -1,4 +1,3 @@
-
 'use server';
 
 import 'server-only';
@@ -104,6 +103,7 @@ export async function deleteHierarchyItem(
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '알 수 없는 서버 오류가 발생했습니다.';
+    console.error('[deleteHierarchyItem Action Error]', errorMessage);
     return { success: false, message: `삭제 실패: ${errorMessage}` };
   }
 }
