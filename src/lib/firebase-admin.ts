@@ -1,7 +1,14 @@
 
 import * as admin from 'firebase-admin';
 import { App, getApps } from 'firebase-admin/app';
-import 'dotenv/config'
+import serviceAccount from './service-account.json';
+
+// Make sure the JSON object is correctly typed for admin.credential.cert()
+const serviceAccountParams = {
+  projectId: serviceAccount.project_id,
+  clientEmail: serviceAccount.client_email,
+  privateKey: serviceAccount.private_key,
+}
 
 /**
  * Initializes the Firebase Admin SDK, ensuring it's a singleton.
@@ -16,21 +23,9 @@ export function initializeAdminApp(): App {
     return getApps()[0];
   }
 
-  const projectId = process.env.PROJECT_ID;
-  const privateKey = process.env.PRIVATE_KEY?.replace(/\\n/g, '\n');
-  const clientEmail = process.env.CLIENT_EMAIL;
-
-  if (!projectId || !privateKey || !clientEmail) {
-    throw new Error('Firebase Admin SDK configuration environment variables are not set.');
-  }
-
   try {
     admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId,
-        privateKey,
-        clientEmail,
-      }),
+      credential: admin.credential.cert(serviceAccountParams),
       storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     });
 
