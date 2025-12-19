@@ -34,7 +34,7 @@ const ItemCard = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail 
   >
     <div className="relative aspect-video">
         <Image 
-            src={item.thumbnailUrl}
+            src={item.thumbnailUrl || 'https://picsum.photos/seed/placeholder/600/400'}
             alt={item.name}
             data-ai-hint={item.thumbnailHint}
             fill
