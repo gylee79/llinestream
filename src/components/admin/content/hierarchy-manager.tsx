@@ -1,13 +1,12 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
-import type { Field, Classification, Course } from '@/lib/types';
+import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useCollection, useFirestore } from '@/firebase';
-import { collection, query, where, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, query, where, doc, addDoc, updateDoc, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
@@ -158,29 +157,21 @@ export default function HierarchyManager() {
     if (!confirm(`정말로 '${name}' 항목을 삭제하시겠습니까? 하위 항목이 있는 경우 서버 액션을 통해 함께 삭제됩니다.`)) return;
 
     try {
-        const isField = collectionName === 'fields';
-        const isClassification = collectionName === 'classifications';
-        
-        if (isField || isClassification) {
-            const result = await deleteHierarchyItem(collectionName, id);
-            if (result.success) {
-                toast({ title: '서버 액션 성공', description: result.message });
-                if (collectionName === 'fields' && selectedField === id) setSelectedField(null);
-                if (collectionName === 'classifications' && selectedClassification === id) setSelectedClassification(null);
-            } else {
-                throw new Error(result.message);
+        const result = await deleteHierarchyItem(collectionName, id);
+        if (result.success) {
+            toast({ title: '삭제 성공', description: result.message });
+            if (collectionName === 'fields' && selectedField === id) {
+                setSelectedField(null);
+            }
+            if (collectionName === 'classifications' && selectedClassification === id) {
+                setSelectedClassification(null);
             }
         } else {
-            const result = await deleteHierarchyItem(collectionName, id);
-             if (result.success) {
-                toast({ title: '서버 액션 성공', description: result.message });
-            } else {
-                throw new Error(result.message);
-            }
+            throw new Error(result.message);
         }
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error("--- DELETE FAILED ---", error);
+        console.error("Error during delete process:", error);
         toast({
             variant: "destructive",
             title: "삭제 중 오류 발생",

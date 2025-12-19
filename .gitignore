@@ -4,6 +4,7 @@
 /node_modules
 /.pnp
 .pnp.js
+.yarn/install-state.gz
 
 # testing
 /coverage
@@ -36,8 +37,4 @@ yarn-error.log*
 next-env.d.ts
 
 # studio
-/studio/
-/cors.json
-
-# service account key
-/src/lib/service-account.json
+src/lib/service-account.json
