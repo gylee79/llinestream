@@ -12,7 +12,7 @@ interface HeroProps {
 
 export default function Hero({ title, description, imageUrl, imageHint }: HeroProps) {
   return (
-    <div className="relative h-[50vh] min-h-[350px] w-full">
+    <div className="relative h-[70vh] min-h-[500px] w-full">
       {imageUrl ? (
         <Image
           src={imageUrl}
