@@ -1,22 +1,23 @@
-import 'server-only';
+'use server';
+
 import * as admin from 'firebase-admin';
 import { App, getApps } from 'firebase-admin/app';
 import { config } from 'dotenv';
 
-// .env 파일에서 환경 변수를 로드합니다.
+// Load environment variables from .env file
 config();
 
 /**
  * Initializes the Firebase Admin SDK, ensuring it's a singleton.
  * This function is safe to call from any server-side module.
  *
- * It uses the `SERVICE_ACCOUNT_JSON` environment variable for explicit credential configuration.
+ * It uses the SERVICE_ACCOUNT_JSON environment variable for explicit credential configuration.
  *
  * @returns The initialized Firebase Admin App instance.
  * @throws {Error} If initialization fails because the required environment variable is missing or invalid.
  */
 export function initializeAdminApp(): App {
-  // 앱이 이미 초기화되었다면, 기존 인스턴스를 반환합니다.
+  // If the app is already initialized, return the existing instance.
   if (getApps().length > 0) {
     return getApps()[0];
   }
@@ -35,7 +36,7 @@ export function initializeAdminApp(): App {
   try {
     const serviceAccount = JSON.parse(serviceAccountString);
     
-    // 서비스 계정 정보를 사용하여 앱을 초기화합니다.
+    // Initialize the app with the service account credentials.
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
