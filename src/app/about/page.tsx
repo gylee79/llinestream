@@ -68,7 +68,7 @@ export default function AboutPage() {
   return (
     <div className="bg-background text-foreground">
       {/* Hero Section */}
-      <section className="relative h-[70vh] min-h-[500px] w-full flex items-center justify-center text-center text-white">
+      <section className="relative h-[70vh] min-h-[500px] w-full flex flex-col items-start justify-end text-left text-white">
         {heroImagesLoading ? (
             <Skeleton className="absolute inset-0" />
         ) : (
@@ -84,14 +84,14 @@ export default function AboutPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
-            className="relative z-10 p-4 max-w-4xl mx-auto"
+            className="relative z-10 p-6 md:p-12 max-w-4xl"
         >
           <h1 className="font-headline text-4xl md:text-5xl font-bold tracking-tight">
             {heroTitle.split('\n').map((line, index) => (
-                index === 1 ? <span key={index} className="text-accent">{line}</span> : <span key={index}>{line}<br/></span>
+                <span key={index} className={index === 1 ? "text-accent" : ""}>{line}<br/></span>
             ))}
           </h1>
-          <p className="mt-6 text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
+          <p className="mt-6 text-lg md:text-xl text-white/90 max-w-2xl">
             {heroDescription}
           </p>
         </motion.div>
