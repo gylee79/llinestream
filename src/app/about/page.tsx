@@ -68,7 +68,7 @@ export default function AboutPage() {
   return (
     <div className="bg-background text-foreground">
       {/* Hero Section */}
-      <section className="relative h-[70vh] min-h-[500px] w-full flex flex-col items-start justify-end text-left text-white">
+      <section className="relative h-[70vh] min-h-[500px] w-full flex flex-col items-start justify-center text-left text-white">
         {heroImagesLoading ? (
             <Skeleton className="absolute inset-0" />
         ) : (

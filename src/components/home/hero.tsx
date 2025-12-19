@@ -1,3 +1,4 @@
+
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 
@@ -26,7 +27,7 @@ export default function Hero({ title, description, imageUrl, imageHint }: HeroPr
         <Skeleton className="h-full w-full" />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/150 to-transparent" />
-      <div className="absolute inset-0 z-10 flex h-full flex-col items-start justify-end p-6 md:p-12 text-left">
+      <div className="absolute inset-0 z-10 flex h-full flex-col items-start justify-center p-6 md:p-12 text-left">
         <div className="container mx-auto text-white">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
