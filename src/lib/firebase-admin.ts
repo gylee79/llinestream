@@ -1,19 +1,15 @@
 
 import * as admin from 'firebase-admin';
 import { App, getApps } from 'firebase-admin/app';
-import { config } from 'dotenv';
-
-// Load environment variables from .env file
-config();
+import serviceAccount from './service-account.json';
 
 /**
  * Initializes the Firebase Admin SDK, ensuring it's a singleton.
  * This function is safe to call from any server-side module.
- *
- * It uses the SERVICE_ACCOUNT_JSON environment variable for explicit credential configuration.
+ * It uses a direct import of the service account JSON file.
  *
  * @returns The initialized Firebase Admin App instance.
- * @throws {Error} If initialization fails because the required environment variable is missing or invalid.
+ * @throws {Error} If initialization fails.
  */
 export function initializeAdminApp(): App {
   // If the app is already initialized, return the existing instance.
@@ -21,30 +17,22 @@ export function initializeAdminApp(): App {
     return getApps()[0];
   }
 
-  const serviceAccountString = process.env.SERVICE_ACCOUNT_JSON;
-
-  if (!serviceAccountString) {
-    console.error("FATAL: SERVICE_ACCOUNT_JSON environment variable is not set.");
-    throw new Error(
-      'Firebase Admin SDK initialization failed. ' +
-      'The SERVICE_ACCOUNT_JSON environment variable is missing. ' +
-      'Please ensure it is set correctly in your .env file.'
-    );
-  }
-
   try {
-    const serviceAccount = JSON.parse(serviceAccountString);
-    
     // Initialize the app with the service account credentials.
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+      credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     });
 
-    console.log("Firebase Admin SDK initialized successfully via service account.");
+    console.log("Firebase Admin SDK initialized successfully via imported service account.");
     return getApps()[0];
 
-  } catch (parseError: any) {
-    console.error("Failed to parse SERVICE_ACCOUNT_JSON. Make sure it's a valid JSON string (and not a file path).", parseError);
-    throw new Error("Firebase Admin SDK initialization failed due to invalid configuration in SERVICE_ACCOUNT_JSON.");
+  } catch (error: any) {
+    console.error("Firebase Admin SDK initialization failed:", error);
+    // Throw a more specific error to help debugging.
+    if (error.code === 'invalid-credential') {
+        throw new Error('Firebase Admin SDK initialization failed due to invalid credentials. Please check your service-account.json file.');
+    }
+    throw new Error(`Firebase Admin SDK initialization failed: ${error.message}`);
   }
 }
