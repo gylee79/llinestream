@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import HierarchyManager from "@/app/admin/content/hierarchy-manager";
+import HierarchyManager from "@/components/admin/content/hierarchy-manager";
 import PricingManager from "@/app/admin/content/pricing-manager";
 import VideoManager from "@/app/admin/content/video-manager";
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,7 +25,7 @@ export default function ContentTabs() {
   }
 
   return (
-    <Tabs defaultValue="videos" className="mt-6">
+    <Tabs defaultValue="hierarchy" className="mt-6">
       <TabsList>
         <TabsTrigger value="hierarchy">콘텐츠 계층 관리</TabsTrigger>
         <TabsTrigger value="pricing">분류 및 가격 관리</TabsTrigger>
