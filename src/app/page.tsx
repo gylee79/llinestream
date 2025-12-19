@@ -5,12 +5,15 @@ import Hero from '@/components/home/hero';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCollection, useDoc, useFirestore } from '@/firebase';
 import { collection, query, collectionGroup, doc } from 'firebase/firestore';
-import { Course, Classification, Episode, HeroImageSettings } from '@/lib/types';
+import { Course, Classification, Episode, HeroImageSettings, Field } from '@/lib/types';
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Home() {
   const firestore = useFirestore();
+
+  const fieldsQuery = useMemo(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
+  const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
 
   const coursesQuery = useMemo(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
@@ -24,7 +27,7 @@ export default function Home() {
   const heroImagesRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
   const { data: heroImagesData, isLoading: heroImagesLoading } = useDoc<HeroImageSettings>(heroImagesRef);
 
-  const isLoading = coursesLoading || classificationsLoading || episodesLoading || heroImagesLoading;
+  const isLoading = fieldsLoading || coursesLoading || classificationsLoading || episodesLoading || heroImagesLoading;
   
   if (isLoading) {
       return (
@@ -70,16 +73,24 @@ export default function Home() {
       <div className="container mx-auto space-y-12 py-12">
         {watchedCourses.length > 0 && <ContentCarousel title="나의 시청 동영상" courses={watchedCourses} />}
         {freeCourses && freeCourses.length > 0 && <ContentCarousel title="무료 영상" courses={freeCourses} />}
-        {classifications?.map((classification) => {
-          const classificationCourses = courses?.filter(
-            (course) => course.classificationId === classification.id
+        
+        {fields?.map((field) => {
+          const classificationsInField = classifications?.filter(
+            (c) => c.fieldId === field.id
           );
-          if (!classificationCourses || classificationCourses.length === 0) return null;
+          if (!classificationsInField || classificationsInField.length === 0) return null;
+          
+          const coursesInField = courses?.filter(c => 
+            classificationsInField.some(clf => clf.id === c.classificationId)
+          );
+          
+          if (!coursesInField || coursesInField.length === 0) return null;
+
           return (
             <ContentCarousel
-              key={classification.id}
-              title={classification.name}
-              courses={classificationCourses}
+              key={field.id}
+              title={field.name}
+              courses={coursesInField}
             />
           );
         })}
