@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -15,9 +16,9 @@ import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
 import ThumbnailEditorDialog from './thumbnail-editor-dialog';
 import { cn } from '@/lib/utils';
 
-type Item = (Classification | Course) & { type: 'classification' | 'course' };
+type Item = (Field | Classification | Course) & { type: 'field' | 'classification' | 'course' };
 
-const ItemCard = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }: {
+const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }: {
   item: Item;
   onSelect: () => void;
   selected: boolean;
@@ -25,38 +26,36 @@ const ItemCard = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail 
   onDelete: () => void;
   onEditThumbnail: () => void;
 }) => (
-  <Card 
-    className={cn(
-        "cursor-pointer transition-all",
-        selected ? "border-primary shadow-md" : "hover:shadow-md hover:border-gray-300"
-    )}
-    onClick={onSelect}
-  >
-    <div className="relative aspect-video">
-        <Image 
-            src={item.thumbnailUrl || 'https://picsum.photos/seed/placeholder/600/400'}
-            alt={item.name}
-            data-ai-hint={item.thumbnailHint}
-            fill
-            className="object-cover rounded-t-lg"
-        />
-    </div>
-    <CardContent className="p-3">
-        <p className="font-semibold truncate" title={item.name}>{item.name}</p>
-        <div className="flex justify-between items-center mt-2">
-          <div className="space-x-1">
+    <div 
+        className={cn(
+            "flex items-center justify-between p-2 rounded-md cursor-pointer", 
+            selected ? 'bg-primary/10' : 'hover:bg-primary/5'
+        )}
+        onClick={onSelect}
+    >
+        <div className="flex items-center gap-3">
+            <div className="relative flex-shrink-0 h-10 w-10 rounded-md overflow-hidden bg-muted">
+                <Image 
+                    src={item.thumbnailUrl || 'https://picsum.photos/seed/placeholder/100/100'}
+                    alt={item.name}
+                    data-ai-hint={item.thumbnailHint}
+                    fill
+                    className="object-cover"
+                />
+            </div>
+            <span className={cn("font-medium truncate", selected && "text-primary")}>{item.name}</span>
+        </div>
+        <div className="flex items-center">
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEdit(); }}><Pencil className="h-4 w-4" /></Button>
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEditThumbnail(); }}><ImageIcon className="h-4 w-4" /></Button>
-          </div>
-          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(); }}><Trash2 className="h-4 w-4" /></Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(); }}><Trash2 className="h-4 w-4" /></Button>
         </div>
-    </CardContent>
-  </Card>
+    </div>
 );
 
-const Column = ({ title, items, children, onAdd }: {
+
+const Column = ({ title, children, onAdd }: {
     title: string;
-    items?: any[];
     children: React.ReactNode;
     onAdd: (() => void) | null;
 }) => (
@@ -65,7 +64,7 @@ const Column = ({ title, items, children, onAdd }: {
             <h3 className="font-bold text-lg">{title}</h3>
             {onAdd && <Button size="sm" onClick={onAdd}><Plus className="mr-2 h-4 w-4"/>추가</Button>}
         </div>
-        <div className="grid grid-cols-1 gap-4 overflow-y-auto h-[60vh] p-1">
+        <div className="flex flex-col gap-2 overflow-y-auto h-[60vh] p-1">
             {children}
         </div>
     </div>
@@ -79,8 +78,8 @@ type NameDialogState = {
 };
 type ThumbnailDialogState = {
     isOpen: boolean;
-    item: Classification | Course | null;
-    type: 'classifications' | 'courses';
+    item: Field | Classification | Course | null;
+    type: 'fields' | 'classifications' | 'courses';
 }
 
 export default function HierarchyManager() {
@@ -91,7 +90,7 @@ export default function HierarchyManager() {
   const [selectedClassification, setSelectedClassification] = useState<string | null>(null);
 
   const [nameDialog, setNameDialog] = useState<NameDialogState>({ isOpen: false, item: null, type: '분야' });
-  const [thumbnailDialog, setThumbnailDialog] = useState<ThumbnailDialogState>({ isOpen: false, item: null, type: 'classifications' });
+  const [thumbnailDialog, setThumbnailDialog] = useState<ThumbnailDialogState>({ isOpen: false, item: null, type: 'fields' });
 
   const fieldsQuery = useMemo(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
@@ -137,13 +136,13 @@ export default function HierarchyManager() {
     setNameDialog({ isOpen: true, item, type });
   };
   
-  const openThumbnailDialog = (type: 'classifications' | 'courses', item: Classification | Course) => {
+  const openThumbnailDialog = (type: ThumbnailDialogState['type'], item: Field | Classification | Course) => {
     setThumbnailDialog({ isOpen: true, item, type });
   }
 
   const closeDialogs = () => {
       setNameDialog({ isOpen: false, item: null, type: '분야' });
-      setThumbnailDialog({ isOpen: false, item: null, type: 'classifications' });
+      setThumbnailDialog({ isOpen: false, item: null, type: 'fields' });
   };
 
   const handleSaveName = async (item: HierarchyItem) => {
@@ -151,6 +150,7 @@ export default function HierarchyManager() {
     try {
       const { type, item: existingItem } = nameDialog;
       let collectionName: 'fields' | 'classifications' | 'courses';
+      let data: any = { name: item.name };
 
       if (type === '분야') collectionName = 'fields';
       else if (type === '큰분류') collectionName = 'classifications';
@@ -160,17 +160,19 @@ export default function HierarchyManager() {
         await updateDoc(doc(firestore, collectionName, existingItem.id), { name: item.name });
         toast({ title: '수정 성공', description: `${type} '${item.name}'이(가) 수정되었습니다.` });
       } else { // Add mode
-        let data: any = { name: item.name };
-        if (type === '큰분류' && selectedField) {
+        if (type === '분야') {
+           data.thumbnailUrl = "https://picsum.photos/seed/default-field/100/100";
+           data.thumbnailHint = "placeholder";
+        } else if (type === '큰분류' && selectedField) {
           data.fieldId = selectedField;
            data.prices = { day1: 0, day30: 0, day60: 0, day90: 0 };
            data.description = "새로운 분류입니다.";
-           data.thumbnailUrl = "https://picsum.photos/seed/default-class/600/400";
+           data.thumbnailUrl = "https://picsum.photos/seed/default-class/100/100";
            data.thumbnailHint = "placeholder";
         } else if (type === '상세분류' && selectedClassification) {
           data.classificationId = selectedClassification;
           data.description = "새로운 강좌입니다.";
-          data.thumbnailUrl = "https://picsum.photos/seed/default-course/600/400";
+          data.thumbnailUrl = "https://picsum.photos/seed/default-course/100/100";
           data.thumbnailHint = "placeholder";
         }
         await addDoc(collection(firestore, collectionName), data);
@@ -213,15 +215,11 @@ export default function HierarchyManager() {
   };
 
   const renderSkeletons = () => (
-    <div className="grid grid-cols-1 gap-4">
-        {Array.from({length: 3}).map((_, i) => (
-            <div key={i} className="rounded-lg border bg-card p-3 space-y-2">
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-5 w-3/4" />
-                <div className="flex justify-between">
-                    <Skeleton className="h-7 w-16" />
-                    <Skeleton className="h-7 w-7" />
-                </div>
+    <div className="flex flex-col gap-2">
+        {Array.from({length: 5}).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 p-2 rounded-md">
+                <Skeleton className="h-10 w-10 rounded-md" />
+                <Skeleton className="h-5 flex-grow" />
             </div>
         ))}
     </div>
@@ -232,31 +230,29 @@ export default function HierarchyManager() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>콘텐츠 계층 관리 (카드 뷰)</CardTitle>
-          <p className="text-sm text-muted-foreground">분야 &gt; 큰분류 &gt; 상세분류 순서로 콘텐츠 계층을 관리합니다. 카드를 클릭하여 하위 항목을 확인하세요.</p>
+          <CardTitle>콘텐츠 계층 관리</CardTitle>
+          <p className="text-sm text-muted-foreground">분야 &gt; 큰분류 &gt; 상세분류 순서로 콘텐츠 계층을 관리합니다. 항목을 클릭하여 하위 항목을 확인하세요.</p>
         </CardHeader>
         <CardContent>
           <div className="flex gap-4">
             <Column title="분야 (Field)" onAdd={() => openNameDialog('분야')}>
-                {fieldsLoading ? <Skeleton className="h-8 w-full" /> : 
-                    <div className="flex flex-col gap-2">
-                        {fields?.map(item => (
-                            <div key={item.id} className={cn("flex items-center justify-between p-2 rounded-md cursor-pointer", selectedField === item.id ? 'bg-primary/10' : 'hover:bg-primary/5')} onClick={() => handleSelectField(item.id)}>
-                                <span className={cn("font-medium", selectedField === item.id && "text-primary")}>{item.name}</span>
-                                <div className="flex gap-2">
-                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openNameDialog('분야', item); }}><Pencil className="h-4 w-4" /></Button>
-                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); handleDelete('fields', item.id, item.name); }}><Trash2 className="h-4 w-4" /></Button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                }
+                {fieldsLoading ? renderSkeletons() : fields?.map(item => (
+                    <ItemRow
+                        key={item.id}
+                        item={{ ...item, type: 'field' }}
+                        selected={selectedField === item.id}
+                        onSelect={() => handleSelectField(item.id)}
+                        onEdit={() => openNameDialog('분야', item)}
+                        onEditThumbnail={() => openThumbnailDialog('fields', item)}
+                        onDelete={() => handleDelete('fields', item.id, item.name)}
+                    />
+                ))}
             </Column>
             <Column title="큰분류 (Classification)" onAdd={selectedField ? () => openNameDialog('큰분류') : null}>
-                {!selectedField ? <p className="text-center text-sm text-muted-foreground">분야를 선택해주세요.</p> :
+                {!selectedField ? <p className="text-center text-sm text-muted-foreground pt-4">분야를 선택해주세요.</p> :
                  classificationsLoading ? renderSkeletons() :
                  classifications?.map(item => (
-                     <ItemCard 
+                     <ItemRow 
                         key={item.id}
                         item={{...item, type: 'classification'}}
                         selected={selectedClassification === item.id}
@@ -269,14 +265,14 @@ export default function HierarchyManager() {
                 }
             </Column>
             <Column title="상세분류 (Course)" onAdd={selectedClassification ? () => openNameDialog('상세분류') : null}>
-                {!selectedClassification ? <p className="text-center text-sm text-muted-foreground">큰분류를 선택해주세요.</p> :
+                {!selectedClassification ? <p className="text-center text-sm text-muted-foreground pt-4">큰분류를 선택해주세요.</p> :
                  coursesLoading ? renderSkeletons() :
                  courses?.map(item => (
-                    <ItemCard 
+                    <ItemRow 
                        key={item.id}
                        item={{...item, type: 'course'}}
-                       selected={false}
-                       onSelect={() => {}} // Leaf node, no selection action
+                       selected={false} // No selection action for the last column
+                       onSelect={() => {}}
                        onEdit={() => openNameDialog('상세분류', item)}
                        onDelete={() => handleDelete('courses', item.id, item.name)}
                        onEditThumbnail={() => openThumbnailDialog('courses', item)}

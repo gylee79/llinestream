@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -14,15 +15,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import type { Classification, Course } from '@/lib/types';
+import type { Field, Classification, Course } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { updateThumbnail } from '@/lib/actions/update-thumbnail';
 
 interface ThumbnailEditorDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  item: Classification | Course;
-  itemType: 'classifications' | 'courses';
+  item: Field | Classification | Course;
+  itemType: 'fields' | 'classifications' | 'courses';
 }
 
 export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType }: ThumbnailEditorDialogProps) {

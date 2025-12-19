@@ -1,4 +1,6 @@
 
+'use client';
+
 import type { Timestamp as FirebaseTimestamp } from 'firebase/firestore';
 
 // We use the client-side Timestamp for all client-facing components and types.
@@ -24,6 +26,8 @@ export interface User {
 export interface Field {
   id: string;
   name: string;
+  thumbnailUrl: string;
+  thumbnailHint: string;
 }
 
 export interface Classification {
