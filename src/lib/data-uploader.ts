@@ -1,3 +1,4 @@
+
 'use server';
 
 import * as admin from 'firebase-admin';
@@ -23,7 +24,8 @@ export async function uploadMockData() {
     console.log(`Uploading ${mockUsers.length} users...`);
     for (const item of mockUsers) {
       const { id: oldId, ...data } = item;
-      const docRef = firestore.collection('users').doc(oldId.includes('admin') ? oldId : undefined); // Preserve admin ID if needed
+      const usersCollection = firestore.collection('users');
+      const docRef = oldId.includes('admin') ? usersCollection.doc(oldId) : usersCollection.doc();
       batch1.set(docRef, data);
     }
 

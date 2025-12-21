@@ -72,7 +72,8 @@ function HeroImageManager() {
 
         const page = type.startsWith('home') ? 'home' : 'about';
         const deviceUrlProp = type.endsWith('Mobile') ? 'urlMobile' : 'url';
-        const originalUrlProp = type.endsWith('Mobile') ? `${page}Mobile` as const : page as const;
+        const originalUrlProp: keyof typeof originalUrls.current = type.endsWith('Mobile') ? `${page}Mobile` : page;
+
 
         setSettings(prev => ({
             ...prev,
