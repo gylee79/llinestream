@@ -65,7 +65,7 @@ export default function Footer() {
           </div>
 
           {/* Right Column: Info Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-3 gap-8">
             <div>
               <h3 className="font-semibold text-foreground">사업자 정보</h3>
               <div className="mt-4 space-y-2 text-[11px] text-muted-foreground">
