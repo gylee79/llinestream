@@ -28,53 +28,59 @@ function HeroImageManager() {
     const { data: heroImageData, isLoading } = useDoc<HeroImageSettings>(heroImagesRef);
 
     const [settings, setSettings] = useState<Partial<HeroImageSettings>>({ home: {}, about: {} });
-    const [files, setFiles] = useState<{ home?: File, about?: File }>({});
+    const [files, setFiles] = useState<{ home?: File, about?: File, homeMobile?: File, aboutMobile?: File }>({});
     const [isSaving, setIsSaving] = useState(false);
     
-    // useRef to store original URLs
-    const originalUrls = useRef<{ home?: string, about?: string }>({});
+    const originalUrls = useRef<{ home?: string, about?: string, homeMobile?: string, aboutMobile?: string }>({});
 
     useEffect(() => {
         if (heroImageData) {
             setSettings(heroImageData);
-            // Store original URLs when data loads
             originalUrls.current = {
                 home: heroImageData.home?.url,
-                about: heroImageData.about?.url
+                about: heroImageData.about?.url,
+                homeMobile: heroImageData.home?.urlMobile,
+                aboutMobile: heroImageData.about?.urlMobile,
             };
         }
     }, [heroImageData]);
     
-    const handleFileChange = (type: 'home' | 'about', file: File | null) => {
+    type FileType = 'home' | 'about' | 'homeMobile' | 'aboutMobile';
+
+    const handleFileChange = (type: FileType, file: File | null) => {
         if (file) {
             setFiles(prev => ({ ...prev, [type]: file }));
             const reader = new FileReader();
             reader.onloadend = () => {
+                const page = type.startsWith('home') ? 'home' : 'about';
+                const device = type.endsWith('Mobile') ? 'urlMobile' : 'url';
                 setSettings(prev => ({
                     ...prev,
-                    [type]: { ...(prev[type] || {}), url: reader.result as string }
+                    [page]: { ...(prev[page] || {}), [device]: reader.result as string }
                 }));
             };
             reader.readAsDataURL(file);
         }
     };
     
-    const handleCancelFileChange = (type: 'home' | 'about') => {
-        // Remove the staged file
+    const handleCancelFileChange = (type: FileType) => {
         setFiles(prev => {
             const newFiles = { ...prev };
             delete newFiles[type];
             return newFiles;
         });
 
-        // Revert the URL to the original one from Firestore
+        const page = type.startsWith('home') ? 'home' : 'about';
+        const deviceUrlProp = type.endsWith('Mobile') ? 'urlMobile' : 'url';
+        const originalUrlProp = type.endsWith('Mobile') ? `${page}Mobile` as const : page as const;
+
         setSettings(prev => ({
             ...prev,
-            [type]: { ...(prev[type] || {}), url: originalUrls.current[type] }
+            [page]: { ...(prev[page] || {}), [deviceUrlProp]: originalUrls.current[originalUrlProp] }
         }));
     };
     
-    const handleTextChange = (type: 'home' | 'about', field: 'title' | 'description' | 'hint', value: string) => {
+    const handleTextChange = (type: 'home' | 'about', field: 'title' | 'description' | 'hint' | 'hintMobile', value: string) => {
       setSettings(prev => ({
         ...prev,
         [type]: { ...(prev[type] || {}), [field]: value }
@@ -88,10 +94,12 @@ function HeroImageManager() {
         let updatedSettings: Partial<HeroImageSettings> = JSON.parse(JSON.stringify(settings));
 
         try {
-            for (const key of Object.keys(files) as Array<'home' | 'about'>) {
+            for (const key of Object.keys(files) as Array<FileType>) {
                 const file = files[key];
                 if (file) {
-                    const storageRef = ref(storage, `settings/hero-${key}/${file.name}`);
+                    const page = key.startsWith('home') ? 'home' : 'about';
+                    const device = key.endsWith('Mobile') ? 'mobile' : 'pc';
+                    const storageRef = ref(storage, `settings/hero-${page}-${device}/${file.name}`);
                     const uploadTask = uploadBytesResumable(storageRef, file);
                     const downloadUrl = await new Promise<string>((resolve, reject) => {
                         uploadTask.on('state_changed',
@@ -100,8 +108,12 @@ function HeroImageManager() {
                             async () => resolve(await getDownloadURL(uploadTask.snapshot.ref))
                         );
                     });
-                    if (!updatedSettings[key]) updatedSettings[key] = {};
-                    updatedSettings[key]!.url = downloadUrl;
+                    if (!updatedSettings[page]) updatedSettings[page] = {};
+                    if (device === 'pc') {
+                        updatedSettings[page]!.url = downloadUrl;
+                    } else {
+                        updatedSettings[page]!.urlMobile = downloadUrl;
+                    }
                 }
             }
             
@@ -138,12 +150,14 @@ function HeroImageManager() {
     };
     
     if (isLoading) {
-        return <CardContent className="space-y-6">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-40 w-full" />)}</CardContent>;
+        return <CardContent className="space-y-6">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-60 w-full" />)}</CardContent>;
     }
 
     const renderManagerFor = (type: 'home' | 'about') => (
-      <div className="space-y-4 rounded-lg border p-4">
+      <div className="space-y-6 rounded-lg border p-4">
           <h4 className="font-semibold text-lg">{type === 'home' ? '홈페이지' : '아카데미 소개'} 히어로</h4>
+          
+          {/* Text Content */}
           <div className="space-y-2">
               <Label>제목</Label>
               <Input 
@@ -160,25 +174,53 @@ function HeroImageManager() {
                   placeholder={`${type === 'home' ? '온라인에서 고품질 강의를 만나보세요' : '엘라인이 뷰티 전문가의 기준을...'}`}
               />
           </div>
-          <div className="space-y-2">
-            <Label>배경 이미지</Label>
-            {settings[type]?.url && <Image src={settings[type]!.url!} alt={`${type} hero preview`} width={500} height={200} className="rounded-md object-cover"/>}
-            <div className="flex items-center gap-2">
-              <Input type="file" onChange={e => handleFileChange(type, e.target.files?.[0] || null)} accept="image/*" className="flex-1" />
-              {files[type] && (
-                <Button variant="outline" size="sm" onClick={() => handleCancelFileChange(type)}>
-                  취소
-                </Button>
-              )}
+
+          <Separator />
+
+          {/* PC Image */}
+          <div className="grid md:grid-cols-2 gap-4 items-start">
+            <div className="space-y-2">
+              <Label>PC 배경 이미지</Label>
+              {settings[type]?.url && <Image src={settings[type]!.url!} alt={`${type} hero preview`} width={500} height={200} className="rounded-md object-cover"/>}
+              <div className="flex items-center gap-2">
+                <Input type="file" onChange={e => handleFileChange(type, e.target.files?.[0] || null)} accept="image/*" className="flex-1" />
+                {files[type] && (
+                  <Button variant="outline" size="sm" onClick={() => handleCancelFileChange(type)}>취소</Button>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+                <Label>PC 이미지 검색 힌트 (AI용)</Label>
+                <Input
+                    value={settings[type]?.hint || ''}
+                    onChange={e => handleTextChange(type, 'hint', e.target.value)}
+                    placeholder="e.g., modern laptop"
+                />
             </div>
           </div>
-          <div className="space-y-2">
-              <Label>이미지 검색 힌트 (AI용)</Label>
-              <Input
-                  value={settings[type]?.hint || ''}
-                  onChange={e => handleTextChange(type, 'hint', e.target.value)}
-                  placeholder="e.g., modern laptop"
-              />
+          
+          <Separator />
+          
+          {/* Mobile Image */}
+          <div className="grid md:grid-cols-2 gap-4 items-start">
+            <div className="space-y-2">
+              <Label>모바일 배경 이미지</Label>
+              {settings[type]?.urlMobile && <Image src={settings[type]!.urlMobile!} alt={`${type} mobile hero preview`} width={500} height={200} className="rounded-md object-cover"/>}
+              <div className="flex items-center gap-2">
+                <Input type="file" onChange={e => handleFileChange(`${type}Mobile`, e.target.files?.[0] || null)} accept="image/*" className="flex-1" />
+                {files[`${type}Mobile` as FileType] && (
+                  <Button variant="outline" size="sm" onClick={() => handleCancelFileChange(`${type}Mobile`)}>취소</Button>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+                <Label>모바일 이미지 검색 힌트 (AI용)</Label>
+                <Input
+                    value={settings[type]?.hintMobile || ''}
+                    onChange={e => handleTextChange(type, 'hintMobile', e.target.value)}
+                    placeholder="e.g., vertical screen, smartphone"
+                />
+            </div>
           </div>
       </div>
   );

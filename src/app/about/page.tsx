@@ -11,6 +11,7 @@ import type { HeroImageSettings } from '@/lib/types';
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const curriculum = [
   {
@@ -60,9 +61,17 @@ export default function AboutPage() {
   const firestore = useFirestore();
   const heroImagesRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
   const { data: heroImagesData, isLoading: heroImagesLoading } = useDoc<HeroImageSettings>(heroImagesRef);
+  const isMobile = useIsMobile();
 
   const heroTitle = heroImagesData?.about?.title || '뷰티 비즈니스, 기술만 배운다고 성공할까요?';
   const heroDescription = heroImagesData?.about?.description || '림프 전문 테크닉부터 AI 상담 솔루션까지, 엘라인이 뷰티 전문가의 기준을 바꿉니다.';
+
+  const heroImageUrl = isMobile 
+    ? (heroImagesData?.about?.urlMobile || heroImagesData?.about?.url) 
+    : heroImagesData?.about?.url;
+  const heroImageHint = isMobile
+    ? (heroImagesData?.about?.hintMobile || heroImagesData?.about?.hint)
+    : heroImagesData?.about?.hint;
 
 
   return (
@@ -73,11 +82,11 @@ export default function AboutPage() {
             <Skeleton className="absolute inset-0" />
         ) : (
             <Image
-                src={heroImagesData?.about?.url || "https://picsum.photos/seed/smart-beauty/1600/900"}
+                src={heroImageUrl || "https://picsum.photos/seed/smart-beauty/1600/900"}
                 alt="스마트 뷰티 교육"
                 fill
                 className="object-cover brightness-50"
-                data-ai-hint={heroImagesData?.about?.hint || "bright modern beauty academy"}
+                data-ai-hint={heroImageHint || "bright modern beauty academy"}
             />
         )}
         <motion.div 

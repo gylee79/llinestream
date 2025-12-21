@@ -32,7 +32,7 @@ export default function Home() {
   if (isLoading) {
       return (
           <div>
-            <Skeleton className="h-[50vh] w-full" />
+            <Skeleton className="h-[70vh] w-full" />
             <div className="container mx-auto py-12 text-center">
                 <p>Loading...</p>
             </div>
@@ -69,6 +69,8 @@ export default function Home() {
           description={heroImagesData?.home?.description}
           imageUrl={heroImagesData?.home?.url}
           imageHint={heroImagesData?.home?.hint}
+          imageUrlMobile={heroImagesData?.home?.urlMobile}
+          imageHintMobile={heroImagesData?.home?.hintMobile}
         />
       <div className="container mx-auto space-y-12 py-12">
         {watchedCourses.length > 0 && <ContentCarousel title="나의 시청 동영상" courses={watchedCourses} />}

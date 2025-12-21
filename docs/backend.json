@@ -280,8 +280,10 @@
       "type": "object",
       "description": "Defines the content for a hero section.",
       "properties": {
-        "url": { "type": "string", "format": "uri", "description": "The URL for the background image." },
-        "hint": { "type": "string", "description": "A hint for AI image generation or search." },
+        "url": { "type": "string", "format": "uri", "description": "The URL for the background image (PC)." },
+        "hint": { "type": "string", "description": "A hint for AI image generation or search (PC)." },
+        "urlMobile": { "type": "string", "format": "uri", "description": "The URL for the background image (Mobile)." },
+        "hintMobile": { "type": "string", "description": "A hint for AI image generation or search (Mobile)." },
         "title": { "type": "string", "description": "The main headline for the hero section." },
         "description": { "type": "string", "description": "The descriptive subtext for the hero section." }
       }

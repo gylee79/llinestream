@@ -1,24 +1,33 @@
 
+'use client';
+
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 
 import { Skeleton } from '../ui/skeleton';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface HeroProps {
   title?: string;
   description?: string;
   imageUrl?: string;
   imageHint?: string;
+  imageUrlMobile?: string;
+  imageHintMobile?: string;
 }
 
-export default function Hero({ title, description, imageUrl, imageHint }: HeroProps) {
+export default function Hero({ title, description, imageUrl, imageHint, imageUrlMobile, imageHintMobile }: HeroProps) {
+  const isMobile = useIsMobile();
+  const finalImageUrl = isMobile ? (imageUrlMobile || imageUrl) : imageUrl;
+  const finalImageHint = isMobile ? (imageHintMobile || imageHint) : imageHint;
+
   return (
     <div className="relative h-[70vh] min-h-[500px] w-full">
-      {imageUrl ? (
+      {finalImageUrl ? (
         <Image
-          src={imageUrl}
-          alt={imageHint || title || 'Hero background'}
-          data-ai-hint={imageHint}
+          src={finalImageUrl}
+          alt={finalImageHint || title || 'Hero background'}
+          data-ai-hint={finalImageHint}
           fill
           className="object-cover"
           priority

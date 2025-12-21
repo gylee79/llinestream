@@ -101,6 +101,8 @@ export interface FooterSettings {
 export interface HeroContent {
   url?: string;
   hint?: string;
+  urlMobile?: string;
+  hintMobile?: string;
   title?: string;
   description?: string;
 }
