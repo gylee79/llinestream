@@ -14,7 +14,7 @@ export default function ClassificationCard({ classification }: ClassificationCar
       <Card className="h-full overflow-hidden transition-all duration-300 hover:shadow-xl hover:border-primary/50">
         <div className="aspect-video overflow-hidden relative">
           <Image
-            src={classification.thumbnailUrl}
+            src={classification.thumbnailUrl || 'https://picsum.photos/seed/placeholder/600/400'}
             alt={classification.name}
             data-ai-hint={classification.thumbnailHint}
             fill
