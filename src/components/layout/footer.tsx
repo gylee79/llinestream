@@ -65,11 +65,11 @@ export default function Footer() {
 
           <div>
             <h3 className="font-semibold text-foreground">사업자 정보</h3>
-            <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+            <div className="mt-4 space-y-2 text-xs text-muted-foreground">
               <p>
                 <span>{settings.companyName}</span>
                 <span className="mx-2">|</span>
-                <span>{settings.representative}</span>
+                <span>대표: {settings.representative}</span>
               </p>
               <p>사업자등록번호: {settings.businessNumber}</p>
               <p>주소: {settings.address}</p>
@@ -78,21 +78,23 @@ export default function Footer() {
 
           <div>
             <h3 className="font-semibold text-foreground">고객센터</h3>
-            <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+            <div className="mt-4 space-y-2 text-xs text-muted-foreground">
               <p>전화번호: {settings.supportPhone}</p>
               <p>상담시간: {settings.supportHours}</p>
-              <Button asChild variant="ghost" className="h-auto p-0 justify-start text-sm text-muted-foreground hover:text-foreground">
-                <Link href={settings.kakaoTalkUrl || '#'} target="_blank" rel="noopener noreferrer">
-                  <KakaoIcon className="mr-2" />
-                  카카오톡 상담
-                </Link>
-              </Button>
+              {settings.kakaoTalkUrl && (
+                <Button asChild variant="ghost" className="h-auto p-0 justify-start text-xs text-muted-foreground hover:text-foreground">
+                  <Link href={settings.kakaoTalkUrl} target="_blank" rel="noopener noreferrer">
+                    <KakaoIcon className="mr-2 h-4 w-4" />
+                    카카오톡 상담
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
 
           <div>
             <h3 className="font-semibold text-foreground">정책</h3>
-            <nav className="mt-4 flex flex-col space-y-2 text-sm">
+            <nav className="mt-4 flex flex-col space-y-2 text-xs">
               <Link href="/policies/terms" className="text-muted-foreground hover:text-foreground">
                 서비스 이용약관
               </Link>
