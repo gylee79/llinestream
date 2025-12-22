@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from 'next/image';
@@ -16,21 +15,26 @@ interface HeroProps {
   imageHintMobile?: string;
 }
 
+const MotionImage = motion(Image);
+
 export default function Hero({ title, description, imageUrl, imageHint, imageUrlMobile, imageHintMobile }: HeroProps) {
   const isMobile = useIsMobile();
   const finalImageUrl = isMobile ? (imageUrlMobile || imageUrl) : imageUrl;
   const finalImageHint = isMobile ? (imageHintMobile || imageHint) : imageHint;
 
   return (
-    <div className="relative h-[70vh] min-h-[500px] w-full">
+    <div className="relative h-[70vh] min-h-[500px] w-full overflow-hidden">
       {finalImageUrl ? (
-        <Image
+        <MotionImage
           src={finalImageUrl}
           alt={finalImageHint || title || 'Hero background'}
           data-ai-hint={finalImageHint}
           fill
           className="object-cover"
           priority
+          initial={{ scale: 1.1 }}
+          animate={{ scale: 1 }}
+          transition={{ duration: 8, ease: "easeOut" }}
         />
       ) : (
         <Skeleton className="h-full w-full" />
