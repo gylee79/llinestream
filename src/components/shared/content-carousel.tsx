@@ -32,7 +32,7 @@ export default function ContentCarousel({ title, courses }: ContentCarouselProps
       >
         <CarouselContent>
           {courses.map((course) => (
-            <CarouselItem key={course.id} className="md:basis-1/2 lg:basis-1/3 xl:basis-1/4">
+            <CarouselItem key={course.id} className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6">
               <div className="p-1 h-full">
                 <CourseCard course={course} />
               </div>
