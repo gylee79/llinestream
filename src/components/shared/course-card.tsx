@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { Course } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 interface CourseCardProps {
   course: Course;
@@ -24,7 +25,7 @@ export default function CourseCard({ course }: CourseCardProps) {
         <CardHeader>
           <CardTitle className="font-headline text-lg tracking-tight truncate">{course.name}</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="hidden md:block">
           <CardDescription className="line-clamp-2 text-sm">{course.description}</CardDescription>
         </CardContent>
       </Card>
