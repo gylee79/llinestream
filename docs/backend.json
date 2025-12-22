@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -245,6 +246,28 @@
         "expiresAt"
       ]
     },
+    "ViewHistoryItem": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "ViewHistoryItem",
+        "type": "object",
+        "description": "Represents a user's viewing history for a single episode.",
+        "properties": {
+            "courseId": {
+                "type": "string",
+                "description": "Reference to Course."
+            },
+            "lastWatched": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The timestamp when the user last watched this episode."
+            },
+            "progress": {
+                "type": "number",
+                "description": "The progress of the video watched, from 0.0 to 1.0."
+            }
+        },
+        "required": ["courseId", "lastWatched", "progress"]
+    },
     "FooterSettings": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "FooterSettings",
@@ -323,6 +346,19 @@
             {
               "name": "userId",
               "description": "The unique identifier for the user."
+            }
+          ],
+          "subcollections": [
+            {
+                "path": "/viewHistory/{episodeId}",
+                "definition": {
+                    "entityName": "ViewHistoryItem",
+                    "schema": { "$ref": "#/entities/ViewHistoryItem" },
+                    "description": "Stores the user's viewing history per episode. Document ID is the episode ID.",
+                    "params": [
+                        { "name": "episodeId", "description": "The unique ID of the episode watched." }
+                    ]
+                }
             }
           ]
         }
@@ -445,6 +481,6 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support LlineStream's video streaming and subscription model. User roles are managed via the `role` field within the `users` document for secure and efficient admin checks in security rules. User data is self-contained. Content is structured hierarchically (Field -> Classification -> Course -> Episode) for easy browsing and management. Subscriptions are stored under each user to easily query a user's entitlements. A 'settings' collection holds global configurations like footer info and hero images as single documents for easy access."
+    "reasoning": "The Firestore structure is designed to support LlineStream's video streaming and subscription model. User roles are managed via the `role` field within the `users` document for secure and efficient admin checks in security rules. User data is self-contained, now with a subcollection for `viewHistory`. Content is structured hierarchically (Field -> Classification -> Course -> Episode) for easy browsing and management. Subscriptions are stored under each user to easily query a user's entitlements. A 'settings' collection holds global configurations like footer info and hero images as single documents for easy access."
   }
 }

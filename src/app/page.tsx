@@ -1,15 +1,17 @@
 
 'use client';
 import Hero from '@/components/home/hero';
-import { useCollection, useDoc, useFirestore } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useUser } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import { Course, Classification, Episode, HeroImageSettings, Field } from '@/lib/types';
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import ClassificationCard from '@/components/shared/classification-card';
+import ContinueWatching from '@/components/home/continue-watching';
 
 export default function Home() {
   const firestore = useFirestore();
+  const { user } = useUser();
 
   const fieldsQuery = useMemo(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
@@ -50,6 +52,7 @@ export default function Home() {
           imageHintMobile={heroImagesData?.home?.hintMobile}
         />
       <div className="container mx-auto space-y-16 py-12">
+        {user && <ContinueWatching />}
         {fields?.map((field) => {
           const classificationsInField = classifications?.filter(
             (c) => c.fieldId === field.id

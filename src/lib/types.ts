@@ -64,6 +64,13 @@ export interface Episode {
   videoUrl: string;
 }
 
+export interface ViewHistoryItem {
+  id: string; // Should be episodeId
+  courseId: string;
+  lastWatched: Timestamp;
+  progress: number; // 0 to 1
+}
+
 export interface Policy {
   slug: 'terms' | 'privacy' | 'refund';
   title: string;
@@ -94,7 +101,6 @@ export interface FooterSettings {
   address: string;
   supportPhone: string;
   supportHours: string;
-
   kakaoTalkUrl?: string;
 }
 
