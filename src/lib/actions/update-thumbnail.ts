@@ -33,7 +33,7 @@ export async function updateThumbnail(formData: FormData): Promise<UpdateResult>
     let downloadUrl: string | null = null;
 
     // 1. If a new image file is provided, upload it to Storage
-    if (imageFile) {
+    if (imageFile && imageFile.size > 0) {
       const filePath = `${collectionName}/${itemId}/${imageFile.name}`;
       const fileBuffer = Buffer.from(await imageFile.arrayBuffer());
       
