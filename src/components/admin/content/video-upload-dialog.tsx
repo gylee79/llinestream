@@ -23,7 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore } from '@/firebase';
-import { collection, doc, addDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -49,66 +49,73 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const [uploadProgress, setUploadProgress] = useState(0); 
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isFree, setIsFree] = useState(false);
-  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
-  const [selectedClassificationId, setSelectedClassificationId] = useState<string | null>(null);
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [selectedFieldId, setSelectedFieldId] = useState<string>('');
+  const [selectedClassificationId, setSelectedClassificationId] = useState<string>('');
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const [videoFile, setVideoFile] = useState<File | null>(null);
 
   const [hierarchyDialogState, setHierarchyDialogState] = useState<HierarchyDialogState>({ isOpen: false, item: null, type: '분야' });
-  const [isPending, startTransition] = useTransition();
 
   const isEditMode = !!episode;
-  const isLoading = isProcessing || isPending;
+  const isLoading = isProcessing;
 
   const fieldsQuery = useMemo(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: dbFields } = useCollection<Field>(fieldsQuery);
 
-  const classificationsQuery = useMemo(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
-  const { data: dbClassifications } = useCollection<Classification>(classificationsQuery);
+  const classificationsQuery = useMemo(() => (
+      firestore && selectedFieldId ? query(collection(firestore, 'classifications'), where('fieldId', '==', selectedFieldId)) : null
+  ), [firestore, selectedFieldId]);
+  const { data: filteredClassifications } = useCollection<Classification>(classificationsQuery);
 
-  const coursesQuery = useMemo(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
-  const { data: dbCourses } = useCollection<Course>(coursesQuery);
+  const coursesQuery = useMemo(() => (
+      firestore && selectedClassificationId ? query(collection(firestore, 'courses'), where('classificationId', '==', selectedClassificationId)) : null
+  ), [firestore, selectedClassificationId]);
+  const { data: filteredCourses } = useCollection<Course>(coursesQuery);
 
-  const filteredClassifications = useMemo(() => dbClassifications?.filter(c => c.fieldId === selectedFieldId) || [], [dbClassifications, selectedFieldId]);
-  const filteredCourses = useMemo(() => dbCourses?.filter(c => c.classificationId === selectedClassificationId) || [], [dbCourses, selectedClassificationId]);
-
-  useEffect(() => {
-    if (open && isEditMode && episode) {
-        setTitle(episode.title);
-        setDescription(episode.description || '');
-        setIsFree(episode.isFree);
-        setSelectedCourseId(episode.courseId);
-        
-        const course = dbCourses?.find(c => c.id === episode.courseId);
-        if (course) {
-            setSelectedClassificationId(course.classificationId);
-            const classification = dbClassifications?.find(c => c.id === course.classificationId);
-            if (classification) {
-                setSelectedFieldId(classification.fieldId);
-            }
-        }
-    } else if (!open) {
-        resetForm();
-    }
-}, [open, episode, isEditMode, dbCourses, dbClassifications]);
 
   const resetForm = () => {
     setTitle('');
     setDescription('');
     setIsFree(false);
-    setSelectedFieldId(null);
-    setSelectedClassificationId(null);
-    setSelectedCourseId(null);
+    setSelectedFieldId('');
+    setSelectedClassificationId('');
+    setSelectedCourseId('');
     setVideoFile(null);
-    setUploadProgress(0);
     setIsProcessing(false);
   };
+  
+  useEffect(() => {
+    async function setInitialState() {
+        if (isEditMode && episode && dbFields) {
+            setTitle(episode.title);
+            setDescription(episode.description || '');
+            setIsFree(episode.isFree);
+            setSelectedCourseId(episode.courseId);
+
+            // This is complex, let's trace it back.
+            const courseDoc = await doc(firestore!, 'courses', episode.courseId).get();
+            if (courseDoc.exists()) {
+                const course = courseDoc.data() as Course;
+                setSelectedClassificationId(course.classificationId);
+                const classDoc = await doc(firestore!, 'classifications', course.classificationId).get();
+                if (classDoc.exists()) {
+                    const classification = classDoc.data() as Classification;
+                    setSelectedFieldId(classification.fieldId);
+                }
+            }
+        }
+    }
+    if (open) {
+        setInitialState();
+    } else {
+        resetForm();
+    }
+}, [open, episode, isEditMode, dbFields, firestore]);
 
   const handleSaveEpisode = async () => {
     if (!firestore) return;
@@ -174,37 +181,36 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const handleSaveHierarchy = async (item: HierarchyItem) => {
     if (!firestore) return;
     const { type } = hierarchyDialogState;
-    const newId = uuidv4();
 
-    setIsProcessing(true); // Use a single loading state
+    setIsProcessing(true);
     try {
         if (type === '분야') {
-            const newItem: Omit<Field, 'id'> = { name: item.name, thumbnailUrl: `https://picsum.photos/seed/${newId}/100/100`, thumbnailHint: 'placeholder' };
-            const docRef = await addDoc(collection(firestore, 'fields'), newItem);
+            const docRef = doc(collection(firestore, 'fields'));
+            await setDoc(docRef, { name: item.name, thumbnailUrl: `https://picsum.photos/seed/${docRef.id}/400/400`, thumbnailHint: 'placeholder' });
             setSelectedFieldId(docRef.id);
-            setSelectedClassificationId(null);
-            setSelectedCourseId(null);
+            setSelectedClassificationId('');
+            setSelectedCourseId('');
         } else if (type === '큰분류' && selectedFieldId) {
-            const newItem: Omit<Classification, 'id'> = {
-                name: item.name, 
+            const docRef = doc(collection(firestore, 'classifications'));
+            await setDoc(docRef, {
                 fieldId: selectedFieldId,
-                description: "새로운 분류 설명", 
-                prices: { day1: 0, day30: 0, day60: 0, day90: 0 },
-                thumbnailUrl: `https://picsum.photos/seed/${newId}/100/100`,
-                thumbnailHint: 'placeholder'
-            };
-            const docRef = await addDoc(collection(firestore, 'classifications'), newItem);
-            setSelectedClassificationId(docRef.id);
-            setSelectedCourseId(null);
-        } else if (type === '상세분류' && selectedClassificationId) {
-            const newItem: Omit<Course, 'id'> = { 
                 name: item.name,
+                description: `${item.name}에 대한 설명입니다.`,
+                prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
+                thumbnailUrl: `https://picsum.photos/seed/${docRef.id}/600/400`,
+                thumbnailHint: 'placeholder'
+            });
+            setSelectedClassificationId(docRef.id);
+            setSelectedCourseId('');
+        } else if (type === '상세분류' && selectedClassificationId) {
+            const docRef = doc(collection(firestore, 'courses'));
+            await setDoc(docRef, {
                 classificationId: selectedClassificationId,
-                description: "새로운 상세분류 설명",
-                thumbnailUrl: `https://picsum.photos/seed/${newId}/600/400`,
-                thumbnailHint: 'placeholder image'
-            };
-            const docRef = await addDoc(collection(firestore, 'courses'), newItem);
+                name: item.name,
+                description: `${item.name}에 대한 상세 설명입니다.`,
+                thumbnailUrl: `https://picsum.photos/seed/${docRef.id}/600/400`,
+                thumbnailHint: 'placeholder'
+            });
             setSelectedCourseId(docRef.id);
         }
          toast({ title: '저장 완료', description: `'${item.name}' 항목이 성공적으로 추가되었습니다.` });
@@ -238,7 +244,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">분류</Label>
               <div className="col-span-3 grid grid-cols-3 gap-2 items-center">
-                <Select value={selectedFieldId || ''} onValueChange={(v) => { setSelectedFieldId(v); setSelectedClassificationId(null); setSelectedCourseId(null); }} disabled={isLoading}>
+                <Select value={selectedFieldId} onValueChange={(v) => { setSelectedFieldId(v); setSelectedClassificationId(''); setSelectedCourseId(''); }} disabled={isLoading}>
                   <SelectTrigger><SelectValue placeholder="분야" /></SelectTrigger>
                   <SelectContent>
                     {dbFields?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
@@ -248,7 +254,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                     </Button>
                   </SelectContent>
                 </Select>
-                <Select value={selectedClassificationId || ''} onValueChange={(v) => { setSelectedClassificationId(v); setSelectedCourseId(null); }} disabled={!selectedFieldId || isLoading}>
+                <Select value={selectedClassificationId} onValueChange={(v) => { setSelectedClassificationId(v); setSelectedCourseId(''); }} disabled={!selectedFieldId || isLoading}>
                   <SelectTrigger><SelectValue placeholder="큰분류" /></SelectTrigger>
                   <SelectContent>
                     {filteredClassifications?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -258,7 +264,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                     </Button>
                   </SelectContent>
                 </Select>
-                <Select value={selectedCourseId || ''} onValueChange={setSelectedCourseId} disabled={!selectedClassificationId || isLoading}>
+                <Select value={selectedCourseId} onValueChange={setSelectedCourseId} disabled={!selectedClassificationId || isLoading}>
                   <SelectTrigger><SelectValue placeholder="상세분류" /></SelectTrigger>
                   <SelectContent>
                     {filteredCourses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -292,9 +298,9 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             )}
             {isLoading && (
               <div className="col-span-full mt-2">
-                <Progress value={uploadProgress} />
+                <Progress value={0} />
                 <p className="text-sm text-center text-muted-foreground mt-2">
-                  {isEditMode ? '저장 중...' : `처리 중... ${uploadProgress > 0 ? `${uploadProgress.toFixed(0)}%` : ''}`}
+                  {isEditMode ? '저장 중...' : `처리 중...`}
                 </p>
               </div>
             )}

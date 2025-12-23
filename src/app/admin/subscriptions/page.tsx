@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -94,15 +93,19 @@ export default function AdminSubscriptionsPage() {
                   </TableRow>
                 ))
               ) : subscriptions && subscriptions.length > 0 ? (
-                subscriptions.map((sub) => (
-                  <TableRow key={sub.id + sub.userId}>
-                    <TableCell className="font-medium">{getUserName(sub.userId)}</TableCell>
-                    <TableCell>{getClassificationName(sub.classificationId)}</TableCell>
-                    <TableCell>{sub.purchasedAt?.toDate().toLocaleDateString('ko-KR')}</TableCell>
-                    <TableCell>{sub.expiresAt?.toDate().toLocaleDateString('ko-KR')}</TableCell>
-                    <TableCell>{sub.expiresAt && getSubscriptionStatus(sub.expiresAt.toDate())}</TableCell>
-                  </TableRow>
-                ))
+                subscriptions.map((sub) => {
+                    // subscriptions are now under users, so the path gives us the user ID
+                    const userId = (sub as any)._path.segments[1];
+                    return (
+                      <TableRow key={sub.id}>
+                        <TableCell className="font-medium">{getUserName(userId)}</TableCell>
+                        <TableCell>{getClassificationName(sub.classificationId)}</TableCell>
+                        <TableCell>{sub.purchasedAt?.toDate().toLocaleDateString('ko-KR')}</TableCell>
+                        <TableCell>{sub.expiresAt?.toDate().toLocaleDateString('ko-KR')}</TableCell>
+                        <TableCell>{sub.expiresAt && getSubscriptionStatus(sub.expiresAt.toDate())}</TableCell>
+                      </TableRow>
+                    )
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center h-24">

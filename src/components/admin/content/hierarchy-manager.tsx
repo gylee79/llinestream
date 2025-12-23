@@ -15,6 +15,7 @@ import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog
 import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
 import ThumbnailEditorDialog from './thumbnail-editor-dialog';
 import { cn } from '@/lib/utils';
+import { v4 as uuidv4 } from 'uuid';
 
 type Item = (Field | Classification | Course) & { type: 'field' | 'classification' | 'course' };
 
@@ -145,44 +146,50 @@ export default function HierarchyManager() {
       setThumbnailDialog({ isOpen: false, item: null, type: 'fields' });
   };
 
-  const handleSaveName = async (item: HierarchyItem) => {
+  const handleSaveName = async (itemData: HierarchyItem) => {
     if (!firestore) return;
     try {
-      const { type, item: existingItem } = nameDialog;
-      let collectionName: 'fields' | 'classifications' | 'courses';
-      let data: any = { name: item.name };
+        const { type, item: existingItem } = nameDialog;
 
-      if (type === '분야') collectionName = 'fields';
-      else if (type === '큰분류') collectionName = 'classifications';
-      else collectionName = 'courses';
-
-      if (existingItem) { // Edit mode
-        await updateDoc(doc(firestore, collectionName, existingItem.id), { name: item.name });
-        toast({ title: '수정 성공', description: `${type} '${item.name}'이(가) 수정되었습니다.` });
-      } else { // Add mode
-        if (type === '분야') {
-           data.thumbnailUrl = "https://picsum.photos/seed/default-field/100/100";
-           data.thumbnailHint = "placeholder";
-        } else if (type === '큰분류' && selectedField) {
-          data.fieldId = selectedField;
-           data.prices = { day1: 0, day30: 0, day60: 0, day90: 0 };
-           data.description = "새로운 분류입니다.";
-           data.thumbnailUrl = "https://picsum.photos/seed/default-class/100/100";
-           data.thumbnailHint = "placeholder";
-        } else if (type === '상세분류' && selectedClassification) {
-          data.classificationId = selectedClassification;
-          data.description = "새로운 강좌입니다.";
-          data.thumbnailUrl = "https://picsum.photos/seed/default-course/100/100";
-          data.thumbnailHint = "placeholder";
+        if (existingItem) { // Edit mode
+            const collectionName = type === '분야' ? 'fields' : type === '큰분류' ? 'classifications' : 'courses';
+            await updateDoc(doc(firestore, collectionName, existingItem.id), { name: itemData.name });
+            toast({ title: '수정 성공', description: `'${itemData.name}'으로 이름이 수정되었습니다.` });
+        } else { // Add mode
+            if (type === '분야') {
+                const newField: Omit<Field, 'id'> = {
+                    name: itemData.name,
+                    thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/400/400`,
+                    thumbnailHint: 'placeholder'
+                };
+                await addDoc(collection(firestore, 'fields'), newField);
+            } else if (type === '큰분류' && selectedField) {
+                const newClassification: Omit<Classification, 'id'> = {
+                    fieldId: selectedField,
+                    name: itemData.name,
+                    description: `${itemData.name}에 대한 설명입니다.`,
+                    prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
+                    thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/600/400`,
+                    thumbnailHint: 'placeholder'
+                };
+                await addDoc(collection(firestore, 'classifications'), newClassification);
+            } else if (type === '상세분류' && selectedClassification) {
+                const newCourse: Omit<Course, 'id'> = {
+                    classificationId: selectedClassification,
+                    name: itemData.name,
+                    description: `${itemData.name}에 대한 상세 설명입니다.`,
+                    thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/600/400`,
+                    thumbnailHint: 'placeholder'
+                };
+                await addDoc(collection(firestore, 'courses'), newCourse);
+            }
+            toast({ title: '추가 성공', description: `${type} '${itemData.name}'이(가) 추가되었습니다.` });
         }
-        await addDoc(collection(firestore, collectionName), data);
-        toast({ title: '추가 성공', description: `${type} '${item.name}'이(가) 추가되었습니다.` });
-      }
     } catch (error) {
-      console.error("Error saving document: ", error);
-      toast({ variant: 'destructive', title: '저장 실패', description: '항목 저장 중 오류가 발생했습니다.' });
+        console.error("Error saving document: ", error);
+        toast({ variant: 'destructive', title: '저장 실패', description: '항목 저장 중 오류가 발생했습니다.' });
     } finally {
-      closeDialogs();
+        closeDialogs();
     }
   };
   
