@@ -16,12 +16,12 @@ type UpdateResult = {
  * @returns A promise that resolves to an UpdateResult.
  */
 export async function updateThumbnail(formData: FormData): Promise<UpdateResult> {
-  const itemType = formData.get('itemType') as 'fields' | 'classifications' | 'courses';
+  const collectionName = formData.get('itemType') as 'fields' | 'classifications' | 'courses';
   const itemId = formData.get('itemId') as string;
   const hint = formData.get('hint') as string;
   const imageFile = formData.get('image') as File | null;
 
-  if (!itemType || !itemId) {
+  if (!collectionName || !itemId) {
     return { success: false, message: '필수 항목(itemType, itemId)이 누락되었습니다.' };
   }
 
@@ -34,7 +34,7 @@ export async function updateThumbnail(formData: FormData): Promise<UpdateResult>
 
     // 1. If a new image file is provided, upload it to Storage
     if (imageFile) {
-      const filePath = `${itemType}/${itemId}/${imageFile.name}`;
+      const filePath = `${collectionName}/${itemId}/${imageFile.name}`;
       const fileBuffer = Buffer.from(await imageFile.arrayBuffer());
       
       const file = storage.file(filePath);
@@ -59,7 +59,7 @@ export async function updateThumbnail(formData: FormData): Promise<UpdateResult>
     }
 
     // 3. Update the Firestore document
-    const docRef = db.collection(itemType).doc(itemId);
+    const docRef = db.collection(collectionName).doc(itemId);
     await docRef.update(dataToUpdate);
 
     // 4. Revalidate the path to show changes on the client
