@@ -2,7 +2,7 @@
 'use server';
 
 import { initializeAdminApp } from '@/lib/firebase-admin';
-import type { Episode, Course, Classification } from '@/lib/types';
+import type { Episode, Course, Classification, Field } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import { WriteBatch, Firestore } from 'firebase-admin/firestore';
 import { Storage } from 'firebase-admin/storage';
@@ -73,7 +73,7 @@ const deleteStorageFile = async (storage: Storage, url: string) => {
  * @param batch The Firestore write batch.
  */
 const deleteEpisodes = async (db: Firestore, storage: Storage, courseId: string, batch: WriteBatch) => {
-  const episodesSnapshot = await db.collection(`courses/${courseId}/episodes`).get();
+  const episodesSnapshot = await db.collectionGroup('episodes').where('courseId', '==', courseId).get();
   if (episodesSnapshot.empty) return;
 
   for (const episodeDoc of episodesSnapshot.docs) {
@@ -181,7 +181,7 @@ export async function deleteHierarchyItem(
       if (!itemData || !itemData.courseId) {
         throw new Error('Episode data (courseId) is required for deletion.');
       }
-      const episodeRef = db.doc(`courses/${itemData.courseId}/episodes/${id}`);
+      const episodeRef = db.collection('courses').doc(itemData.courseId).collection('episodes').doc(id);
       const episodeDoc = await episodeRef.get();
       if(episodeDoc.exists){
         const episode = episodeDoc.data() as Episode;
