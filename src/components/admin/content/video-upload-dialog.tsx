@@ -189,7 +189,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
         } else if (videoFile) { // Create new episode
             const duration = await getVideoDuration(videoFile);
             const episodeId = uuidv4();
-            const storageRef = ref(storage, `episodes/${selectedCourseId}/${episodeId}/${videoFile.name}`);
+            const storageRef = ref(storage, `courses/${selectedCourseId}/episodes/${episodeId}/${videoFile.name}`);
             const uploadTask = uploadBytesResumable(storageRef, videoFile);
 
             const uploadedUrl = await new Promise<string>((resolve, reject) => {
