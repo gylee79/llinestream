@@ -70,7 +70,8 @@ export async function updateThumbnail(formData: FormData): Promise<UpdateResult>
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '알 수 없는 서버 오류가 발생했습니다.';
-    console.error('Thumbnail Update Error:', errorMessage);
+    console.error('Thumbnail Update Error:', errorMessage, error);
     return { success: false, message: `업데이트 실패: ${errorMessage}` };
   }
 }
+
