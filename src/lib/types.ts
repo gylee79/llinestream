@@ -62,6 +62,8 @@ export interface Episode {
   duration: number; // in seconds
   isFree: boolean;
   videoUrl: string;
+  thumbnailUrl: string;
+  thumbnailHint: string;
 }
 
 export interface ViewHistoryItem {

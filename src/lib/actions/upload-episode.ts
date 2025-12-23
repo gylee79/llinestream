@@ -1,3 +1,4 @@
+
 'use server';
 
 import { initializeAdminApp } from '@/lib/firebase-admin';
@@ -63,18 +64,28 @@ export async function uploadEpisode(formData: FormData): Promise<UploadResult> {
 
         // 2. Generate and Upload Thumbnail from Video (using GenAI flow)
         const videoDataUri = `data:${videoFile.type};base64,${videoBuffer.toString('base64')}`;
-        const thumbnailResult = await generateVideoThumbnail({ videoDataUri });
-        const thumbnailDataUri = thumbnailResult.thumbnailDataUri;
+        
+        // Let's create a placeholder thumbnail first, AI generation can take time
+        let thumbnailUrl = `https://picsum.photos/seed/${episodeId}/600/400`;
+        let thumbnailHint = 'placeholder video frame';
 
-        let thumbnailUrl = '';
-        if (thumbnailDataUri) {
-            const matches = thumbnailDataUri.match(/^data:(image\/.+);base64,(.+)$/);
-            if (matches) {
-                const [, thumbContentType, thumbBase64] = matches;
-                const thumbBuffer = Buffer.from(thumbBase64, 'base64');
-                const thumbnailPath = `courses/${selectedCourseId}/episodes/${episodeId}/thumbnail.jpg`;
-                thumbnailUrl = await uploadFileToStorage(storage, thumbnailPath, thumbBuffer, thumbContentType);
+        try {
+            const thumbnailResult = await generateVideoThumbnail({ videoDataUri });
+            const thumbnailDataUri = thumbnailResult.thumbnailDataUri;
+
+            if (thumbnailDataUri) {
+                const matches = thumbnailDataUri.match(/^data:(image\/.+);base64,(.+)$/);
+                if (matches) {
+                    const [, thumbContentType, thumbBase64] = matches;
+                    const thumbBuffer = Buffer.from(thumbBase64, 'base64');
+                    const thumbnailPath = `courses/${selectedCourseId}/episodes/${episodeId}/thumbnail.jpg`;
+                    thumbnailUrl = await uploadFileToStorage(storage, thumbnailPath, thumbBuffer, thumbContentType);
+                    thumbnailHint = 'generated from video';
+                }
             }
+        } catch(aiError) {
+            console.error("AI Thumbnail generation failed, using placeholder.", aiError);
+            // Fallback to placeholder is already set, so we just log the error.
         }
         
         // 3. Get video duration (mocked for now)
@@ -90,13 +101,11 @@ export async function uploadEpisode(formData: FormData): Promise<UploadResult> {
             duration,
             isFree,
             videoUrl,
-            // thumbnailUrl is not part of the Episode type, but let's add it to the course instead
+            thumbnailUrl,
+            thumbnailHint,
         };
 
         await episodeRef.set(newEpisode);
-
-        // Also update the course's thumbnail if a new one was generated for the first episode maybe?
-        // For now, let's assume the course thumbnail is managed separately.
 
         revalidatePath('/admin/content');
         return { success: true, message: `에피소드 '${title}'가 성공적으로 업로드되었습니다.` };
