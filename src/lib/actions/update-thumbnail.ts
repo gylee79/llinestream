@@ -10,13 +10,13 @@ type UpdateResult = {
 };
 
 /**
- * Updates the thumbnail for a classification or course.
+ * Updates the thumbnail for a field, classification or course.
  * Handles file upload to Firebase Storage and updates the Firestore document.
  * @param formData The FormData object containing itemType, itemId, hint, and optionally an image file.
  * @returns A promise that resolves to an UpdateResult.
  */
 export async function updateThumbnail(formData: FormData): Promise<UpdateResult> {
-  const itemType = formData.get('itemType') as 'classifications' | 'courses';
+  const itemType = formData.get('itemType') as 'fields' | 'classifications' | 'courses';
   const itemId = formData.get('itemId') as string;
   const hint = formData.get('hint') as string;
   const imageFile = formData.get('image') as File | null;
