@@ -14,6 +14,7 @@ type DeletionResult = {
 
 /**
  * Extracts the storage path from a Firebase Storage URL.
+ * Handles both gs:// and https:// formats.
  * @param url The full gs:// or https:// URL.
  * @returns The file path within the bucket.
  */
@@ -21,15 +22,21 @@ const getPathFromUrl = (url: string): string | null => {
   if (!url) return null;
   try {
     const decodedUrl = decodeURIComponent(url);
-    // Matches paths in URLs like:
-    // https://storage.googleapis.com/bucket-name/path/to/file.jpg?alt=media&token=...
-    // https://firebasestorage.googleapis.com/v0/b/bucket-name/o/path%2Fto%2Ffile.jpg?alt=media...
-    const match = decodedUrl.match(/(?:[^\/]+\/o\/|storage.googleapis.com\/[^\/]+\/)(.*?)(?:\?|$)/);
-    return match ? match[1] : null;
+    // Handle gs:// URLs
+    if (decodedUrl.startsWith('gs://')) {
+      const path = decodedUrl.substring(decodedUrl.indexOf('/', 5) + 1);
+      return path;
+    }
+    // Handle https:// URLs for Firebase Storage
+    const match = decodedUrl.match(/o\/(.*?)(?:\?|$)/);
+    if (match && match[1]) {
+      return match[1];
+    }
   } catch (e) {
     console.error(`Could not decode or parse URL: ${url}`, e);
-    return null;
   }
+  console.warn(`Could not determine storage path from URL, skipping deletion: ${url}`);
+  return null;
 };
 
 
@@ -41,7 +48,6 @@ const getPathFromUrl = (url: string): string | null => {
 const deleteStorageFile = async (storage: Storage, url: string) => {
   const path = getPathFromUrl(url);
   if (!path) {
-    console.warn(`Could not determine storage path from URL, skipping deletion: ${url}`);
     return;
   }
 
@@ -148,7 +154,8 @@ export async function deleteHierarchyItem(
       const fieldRef = db.collection('fields').doc(id);
       const fieldDoc = await fieldRef.get();
       if(fieldDoc.exists) {
-          await deleteStorageFile(storage, (fieldDoc.data() as any).thumbnailUrl);
+          const fieldData = fieldDoc.data() as Field;
+          if (fieldData.thumbnailUrl) await deleteStorageFile(storage, fieldData.thumbnailUrl);
           await deleteClassifications(db, storage, id, batch);
           batch.delete(fieldRef);
       }
@@ -156,7 +163,8 @@ export async function deleteHierarchyItem(
       const classRef = db.collection('classifications').doc(id);
       const classDoc = await classRef.get();
       if(classDoc.exists) {
-          await deleteStorageFile(storage, (classDoc.data() as any).thumbnailUrl);
+          const classData = classDoc.data() as Classification;
+          if (classData.thumbnailUrl) await deleteStorageFile(storage, classData.thumbnailUrl);
           await deleteCourses(db, storage, id, batch);
           batch.delete(classRef);
       }
@@ -164,7 +172,8 @@ export async function deleteHierarchyItem(
       const courseRef = db.collection('courses').doc(id);
       const courseDoc = await courseRef.get();
       if(courseDoc.exists) {
-          await deleteStorageFile(storage, (courseDoc.data() as any).thumbnailUrl);
+          const courseData = courseDoc.data() as Course;
+          if (courseData.thumbnailUrl) await deleteStorageFile(storage, courseData.thumbnailUrl);
           await deleteEpisodes(db, storage, id, batch);
           batch.delete(courseRef);
       }
@@ -176,8 +185,8 @@ export async function deleteHierarchyItem(
       const episodeDoc = await episodeRef.get();
       if(episodeDoc.exists){
         const episode = episodeDoc.data() as Episode;
-        await deleteStorageFile(storage, episode.videoUrl);
-        await deleteStorageFile(storage, episode.thumbnailUrl);
+        if (episode.videoUrl) await deleteStorageFile(storage, episode.videoUrl);
+        if (episode.thumbnailUrl) await deleteStorageFile(storage, episode.thumbnailUrl);
         batch.delete(episodeRef);
       }
     } else {

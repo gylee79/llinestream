@@ -14,7 +14,7 @@ export interface User {
   phone: string;
   dob: string; // Date of Birth YYYY-MM-DD
   role: 'user' | 'admin';
-  activeSubscriptions?: {
+  activeSubscriptions: {
     [classificationId: string]: {
       expiresAt: Timestamp;
       purchasedAt: Timestamp; // Keep this consistent
