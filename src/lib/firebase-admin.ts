@@ -1,4 +1,3 @@
-
 import * as admin from 'firebase-admin';
 import { App, getApps } from 'firebase-admin/app';
 
@@ -39,6 +38,7 @@ export function initializeAdminApp(): App {
         projectId,
         clientEmail,
         // The private key from environment variables often has escaped newlines.
+        // This line replaces the literal `\\n` with actual newline characters.
         privateKey: privateKey.replace(/\\n/g, '\n'),
       }),
       storageBucket: storageBucket,
