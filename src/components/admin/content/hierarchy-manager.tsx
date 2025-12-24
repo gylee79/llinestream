@@ -22,9 +22,9 @@ const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }
   item: Item;
   onSelect: () => void;
   selected: boolean;
-  onEdit: () => void;
+  onEdit: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
-  onEditThumbnail: () => void;
+  onEditThumbnail: (e: React.MouseEvent) => void;
 }) => (
     <div 
         className={cn(
@@ -46,8 +46,8 @@ const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }
             <span className={cn("font-medium truncate", selected && "text-primary")}>{item.name}</span>
         </div>
         <div className="flex items-center">
-            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEdit(); }}><Pencil className="h-4 w-4" /></Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEditThumbnail(); }}><ImageIcon className="h-4 w-4" /></Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit}><Pencil className="h-4 w-4" /></Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEditThumbnail}><ImageIcon className="h-4 w-4" /></Button>
             <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>
         </div>
     </div>
@@ -193,12 +193,24 @@ export default function HierarchyManager() {
   const handleDelete = useCallback(async (e: React.MouseEvent, collectionName: 'fields' | 'classifications' | 'courses' | 'episodes', id: string, name: string, itemData?: any) => {
     e.stopPropagation();
     if (!firestore) return;
-    
-    if (!confirm(`정말로 '${name}' 항목과 모든 하위 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
+
+    toast({
+        title: '삭제 확인',
+        description: `'${name}' 항목 삭제를 확인해주세요.`,
+    });
+
+    if (!confirm(`정말로 '${name}' 항목과 모든 하위 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+        toast({
+            title: '취소됨',
+            description: '삭제 작업이 취소되었습니다.',
+        });
+        return;
+    }
 
     const { toast: toastWithUpdate, dismiss, id: toastId } = toast({
       title: '삭제 시작',
       description: '삭제 프로세스를 시작합니다...',
+      duration: 999999, // Long duration, will be dismissed manually
     });
 
     const onProgress: ProgressCallback = (message) => {
@@ -227,8 +239,8 @@ export default function HierarchyManager() {
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error("Error during delete process:", error);
-        dismiss(toastId); // 이전 토스트를 닫고
-        toast({ // 새로운 오류 토스트를 띄웁니다
+        dismiss(toastId);
+        toast({
             variant: "destructive",
             title: "삭제 중 오류 발생",
             description: errorMessage,
@@ -265,8 +277,8 @@ export default function HierarchyManager() {
                         item={{ ...item, type: 'field' }}
                         selected={selectedField === item.id}
                         onSelect={() => handleSelectField(item.id)}
-                        onEdit={() => openNameDialog('분야', item)}
-                        onEditThumbnail={() => openThumbnailDialog('fields', item)}
+                        onEdit={(e) => { e.stopPropagation(); openNameDialog('분야', item); }}
+                        onEditThumbnail={(e) => { e.stopPropagation(); openThumbnailDialog('fields', item); }}
                         onDelete={(e) => handleDelete(e, 'fields', item.id, item.name, item)}
                     />
                 ))}
@@ -280,9 +292,9 @@ export default function HierarchyManager() {
                         item={{...item, type: 'classification'}}
                         selected={selectedClassification === item.id}
                         onSelect={() => handleSelectClassification(item.id)}
-                        onEdit={() => openNameDialog('큰분류', item)}
+                        onEdit={(e) => { e.stopPropagation(); openNameDialog('큰분류', item); }}
                         onDelete={(e) => handleDelete(e, 'classifications', item.id, item.name, item)}
-                        onEditThumbnail={() => openThumbnailDialog('classifications', item)}
+                        onEditThumbnail={(e) => { e.stopPropagation(); openThumbnailDialog('classifications', item); }}
                      />
                  ))
                 }
@@ -296,9 +308,9 @@ export default function HierarchyManager() {
                        item={{...item, type: 'course'}}
                        selected={false} // No selection action for the last column
                        onSelect={() => {}}
-                       onEdit={() => openNameDialog('상세분류', item)}
+                       onEdit={(e) => { e.stopPropagation(); openNameDialog('상세분류', item); }}
                        onDelete={(e) => handleDelete(e, 'courses', item.id, item.name, item)}
-                       onEditThumbnail={() => openThumbnailDialog('courses', item)}
+                       onEditThumbnail={(e) => { e.stopPropagation(); openThumbnailDialog('courses', item); }}
                     />
                 ))
                 }
