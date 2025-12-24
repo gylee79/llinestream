@@ -1,3 +1,4 @@
+
 'use server';
 
 import { initializeAdminApp } from '@/lib/firebase-admin';
@@ -20,32 +21,43 @@ const noOpProgress: ProgressCallback = () => {};
  * Extracts the storage path from a Firebase Storage URL.
  * Handles both gs:// and various https:// formats robustly.
  * @param url The full gs:// or https:// URL.
- * @returns The file path within the bucket.
+ * @param storage The Firebase Admin Storage instance to get the default bucket name.
+ * @returns The file path within the bucket, or null if parsing fails.
  */
-const getPathFromUrl = (url: string): string | null => {
+const getPathFromUrl = (url: string, storage: Storage): string | null => {
   if (!url) return null;
   try {
     const decodedUrl = decodeURIComponent(url);
     
+    // Handle gs:// URLs
     if (decodedUrl.startsWith('gs://')) {
       const path = decodedUrl.substring(decodedUrl.indexOf('/', 5) + 1);
       return path;
     }
     
-    const firebaseStorageMatch = decodedUrl.match(/firebasestorage\.googleapis\.com\/v\d+\/b\/[^/]+\/o\/(.*?)(?:\?|$)/);
-    if (firebaseStorageMatch && firebaseStorageMatch[1]) {
-      return firebaseStorageMatch[1];
-    }
+    // Get the default bucket name from the storage instance
+    const bucketName = storage.bucket().name;
 
-    const googleStorageMatch = decodedUrl.match(/storage\.googleapis\.com\/[^/]+\/(.*)/);
-    if (googleStorageMatch && googleStorageMatch[1]) {
-        return googleStorageMatch[1];
+    // Try to match various HTTPS URL formats
+    const patterns = [
+      // New format: https://firebasestorage.googleapis.com/v0/b/BUCKET_NAME/o/PATH?alt=media&token=...
+      `https://firebasestorage\\.googleapis\\.com/v\\d+/b/${bucketName}/o/(.*?)(?:\\?|$)`,
+      // Old format / GCS format: https://storage.googleapis.com/BUCKET_NAME/PATH
+      `https://storage\\.googleapis\\.com/${bucketName}/(.*?)(?:\\?|$)`
+    ];
+
+    for (const pattern of patterns) {
+      const match = decodedUrl.match(new RegExp(pattern));
+      if (match && match[1]) {
+        return match[1];
+      }
     }
 
   } catch (e) {
     console.error(`[delete-hierarchy-item] Could not decode or parse URL: ${url}`, e);
   }
-  console.warn(`[delete-hierarchy-item] Could not determine storage path from URL, skipping deletion for: ${url}`);
+  
+  console.warn(`[delete-hierarchy-item] Could not determine storage path from URL, skipping deletion for: ${url.substring(0, 70)}...`);
   return null;
 };
 
@@ -56,9 +68,9 @@ const getPathFromUrl = (url: string): string | null => {
  * @param url The full URL of the file to delete.
  */
 const deleteStorageFile = async (storage: Storage, url: string, onProgress: ProgressCallback) => {
-  const path = getPathFromUrl(url);
+  const path = getPathFromUrl(url, storage);
   if (!path) {
-    onProgress(`스토리지 파일 경로를 찾을 수 없어 건너뜁니다: ${url.substring(0, 50)}...`);
+    onProgress(`스토리지 파일 경로를 찾을 수 없어 건너뜁니다: ${url.substring(0, 70)}...`);
     return;
   }
   onProgress(`스토리지 파일 삭제 시도: ${path}`);
