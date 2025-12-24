@@ -25,7 +25,6 @@ const deleteStorageFile = async (storage: Storage, url: string) => {
   }
 
   try {
-    // Firebase Admin SDK's robust way to get a file reference from a URL
     const file = storage.bucket().file(decodeURIComponent(new URL(url).pathname.split('/o/')[1].split('?')[0]));
     
     console.log(`[ATTEMPT DELETE] Attempting to delete storage file at path: ${file.name}`);

@@ -26,7 +26,6 @@ const deleteStorageFile = async (storage: Storage, url: string) => {
   }
 
   try {
-    // Firebase Admin SDK's robust way to get a file reference from a URL
     const file = storage.bucket().file(decodeURIComponent(new URL(url).pathname.split('/o/')[1].split('?')[0]));
     
     console.log(`[ATTEMPT DELETE] Attempting to delete storage file at path: ${file.name}`);
@@ -121,6 +120,9 @@ export async function deleteHierarchyItem(
         batch.delete(courseRef);
       }
     } else if (collectionName === 'episodes') {
+        // Since episodes are in a subcollection, we need to find its parent course first.
+        // However, the client should pass the full context if possible.
+        // For now, let's assume a collection group query is feasible, though less efficient.
         const episodeQuery = await db.collectionGroup('episodes').where(admin.firestore.FieldPath.documentId(), '==', id).limit(1).get();
         if (episodeQuery.empty) {
             console.warn(`[NOT FOUND] Episode with ID ${id} not found in any course.`);

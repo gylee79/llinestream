@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -91,7 +92,7 @@ export function useCollection<T = any>(
     // If the query is not ready, reset the state
     if (!targetRefOrQuery) {
       setData(null);
-      setIsLoading(false); // Not loading if there's no query
+      setIsLoading(true); // Set to true to show loading state until a valid query is provided
       setError(null);
       return;
     }

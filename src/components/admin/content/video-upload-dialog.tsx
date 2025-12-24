@@ -205,8 +205,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
         if (type === '분야') {
             const docRef = await addDoc(collection(firestore, 'fields'), { 
                 name: item.name, 
-                thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/400/400`, 
-                thumbnailHint: 'placeholder' 
+                thumbnailUrl: '', 
+                thumbnailHint: '' 
             });
             newDocId = docRef.id;
             setSelectedFieldId(newDocId);
@@ -218,8 +218,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 name: item.name,
                 description: `${item.name}에 대한 설명입니다.`,
                 prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
-                thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/600/400`,
-                thumbnailHint: 'placeholder'
+                thumbnailUrl: '',
+                thumbnailHint: ''
             });
             newDocId = docRef.id;
             setSelectedClassificationId(newDocId);
@@ -229,8 +229,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 classificationId: selectedClassificationId,
                 name: item.name,
                 description: `${item.name}에 대한 상세 설명입니다.`,
-                thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/600/400`,
-                thumbnailHint: 'placeholder'
+                thumbnailUrl: '',
+                thumbnailHint: ''
             });
             newDocId = docRef.id;
             setSelectedCourseId(newDocId);
@@ -251,7 +251,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
           <DialogHeader>
             <DialogTitle className="font-headline">{isEditMode ? '에피소드 수정' : '비디오 업로드'}</DialogTitle>
             <DialogDescription>
-              {isEditMode ? '에피소드 정보를 수정합니다.' : '새 에피소드를 추가합니다. 썸네일은 비디오에서 자동으로 생성됩니다.'}
+              {isEditMode ? '에피소드 정보를 수정합니다.' : '새 에피소드를 추가합니다. 썸네일은 별도로 등록해야 합니다.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
