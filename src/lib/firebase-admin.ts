@@ -1,6 +1,4 @@
 
-'use server';
-
 import * as admin from 'firebase-admin';
 import { App, getApps } from 'firebase-admin/app';
 
@@ -16,17 +14,30 @@ export function initializeAdminApp(): App {
     return apps[0];
   }
 
-  // Temporarily bypass environment variable checks for reset
-  console.warn("Firebase Admin SDK is not configured. Some server-side features will not work.");
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
-  // Return a dummy app object or throw an error if needed, for now, we try to initialize with what we have
-  try {
-     const adminApp = admin.initializeApp();
-     return adminApp;
-  } catch(error) {
-      console.error("Dummy Firebase Admin SDK initialization failed:", error);
-      // This will likely fail but prevents app from crashing if called.
-      // A proper setup is required.
-      throw new Error('Firebase Admin SDK is not configured. Please set up the environment variables.');
+  if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !privateKey) {
+    console.warn("Firebase Admin SDK is not configured. Some server-side features will not work.");
+    // This will likely fail but prevents app from crashing if called.
+    // A proper setup is required.
+    try {
+       const adminApp = admin.initializeApp();
+       return adminApp;
+    } catch(error) {
+        console.error("Dummy Firebase Admin SDK initialization failed:", error);
+        throw new Error('Firebase Admin SDK is not configured. Please set up the environment variables.');
+    }
   }
+  
+  // Initialize the Admin SDK with credentials
+  const adminApp = admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: privateKey,
+    }),
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+  });
+
+  return adminApp;
 }
