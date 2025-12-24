@@ -1,5 +1,8 @@
 'use server';
 
+import { config } from 'dotenv';
+config();
+
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import type { Episode, Course, Classification, Field } from '@/lib/types';
 import * as admin from 'firebase-admin';
