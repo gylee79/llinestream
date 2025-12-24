@@ -17,7 +17,10 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import type { Field, Classification, Course } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { updateThumbnail } from '@/lib/actions/update-thumbnail';
+import { updateDoc, doc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useFirestore, useStorage } from '@/firebase';
+import { revalidatePath } from 'next/cache';
 
 interface ThumbnailEditorDialogProps {
   isOpen: boolean;
@@ -27,6 +30,8 @@ interface ThumbnailEditorDialogProps {
 }
 
 export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType }: ThumbnailEditorDialogProps) {
+  const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -55,28 +60,35 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
   };
 
   const handleSave = async () => {
-    if (!item) return;
-
-    setIsSaving(true);
-    const formData = new FormData();
-    formData.append('itemType', itemType);
-    formData.append('itemId', item.id);
-    formData.append('hint', thumbnailHint);
-    if (imageFile) {
-        formData.append('image', imageFile);
+    if (!item || !firestore || !storage) {
+        toast({ variant: 'destructive', title: '오류', description: 'Firebase 서비스가 준비되지 않았습니다.' });
+        return;
     }
 
+    setIsSaving(true);
+
     try {
-        const result = await updateThumbnail(formData);
-        if (result.success) {
-            toast({
-                title: '저장 성공',
-                description: '썸네일 정보가 성공적으로 업데이트되었습니다.',
-            });
-            onClose();
-        } else {
-            throw new Error(result.message);
+        const dataToUpdate: { thumbnailHint: string; thumbnailUrl?: string } = {
+          thumbnailHint: thumbnailHint,
+        };
+
+        if (imageFile) {
+            const storageRef = ref(storage, `${itemType}/${item.id}/${imageFile.name}`);
+            const uploadResult = await uploadBytes(storageRef, imageFile);
+            const downloadUrl = await getDownloadURL(uploadResult.ref);
+            dataToUpdate.thumbnailUrl = downloadUrl;
         }
+
+        const docRef = doc(firestore, itemType, item.id);
+        await updateDoc(docRef, dataToUpdate);
+
+        toast({
+            title: '저장 성공',
+            description: '썸네일 정보가 성공적으로 업데이트되었습니다.',
+        });
+        onClose();
+        // Manually trigger revalidation if needed, though server actions do this better.
+        // revalidatePath('/admin/content'); 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
         toast({

@@ -24,7 +24,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, getDoc, query, where } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
@@ -92,24 +92,31 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   useEffect(() => {
     async function setInitialState() {
         if (isEditMode && episode && firestore) {
+            setIsProcessing(true);
             setTitle(episode.title);
             setDescription(episode.description || '');
             setIsFree(episode.isFree);
             setSelectedCourseId(episode.courseId);
 
-            // This is complex, let's trace it back.
-            const courseDocRef = doc(firestore, 'courses', episode.courseId);
-            const courseDocSnap = await getDoc(courseDocRef);
+            try {
+              const courseDocRef = doc(firestore, 'courses', episode.courseId);
+              const courseDocSnap = await getDoc(courseDocRef);
 
-            if (courseDocSnap.exists()) {
-                const course = courseDocSnap.data() as Course;
-                setSelectedClassificationId(course.classificationId);
-                const classDocRef = doc(firestore, 'classifications', course.classificationId);
-                const classDocSnap = await getDoc(classDocRef);
-                if (classDocSnap.exists()) {
-                    const classification = classDocSnap.data() as Classification;
-                    setSelectedFieldId(classification.fieldId);
-                }
+              if (courseDocSnap.exists()) {
+                  const course = courseDocSnap.data() as Course;
+                  setSelectedClassificationId(course.classificationId);
+                  const classDocRef = doc(firestore, 'classifications', course.classificationId);
+                  const classDocSnap = await getDoc(classDocRef);
+                  if (classDocSnap.exists()) {
+                      const classification = classDocSnap.data() as Classification;
+                      setSelectedFieldId(classification.fieldId);
+                  }
+              }
+            } catch(e) {
+              console.error("Error fetching hierarchy for episode:", e);
+              toast({variant: 'destructive', title:'오류', description: '상위 분류 정보를 불러오는데 실패했습니다.'})
+            } finally {
+              setIsProcessing(false);
             }
         }
     }
@@ -118,7 +125,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     } else {
         resetForm();
     }
-}, [open, episode, isEditMode, firestore]);
+}, [open, episode, isEditMode, firestore, toast]);
 
   const handleSaveEpisode = async () => {
     if (!firestore) return;
@@ -136,11 +143,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
 
     try {
         if (isEditMode && episode) { // Update existing episode metadata
-            const courseDocRef = doc(firestore, 'courses', episode.courseId);
-            const courseDoc = await getDoc(courseDocRef);
-            if (!courseDoc.exists()) throw new Error("Parent course not found");
-
-            const episodeRef = doc(firestore, courseDoc.ref.path, 'episodes', episode.id);
+            const courseDocRef = doc(firestore, 'courses', selectedCourseId);
+            const episodeRef = doc(courseDocRef, 'episodes', episode.id);
             
             const updatedData: Partial<Episode> = { 
               title, 
@@ -197,13 +201,15 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
 
     setIsProcessing(true);
     try {
+        let newDocId = '';
         if (type === '분야') {
             const docRef = await addDoc(collection(firestore, 'fields'), { 
                 name: item.name, 
                 thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/400/400`, 
                 thumbnailHint: 'placeholder' 
             });
-            setSelectedFieldId(docRef.id);
+            newDocId = docRef.id;
+            setSelectedFieldId(newDocId);
             setSelectedClassificationId('');
             setSelectedCourseId('');
         } else if (type === '큰분류' && selectedFieldId) {
@@ -215,7 +221,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/600/400`,
                 thumbnailHint: 'placeholder'
             });
-            setSelectedClassificationId(docRef.id);
+            newDocId = docRef.id;
+            setSelectedClassificationId(newDocId);
             setSelectedCourseId('');
         } else if (type === '상세분류' && selectedClassificationId) {
             const docRef = await addDoc(collection(firestore, 'courses'), {
@@ -225,7 +232,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/600/400`,
                 thumbnailHint: 'placeholder'
             });
-            setSelectedCourseId(docRef.id);
+            newDocId = docRef.id;
+            setSelectedCourseId(newDocId);
         }
          toast({ title: '저장 완료', description: `'${item.name}' 항목이 성공적으로 추가되었습니다.` });
     } catch (e) {
@@ -310,11 +318,10 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 />
                 </div>
             )}
-            {isLoading && (
+            {isLoading && isEditMode && (
               <div className="col-span-full mt-2">
-                <Progress value={0} />
                 <p className="text-sm text-center text-muted-foreground mt-2">
-                  {isEditMode ? '저장 중...' : `처리 중...`}
+                  분류 정보 로딩 중...
                 </p>
               </div>
             )}

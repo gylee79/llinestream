@@ -5,7 +5,7 @@ import React, { DependencyList, createContext, useContext, ReactNode, useMemo, u
 import { FirebaseApp } from 'firebase/app';
 import { Firestore, doc } from 'firebase/firestore';
 import { Auth, User as AuthUser, onAuthStateChanged } from 'firebase/auth';
-import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { FirebaseStorage } from 'firebase/storage';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { useDoc as useFirestoreDoc } from './firestore/use-doc'; // Renamed to avoid conflict
 import type { User as AppUser } from '@/lib/types'; // Renamed to avoid conflict
@@ -16,6 +16,7 @@ interface FirebaseProviderProps {
   firebaseApp: FirebaseApp;
   firestore: Firestore;
   auth: Auth;
+  storage: FirebaseStorage;
 }
 
 // Internal state for user authentication
@@ -68,14 +69,13 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   firebaseApp,
   firestore,
   auth,
+  storage
 }) => {
   const [userAuthState, setUserAuthState] = useState<UserAuthState>({
     authUser: null,
     isAuthLoading: true, // Start loading until first auth event
     authError: null,
   });
-  
-  const storage = useMemo(() => getStorage(firebaseApp), [firebaseApp]);
 
   // Effect to subscribe to Firebase auth state changes
   useEffect(() => {
@@ -176,7 +176,7 @@ export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const memoized = useMemo(factory, deps);
   
-  if(memoized && typeof memoized === 'object') {
+  if(memoized && typeof memoized === 'object' && memoized !== null) {
     Object.defineProperty(memoized, '__memo', {
         value: true,
         writable: false,

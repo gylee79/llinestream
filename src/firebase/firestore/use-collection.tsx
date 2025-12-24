@@ -29,7 +29,7 @@ export interface UseCollectionResult<T> {
 
 /* Internal representation of a query, to safely access its path */
 interface InternalQuery extends Query<DocumentData> {
-    _query: {
+    _query?: {
         path: {
             canonicalString(): string;
             toString(): string;

@@ -1,4 +1,3 @@
-
 'use server';
 
 import { initializeAdminApp } from '@/lib/firebase-admin';
@@ -27,7 +26,8 @@ const getPathFromUrl = (url: string): string | null => {
       const path = decodedUrl.substring(decodedUrl.indexOf('/', 5) + 1);
       return path;
     }
-    const match = decodedUrl.match(/o\/(.*?)(?:\?|$)/);
+    // Updated regex to handle URLs with or without /o/ prefix
+    const match = decodedUrl.match(/(?:gs:\/\/.*\/|o\/)(.*?)(\?|$)/);
     if (match && match[1]) {
       return match[1];
     }
@@ -137,7 +137,7 @@ export async function deleteHierarchyItem(
           const courseData = courseDoc.data() as Course;
           if (courseData.thumbnailUrl) await deleteStorageFile(storage, courseData.thumbnailUrl);
           await deleteEpisodes(db, storage, id, batch);
-batch.delete(courseRef);
+        batch.delete(courseRef);
       }
     } else if (collectionName === 'episodes') {
       if (!itemData || !itemData.courseId) {

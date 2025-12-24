@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2, Image as ImageIcon } from 'lucide-react';
 import type { Field, Classification, Course } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
@@ -185,9 +185,9 @@ export default function HierarchyManager() {
             }
             toast({ title: '추가 성공', description: `${type} '${itemData.name}'이(가) 추가되었습니다.` });
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error saving document: ", error);
-        toast({ variant: 'destructive', title: '저장 실패', description: '항목 저장 중 오류가 발생했습니다.' });
+        toast({ variant: 'destructive', title: '저장 실패', description: error.message || '항목 저장 중 오류가 발생했습니다.' });
     } finally {
         closeDialogs();
     }
@@ -265,7 +265,7 @@ export default function HierarchyManager() {
                         selected={selectedClassification === item.id}
                         onSelect={() => handleSelectClassification(item.id)}
                         onEdit={() => openNameDialog('큰분류', item)}
-                        onDelete={() => handleDelete('classifications', item.id, item.name)}
+                        onDelete={() => handleDelete('classifications', item.id, item.name, item)}
                         onEditThumbnail={() => openThumbnailDialog('classifications', item)}
                      />
                  ))
@@ -281,7 +281,7 @@ export default function HierarchyManager() {
                        selected={false} // No selection action for the last column
                        onSelect={() => {}}
                        onEdit={() => openNameDialog('상세분류', item)}
-                       onDelete={() => handleDelete('courses', item.id, item.name)}
+                       onDelete={() => handleDelete('courses', item.id, item.name, item)}
                        onEditThumbnail={() => openThumbnailDialog('courses', item)}
                     />
                 ))
