@@ -5,7 +5,6 @@ import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
-import { generateVideoThumbnail } from '@/ai/flows/admin-auto-generate-video-thumbnails';
 import { Episode } from '../types';
 
 type UploadResult = {
@@ -62,38 +61,13 @@ export async function uploadEpisode(formData: FormData): Promise<UploadResult> {
         const videoPath = `courses/${selectedCourseId}/episodes/${episodeId}/${videoFile.name}`;
         const videoUrl = await uploadFileToStorage(storage, videoPath, videoBuffer, videoFile.type);
 
-        // 2. Generate and Upload Thumbnail from Video (using GenAI flow)
-        const videoDataUri = `data:${videoFile.type};base64,${videoBuffer.toString('base64')}`;
-        
-        // Let's create a placeholder thumbnail first, AI generation can take time
-        let thumbnailUrl = `https://picsum.photos/seed/${episodeId}/600/400`;
-        let thumbnailHint = 'placeholder video frame';
-
-        try {
-            const thumbnailResult = await generateVideoThumbnail({ videoDataUri });
-            const thumbnailDataUri = thumbnailResult.thumbnailDataUri;
-
-            if (thumbnailDataUri) {
-                const matches = thumbnailDataUri.match(/^data:(image\/.+);base64,(.+)$/);
-                if (matches) {
-                    const [, thumbContentType, thumbBase64] = matches;
-                    const thumbBuffer = Buffer.from(thumbBase64, 'base64');
-                    const thumbnailPath = `courses/${selectedCourseId}/episodes/${episodeId}/thumbnail.jpg`;
-                    thumbnailUrl = await uploadFileToStorage(storage, thumbnailPath, thumbBuffer, thumbContentType);
-                    thumbnailHint = 'generated from video';
-                }
-            }
-        } catch(aiError) {
-            console.error("AI Thumbnail generation failed, using placeholder.", aiError);
-            // Fallback to placeholder is already set, so we just log the error.
-        }
-        
-        // 3. Get video duration (mocked for now)
+        // 2. Get video duration (mocked for now)
         const duration = await getVideoDuration(videoBuffer);
 
-        // 4. Create Firestore document
+        // 3. Create Firestore document
         const episodeRef = db.collection('courses').doc(selectedCourseId).collection('episodes').doc(episodeId);
         
+        // Thumbnail is no longer auto-generated. It should be uploaded separately by the user.
         const newEpisode: Omit<Episode, 'id'> = {
             courseId: selectedCourseId,
             title,
@@ -101,8 +75,8 @@ export async function uploadEpisode(formData: FormData): Promise<UploadResult> {
             duration,
             isFree,
             videoUrl,
-            thumbnailUrl,
-            thumbnailHint,
+            thumbnailUrl: '', // Initially empty
+            thumbnailHint: '', // Initially empty
         };
 
         await episodeRef.set(newEpisode);

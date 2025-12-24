@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2, Image as ImageIcon } from 'lucide-react';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
@@ -34,15 +34,23 @@ const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }
         )}
         onClick={onSelect}
     >
-        <div className="flex items-center gap-3">
-            <div className="relative flex-shrink-0 h-10 w-10 rounded-md overflow-hidden bg-muted">
-                <Image 
-                    src={item.thumbnailUrl || 'https://picsum.photos/seed/placeholder/100/100'}
-                    alt={item.name}
-                    data-ai-hint={item.thumbnailHint}
-                    fill
-                    className="object-cover"
-                />
+        <div className="flex items-center gap-3 min-w-0">
+            <div className="relative flex-shrink-0 h-10 w-10 rounded-md overflow-hidden bg-muted border">
+                {item.thumbnailUrl ? (
+                    <Image 
+                        key={item.thumbnailUrl} // Add key to force re-render on URL change
+                        src={item.thumbnailUrl}
+                        alt={item.name}
+                        data-ai-hint={item.thumbnailHint}
+                        fill
+                        className="object-cover"
+                        sizes="40px"
+                    />
+                ) : (
+                    <div className="flex items-center justify-center h-full w-full">
+                      <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                )}
             </div>
             <span className={cn("font-medium truncate", selected && "text-primary")}>{item.name}</span>
         </div>
@@ -157,29 +165,25 @@ export default function HierarchyManager() {
             await updateDoc(doc(firestore, collectionName, existingItem.id), { name: itemData.name });
             toast({ title: '수정 성공', description: `'${itemData.name}'으로 이름이 수정되었습니다.` });
         } else { // Add mode
-             const docId = uuidv4();
+             const docRef = doc(firestore, collectionName, uuidv4());
             if (type === '분야') {
-                await addDoc(collection(firestore, 'fields'), { 
-                    name: itemData.name, 
-                    thumbnailUrl: `https://picsum.photos/seed/${docId}/400/400`, 
-                    thumbnailHint: 'placeholder' 
-                });
+                await setDoc(docRef, { name: itemData.name, thumbnailUrl: '', thumbnailHint: '' });
             } else if (type === '큰분류' && selectedField) {
-                await addDoc(collection(firestore, 'classifications'), {
+                await setDoc(docRef, {
                     fieldId: selectedField,
                     name: itemData.name,
                     description: `${itemData.name}에 대한 설명입니다.`,
                     prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
-                    thumbnailUrl: `https://picsum.photos/seed/${docId}/600/400`,
-                    thumbnailHint: 'placeholder'
+                    thumbnailUrl: '',
+                    thumbnailHint: ''
                 });
             } else if (type === '상세분류' && selectedClassification) {
-                await addDoc(collection(firestore, 'courses'), {
+                await setDoc(docRef, {
                     classificationId: selectedClassification,
                     name: itemData.name,
                     description: `${itemData.name}에 대한 상세 설명입니다.`,
-                    thumbnailUrl: `https://picsum.photos/seed/${docId}/600/400`,
-                    thumbnailHint: 'placeholder'
+                    thumbnailUrl: '',
+                    thumbnailHint: ''
                 });
             }
             toast({ title: '추가 성공', description: `${type} '${itemData.name}'이(가) 추가되었습니다.` });
@@ -192,55 +196,52 @@ export default function HierarchyManager() {
     }
   };
   
-  const handleDelete = useCallback((e: React.MouseEvent, collectionName: 'fields' | 'classifications' | 'courses' | 'episodes', id: string, name: string, itemData?: any) => {
+  const handleDelete = useCallback((e: React.MouseEvent, collectionName: 'fields' | 'classifications' | 'courses' | 'episodes', id: string, name: string) => {
     e.stopPropagation();
 
-    toast({
-      title: '삭제 확인',
-      description: '삭제 버튼이 클릭되었습니다. 확인 창을 진행해주세요.',
-    });
+    if (!confirm(`정말로 '${name}' 항목과 모든 하위 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+        toast({
+            title: '취소됨',
+            description: '삭제 작업이 취소되었습니다.',
+            duration: 3000,
+        });
+        return;
+    }
 
-    if (confirm(`정말로 '${name}' 항목과 모든 하위 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
-      startTransition(async () => {
+    startTransition(async () => {
         const { id: toastId } = toast({
-          title: '삭제 중...',
-          description: `'${name}' 항목과 관련된 모든 데이터를 삭제하고 있습니다.`,
-          duration: 999999,
+            title: '삭제 중...',
+            description: `'${name}' 항목과 관련된 모든 데이터를 삭제하고 있습니다.`,
+            duration: 999999,
         });
 
         try {
-          const result = await deleteHierarchyItem(collectionName, id, itemData);
-          
-          if (result.success) {
-            toast({ id: toastId, title: '삭제 성공', description: result.message, duration: 5000 });
-            if (collectionName === 'fields' && selectedField === id) {
-                setSelectedField(null);
+            const result = await deleteHierarchyItem(collectionName, id);
+            
+            if (result.success) {
+                toast.dismiss(toastId);
+                toast({ title: '삭제 성공', description: result.message, duration: 5000 });
+                if (collectionName === 'fields' && selectedField === id) {
+                    setSelectedField(null);
+                }
+                if (collectionName === 'classifications' && selectedClassification === id) {
+                    setSelectedClassification(null);
+                }
+            } else {
+                throw new Error(result.message);
             }
-            if (collectionName === 'classifications' && selectedClassification === id) {
-                setSelectedClassification(null);
-            }
-          } else {
-            throw new Error(result.message);
-          }
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          toast({
-              id: toastId,
-              variant: "destructive",
-              title: "삭제 중 오류 발생",
-              description: errorMessage,
-              duration: 9000,
-          });
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            toast.dismiss(toastId);
+            toast({
+                variant: "destructive",
+                title: "삭제 중 오류 발생",
+                description: errorMessage,
+                duration: 9000,
+            });
         }
-      });
-    } else {
-      toast({
-        title: '취소됨',
-        description: '삭제 작업이 취소되었습니다.',
-        duration: 3000,
-      });
-    }
-  }, [toast, startTransition, selectedField, selectedClassification]);
+    });
+}, [toast, startTransition, selectedField, selectedClassification]);
 
   const renderSkeletons = () => (
     <div className="flex flex-col gap-2">
@@ -271,7 +272,7 @@ export default function HierarchyManager() {
                         onSelect={() => handleSelectField(item.id)}
                         onEdit={(e) => { e.stopPropagation(); openNameDialog('분야', item); }}
                         onEditThumbnail={(e) => { e.stopPropagation(); openThumbnailDialog('fields', item); }}
-                        onDelete={(e) => handleDelete(e, 'fields', item.id, item.name, item)}
+                        onDelete={(e) => handleDelete(e, 'fields', item.id, item.name)}
                     />
                 ))}
             </Column>
@@ -285,7 +286,7 @@ export default function HierarchyManager() {
                         selected={selectedClassification === item.id}
                         onSelect={() => handleSelectClassification(item.id)}
                         onEdit={(e) => { e.stopPropagation(); openNameDialog('큰분류', item); }}
-                        onDelete={(e) => handleDelete(e, 'classifications', item.id, item.name, item)}
+                        onDelete={(e) => handleDelete(e, 'classifications', item.id, item.name)}
                         onEditThumbnail={(e) => { e.stopPropagation(); openThumbnailDialog('classifications', item); }}
                      />
                  ))
@@ -301,7 +302,7 @@ export default function HierarchyManager() {
                        selected={false} // No selection action for the last column
                        onSelect={() => {}}
                        onEdit={(e) => { e.stopPropagation(); openNameDialog('상세분류', item); }}
-                       onDelete={(e) => handleDelete(e, 'courses', item.id, item.name, item)}
+                       onDelete={(e) => handleDelete(e, 'courses', item.id, item.name)}
                        onEditThumbnail={(e) => { e.stopPropagation(); openThumbnailDialog('courses', item); }}
                     />
                 ))
@@ -323,6 +324,7 @@ export default function HierarchyManager() {
 
       {thumbnailDialog.isOpen && thumbnailDialog.item && (
         <ThumbnailEditorDialog
+            key={thumbnailDialog.item.id} // Add key to force re-mount
             isOpen={thumbnailDialog.isOpen}
             onClose={closeDialogs}
             item={thumbnailDialog.item}

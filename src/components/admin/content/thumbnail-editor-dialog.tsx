@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import {
   Dialog,
@@ -17,10 +17,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import type { Field, Classification, Course } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { updateDoc, doc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { useFirestore, useStorage } from '@/firebase';
-import { revalidatePath } from 'next/cache';
+import { updateThumbnail } from '@/lib/actions/update-thumbnail';
 
 interface ThumbnailEditorDialogProps {
   isOpen: boolean;
@@ -30,22 +27,20 @@ interface ThumbnailEditorDialogProps {
 }
 
 export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType }: ThumbnailEditorDialogProps) {
-  const firestore = useFirestore();
-  const storage = useStorage();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [thumbnailHint, setThumbnailHint] = useState('');
+  const [imagePreview, setImagePreview] = useState<string | null>(item.thumbnailUrl || null);
+  const [thumbnailHint, setThumbnailHint] = useState(item.thumbnailHint || '');
 
+  // Reset state when the dialog is opened with a new item
   useEffect(() => {
-    if (item) {
-      setImagePreview(item.thumbnailUrl);
+    if (isOpen) {
+      setImagePreview(item.thumbnailUrl || null);
       setThumbnailHint(item.thumbnailHint || '');
+      setImageFile(null); // Clear previous file selection
     }
-    // Reset file input when dialog opens or item changes
-    setImageFile(null);
-  }, [item, isOpen]);
+  }, [isOpen, item]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -60,35 +55,38 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
   };
 
   const handleSave = async () => {
-    if (!item || !firestore || !storage) {
-        toast({ variant: 'destructive', title: '오류', description: 'Firebase 서비스가 준비되지 않았습니다.' });
+    if (!item) {
+        toast({ variant: 'destructive', title: '오류', description: '항목 정보가 없습니다.' });
+        return;
+    }
+    
+    // A new image file is required to save. User can't just save the hint.
+    if (!imageFile) {
+        toast({ variant: 'destructive', title: '오류', description: '새로운 이미지 파일을 선택해주세요.' });
         return;
     }
 
     setIsSaving(true);
-
+    
+    const formData = new FormData();
+    formData.append('itemType', itemType);
+    formData.append('itemId', item.id);
+    formData.append('hint', thumbnailHint);
+    if (imageFile) {
+      formData.append('image', imageFile);
+    }
+    
     try {
-        const dataToUpdate: { thumbnailHint: string; thumbnailUrl?: string } = {
-          thumbnailHint: thumbnailHint,
-        };
-
-        if (imageFile) {
-            const storageRef = ref(storage, `${itemType}/${item.id}/${imageFile.name}`);
-            const uploadResult = await uploadBytes(storageRef, imageFile);
-            const downloadUrl = await getDownloadURL(uploadResult.ref);
-            dataToUpdate.thumbnailUrl = downloadUrl;
+        const result = await updateThumbnail(formData);
+        if (result.success) {
+            toast({
+                title: '저장 성공',
+                description: '썸네일 정보가 성공적으로 업데이트되었습니다.',
+            });
+            onClose();
+        } else {
+            throw new Error(result.message);
         }
-
-        const docRef = doc(firestore, itemType, item.id);
-        await updateDoc(docRef, dataToUpdate);
-
-        toast({
-            title: '저장 성공',
-            description: '썸네일 정보가 성공적으로 업데이트되었습니다.',
-        });
-        onClose();
-        // Manually trigger revalidation if needed, though server actions do this better.
-        // revalidatePath('/admin/content'); 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
         toast({
@@ -112,7 +110,7 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label>현재 썸네일</Label>
+            <Label>썸네일 미리보기</Label>
             <div className="relative w-full aspect-video rounded-md overflow-hidden bg-muted">
                 {imagePreview ? (
                     <Image src={imagePreview} alt="썸네일 미리보기" fill className="object-cover" />
@@ -140,7 +138,7 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
           <Button variant="outline" onClick={onClose} disabled={isSaving}>
             취소
           </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button onClick={handleSave} disabled={isSaving || !imageFile}>
             {isSaving ? '저장 중...' : '저장'}
           </Button>
         </DialogFooter>
