@@ -9,11 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import type { Policy, FooterSettings, HeroImageSettings, HeroContent } from '@/lib/types';
-import { useCollection, useDoc, useFirestore, useFirebase, errorEmitter, useStorage } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useFirebase, errorEmitter, useStorage, useMemoFirebase } from '@/firebase';
 import { collection, doc, writeBatch, setDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { FirestorePermissionError } from "@/firebase/errors";
 import Image from "next/image";
@@ -22,9 +22,9 @@ import { Separator } from "@/components/ui/separator";
 function HeroImageManager() {
     const firestore = useFirestore();
     const storage = useStorage();
-    const { authUser } = useFirebase();
+    const { user } = useFirebase();
     const { toast } = useToast();
-    const heroImagesRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
+    const heroImagesRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
     const { data: heroImageData, isLoading } = useDoc<HeroImageSettings>(heroImagesRef);
 
     const [settings, setSettings] = useState<Partial<HeroImageSettings>>({ home: {}, about: {} });
@@ -72,7 +72,7 @@ function HeroImageManager() {
 
         const page = type.startsWith('home') ? 'home' : 'about';
         const deviceUrlProp = type.endsWith('Mobile') ? 'urlMobile' : 'url';
-        const originalUrlProp: keyof typeof originalUrls.current = type.endsWith('Mobile') ? `${page}Mobile` : page;
+        const originalUrlProp: keyof typeof originalUrls.current = type.endsWith('Mobile') ? `${page}Mobile` as keyof typeof originalUrls.current : page as keyof typeof originalUrls.current;
 
 
         setSettings(prev => ({
@@ -89,7 +89,7 @@ function HeroImageManager() {
     };
 
     const handleSave = async () => {
-        if (!firestore || !storage || !authUser) return;
+        if (!firestore || !storage || !user) return;
         setIsSaving(true);
         
         let updatedSettings: Partial<HeroImageSettings> = JSON.parse(JSON.stringify(settings));
@@ -125,7 +125,7 @@ function HeroImageManager() {
                     path: docRef.path,
                     operation: 'update',
                     requestResourceData: updatedSettings,
-                }, authUser);
+                }, user);
                 throw contextualError;
             });
             
@@ -210,7 +210,7 @@ function HeroImageManager() {
               <div className="flex items-center gap-2">
                 <Input type="file" onChange={e => handleFileChange(`${type}Mobile`, e.target.files?.[0] || null)} accept="image/*" className="flex-1" />
                 {files[`${type}Mobile` as FileType] && (
-                  <Button variant="outline" size="sm" onClick={() => handleCancelFileChange(`${type}Mobile`)}>취소</Button>
+                  <Button variant="outline" size="sm" onClick={() => handleCancelFileChange(`${type}Mobile` as FileType)}>취소</Button>
                 )}
               </div>
             </div>
@@ -237,9 +237,9 @@ function HeroImageManager() {
 
 function FooterSettingsManager() {
   const firestore = useFirestore();
-  const { authUser } = useFirebase();
+  const { user } = useFirebase();
   const { toast } = useToast();
-  const footerRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
+  const footerRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
   const { data: footerData, isLoading } = useDoc<FooterSettings>(footerRef);
 
   const [settings, setSettings] = useState<Partial<FooterSettings>>({});
@@ -256,7 +256,7 @@ function FooterSettingsManager() {
   };
 
   const handleSave = async () => {
-    if (!firestore || Object.keys(settings).length === 0 || !authUser) return;
+    if (!firestore || Object.keys(settings).length === 0 || !user) return;
     setIsSaving(true);
     
     const docRef = doc(firestore, 'settings', 'footer');
@@ -274,7 +274,7 @@ function FooterSettingsManager() {
           path: docRef.path,
           operation: 'update',
           requestResourceData: dataToSave,
-        }, authUser);
+        }, user);
         errorEmitter.emit('permission-error', contextualError);
       })
       .finally(() => {
@@ -306,7 +306,7 @@ function FooterSettingsManager() {
 function PolicySettingsManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const policiesQuery = useMemo(() => (firestore ? collection(firestore, 'policies') : null), [firestore]);
+  const policiesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'policies') : null), [firestore]);
   const { data: policies, isLoading } = useCollection<Policy>(policiesQuery);
   
   const [localPolicies, setLocalPolicies] = useState<Policy[]>([]);

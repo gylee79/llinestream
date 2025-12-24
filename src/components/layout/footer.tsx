@@ -1,17 +1,16 @@
 
 'use client';
 import Link from 'next/link';
-import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { LlineStreamLogo, KakaoIcon } from '@/components/icons';
-import { useDoc, useFirestore } from '@/firebase';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { FooterSettings } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 
 export default function Footer() {
   const firestore = useFirestore();
-  const footerRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
+  const footerRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
   const { data: settings, isLoading } = useDoc<FooterSettings>(footerRef);
 
   if (isLoading || !settings) {

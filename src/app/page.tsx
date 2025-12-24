@@ -1,10 +1,9 @@
 
 'use client';
 import Hero from '@/components/home/hero';
-import { useCollection, useDoc, useFirestore, useUser } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import { Course, Classification, Episode, HeroImageSettings, Field } from '@/lib/types';
-import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import ClassificationCard from '@/components/shared/classification-card';
 import ContinueWatching from '@/components/home/continue-watching';
@@ -13,13 +12,13 @@ export default function Home() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  const fieldsQuery = useMemo(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
+  const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
 
-  const classificationsQuery = useMemo(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
+  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
   const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
   
-  const heroImagesRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
+  const heroImagesRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
   const { data: heroImagesData, isLoading: heroImagesLoading } = useDoc<HeroImageSettings>(heroImagesRef);
 
   const isLoading = fieldsLoading || classificationsLoading || heroImagesLoading;

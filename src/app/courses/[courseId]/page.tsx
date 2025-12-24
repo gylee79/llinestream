@@ -7,27 +7,26 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import PaymentDialog from '@/components/shared/payment-dialog';
-import { useDoc, useCollection, useFirestore, useUser } from '@/firebase';
+import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { doc, collection, query } from 'firebase/firestore';
 import type { Course, Episode, Classification } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useMemo } from 'react';
 
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
   const firestore = useFirestore();
   const { user } = useUser();
 
-  const courseRef = useMemo(() => (firestore ? doc(firestore, 'courses', params.courseId) : null), [firestore, params.courseId]);
+  const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', params.courseId) : null), [firestore, params.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
 
-  const episodesQuery = useMemo(() => 
+  const episodesQuery = useMemoFirebase(() => 
     firestore && course ? query(collection(firestore, 'courses', course.id, 'episodes')) : null, 
     [firestore, course]
   );
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
   
-  const classificationRef = useMemo(() => 
+  const classificationRef = useMemoFirebase(() => 
     firestore && course ? doc(firestore, 'classifications', course.classificationId) : null,
     [firestore, course]
   );

@@ -1,10 +1,10 @@
+
 'use client';
 
 import { useParams, notFound } from 'next/navigation';
-import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useDoc, useFirestore } from '@/firebase';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { Policy } from '@/lib/types';
 
@@ -13,7 +13,7 @@ export default function PolicyPage() {
   const firestore = useFirestore();
   const slug = params.slug;
 
-  const policyRef = useMemo(
+  const policyRef = useMemoFirebase(
     () => (firestore && slug ? doc(firestore, 'policies', slug) : null),
     [firestore, slug]
   );

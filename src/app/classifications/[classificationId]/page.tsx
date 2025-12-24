@@ -1,10 +1,9 @@
 
 'use client';
 
-import { useMemo } from 'react';
 import Image from 'next/image';
 import { useParams, notFound } from 'next/navigation';
-import { useDoc, useCollection, useFirestore } from '@/firebase';
+import { useDoc, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where } from 'firebase/firestore';
 import type { Classification, Course } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,13 +15,13 @@ export default function ClassificationDetailPage() {
   const params = useParams<{ classificationId: string }>();
   const firestore = useFirestore();
 
-  const classificationRef = useMemo(
+  const classificationRef = useMemoFirebase(
     () => (firestore ? doc(firestore, 'classifications', params.classificationId) : null),
     [firestore, params.classificationId]
   );
   const { data: classification, isLoading: classificationLoading } = useDoc<Classification>(classificationRef);
 
-  const coursesQuery = useMemo(
+  const coursesQuery = useMemoFirebase(
     () =>
       firestore && classification
         ? query(collection(firestore, 'courses'), where('classificationId', '==', classification.id))

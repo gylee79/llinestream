@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect, useTransition, useMemo } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -22,8 +23,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { useCollection, useFirestore } from '@/firebase';
-import { collection, doc, addDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, doc, addDoc, setDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -64,15 +65,15 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const isEditMode = !!episode;
   const isLoading = isProcessing;
 
-  const fieldsQuery = useMemo(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
+  const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: dbFields } = useCollection<Field>(fieldsQuery);
 
-  const classificationsQuery = useMemo(() => (
+  const classificationsQuery = useMemoFirebase(() => (
       firestore && selectedFieldId ? query(collection(firestore, 'classifications'), where('fieldId', '==', selectedFieldId)) : null
   ), [firestore, selectedFieldId]);
   const { data: filteredClassifications } = useCollection<Classification>(classificationsQuery);
 
-  const coursesQuery = useMemo(() => (
+  const coursesQuery = useMemoFirebase(() => (
       firestore && selectedClassificationId ? query(collection(firestore, 'courses'), where('classificationId', '==', selectedClassificationId)) : null
   ), [firestore, selectedClassificationId]);
   const { data: filteredCourses } = useCollection<Course>(coursesQuery);
@@ -98,19 +99,21 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             setSelectedCourseId(episode.courseId);
 
             // This is complex, let's trace it back.
-            const courseDoc = await doc(firestore!, 'courses', episode.courseId).get();
-            if (courseDoc.exists()) {
-                const course = courseDoc.data() as Course;
-                setSelectedClassificationId(course.classificationId);
-                const classDoc = await doc(firestore!, 'classifications', course.classificationId).get();
-                if (classDoc.exists()) {
-                    const classification = classDoc.data() as Classification;
-                    setSelectedFieldId(classification.fieldId);
-                }
+            if (firestore) {
+              const courseDocSnap = await doc(firestore, 'courses', episode.courseId).get();
+              if (courseDocSnap.exists()) {
+                  const course = courseDocSnap.data() as Course;
+                  setSelectedClassificationId(course.classificationId);
+                  const classDocSnap = await doc(firestore, 'classifications', course.classificationId).get();
+                  if (classDocSnap.exists()) {
+                      const classification = classDocSnap.data() as Classification;
+                      setSelectedFieldId(classification.fieldId);
+                  }
+              }
             }
         }
     }
-    if (open) {
+    if (open && firestore) {
         setInitialState();
     } else {
         resetForm();
@@ -186,13 +189,14 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     try {
         if (type === '분야') {
             const docRef = doc(collection(firestore, 'fields'));
-            await setDoc(docRef, { name: item.name, thumbnailUrl: `https://picsum.photos/seed/${docRef.id}/400/400`, thumbnailHint: 'placeholder' });
+            await setDoc(docRef, { id: docRef.id, name: item.name, thumbnailUrl: `https://picsum.photos/seed/${docRef.id}/400/400`, thumbnailHint: 'placeholder' });
             setSelectedFieldId(docRef.id);
             setSelectedClassificationId('');
             setSelectedCourseId('');
         } else if (type === '큰분류' && selectedFieldId) {
             const docRef = doc(collection(firestore, 'classifications'));
             await setDoc(docRef, {
+                id: docRef.id,
                 fieldId: selectedFieldId,
                 name: item.name,
                 description: `${item.name}에 대한 설명입니다.`,
@@ -205,6 +209,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
         } else if (type === '상세분류' && selectedClassificationId) {
             const docRef = doc(collection(firestore, 'courses'));
             await setDoc(docRef, {
+                id: docRef.id,
                 classificationId: selectedClassificationId,
                 name: item.name,
                 description: `${item.name}에 대한 상세 설명입니다.`,

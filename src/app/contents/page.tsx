@@ -1,19 +1,18 @@
 
 'use client';
 import ContentCarousel from '@/components/shared/content-carousel';
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import type { Course, Classification } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useMemo } from 'react';
 
 export default function ContentsPage() {
   const firestore = useFirestore();
 
-  const coursesQuery = useMemo(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
+  const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
 
-  const classificationsQuery = useMemo(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
+  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
   const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
 
   const isLoading = coursesLoading || classificationsLoading;

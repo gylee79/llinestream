@@ -3,7 +3,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useMemo } from 'react';
 import {
   BarChart3,
   Cog,
@@ -18,7 +17,7 @@ import { LlineStreamLogo } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { useDoc, useFirestore } from '@/firebase';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import type { FooterSettings } from '@/lib/types';
 import { doc } from 'firebase/firestore';
 
@@ -59,7 +58,7 @@ const AdminNav = ({ className }: { className?: string }) => {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const firestore = useFirestore();
-  const footerRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
+  const footerRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
   const { data: settings } = useDoc<FooterSettings>(footerRef);
   const appName = settings?.appName || 'LlineStream';
 

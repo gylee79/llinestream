@@ -28,9 +28,8 @@ import {
     SelectValue,
   } from '@/components/ui/select';
 import type { User, Classification } from '@/lib/types';
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
-import { useMemo } from 'react';
 
 interface UserDetailsDialogProps {
   user: User;
@@ -40,7 +39,7 @@ interface UserDetailsDialogProps {
 
 export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialogProps) {
     const firestore = useFirestore();
-    const classificationsQuery = useMemo(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
+    const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
     const { data: classifications } = useCollection<Classification>(classificationsQuery);
 
     const activeSubs = user.activeSubscriptions ? Object.entries(user.activeSubscriptions).map(([id, sub]) => ({

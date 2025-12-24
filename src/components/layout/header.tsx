@@ -39,11 +39,10 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { useUser, useAuth, useDoc, useFirestore, useFirebase } from '@/firebase';
+import { useUser, useAuth, useDoc, useFirestore, useFirebase, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useCart } from '@/context/cart-context';
 import { Badge } from '../ui/badge';
-import { useMemo } from 'react';
 import type { FooterSettings } from '@/lib/types';
 import { doc } from 'firebase/firestore';
 
@@ -59,13 +58,14 @@ const adminLink = { href: '/admin', label: '관리자', icon: Shield };
 export default function Header() {
   const pathname = usePathname();
   const firestore = useFirestore();
-  const { user, authUser, isUserLoading } = useUser();
+  const { user, isUserLoading } = useUser();
   const auth = useAuth();
+  const authUser = auth.currentUser;
   const { openCart, items } = useCart();
   const isLoggedIn = !!user;
   const isAdmin = user?.role === 'admin';
 
-  const footerRef = useMemo(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
+  const footerRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
   const { data: settings } = useDoc<FooterSettings>(footerRef);
   const appName = settings?.appName || 'LlineStream';
 
