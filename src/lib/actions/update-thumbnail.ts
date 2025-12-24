@@ -39,7 +39,8 @@ const getPathFromUrl = (url: string, storage: Storage): string | null => {
             const pathRegex = new RegExp(`/v0/b/${bucketName}/o/(.+)`);
             const match = urlObject.pathname.match(pathRegex);
             if (match && match[1]) {
-                return decodeURIComponent(match[1]);
+                const decodedPath = decodeURIComponent(match[1]);
+                return decodedPath.split('?')[0]; // Remove query params like alt=media&token=...
             }
         }
 
@@ -47,7 +48,8 @@ const getPathFromUrl = (url: string, storage: Storage): string | null => {
         if (urlObject.hostname === 'storage.googleapis.com') {
             const pathPrefix = `/${bucketName}/`;
             if (urlObject.pathname.startsWith(pathPrefix)) {
-                return decodeURIComponent(urlObject.pathname.substring(pathPrefix.length));
+                const decodedPath = decodeURIComponent(urlObject.pathname.substring(pathPrefix.length));
+                 return decodedPath.split('?')[0]; // Remove query params
             }
         }
     } catch (e) {
@@ -64,7 +66,10 @@ const getPathFromUrl = (url: string, storage: Storage): string | null => {
  */
 const deleteStorageFile = async (storage: Storage, url: string) => {
     const path = getPathFromUrl(url, storage);
-    if (!path) return;
+    if (!path) {
+        console.warn(`[update-thumbnail] Skipping deletion for un-parsable URL: ${url}`);
+        return;
+    }
     
     try {
         await storage.bucket().file(path).delete({ ignoreNotFound: true });
