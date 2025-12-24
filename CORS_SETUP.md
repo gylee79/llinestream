@@ -23,3 +23,4 @@ gcloud storage buckets update gs://studio-6929130257-b96ff.appspot.com --cors-fi
 ### 실행 후
 
 명령어 실행 후 별다른 오류 메시지가 없다면 설정이 완료된 것입니다. 이제 웹 애플리케이션에서 썸네일 업로드를 다시 시도해 보세요. "The specified bucket does not exist" 오류 없이 정상적으로 작동할 것입니다.
+
