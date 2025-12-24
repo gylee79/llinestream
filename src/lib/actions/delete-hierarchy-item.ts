@@ -33,7 +33,8 @@ const deleteStorageFile = async (storage: Storage, url: string) => {
     await file.delete({ ignoreNotFound: true });
     console.log(`[DELETE SUCCESS] File deleted or did not exist: ${file.name}`);
   } catch (error: any) {
-    console.error(`[DELETE FAILED] Failed to delete storage file from URL ${url}:`, error.message);
+    // Log the error but do not throw, to allow other deletions to proceed.
+    console.error(`[DELETE FAILED] Could not delete storage file from URL ${url}. Error: ${error.message}`);
   }
 };
 
