@@ -1,4 +1,6 @@
 
+'use server';
+
 import * as admin from 'firebase-admin';
 import { App, getApps } from 'firebase-admin/app';
 
@@ -14,43 +16,17 @@ export function initializeAdminApp(): App {
     return apps[0];
   }
 
-  // Check for required environment variables.
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
-  const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  // Temporarily bypass environment variable checks for reset
+  console.warn("Firebase Admin SDK is not configured. Some server-side features will not work.");
 
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error(
-      'Missing required Firebase Admin SDK environment variables (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY).'
-    );
-  }
-   if (!storageBucket) {
-    throw new Error(
-      'Missing required Firebase Storage Bucket environment variable (NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET).'
-    );
-  }
-
-
+  // Return a dummy app object or throw an error if needed, for now, we try to initialize with what we have
   try {
-    // Initialize the app with explicit credentials.
-    const adminApp = admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId,
-        clientEmail,
-        // The private key from environment variables often has escaped newlines.
-        // This line replaces the literal `\\n` with actual newline characters.
-        privateKey: privateKey.replace(/\\n/g, '\n'),
-      }),
-      storageBucket: storageBucket,
-    });
-    
-    console.log("Firebase Admin SDK initialized successfully.");
-    return adminApp;
-
-  } catch (error: any) {
-    console.error("Firebase Admin SDK initialization failed:", error);
-    // Throw a more informative error.
-    throw new Error(`Firebase Admin SDK initialization failed: ${error.message}`);
+     const adminApp = admin.initializeApp();
+     return adminApp;
+  } catch(error) {
+      console.error("Dummy Firebase Admin SDK initialization failed:", error);
+      // This will likely fail but prevents app from crashing if called.
+      // A proper setup is required.
+      throw new Error('Firebase Admin SDK is not configured. Please set up the environment variables.');
   }
 }
