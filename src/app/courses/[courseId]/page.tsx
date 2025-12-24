@@ -21,14 +21,14 @@ export default function CourseDetailPage() {
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
 
   const episodesQuery = useMemoFirebase(() => 
-    firestore && course ? query(collection(firestore, 'courses', course.id, 'episodes')) : null, 
-    [firestore, course]
+    firestore && course?.id ? query(collection(firestore, 'courses', course.id, 'episodes')) : null, 
+    [firestore, course?.id]
   );
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
   
   const classificationRef = useMemoFirebase(() => 
-    firestore && course ? doc(firestore, 'classifications', course.classificationId) : null,
-    [firestore, course]
+    firestore && course?.classificationId ? doc(firestore, 'classifications', course.classificationId) : null,
+    [firestore, course?.classificationId]
   );
   const { data: classification, isLoading: classificationLoading } = useDoc<Classification>(classificationRef);
 

@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Query,
   onSnapshot,
@@ -60,6 +59,34 @@ export function useCollection<T = any>(
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
+  const handleNext = useCallback((snapshot: QuerySnapshot<DocumentData>) => {
+    const results: ResultItemType[] = snapshot.docs.map(doc => ({
+      ...(doc.data() as T),
+      id: doc.id
+    }));
+    setData(results);
+    setError(null);
+    setIsLoading(false);
+  }, []);
+
+  const handleError = useCallback((err: FirestoreError) => {
+    const path = targetRefOrQuery?.type === 'collection'
+      ? (targetRefOrQuery as CollectionReference).path
+      : ((targetRefOrQuery as InternalQuery)._query?.path?.canonicalString() || 'unknown path');
+
+    const contextualError = new FirestorePermissionError({
+      operation: 'list',
+      path,
+    }, authUser);
+
+    setError(contextualError);
+    setData(null);
+    setIsLoading(false);
+
+    // trigger global error propagation
+    errorEmitter.emit('permission-error', contextualError);
+  }, [targetRefOrQuery, authUser]);
+
   useEffect(() => {
     // If the query is not ready, reset the state
     if (!targetRefOrQuery) {
@@ -72,39 +99,10 @@ export function useCollection<T = any>(
     setIsLoading(true);
     setError(null);
 
-    const unsubscribe = onSnapshot(
-      targetRefOrQuery,
-      (snapshot: QuerySnapshot<DocumentData>) => {
-        const results: ResultItemType[] = snapshot.docs.map(doc => ({
-            ...(doc.data() as T),
-            id: doc.id
-        }));
-        setData(results);
-        setError(null);
-        setIsLoading(false);
-      },
-      (err: FirestoreError) => {
-        // This logic extracts the path from either a ref or a query
-        const path = targetRefOrQuery.type === 'collection'
-          ? (targetRefOrQuery as CollectionReference).path
-          : (targetRefOrQuery as InternalQuery)._query?.path?.canonicalString() || 'unknown path';
-
-        const contextualError = new FirestorePermissionError({
-          operation: 'list',
-          path,
-        }, authUser);
-
-        setError(contextualError);
-        setData(null);
-        setIsLoading(false);
-
-        // trigger global error propagation
-        errorEmitter.emit('permission-error', contextualError);
-      }
-    );
+    const unsubscribe = onSnapshot(targetRefOrQuery, handleNext, handleError);
 
     return () => unsubscribe();
-  }, [targetRefOrQuery, authUser]); // Re-run if the target query/reference or user changes.
+  }, [targetRefOrQuery, handleNext, handleError]);
 
   return { data, isLoading, error };
 }

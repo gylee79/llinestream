@@ -23,10 +23,10 @@ export default function ClassificationDetailPage() {
 
   const coursesQuery = useMemoFirebase(
     () =>
-      firestore && classification
+      firestore && classification?.id
         ? query(collection(firestore, 'courses'), where('classificationId', '==', classification.id))
         : null,
-    [firestore, classification]
+    [firestore, classification?.id]
   );
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
 
