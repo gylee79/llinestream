@@ -8,57 +8,56 @@ import { WriteBatch, Firestore } from 'firebase-admin/firestore';
 import { Storage } from 'firebase-admin/storage';
 import { revalidatePath } from 'next/cache';
 
-export type ProgressCallback = (message: string) => void;
-
 type DeletionResult = {
   success: boolean;
   message: string;
 };
 
-const noOpProgress: ProgressCallback = () => {};
-
 /**
- * Extracts the storage path from a Firebase Storage URL.
- * Handles both gs:// and various https:// formats robustly.
- * @param url The full gs:// or https:// URL.
- * @param storage The Firebase Admin Storage instance to get the default bucket name.
- * @returns The file path within the bucket, or null if parsing fails.
+ * Extracts the storage path from a Firebase Storage URL, decoding it correctly.
+ * This is the robust, final version to handle all known URL formats.
+ * @param url The full gs:// or https:// URL of the file in Firebase Storage.
+ * @param storage The Firebase Admin Storage instance, used to get the default bucket name.
+ * @returns The decoded file path within the bucket (e.g., "courses/courseId/image.jpg"), or null if parsing fails.
  */
 const getPathFromUrl = (url: string, storage: Storage): string | null => {
-  if (!url) return null;
-  try {
-    const decodedUrl = decodeURIComponent(url);
-    
-    // Handle gs:// URLs
-    if (decodedUrl.startsWith('gs://')) {
-      const path = decodedUrl.substring(decodedUrl.indexOf('/', 5) + 1);
-      return path;
+    if (!url) return null;
+
+    try {
+        // Handle gs:// URLs directly
+        if (url.startsWith('gs://')) {
+            const bucketNameAndPath = url.substring(5);
+            const path = bucketNameAndPath.substring(bucketNameAndPath.indexOf('/') + 1);
+            return decodeURIComponent(path);
+        }
+
+        // Handle https:// URLs
+        const urlObject = new URL(url);
+        const bucketName = storage.bucket().name;
+
+        // Standard Firebase Storage URL format: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}
+        if (urlObject.hostname === 'firebasestorage.googleapis.com') {
+            const pathRegex = new RegExp(`/v0/b/${bucketName}/o/(.+)`);
+            const match = urlObject.pathname.match(pathRegex);
+            if (match && match[1]) {
+                return decodeURIComponent(match[1]);
+            }
+        }
+
+        // Alternative/Public GCS URL format: https://storage.googleapis.com/{bucket}/{path}
+        if (urlObject.hostname === 'storage.googleapis.com') {
+            const pathPrefix = `/${bucketName}/`;
+            if (urlObject.pathname.startsWith(pathPrefix)) {
+                return decodeURIComponent(urlObject.pathname.substring(pathPrefix.length));
+            }
+        }
+    } catch (e) {
+        console.error(`[delete-hierarchy-item] URL parsing failed for: ${url}`, e);
+        return null;
     }
     
-    // Get the default bucket name from the storage instance
-    const bucketName = storage.bucket().name;
-
-    // Try to match various HTTPS URL formats
-    const patterns = [
-      // New format: https://firebasestorage.googleapis.com/v0/b/BUCKET_NAME/o/PATH?alt=media&token=...
-      `https://firebasestorage\\.googleapis\\.com/v\\d+/b/${bucketName}/o/(.*?)(?:\\?|$)`,
-      // Old format / GCS format: https://storage.googleapis.com/BUCKET_NAME/PATH
-      `https://storage\\.googleapis\\.com/${bucketName}/(.*?)(?:\\?|$)`
-    ];
-
-    for (const pattern of patterns) {
-      const match = decodedUrl.match(new RegExp(pattern));
-      if (match && match[1]) {
-        return match[1];
-      }
-    }
-
-  } catch (e) {
-    console.error(`[delete-hierarchy-item] Could not decode or parse URL: ${url}`, e);
-  }
-  
-  console.warn(`[delete-hierarchy-item] Could not determine storage path from URL, skipping deletion for: ${url.substring(0, 70)}...`);
-  return null;
+    console.warn(`[delete-hierarchy-item] Could not determine storage path from URL: ${url}`);
+    return null;
 };
 
 
@@ -67,74 +66,55 @@ const getPathFromUrl = (url: string, storage: Storage): string | null => {
  * @param storage The Firebase Admin Storage instance.
  * @param url The full URL of the file to delete.
  */
-const deleteStorageFile = async (storage: Storage, url: string, onProgress: ProgressCallback) => {
+const deleteStorageFile = async (storage: Storage, url: string) => {
   const path = getPathFromUrl(url, storage);
   if (!path) {
-    onProgress(`스토리지 파일 경로를 찾을 수 없어 건너뜁니다: ${url.substring(0, 70)}...`);
+    console.warn(`Skipping deletion for un-parsable URL: ${url}`);
     return;
   }
-  onProgress(`스토리지 파일 삭제 시도: ${path}`);
+  console.log(`Attempting to delete storage file at path: ${path}`);
   try {
     await storage.bucket().file(path).delete({ ignoreNotFound: true });
-    onProgress(`파일 삭제 완료(또는 존재하지 않음): ${path}`);
+    console.log(`File deleted or did not exist: ${path}`);
   } catch (error: any) {
     console.error(`[delete-hierarchy-item] Failed to delete storage file at path ${path}:`, error);
-    onProgress(`파일 삭제 실패: ${path}. 오류: ${error.message}`);
-    // We will not throw here to allow DB deletion to proceed, but the error is logged.
+    // Do not throw; log the error and allow DB deletion to proceed.
   }
 };
 
 
-const deleteEpisodes = async (db: Firestore, storage: Storage, courseId: string, batch: WriteBatch, onProgress: ProgressCallback) => {
-  onProgress(`'${courseId}' 강좌의 에피소드 조회 중...`);
+const deleteEpisodes = async (db: Firestore, storage: Storage, courseId: string, batch: WriteBatch) => {
   const episodesSnapshot = await db.collection('courses').doc(courseId).collection('episodes').get();
-  if (episodesSnapshot.empty) {
-    onProgress('삭제할 에피소드가 없습니다.');
-    return;
-  }
-  onProgress(`${episodesSnapshot.size}개의 에피소드를 삭제합니다.`);
+  if (episodesSnapshot.empty) return;
 
   for (const episodeDoc of episodesSnapshot.docs) {
     const episodeData = episodeDoc.data() as Episode;
-    onProgress(`'${episodeData.title}' 에피소드 데이터 처리 중...`);
-    if (episodeData.videoUrl) await deleteStorageFile(storage, episodeData.videoUrl, onProgress);
-    if (episodeData.thumbnailUrl) await deleteStorageFile(storage, episodeData.thumbnailUrl, onProgress);
+    if (episodeData.videoUrl) await deleteStorageFile(storage, episodeData.videoUrl);
+    if (episodeData.thumbnailUrl) await deleteStorageFile(storage, episodeData.thumbnailUrl);
     batch.delete(episodeDoc.ref);
   }
 };
 
-const deleteCourses = async (db: Firestore, storage: Storage, classificationId: string, batch: WriteBatch, onProgress: ProgressCallback) => {
-  onProgress(`'${classificationId}' 분류의 강좌 조회 중...`);
+const deleteCourses = async (db: Firestore, storage: Storage, classificationId: string, batch: WriteBatch) => {
   const coursesSnapshot = await db.collection('courses').where('classificationId', '==', classificationId).get();
-  if (coursesSnapshot.empty) {
-     onProgress('삭제할 강좌가 없습니다.');
-     return;
-  }
-  onProgress(`${coursesSnapshot.size}개의 강좌를 삭제합니다.`);
+  if (coursesSnapshot.empty) return;
 
   for (const courseDoc of coursesSnapshot.docs) {
     const courseData = courseDoc.data() as Course;
-    onProgress(`'${courseData.name}' 강좌 데이터 처리 중...`);
-    if (courseData.thumbnailUrl) await deleteStorageFile(storage, courseData.thumbnailUrl, onProgress);
-    await deleteEpisodes(db, storage, courseDoc.id, batch, onProgress);
+    if (courseData.thumbnailUrl) await deleteStorageFile(storage, courseData.thumbnailUrl);
+    await deleteEpisodes(db, storage, courseDoc.id, batch);
     batch.delete(courseDoc.ref);
   }
 };
 
-const deleteClassifications = async (db: Firestore, storage: Storage, fieldId: string, batch: WriteBatch, onProgress: ProgressCallback) => {
-  onProgress(`'${fieldId}' 분야의 큰분류 조회 중...`);
+const deleteClassifications = async (db: Firestore, storage: Storage, fieldId: string, batch: WriteBatch) => {
   const classificationsSnapshot = await db.collection('classifications').where('fieldId', '==', fieldId).get();
-  if (classificationsSnapshot.empty) {
-    onProgress('삭제할 큰분류가 없습니다.');
-    return;
-  }
-  onProgress(`${classificationsSnapshot.size}개의 큰분류를 삭제합니다.`);
+  if (classificationsSnapshot.empty) return;
 
   for (const classDoc of classificationsSnapshot.docs) {
     const classData = classDoc.data() as Classification;
-    onProgress(`'${classData.name}' 큰분류 데이터 처리 중...`);
-    if (classData.thumbnailUrl) await deleteStorageFile(storage, classData.thumbnailUrl, onProgress);
-    await deleteCourses(db, storage, classDoc.id, batch, onProgress);
+    if (classData.thumbnailUrl) await deleteStorageFile(storage, classData.thumbnailUrl);
+    await deleteCourses(db, storage, classDoc.id, batch);
     batch.delete(classDoc.ref);
   }
 };
@@ -142,29 +122,25 @@ const deleteClassifications = async (db: Firestore, storage: Storage, fieldId: s
 export async function deleteHierarchyItem(
   collectionName: 'fields' | 'classifications' | 'courses' | 'episodes',
   id: string,
-  itemData?: any,
-  onProgress: ProgressCallback = noOpProgress,
+  itemData?: any
 ): Promise<DeletionResult> {
   if (!id) {
     return { success: false, message: '삭제할 항목의 ID가 제공되지 않았습니다.' };
   }
 
   try {
-    onProgress('서버에 연결하고 Admin SDK를 초기화합니다...');
     const adminApp = initializeAdminApp();
     const db = admin.firestore(adminApp);
     const storage = admin.storage(adminApp);
     const batch = db.batch();
 
-    onProgress('삭제할 항목의 종류를 확인합니다...');
     if (collectionName === 'fields') {
       const fieldRef = db.collection('fields').doc(id);
       const fieldDoc = await fieldRef.get();
       if(fieldDoc.exists) {
           const fieldData = fieldDoc.data() as Field;
-          onProgress(`'${fieldData.name}' 분야 삭제를 시작합니다.`);
-          if (fieldData.thumbnailUrl) await deleteStorageFile(storage, fieldData.thumbnailUrl, onProgress);
-          await deleteClassifications(db, storage, id, batch, onProgress);
+          if (fieldData.thumbnailUrl) await deleteStorageFile(storage, fieldData.thumbnailUrl);
+          await deleteClassifications(db, storage, id, batch);
           batch.delete(fieldRef);
       }
     } else if (collectionName === 'classifications') {
@@ -172,9 +148,8 @@ export async function deleteHierarchyItem(
       const classDoc = await classRef.get();
       if(classDoc.exists) {
           const classData = classDoc.data() as Classification;
-          onProgress(`'${classData.name}' 큰분류 삭제를 시작합니다.`);
-          if (classData.thumbnailUrl) await deleteStorageFile(storage, classData.thumbnailUrl, onProgress);
-          await deleteCourses(db, storage, id, batch, onProgress);
+          if (classData.thumbnailUrl) await deleteStorageFile(storage, classData.thumbnailUrl);
+          await deleteCourses(db, storage, id, batch);
           batch.delete(classRef);
       }
     } else if (collectionName === 'courses') {
@@ -182,31 +157,27 @@ export async function deleteHierarchyItem(
       const courseDoc = await courseRef.get();
       if(courseDoc.exists) {
           const courseData = courseDoc.data() as Course;
-          onProgress(`'${courseData.name}' 상세분류 삭제를 시작합니다.`);
-          if (courseData.thumbnailUrl) await deleteStorageFile(storage, courseData.thumbnailUrl, onProgress);
-          await deleteEpisodes(db, storage, id, batch, onProgress);
+          if (courseData.thumbnailUrl) await deleteStorageFile(storage, courseData.thumbnailUrl);
+          await deleteEpisodes(db, storage, id, batch);
         batch.delete(courseRef);
       }
     } else if (collectionName === 'episodes') {
       if (!itemData || !itemData.courseId) {
         throw new Error('에피소드 삭제를 위해서는 courseId 정보가 필요합니다.');
       }
-      onProgress(`'${itemData.title}' 에피소드 삭제를 시작합니다.`);
       const episodeRef = db.collection('courses').doc(itemData.courseId).collection('episodes').doc(id);
       const episodeDoc = await episodeRef.get();
       if(episodeDoc.exists){
         const episode = episodeDoc.data() as Episode;
-        if (episode.videoUrl) await deleteStorageFile(storage, episode.videoUrl, onProgress);
-        if (episode.thumbnailUrl) await deleteStorageFile(storage, episode.thumbnailUrl, onProgress);
+        if (episode.videoUrl) await deleteStorageFile(storage, episode.videoUrl);
+        if (episode.thumbnailUrl) await deleteStorageFile(storage, episode.thumbnailUrl);
         batch.delete(episodeRef);
       }
     } else {
         return { success: false, message: '잘못된 collection 이름이 제공되었습니다.' };
     }
 
-    onProgress('데이터베이스에 변경사항을 커밋합니다...');
     await batch.commit();
-    onProgress('UI를 새로고침합니다...');
     revalidatePath('/admin/content', 'layout');
 
     return { success: true, message: '항목 및 모든 하위 데이터가 성공적으로 삭제되었습니다.' };
@@ -214,7 +185,6 @@ export async function deleteHierarchyItem(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '알 수 없는 서버 오류가 발생했습니다.';
     console.error('[delete-hierarchy-item] 최종 오류:', errorMessage, error);
-    onProgress(`오류 발생: ${errorMessage}`);
     return { success: false, message: `삭제 실패: ${errorMessage}` };
   }
 }

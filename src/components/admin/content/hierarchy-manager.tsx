@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useTransition } from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import { collection, query, where, doc, addDoc, updateDoc } from 'firebase/fires
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
-import { deleteHierarchyItem, type ProgressCallback } from '@/lib/actions/delete-hierarchy-item';
+import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
 import ThumbnailEditorDialog from './thumbnail-editor-dialog';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
@@ -48,7 +49,7 @@ const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }
         <div className="flex items-center opacity-0 group-hover/menu-item:opacity-100 transition-opacity">
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit}><Pencil className="h-4 w-4" /></Button>
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEditThumbnail}><ImageIcon className="h-4 w-4" /></Button>
-            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>
         </div>
     </div>
 );
@@ -85,6 +86,7 @@ type ThumbnailDialogState = {
 export default function HierarchyManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
 
   const [selectedField, setSelectedField] = useState<string | null>(null);
   const [selectedClassification, setSelectedClassification] = useState<string | null>(null);
@@ -149,9 +151,9 @@ export default function HierarchyManager() {
     if (!firestore) return;
     try {
         const { type, item: existingItem } = nameDialog;
+        const collectionName = type === '분야' ? 'fields' : type === '큰분류' ? 'classifications' : 'courses';
 
         if (existingItem?.id) { // Edit mode
-            const collectionName = type === '분야' ? 'fields' : type === '큰분류' ? 'classifications' : 'courses';
             await updateDoc(doc(firestore, collectionName, existingItem.id), { name: itemData.name });
             toast({ title: '수정 성공', description: `'${itemData.name}'으로 이름이 수정되었습니다.` });
         } else { // Add mode
@@ -190,63 +192,55 @@ export default function HierarchyManager() {
     }
   };
   
-  const handleDelete = useCallback(async (e: React.MouseEvent, collectionName: 'fields' | 'classifications' | 'courses' | 'episodes', id: string, name: string, itemData?: any) => {
+  const handleDelete = useCallback((e: React.MouseEvent, collectionName: 'fields' | 'classifications' | 'courses' | 'episodes', id: string, name: string, itemData?: any) => {
     e.stopPropagation();
-    if (!firestore) return;
-  
+
     toast({
       title: '삭제 확인',
-      description: '삭제 버튼 클릭이 인식되었습니다. 확인 창을 확인해주세요.',
+      description: '삭제 버튼이 클릭되었습니다. 확인 창을 진행해주세요.',
     });
-  
+
     if (confirm(`정말로 '${name}' 항목과 모든 하위 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
-      const { toast: toastWithUpdate, dismiss, id: toastId } = toast({
-        title: '삭제 시작',
-        description: '삭제 프로세스를 시작합니다...',
-        duration: 999999, // Long duration, will be dismissed manually
-      });
-  
-      const onProgress: ProgressCallback = (message) => {
-        console.log(`[Delete Progress] ${message}`);
-        toastWithUpdate({
-          id: toastId,
-          description: message,
+      startTransition(async () => {
+        const { id: toastId } = toast({
+          title: '삭제 중...',
+          description: `'${name}' 항목과 관련된 모든 데이터를 삭제하고 있습니다.`,
+          duration: 999999,
         });
-      };
-  
-      try {
-        const result = await deleteHierarchyItem(collectionName, id, itemData, onProgress);
-        
-        if (result.success) {
-          dismiss(toastId);
-          toast({ title: '삭제 성공', description: result.message });
-          if (collectionName === 'fields' && selectedField === id) {
-              setSelectedField(null);
+
+        try {
+          const result = await deleteHierarchyItem(collectionName, id, itemData);
+          
+          if (result.success) {
+            toast({ id: toastId, title: '삭제 성공', description: result.message, duration: 5000 });
+            if (collectionName === 'fields' && selectedField === id) {
+                setSelectedField(null);
+            }
+            if (collectionName === 'classifications' && selectedClassification === id) {
+                setSelectedClassification(null);
+            }
+          } else {
+            throw new Error(result.message);
           }
-          if (collectionName === 'classifications' && selectedClassification === id) {
-              setSelectedClassification(null);
-          }
-        } else {
-          throw new Error(result.message);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          toast({
+              id: toastId,
+              variant: "destructive",
+              title: "삭제 중 오류 발생",
+              description: errorMessage,
+              duration: 9000,
+          });
         }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error("Error during delete process:", error);
-        dismiss(toastId);
-        toast({
-            variant: "destructive",
-            title: "삭제 중 오류 발생",
-            description: errorMessage,
-            duration: 9000,
-        });
-      }
+      });
     } else {
       toast({
         title: '취소됨',
         description: '삭제 작업이 취소되었습니다.',
+        duration: 3000,
       });
     }
-  }, [firestore, toast, selectedField, selectedClassification]);
+  }, [toast, startTransition, selectedField, selectedClassification]);
 
   const renderSkeletons = () => (
     <div className="flex flex-col gap-2">
@@ -259,7 +253,6 @@ export default function HierarchyManager() {
     </div>
   )
 
-
   return (
     <>
       <Card>
@@ -270,7 +263,7 @@ export default function HierarchyManager() {
         <CardContent>
           <div className="flex flex-col md:flex-row gap-4">
             <Column title="분야 (Field)" onAdd={() => openNameDialog('분야')}>
-                {fieldsLoading ? renderSkeletons() : fields?.map(item => (
+                {fieldsLoading || isPending ? renderSkeletons() : fields?.map(item => (
                     <ItemRow
                         key={item.id}
                         item={{ ...item, type: 'field' }}
@@ -284,7 +277,7 @@ export default function HierarchyManager() {
             </Column>
             <Column title="큰분류 (Classification)" onAdd={selectedField ? () => openNameDialog('큰분류') : null}>
                 {!selectedField ? <p className="text-center text-sm text-muted-foreground pt-4">분야를 선택해주세요.</p> :
-                 classificationsLoading ? renderSkeletons() :
+                 classificationsLoading || isPending ? renderSkeletons() :
                  classifications?.map(item => (
                      <ItemRow 
                         key={item.id}
@@ -300,7 +293,7 @@ export default function HierarchyManager() {
             </Column>
             <Column title="상세분류 (Course)" onAdd={selectedClassification ? () => openNameDialog('상세분류') : null}>
                 {!selectedClassification ? <p className="text-center text-sm text-muted-foreground pt-4">큰분류를 선택해주세요.</p> :
-                 coursesLoading ? renderSkeletons() :
+                 coursesLoading || isPending ? renderSkeletons() :
                  courses?.map(item => (
                     <ItemRow 
                        key={item.id}

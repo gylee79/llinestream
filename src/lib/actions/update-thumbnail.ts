@@ -13,36 +13,49 @@ type UpdateResult = {
 };
 
 /**
- * Extracts the storage path from a Firebase Storage URL.
- * Handles both gs:// and various https:// formats robustly.
+ * Extracts the storage path from a Firebase Storage URL, decoding it correctly.
+ * This is the robust, final version to handle all known URL formats.
+ * @param url The full gs:// or https:// URL of the file in Firebase Storage.
+ * @param storage The Firebase Admin Storage instance, used to get the default bucket name.
+ * @returns The decoded file path within the bucket (e.g., "courses/courseId/image.jpg"), or null if parsing fails.
  */
 const getPathFromUrl = (url: string, storage: Storage): string | null => {
     if (!url) return null;
+
     try {
-      const decodedUrl = decodeURIComponent(url);
-      
-      if (decodedUrl.startsWith('gs://')) {
-        const path = decodedUrl.substring(decodedUrl.indexOf('/', 5) + 1);
-        return path;
-      }
-      
-      const bucketName = storage.bucket().name;
-      const patterns = [
-        `https://firebasestorage\\.googleapis\\.com/v\\d+/b/${bucketName}/o/(.*?)(?:\\?|$)`,
-        `https://storage\\.googleapis\\.com/${bucketName}/(.*?)(?:\\?|$)`
-      ];
-  
-      for (const pattern of patterns) {
-        const match = decodedUrl.match(new RegExp(pattern));
-        if (match && match[1]) {
-          return match[1];
+        // Handle gs:// URLs directly
+        if (url.startsWith('gs://')) {
+            const bucketNameAndPath = url.substring(5);
+            const path = bucketNameAndPath.substring(bucketNameAndPath.indexOf('/') + 1);
+            return decodeURIComponent(path);
         }
-      }
-  
+
+        // Handle https:// URLs
+        const urlObject = new URL(url);
+        const bucketName = storage.bucket().name;
+
+        // Standard Firebase Storage URL format: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}
+        if (urlObject.hostname === 'firebasestorage.googleapis.com') {
+            const pathRegex = new RegExp(`/v0/b/${bucketName}/o/(.+)`);
+            const match = urlObject.pathname.match(pathRegex);
+            if (match && match[1]) {
+                return decodeURIComponent(match[1]);
+            }
+        }
+
+        // Alternative/Public GCS URL format: https://storage.googleapis.com/{bucket}/{path}
+        if (urlObject.hostname === 'storage.googleapis.com') {
+            const pathPrefix = `/${bucketName}/`;
+            if (urlObject.pathname.startsWith(pathPrefix)) {
+                return decodeURIComponent(urlObject.pathname.substring(pathPrefix.length));
+            }
+        }
     } catch (e) {
-      console.error(`[update-thumbnail] Could not decode or parse URL: ${url}`, e);
+        console.error(`[update-thumbnail] URL parsing failed for: ${url}`, e);
+        return null;
     }
-    console.warn(`[update-thumbnail] Could not determine storage path from URL, skipping deletion for: ${url.substring(0, 70)}...`);
+    
+    console.warn(`[update-thumbnail] Could not determine storage path from URL: ${url}`);
     return null;
 };
 
@@ -109,8 +122,7 @@ export async function updateThumbnail(formData: FormData): Promise<UpdateResult>
 
       // If upload is successful and there was an old URL, delete the old file
       if (oldThumbnailUrl && oldThumbnailUrl !== downloadUrl) {
-          // Do not wait for this to finish to speed up response time
-          deleteStorageFile(storage, oldThumbnailUrl);
+          await deleteStorageFile(storage, oldThumbnailUrl);
       }
     }
 
