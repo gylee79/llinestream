@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -26,6 +25,15 @@ interface ThumbnailEditorDialogProps {
   itemType: 'fields' | 'classifications' | 'courses';
 }
 
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+    });
+};
+
 export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType }: ThumbnailEditorDialogProps) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
@@ -33,12 +41,11 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
   const [imagePreview, setImagePreview] = useState<string | null>(item.thumbnailUrl || null);
   const [thumbnailHint, setThumbnailHint] = useState(item.thumbnailHint || '');
 
-  // Reset state when the dialog is opened with a new item
   useEffect(() => {
     if (isOpen) {
       setImagePreview(item.thumbnailUrl || null);
       setThumbnailHint(item.thumbnailHint || '');
-      setImageFile(null); // Clear previous file selection
+      setImageFile(null);
     }
   }, [isOpen, item]);
 
@@ -60,7 +67,6 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
         return;
     }
     
-    // A new image file is required to save. User can't just save the hint.
     if (!imageFile) {
         toast({ variant: 'destructive', title: '오류', description: '새로운 이미지 파일을 선택해주세요.' });
         return;
@@ -68,16 +74,18 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
 
     setIsSaving(true);
     
-    const formData = new FormData();
-    formData.append('itemType', itemType);
-    formData.append('itemId', item.id);
-    formData.append('hint', thumbnailHint);
-    if (imageFile) {
-      formData.append('image', imageFile);
-    }
-    
     try {
-        const result = await updateThumbnail(formData);
+        const base64Image = await fileToBase64(imageFile);
+
+        const result = await updateThumbnail({
+            itemType,
+            itemId: item.id,
+            hint: thumbnailHint,
+            base64Image,
+            imageContentType: imageFile.type,
+            imageName: imageFile.name,
+        });
+        
         if (result.success) {
             toast({
                 title: '저장 성공',

@@ -14,50 +14,39 @@ type UpdateResult = {
   message: string;
 };
 
-/**
- * Robustly deletes a file from Firebase Storage given its URL.
- * It uses the official admin SDK method to get the file reference from the URL.
- * @param storage The Firebase Admin Storage instance.
- * @param url The full HTTP URL of the file to delete.
- */
+type UpdateThumbnailPayload = {
+    itemType: 'fields' | 'classifications' | 'courses';
+    itemId: string;
+    hint: string;
+    base64Image: string;
+    imageContentType: string;
+    imageName: string;
+}
+
 const deleteStorageFile = async (storage: Storage, url: string) => {
   if (!url || !url.startsWith('http')) {
     console.warn(`[SKIP DELETE] Invalid or empty URL provided: "${url}"`);
     return;
   }
-
   try {
-    // Use the official SDK method to get a reference from the URL
     const file = storage.bucket().file(decodeURIComponent(new URL(url).pathname.split('/o/')[1].split('?')[0]));
-    
-    console.log(`[ATTEMPT DELETE] Deleting storage file at path: ${file.name}`);
     await file.delete({ ignoreNotFound: true });
     console.log(`[DELETE SUCCESS] File deleted or did not exist: ${file.name}`);
   } catch (error: any) {
-    // Log the error but don't re-throw, to allow the main operation to continue if possible
     console.error(`[DELETE FAILED] Could not delete storage file from URL ${url}. Error: ${error.message}`);
   }
 };
 
-
-/**
- * Updates the thumbnail for a field, classification or course.
- * Handles file upload to Firebase Storage and updates the Firestore document.
- * @param formData The FormData object containing itemType, itemId, hint, and optionally an image file.
- * @returns A promise that resolves to an UpdateResult.
- */
-export async function updateThumbnail(formData: FormData): Promise<UpdateResult> {
-  const collectionName = formData.get('itemType') as 'fields' | 'classifications' | 'courses';
-  const itemId = formData.get('itemId') as string;
-  const hint = formData.get('hint') as string;
-  const imageFile = formData.get('image') as File | null;
+export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<UpdateResult> {
+  const { itemType, itemId, hint, base64Image, imageContentType, imageName } = payload;
+  const collectionName = itemType;
 
   if (!collectionName || !itemId) {
     return { success: false, message: '필수 항목(itemType, itemId)이 누락되었습니다.' };
   }
 
-  if (!imageFile || imageFile.size === 0) {
-      return { success: false, message: '업데이트를 위해 새로운 이미지 파일을 제공해야 합니다.' };
+  if (!base64Image) {
+      return { success: false, message: '업데이트를 위해 이미지 데이터가 필요합니다.' };
   }
 
   try {
@@ -66,7 +55,6 @@ export async function updateThumbnail(formData: FormData): Promise<UpdateResult>
     const storage = admin.storage(adminApp);
     const docRef = db.collection(collectionName).doc(itemId);
     
-    // 1. Get the current document to find and delete the old thumbnail URL
     const currentDoc = await docRef.get();
     if (currentDoc.exists) {
         const oldThumbnailUrl = (currentDoc.data() as Field | Classification | Course)?.thumbnailUrl;
@@ -75,13 +63,13 @@ export async function updateThumbnail(formData: FormData): Promise<UpdateResult>
         }
     }
 
-    // 2. Upload the new file
-    const filePath = `${collectionName}/${itemId}/${Date.now()}-${imageFile.name}`;
-    const fileBuffer = Buffer.from(await imageFile.arrayBuffer());
+    const filePath = `${collectionName}/${itemId}/${Date.now()}-${imageName}`;
+    const base64EncodedImageString = base64Image.replace(/^data:image\/\w+;base64,/, '');
+    const fileBuffer = Buffer.from(base64EncodedImageString, 'base64');
     
     const file = storage.bucket().file(filePath);
     await file.save(fileBuffer, {
-      metadata: { contentType: imageFile.type },
+      metadata: { contentType: imageContentType },
       public: true,
     });
 
@@ -91,16 +79,13 @@ export async function updateThumbnail(formData: FormData): Promise<UpdateResult>
         throw new Error('파일 업로드 후 URL을 받지 못했습니다.');
     }
 
-    // 3. Prepare the data to update in Firestore
     const dataToUpdate = {
       thumbnailHint: hint,
       thumbnailUrl: downloadUrl,
     };
 
-    // 4. Update the Firestore document
     await docRef.update(dataToUpdate);
 
-    // 5. Revalidate the path to show changes on the client
     revalidatePath('/admin/content', 'layout');
 
     return { success: true, message: '썸네일이 성공적으로 업데이트되었습니다.' };
