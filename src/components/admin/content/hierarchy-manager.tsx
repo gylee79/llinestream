@@ -1,18 +1,17 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2, Image as ImageIcon } from 'lucide-react';
-import type { Field, Classification, Course } from '@/lib/types';
+import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, doc, addDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
-import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
+import { deleteHierarchyItem, type ProgressCallback } from '@/lib/actions/delete-hierarchy-item';
 import ThumbnailEditorDialog from './thumbnail-editor-dialog';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
@@ -151,34 +150,35 @@ export default function HierarchyManager() {
     try {
         const { type, item: existingItem } = nameDialog;
 
-        if (existingItem) { // Edit mode
+        if (existingItem?.id) { // Edit mode
             const collectionName = type === '분야' ? 'fields' : type === '큰분류' ? 'classifications' : 'courses';
             await updateDoc(doc(firestore, collectionName, existingItem.id), { name: itemData.name });
             toast({ title: '수정 성공', description: `'${itemData.name}'으로 이름이 수정되었습니다.` });
         } else { // Add mode
+             const docId = uuidv4();
             if (type === '분야') {
-                const newField = {
+                const newField: Omit<Field, 'id'> = {
                     name: itemData.name,
-                    thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/400/400`,
+                    thumbnailUrl: `https://picsum.photos/seed/${docId}/400/400`,
                     thumbnailHint: 'placeholder'
                 };
                 await addDoc(collection(firestore, 'fields'), newField);
             } else if (type === '큰분류' && selectedField) {
-                const newClassification = {
+                const newClassification: Omit<Classification, 'id'> = {
                     fieldId: selectedField,
                     name: itemData.name,
                     description: `${itemData.name}에 대한 설명입니다.`,
                     prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
-                    thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/600/400`,
+                    thumbnailUrl: `https://picsum.photos/seed/${docId}/600/400`,
                     thumbnailHint: 'placeholder'
                 };
                 await addDoc(collection(firestore, 'classifications'), newClassification);
             } else if (type === '상세분류' && selectedClassification) {
-                const newCourse = {
+                const newCourse: Omit<Course, 'id'> = {
                     classificationId: selectedClassification,
                     name: itemData.name,
                     description: `${itemData.name}에 대한 상세 설명입니다.`,
-                    thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/600/400`,
+                    thumbnailUrl: `https://picsum.photos/seed/${docId}/600/400`,
                     thumbnailHint: 'placeholder'
                 };
                 await addDoc(collection(firestore, 'courses'), newCourse);
@@ -193,13 +193,27 @@ export default function HierarchyManager() {
     }
   };
   
-  const handleDelete = async (collectionName: 'fields' | 'classifications' | 'courses' | 'episodes', id: string, name: string, itemData?: any) => {
+  const handleDelete = useCallback(async (collectionName: 'fields' | 'classifications' | 'courses' | 'episodes', id: string, name: string, itemData?: any) => {
     if (!firestore) return;
-    if (!confirm(`정말로 '${name}' 항목을 삭제하시겠습니까? 하위 항목이 있는 경우 함께 삭제됩니다.`)) return;
+    if (!confirm(`정말로 '${name}' 항목과 모든 하위 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
+
+    const { toast: toastWithUpdate, dismiss } = toast({
+      title: '삭제 시작',
+      description: '삭제 프로세스를 시작합니다...',
+    });
+
+    const onProgress: ProgressCallback = (message) => {
+      console.log(`[Delete Progress] ${message}`);
+      toastWithUpdate({
+        description: message,
+      });
+    };
 
     try {
-        const result = await deleteHierarchyItem(collectionName, id, itemData);
+        const result = await deleteHierarchyItem(collectionName, id, itemData, onProgress);
+        
         if (result.success) {
+            dismiss();
             toast({ title: '삭제 성공', description: result.message });
             if (collectionName === 'fields' && selectedField === id) {
                 setSelectedField(null);
@@ -213,13 +227,15 @@ export default function HierarchyManager() {
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error("Error during delete process:", error);
-        toast({
+        dismiss(); // 이전 토스트를 닫고
+        toast({ // 새로운 오류 토스트를 띄웁니다
             variant: "destructive",
             title: "삭제 중 오류 발생",
             description: errorMessage,
+            duration: 9000,
         });
     }
-  };
+  }, [firestore, toast, selectedField, selectedClassification]);
 
   const renderSkeletons = () => (
     <div className="flex flex-col gap-2">
@@ -251,7 +267,7 @@ export default function HierarchyManager() {
                         onSelect={() => handleSelectField(item.id)}
                         onEdit={() => openNameDialog('분야', item)}
                         onEditThumbnail={() => openThumbnailDialog('fields', item)}
-                        onDelete={() => handleDelete('fields', item.id, item.name)}
+                        onDelete={() => handleDelete('fields', item.id, item.name, item)}
                     />
                 ))}
             </Column>
