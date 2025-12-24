@@ -19,7 +19,7 @@ type UpdateResult = {
  * @param url The full gs:// or https:// URL of the file in Firebase Storage.
  * @returns The decoded file path within the bucket (e.g., "courses/courseId/image.jpg"), or null if parsing fails.
  */
-function getPathFromUrl(url: string, bucketName: string): string | null {
+function getPathFromUrl(url: string): string | null {
     if (!url) return null;
 
     try {
@@ -28,7 +28,7 @@ function getPathFromUrl(url: string, bucketName: string): string | null {
 
         if (urlObject.protocol === 'gs:') {
             // Handle gs://bucket-name/path/to/file format
-            path = urlObject.pathname;
+             path = urlObject.pathname.startsWith('/') ? urlObject.pathname.substring(1) : urlObject.pathname;
         } else if (urlObject.hostname === 'firebasestorage.googleapis.com') {
             // Handle https://firebasestorage.googleapis.com/v0/b/bucket-name/o/path%2Fto%2Ffile?alt=media&token=... format
             const pathName = urlObject.pathname;
@@ -38,16 +38,17 @@ function getPathFromUrl(url: string, bucketName: string): string | null {
                 path = pathName.substring(oIndex + oMarker.length);
             }
         } else if (urlObject.hostname === 'storage.googleapis.com') {
-            // Handle https://storage.googleapis.com/bucket-name/path/to/file format
-            const pathName = urlObject.pathname;
-            const bucketPrefix = `/${bucketName}/`;
-            if (pathName.startsWith(bucketPrefix)) {
-                path = pathName.substring(bucketPrefix.length);
-            }
+             // Handle https://storage.googleapis.com/bucket-name/path/to/file format
+             const bucketName = admin.storage().bucket().name;
+             const bucketPrefix = `/${bucketName}/`;
+             if (urlObject.pathname.startsWith(bucketPrefix)) {
+                 path = urlObject.pathname.substring(bucketPrefix.length);
+             }
         }
         
         if (path) {
             // The path is URL-encoded, so we need to decode it.
+            // e.g. fields%2FzKpFXbCbvls2fhaJmXsz%2FGemini... becomes fields/zKpFXbCbvls2fhaJmXsz/Gemini...
             return decodeURIComponent(path.split('?')[0]);
         }
 
@@ -59,12 +60,12 @@ function getPathFromUrl(url: string, bucketName: string): string | null {
     return null;
 }
 
+
 /**
  * Deletes a file from Firebase Storage, ignoring not-found errors.
  */
 const deleteStorageFile = async (storage: Storage, url: string) => {
-    const bucketName = storage.bucket().name;
-    const path = getPathFromUrl(url, bucketName);
+    const path = getPathFromUrl(url);
     if (!path) {
         console.warn(`[SKIP DELETE] Skipping deletion for un-parsable or empty URL: "${url}"`);
         return;
