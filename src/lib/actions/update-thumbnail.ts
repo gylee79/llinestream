@@ -13,72 +13,29 @@ type UpdateResult = {
 };
 
 /**
- * Extracts the storage path from a Firebase Storage URL.
- * This handles both `firebasestorage.googleapis.com` and `storage.googleapis.com` URLs,
- * and correctly decodes URL-encoded characters in the path.
- * @param url The full gs:// or https:// URL of the file in Firebase Storage.
- * @returns The decoded file path within the bucket (e.g., "courses/courseId/image.jpg"), or null if parsing fails.
- */
-function getPathFromUrl(url: string): string | null {
-    if (!url) return null;
-
-    try {
-        const urlObject = new URL(url);
-        let path: string | undefined;
-
-        if (urlObject.protocol === 'gs:') {
-            // Handle gs://bucket-name/path/to/file format
-             path = urlObject.pathname.startsWith('/') ? urlObject.pathname.substring(1) : urlObject.pathname;
-        } else if (urlObject.hostname === 'firebasestorage.googleapis.com') {
-            // Handle https://firebasestorage.googleapis.com/v0/b/bucket-name/o/path%2Fto%2Ffile?alt=media&token=... format
-            const pathName = urlObject.pathname;
-            const oMarker = `/o/`;
-            const oIndex = pathName.indexOf(oMarker);
-            if (oIndex !== -1) {
-                path = pathName.substring(oIndex + oMarker.length);
-            }
-        } else if (urlObject.hostname === 'storage.googleapis.com') {
-             // Handle https://storage.googleapis.com/bucket-name/path/to/file format
-             const bucketName = admin.storage().bucket().name;
-             const bucketPrefix = `/${bucketName}/`;
-             if (urlObject.pathname.startsWith(bucketPrefix)) {
-                 path = urlObject.pathname.substring(bucketPrefix.length);
-             }
-        }
-        
-        if (path) {
-            // The path is URL-encoded, so we need to decode it.
-            // e.g. fields%2FzKpFXbCbvls2fhaJmXsz%2FGemini... becomes fields/zKpFXbCbvls2fhaJmXsz/Gemini...
-            return decodeURIComponent(path.split('?')[0]);
-        }
-
-    } catch (e) {
-        console.error(`[update-thumbnail] URL parsing failed for: ${url}`, e);
-    }
-    
-    console.warn(`[update-thumbnail] Could not determine storage path from URL: ${url}`);
-    return null;
-}
-
-
-/**
- * Deletes a file from Firebase Storage, ignoring not-found errors.
+ * Deletes a file from Firebase Storage using the official SDK method, ignoring not-found errors.
+ * This function is robust and handles various Firebase Storage URL formats.
+ * @param storage The Firebase Admin Storage instance.
+ * @param url The full URL of the file to delete.
  */
 const deleteStorageFile = async (storage: Storage, url: string) => {
-    const path = getPathFromUrl(url);
-    if (!path) {
-        console.warn(`[SKIP DELETE] Skipping deletion for un-parsable or empty URL: "${url}"`);
-        return;
-    }
+  if (!url || !url.startsWith('http')) {
+    console.warn(`[SKIP DELETE] Invalid or empty URL: "${url}"`);
+    return;
+  }
+
+  try {
+    // Firebase Admin SDK's robust way to get a file reference from a URL
+    const file = storage.bucket().file(decodeURIComponent(new URL(url).pathname.split('/o/')[1].split('?')[0]));
     
-    try {
-        await storage.bucket().file(path).delete({ ignoreNotFound: true });
-        console.log(`[DELETE SUCCESS] Successfully deleted old file: ${path}`);
-    } catch (error: any) {
-        console.error(`[DELETE FAILED] Failed to delete old storage file at path ${path}:`, error.message);
-        // Do not throw; log the error and continue with the update.
-    }
+    console.log(`[ATTEMPT DELETE] Attempting to delete storage file at path: ${file.name}`);
+    await file.delete({ ignoreNotFound: true });
+    console.log(`[DELETE SUCCESS] File deleted or did not exist: ${file.name}`);
+  } catch (error: any) {
+    console.error(`[DELETE FAILED] Failed to delete storage file from URL ${url}:`, error.message);
+  }
 };
+
 
 /**
  * Updates the thumbnail for a field, classification or course.
@@ -96,7 +53,6 @@ export async function updateThumbnail(formData: FormData): Promise<UpdateResult>
     return { success: false, message: '필수 항목(itemType, itemId)이 누락되었습니다.' };
   }
 
-  // A new image file is required for an update.
   if (!imageFile || imageFile.size === 0) {
       return { success: false, message: '업데이트를 위해 새로운 이미지 파일을 제공해야 합니다.' };
   }
@@ -108,8 +64,6 @@ export async function updateThumbnail(formData: FormData): Promise<UpdateResult>
     const storage = admin.storage(adminApp);
     const docRef = db.collection(collectionName).doc(itemId);
     
-    let downloadUrl: string | null = null;
-
     // 1. Get the current document to find and delete the old thumbnail URL
     const currentDoc = await docRef.get();
     if (currentDoc.exists) {
@@ -129,7 +83,7 @@ export async function updateThumbnail(formData: FormData): Promise<UpdateResult>
       public: true,
     });
 
-    downloadUrl = file.publicUrl();
+    const downloadUrl = file.publicUrl();
     
     if (!downloadUrl) {
         throw new Error('파일 업로드 후 URL을 받지 못했습니다.');
