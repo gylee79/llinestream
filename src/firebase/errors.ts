@@ -1,5 +1,5 @@
 'use client';
-import { getAuth, type User } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 
 type SecurityRuleContext = {
   path: string;
@@ -74,19 +74,8 @@ function buildAuthObject(currentUser: User | null): FirebaseAuthObject | null {
  * @param context The context of the failed Firestore operation.
  * @returns A structured request object.
  */
-function buildRequestObject(context: SecurityRuleContext): SecurityRuleRequest {
-  let authObject: FirebaseAuthObject | null = null;
-  try {
-    // Safely attempt to get the current user.
-    const firebaseAuth = getAuth();
-    const currentUser = firebaseAuth.currentUser;
-    if (currentUser) {
-      authObject = buildAuthObject(currentUser);
-    }
-  } catch {
-    // This will catch errors if the Firebase app is not yet initialized.
-    // In this case, we'll proceed without auth information.
-  }
+function buildRequestObject(context: SecurityRuleContext, currentUser: User | null): SecurityRuleRequest {
+  const authObject = buildAuthObject(currentUser);
 
   return {
     auth: authObject,
@@ -110,12 +99,13 @@ ${JSON.stringify(requestObject, null, 2)}`;
  * A custom error class designed to be consumed by an LLM for debugging.
  * It structures the error information to mimic the request object
  * available in Firestore Security Rules.
+ * IMPORTANT: The currentUser must be passed in from a context-aware component.
  */
 export class FirestorePermissionError extends Error {
   public readonly request: SecurityRuleRequest;
 
-  constructor(context: SecurityRuleContext) {
-    const requestObject = buildRequestObject(context);
+  constructor(context: SecurityRuleContext, currentUser: User | null) {
+    const requestObject = buildRequestObject(context, currentUser);
     super(buildErrorMessage(requestObject));
     this.name = 'FirebaseError';
     this.request = requestObject;

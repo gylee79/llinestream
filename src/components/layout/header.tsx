@@ -39,7 +39,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { useUser, useAuth, useDoc, useFirestore, useFirebase, useMemoFirebase } from '@/firebase';
+import { useUser, useAuth, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useCart } from '@/context/cart-context';
 import { Badge } from '../ui/badge';
@@ -58,11 +58,10 @@ const adminLink = { href: '/admin', label: '관리자', icon: Shield };
 export default function Header() {
   const pathname = usePathname();
   const firestore = useFirestore();
-  const { user, isUserLoading } = useUser();
+  const { user, authUser, isUserLoading } = useUser();
   const auth = useAuth();
-  const authUser = auth.currentUser;
   const { openCart, items } = useCart();
-  const isLoggedIn = !!user;
+  const isLoggedIn = !!authUser;
   const isAdmin = user?.role === 'admin';
 
   const footerRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
