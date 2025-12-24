@@ -1,3 +1,4 @@
+
 'use server';
 
 import { initializeAdminApp } from '@/lib/firebase-admin';
@@ -14,7 +15,7 @@ type DeletionResult = {
 
 /**
  * Extracts the storage path from a Firebase Storage URL.
- * Handles both gs:// and https:// formats robustly.
+ * Handles both gs:// and various https:// formats robustly.
  * @param url The full gs:// or https:// URL.
  * @returns The file path within the bucket.
  */
@@ -22,15 +23,26 @@ const getPathFromUrl = (url: string): string | null => {
   if (!url) return null;
   try {
     const decodedUrl = decodeURIComponent(url);
+    
+    // Handle gs:// format
     if (decodedUrl.startsWith('gs://')) {
       const path = decodedUrl.substring(decodedUrl.indexOf('/', 5) + 1);
       return path;
     }
-    // Updated regex to handle URLs with or without /o/ prefix
-    const match = decodedUrl.match(/(?:gs:\/\/.*\/|o\/)(.*?)(\?|$)/);
-    if (match && match[1]) {
-      return match[1];
+    
+    // Handle https://firebasestorage.googleapis.com/... format
+    // Extracts path from .../o/path-to-file?alt=media...
+    const firebaseStorageMatch = decodedUrl.match(/firebasestorage\.googleapis\.com\/v\d+\/b\/.*\/o\/(.*?)(?:\?|$)/);
+    if (firebaseStorageMatch && firebaseStorageMatch[1]) {
+      return firebaseStorageMatch[1];
     }
+
+    // Handle https://storage.googleapis.com/... format
+    const googleStorageMatch = decodedUrl.match(/storage\.googleapis\.com\/[^/]+\/(.*)/);
+    if (googleStorageMatch && googleStorageMatch[1]) {
+        return googleStorageMatch[1];
+    }
+
   } catch (e) {
     console.error(`Could not decode or parse URL: ${url}`, e);
   }
