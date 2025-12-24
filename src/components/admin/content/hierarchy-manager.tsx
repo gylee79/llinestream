@@ -28,7 +28,7 @@ const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }
 }) => (
     <div 
         className={cn(
-            "flex items-center justify-between p-2 rounded-md cursor-pointer", 
+            "flex items-center justify-between p-2 rounded-md cursor-pointer group/menu-item", 
             selected ? 'bg-primary/10' : 'hover:bg-primary/5'
         )}
         onClick={onSelect}
@@ -45,7 +45,7 @@ const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }
             </div>
             <span className={cn("font-medium truncate", selected && "text-primary")}>{item.name}</span>
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center opacity-0 group-hover/menu-item:opacity-100 transition-opacity">
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit}><Pencil className="h-4 w-4" /></Button>
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEditThumbnail}><ImageIcon className="h-4 w-4" /></Button>
             <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>
@@ -193,50 +193,43 @@ export default function HierarchyManager() {
   const handleDelete = useCallback(async (e: React.MouseEvent, collectionName: 'fields' | 'classifications' | 'courses' | 'episodes', id: string, name: string, itemData?: any) => {
     e.stopPropagation();
     if (!firestore) return;
-
+  
     toast({
-        title: '삭제 확인',
-        description: `'${name}' 항목 삭제를 확인해주세요.`,
+      title: '삭제 확인',
+      description: '삭제 버튼 클릭이 인식되었습니다. 확인 창을 확인해주세요.',
     });
-
-    if (!confirm(`정말로 '${name}' 항목과 모든 하위 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
-        toast({
-            title: '취소됨',
-            description: '삭제 작업이 취소되었습니다.',
-        });
-        return;
-    }
-
-    const { toast: toastWithUpdate, dismiss, id: toastId } = toast({
-      title: '삭제 시작',
-      description: '삭제 프로세스를 시작합니다...',
-      duration: 999999, // Long duration, will be dismissed manually
-    });
-
-    const onProgress: ProgressCallback = (message) => {
-      console.log(`[Delete Progress] ${message}`);
-      toastWithUpdate({
-        id: toastId,
-        description: message,
+  
+    if (confirm(`정말로 '${name}' 항목과 모든 하위 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+      const { toast: toastWithUpdate, dismiss, id: toastId } = toast({
+        title: '삭제 시작',
+        description: '삭제 프로세스를 시작합니다...',
+        duration: 999999, // Long duration, will be dismissed manually
       });
-    };
-
-    try {
+  
+      const onProgress: ProgressCallback = (message) => {
+        console.log(`[Delete Progress] ${message}`);
+        toastWithUpdate({
+          id: toastId,
+          description: message,
+        });
+      };
+  
+      try {
         const result = await deleteHierarchyItem(collectionName, id, itemData, onProgress);
         
         if (result.success) {
-            dismiss(toastId);
-            toast({ title: '삭제 성공', description: result.message });
-            if (collectionName === 'fields' && selectedField === id) {
-                setSelectedField(null);
-            }
-            if (collectionName === 'classifications' && selectedClassification === id) {
-                setSelectedClassification(null);
-            }
+          dismiss(toastId);
+          toast({ title: '삭제 성공', description: result.message });
+          if (collectionName === 'fields' && selectedField === id) {
+              setSelectedField(null);
+          }
+          if (collectionName === 'classifications' && selectedClassification === id) {
+              setSelectedClassification(null);
+          }
         } else {
-            throw new Error(result.message);
+          throw new Error(result.message);
         }
-    } catch (error) {
+      } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error("Error during delete process:", error);
         dismiss(toastId);
@@ -246,6 +239,12 @@ export default function HierarchyManager() {
             description: errorMessage,
             duration: 9000,
         });
+      }
+    } else {
+      toast({
+        title: '취소됨',
+        description: '삭제 작업이 취소되었습니다.',
+      });
     }
   }, [firestore, toast, selectedField, selectedClassification]);
 
