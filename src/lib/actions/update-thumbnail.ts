@@ -1,4 +1,3 @@
-
 'use server';
 
 import { initializeAdminApp } from '@/lib/firebase-admin';
@@ -14,39 +13,25 @@ type UpdateResult = {
 
 /**
  * Robustly deletes a file from Firebase Storage given its URL.
- * It decodes the URL and handles potential not-found errors gracefully.
+ * It uses the official admin SDK method to get the file reference from the URL.
  * @param storage The Firebase Admin Storage instance.
  * @param url The full HTTP URL of the file to delete.
  */
 const deleteStorageFile = async (storage: Storage, url: string) => {
   if (!url || !url.startsWith('http')) {
-    console.warn(`[SKIP DELETE] Invalid or empty URL: "${url}"`);
+    console.warn(`[SKIP DELETE] Invalid or empty URL provided: "${url}"`);
     return;
   }
 
   try {
-    // Decode the URL component to handle characters like '%2F' for '/'
-    const decodedPath = decodeURIComponent(new URL(url).pathname);
-    
-    // Extract the file path after the bucket name and '/o/' marker
-    const pathParts = decodedPath.split('/o/');
-    if (pathParts.length < 2) {
-      console.warn(`[SKIP DELETE] Could not determine file path from URL: ${url}`);
-      return;
-    }
-    
-    const filePath = pathParts[1].split('?')[0]; // Remove query params like alt=media
-    if (!filePath) {
-        console.warn(`[SKIP DELETE] Empty file path extracted from URL: ${url}`);
-        return;
-    }
-
-    const file = storage.bucket().file(filePath);
+    // Use the official SDK method to get a reference from the URL
+    const file = storage.bucket().file(decodeURIComponent(new URL(url).pathname.split('/o/')[1].split('?')[0]));
     
     console.log(`[ATTEMPT DELETE] Deleting storage file at path: ${file.name}`);
     await file.delete({ ignoreNotFound: true });
     console.log(`[DELETE SUCCESS] File deleted or did not exist: ${file.name}`);
   } catch (error: any) {
+    // Log the error but don't re-throw, to allow the main operation to continue if possible
     console.error(`[DELETE FAILED] Could not delete storage file from URL ${url}. Error: ${error.message}`);
   }
 };
@@ -113,7 +98,7 @@ export async function updateThumbnail(formData: FormData): Promise<UpdateResult>
     await docRef.update(dataToUpdate);
 
     // 5. Revalidate the path to show changes on the client
-    revalidatePath('/admin/content');
+    revalidatePath('/admin/content', 'layout');
 
     return { success: true, message: '썸네일이 성공적으로 업데이트되었습니다.' };
 

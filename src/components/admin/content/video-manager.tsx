@@ -53,6 +53,7 @@ export default function VideoManager() {
 
   const toggleFreeStatus = async (episode: Episode) => {
     if (!firestore) return;
+    // To update a doc in a subcollection, we need the full path.
     const docRef = doc(firestore, 'courses', episode.courseId, 'episodes', episode.id);
     try {
       await updateDoc(docRef, { isFree: !episode.isFree });
@@ -73,6 +74,8 @@ export default function VideoManager() {
   const handleDeleteEpisode = async (episode: Episode) => {
     if (!confirm(`정말로 '${episode.title}' 에피소드와 관련 비디오 파일을 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
     try {
+        // Pass the entire episode object to the server action
+        // This is crucial because the action needs the `courseId` to build the correct path.
         const result = await deleteHierarchyItem('episodes', episode.id, episode);
         if (result.success) {
             toast({

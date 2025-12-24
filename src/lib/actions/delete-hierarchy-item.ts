@@ -14,24 +14,14 @@ type DeletionResult = {
 
 const deleteStorageFile = async (storage: Storage, url: string) => {
     if (!url || !url.startsWith('http')) {
-        console.warn(`[SKIP DELETE] Invalid or empty URL: "${url}"`);
+        console.warn(`[SKIP DELETE] Invalid or empty URL provided: "${url}"`);
         return;
     }
 
     try {
-        const decodedPath = decodeURIComponent(new URL(url).pathname);
-        const pathParts = decodedPath.split('/o/');
-        if (pathParts.length < 2) {
-            console.warn(`[SKIP DELETE] Could not determine file path from URL: ${url}`);
-            return;
-        }
-        const filePath = pathParts[1].split('?')[0];
-        if (!filePath) {
-            console.warn(`[SKIP DELETE] Empty file path extracted from URL: ${url}`);
-            return;
-        }
-
-        const file = storage.bucket().file(filePath);
+        const file = storage.bucket().file(decodeURIComponent(new URL(url).pathname.split('/o/')[1].split('?')[0]));
+        
+        console.log(`[ATTEMPT DELETE] Deleting storage file at path: ${file.name}`);
         await file.delete({ ignoreNotFound: true });
         console.log(`[DELETE SUCCESS] File deleted or did not exist: ${file.name}`);
     } catch (error: any) {
@@ -98,19 +88,21 @@ export async function deleteHierarchyItem(
     let docData: admin.firestore.DocumentData | undefined;
 
     if (collectionName === 'episodes') {
-      const episodeQuery = await db.collectionGroup('episodes').where(admin.firestore.FieldPath.documentId(), '==', id).limit(1).get();
-      if (episodeQuery.empty) {
-        console.warn(`[NOT FOUND] Episode with ID ${id} not found in any course.`);
-        return { success: true, message: '에피소드를 찾을 수 없지만, 삭제된 것으로 처리합니다.' };
+      if (!itemData?.courseId) {
+        return { success: false, message: '에피소드 삭제를 위해서는 courseId가 포함된 itemData가 필요합니다.' };
       }
-      docRef = episodeQuery.docs[0].ref;
-      docData = itemData || episodeQuery.docs[0].data();
+      docRef = db.collection('courses').doc(itemData.courseId).collection('episodes').doc(id);
+      docData = itemData;
     } else {
       docRef = db.collection(collectionName).doc(id);
       const docSnap = await docRef.get();
       docData = itemData || docSnap.data();
     }
     
+    if (!docData) {
+      console.warn(`[NOT FOUND] Document with ID ${id} not found in ${collectionName}. Assuming deleted.`);
+      return { success: true, message: '항목을 찾을 수 없지만, 삭제된 것으로 처리합니다.' };
+    }
 
     if (collectionName === 'fields') {
       if (docData?.thumbnailUrl) await deleteStorageFile(storage, docData.thumbnailUrl);
