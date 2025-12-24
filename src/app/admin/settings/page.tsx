@@ -8,14 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import type { Policy, FooterSettings, HeroImageSettings, HeroContent } from '@/lib/types';
+import type { Policy, FooterSettings, HeroImageSettings } from '@/lib/types';
 import { useCollection, useDoc, useFirestore, useFirebase, errorEmitter, useStorage, useMemoFirebase } from '@/firebase';
-import { collection, doc, writeBatch, setDoc } from 'firebase/firestore';
+import { collection, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useRef } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
-import { FirestorePermissionError } from "@/firebase/errors";
 import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
 
@@ -72,8 +71,7 @@ function HeroImageManager() {
 
         const page = type.startsWith('home') ? 'home' : 'about';
         const deviceUrlProp = type.endsWith('Mobile') ? 'urlMobile' : 'url';
-        const originalUrlProp: keyof typeof originalUrls.current = type.endsWith('Mobile') ? `${page}Mobile` as keyof typeof originalUrls.current : page as keyof typeof originalUrls.current;
-
+        const originalUrlProp = (type.endsWith('Mobile') ? `${page}Mobile` : page) as keyof typeof originalUrls.current;
 
         setSettings(prev => ({
             ...prev,
@@ -110,24 +108,13 @@ function HeroImageManager() {
                         );
                     });
                     if (!updatedSettings[page]) updatedSettings[page] = {};
-                    if (device === 'pc') {
-                        updatedSettings[page]!.url = downloadUrl;
-                    } else {
-                        updatedSettings[page]!.urlMobile = downloadUrl;
-                    }
+                    const urlProp = device === 'pc' ? 'url' : 'urlMobile';
+                    (updatedSettings[page]! as any)[urlProp] = downloadUrl;
                 }
             }
             
             const docRef = doc(firestore, 'settings', 'heroImages');
-            await setDoc(docRef, updatedSettings, { merge: true })
-            .catch((serverError) => {
-                const contextualError = new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'update',
-                    requestResourceData: updatedSettings,
-                }, user);
-                throw contextualError;
-            });
+            await setDoc(docRef, updatedSettings, { merge: true });
             
             toast({
                 title: '저장 완료',
@@ -135,16 +122,13 @@ function HeroImageManager() {
             });
             setFiles({});
         } catch (error) {
-            if (error instanceof FirestorePermissionError) {
-                 errorEmitter.emit('permission-error', error);
-            } else {
-                console.error("Error saving hero images: ", error);
-                 toast({
-                    variant: 'destructive',
-                    title: '저장 실패',
-                    description: '히어로 정보 저장 중 오류가 발생했습니다.',
-                });
-            }
+            console.error("Error saving hero images: ", error);
+            const message = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
+             toast({
+                variant: 'destructive',
+                title: '저장 실패',
+                description: `히어로 정보 저장 중 오류가 발생했습니다: ${message}`,
+            });
         } finally {
             setIsSaving(false);
         }
@@ -237,7 +221,6 @@ function HeroImageManager() {
 
 function FooterSettingsManager() {
   const firestore = useFirestore();
-  const { user } = useFirebase();
   const { toast } = useToast();
   const footerRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
   const { data: footerData, isLoading } = useDoc<FooterSettings>(footerRef);
@@ -256,7 +239,7 @@ function FooterSettingsManager() {
   };
 
   const handleSave = async () => {
-    if (!firestore || Object.keys(settings).length === 0 || !user) return;
+    if (!firestore || Object.keys(settings).length === 0) return;
     setIsSaving(true);
     
     const docRef = doc(firestore, 'settings', 'footer');
@@ -269,13 +252,9 @@ function FooterSettingsManager() {
           description: "푸터 정보가 성공적으로 업데이트되었습니다.",
         });
       })
-      .catch((serverError) => {
-        const contextualError = new FirestorePermissionError({
-          path: docRef.path,
-          operation: 'update',
-          requestResourceData: dataToSave,
-        }, user);
-        errorEmitter.emit('permission-error', contextualError);
+      .catch((error) => {
+        console.error(error);
+        toast({ variant: 'destructive', title: '저장 실패', description: '푸터 정보 업데이트 중 오류가 발생했습니다.'});
       })
       .finally(() => {
         setIsSaving(false);
@@ -309,29 +288,37 @@ function PolicySettingsManager() {
   const policiesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'policies') : null), [firestore]);
   const { data: policies, isLoading } = useCollection<Policy>(policiesQuery);
   
-  const [localPolicies, setLocalPolicies] = useState<Policy[]>([]);
+  const [localPolicies, setLocalPolicies] = useState<Record<string, Partial<Policy>>>({});
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (policies) {
-      setLocalPolicies(policies);
+      const policyMap = policies.reduce((acc, p) => {
+        acc[p.slug] = p;
+        return acc;
+      }, {} as Record<string, Policy>);
+      setLocalPolicies(policyMap);
     }
   }, [policies]);
 
   const handlePolicyChange = (slug: string, content: string) => {
-    setLocalPolicies(prev => prev.map(p => p.slug === slug ? { ...p, content } : p));
+    setLocalPolicies(prev => ({
+      ...prev,
+      [slug]: { ...prev[slug], content }
+    }));
   };
 
   const handleSaveChanges = async () => {
-    if (!firestore || localPolicies.length === 0) return;
+    if (!firestore || Object.keys(localPolicies).length === 0) return;
     setIsSaving(true);
     try {
-      const batch = writeBatch(firestore);
-      localPolicies.forEach(policy => {
-        const docRef = doc(firestore, 'policies', policy.slug);
-        batch.update(docRef, { content: policy.content });
-      });
-      await batch.commit();
+      for (const slug in localPolicies) {
+        const policy = localPolicies[slug];
+        if (policy && policy.content) {
+            const docRef = doc(firestore, 'policies', slug);
+            await updateDoc(docRef, { content: policy.content });
+        }
+      }
       toast({
         title: "저장 완료",
         description: "약관 및 정책이 성공적으로 업데이트되었습니다.",
@@ -349,11 +336,11 @@ function PolicySettingsManager() {
   };
 
   const getPolicyContent = (slug: 'terms' | 'privacy' | 'refund') => {
-    return localPolicies.find(p => p.slug === slug)?.content || '';
+    return localPolicies[slug]?.content || '';
   }
   
   const getPolicyTitle = (slug: 'terms' | 'privacy' | 'refund') => {
-    return policies?.find(p => p.slug === slug)?.title || '로딩 중...';
+    return localPolicies[slug]?.title || '로딩 중...';
   }
 
   return (
@@ -428,9 +415,9 @@ export default function AdminSettingsPage() {
                                 활성화 시, 관리자를 제외한 모든 사용자는 서비스에 접근할 수 없습니다.
                             </p>
                         </div>
-                        <Switch />
+                        <Switch disabled />
                     </div>
-                    <Button>저장</Button>
+                    <Button disabled>저장</Button>
                 </CardContent>
             </Card>
         </TabsContent>

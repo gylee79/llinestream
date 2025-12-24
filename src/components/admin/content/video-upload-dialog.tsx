@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -24,15 +24,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, addDoc, setDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { v4 as uuidv4 } from 'uuid';
 import { Separator } from '@/components/ui/separator';
 import { PlusCircle } from 'lucide-react';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
 import { uploadEpisode } from '@/lib/actions/upload-episode';
-import { updateDoc } from 'firebase/firestore';
+import { v4 as uuidv4 } from 'uuid';
 
 interface VideoUploadDialogProps {
   open: boolean;
@@ -92,33 +91,34 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   
   useEffect(() => {
     async function setInitialState() {
-        if (isEditMode && episode && dbFields) {
+        if (isEditMode && episode && firestore) {
             setTitle(episode.title);
             setDescription(episode.description || '');
             setIsFree(episode.isFree);
             setSelectedCourseId(episode.courseId);
 
             // This is complex, let's trace it back.
-            if (firestore) {
-              const courseDocSnap = await doc(firestore, 'courses', episode.courseId).get();
-              if (courseDocSnap.exists()) {
-                  const course = courseDocSnap.data() as Course;
-                  setSelectedClassificationId(course.classificationId);
-                  const classDocSnap = await doc(firestore, 'classifications', course.classificationId).get();
-                  if (classDocSnap.exists()) {
-                      const classification = classDocSnap.data() as Classification;
-                      setSelectedFieldId(classification.fieldId);
-                  }
-              }
+            const courseDocRef = doc(firestore, 'courses', episode.courseId);
+            const courseDocSnap = await getDoc(courseDocRef);
+
+            if (courseDocSnap.exists()) {
+                const course = courseDocSnap.data() as Course;
+                setSelectedClassificationId(course.classificationId);
+                const classDocRef = doc(firestore, 'classifications', course.classificationId);
+                const classDocSnap = await getDoc(classDocRef);
+                if (classDocSnap.exists()) {
+                    const classification = classDocSnap.data() as Classification;
+                    setSelectedFieldId(classification.fieldId);
+                }
             }
         }
     }
-    if (open && firestore) {
+    if (open) {
         setInitialState();
     } else {
         resetForm();
     }
-}, [open, episode, isEditMode, dbFields, firestore]);
+}, [open, episode, isEditMode, firestore]);
 
   const handleSaveEpisode = async () => {
     if (!firestore) return;
@@ -136,9 +136,19 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
 
     try {
         if (isEditMode && episode) { // Update existing episode metadata
-            const episodeRef = doc(firestore, 'courses', episode.courseId, 'episodes', episode.id);
-            const updatedData = { title, description, isFree, courseId: selectedCourseId };
-            // Note: Video file replacement is not handled in edit mode for simplicity.
+            const courseDocRef = doc(firestore, 'courses', episode.courseId);
+            const courseDoc = await getDoc(courseDocRef);
+            if (!courseDoc.exists()) throw new Error("Parent course not found");
+
+            const episodeRef = doc(firestore, courseDoc.ref.path, 'episodes', episode.id);
+            
+            const updatedData: Partial<Episode> = { 
+              title, 
+              description, 
+              isFree, 
+              courseId: selectedCourseId 
+            };
+            
             await updateDoc(episodeRef, updatedData);
             toast({ title: '수정 완료', description: `'${title}' 에피소드 정보가 업데이트되었습니다.` });
 
@@ -188,32 +198,31 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setIsProcessing(true);
     try {
         if (type === '분야') {
-            const docRef = doc(collection(firestore, 'fields'));
-            await setDoc(docRef, { id: docRef.id, name: item.name, thumbnailUrl: `https://picsum.photos/seed/${docRef.id}/400/400`, thumbnailHint: 'placeholder' });
+            const docRef = await addDoc(collection(firestore, 'fields'), { 
+                name: item.name, 
+                thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/400/400`, 
+                thumbnailHint: 'placeholder' 
+            });
             setSelectedFieldId(docRef.id);
             setSelectedClassificationId('');
             setSelectedCourseId('');
         } else if (type === '큰분류' && selectedFieldId) {
-            const docRef = doc(collection(firestore, 'classifications'));
-            await setDoc(docRef, {
-                id: docRef.id,
+            const docRef = await addDoc(collection(firestore, 'classifications'), {
                 fieldId: selectedFieldId,
                 name: item.name,
                 description: `${item.name}에 대한 설명입니다.`,
                 prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
-                thumbnailUrl: `https://picsum.photos/seed/${docRef.id}/600/400`,
+                thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/600/400`,
                 thumbnailHint: 'placeholder'
             });
             setSelectedClassificationId(docRef.id);
             setSelectedCourseId('');
         } else if (type === '상세분류' && selectedClassificationId) {
-            const docRef = doc(collection(firestore, 'courses'));
-            await setDoc(docRef, {
-                id: docRef.id,
+            const docRef = await addDoc(collection(firestore, 'courses'), {
                 classificationId: selectedClassificationId,
                 name: item.name,
                 description: `${item.name}에 대한 상세 설명입니다.`,
-                thumbnailUrl: `https://picsum.photos/seed/${docRef.id}/600/400`,
+                thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/600/400`,
                 thumbnailHint: 'placeholder'
             });
             setSelectedCourseId(docRef.id);

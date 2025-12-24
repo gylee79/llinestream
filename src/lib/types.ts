@@ -8,7 +8,7 @@ import type { Timestamp as FirebaseTimestamp } from 'firebase/firestore';
 export type Timestamp = FirebaseTimestamp;
 
 export interface User {
-  id: string;
+  id: string; // This will be the document ID from Firestore, added on the client
   name: string;
   email: string;
   phone: string;
@@ -17,21 +17,21 @@ export interface User {
   activeSubscriptions: {
     [classificationId: string]: {
       expiresAt: Timestamp;
-      purchasedAt: Timestamp; // Keep this consistent
+      purchasedAt: Timestamp;
     };
   };
   createdAt: Timestamp;
 }
 
 export interface Field {
-  id: string;
+  id: string; // This will be the document ID from Firestore, added on the client
   name: string;
   thumbnailUrl: string;
   thumbnailHint: string;
 }
 
 export interface Classification {
-  id: string;
+  id:string; // This will be the document ID from Firestore, added on the client
   fieldId: string;
   name: string;
   description: string;
@@ -46,7 +46,7 @@ export interface Classification {
 }
 
 export interface Course {
-  id: string;
+  id: string; // This will be the document ID from Firestore, added on the client
   classificationId: string;
   name: string;
   description: string;
@@ -55,7 +55,7 @@ export interface Course {
 }
 
 export interface Episode {
-  id: string;
+  id: string; // This will be the document ID from Firestore, added on the client
   courseId: string;
   title: string;
   description?: string;
@@ -74,13 +74,14 @@ export interface ViewHistoryItem {
 }
 
 export interface Policy {
+  id: string; // This will be the document ID from Firestore, added on the client
   slug: 'terms' | 'privacy' | 'refund';
   title: string;
   content: string;
 }
 
 export interface Subscription {
-    id: string; // Should be the same as classificationId for easy lookup
+    id: string; // This will be the document ID from Firestore (same as paymentId)
     userId: string;
     classificationId: string;
     purchasedAt: Timestamp;

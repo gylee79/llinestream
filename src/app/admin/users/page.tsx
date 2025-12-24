@@ -28,6 +28,7 @@ export default function AdminUsersPage() {
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isDialogOpen, setDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const getActiveSubscriptions = (user: User) => {
     if (!user.activeSubscriptions) return '없음';
@@ -41,7 +42,7 @@ export default function AdminUsersPage() {
     const dates = Object.values(user.activeSubscriptions).map(s => s.expiresAt.toDate().getTime());
     if (dates.length === 0) return 'N/A';
     const maxDate = new Date(Math.max(...dates));
-    return maxDate.toLocaleDateString();
+    return maxDate.toLocaleDateString('ko-KR');
   };
 
   const openDetails = (user: User) => {
@@ -49,6 +50,11 @@ export default function AdminUsersPage() {
     setDialogOpen(true);
   };
   
+  const filteredUsers = users?.filter(user => 
+    user.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    user.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <>
       <div>
@@ -64,6 +70,8 @@ export default function AdminUsersPage() {
                 type="search"
                 placeholder="이름 또는 이메일로 검색..."
                 className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[320px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </CardHeader>
@@ -91,7 +99,7 @@ export default function AdminUsersPage() {
                     </TableRow>
                   ))
                 ) : (
-                  users?.map((user) => (
+                  filteredUsers?.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.name || 'N/A'}</TableCell>
                       <TableCell>{user.email}</TableCell>
@@ -101,7 +109,7 @@ export default function AdminUsersPage() {
                           {user.role}
                         </Badge>
                       </TableCell>
-                      <TableCell>{user.createdAt?.toDate().toLocaleDateString() || 'N/A'}</TableCell>
+                      <TableCell>{user.createdAt?.toDate().toLocaleDateString('ko-KR') || 'N/A'}</TableCell>
                       <TableCell>{getActiveSubscriptions(user)}</TableCell>
                       <TableCell>{getFinalExpiry(user)}</TableCell>
                       <TableCell className="text-right">

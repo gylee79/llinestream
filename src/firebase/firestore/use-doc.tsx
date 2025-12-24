@@ -1,3 +1,4 @@
+
 'use client';
     
 import { useState, useEffect } from 'react';
@@ -29,8 +30,8 @@ export interface UseDocResult<T> {
  * React hook to subscribe to a single Firestore document in real-time.
  * Handles nullable references.
  * 
- * IMPORTANT! YOU MUST MEMOIZE the inputted memoizedTargetRefOrQuery or BAD THINGS WILL HAPPEN
- * use useMemo to memoize it per React guidence.  Also make sure that it's dependencies are stable
+ * IMPORTANT! YOU MUST MEMOIZE the inputted docRef or BAD THINGS WILL HAPPEN
+ * use useMemoFirebase to memoize it per React guidence. Also make sure that its dependencies are stable
  * references
  *
  *
@@ -40,7 +41,7 @@ export interface UseDocResult<T> {
  * @returns {UseDocResult<T>} Object with data, isLoading, error.
  */
 export function useDoc<T = any>(
-  memoizedDocRef: DocumentReference<DocumentData> | null | undefined,
+  docRef: DocumentReference<DocumentData> | null | undefined,
 ): UseDocResult<T> {
   type StateDataType = WithId<T> | null;
   const { authUser } = useFirebase();
@@ -50,7 +51,7 @@ export function useDoc<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
-    if (!memoizedDocRef) {
+    if (!docRef) {
       setData(null);
       setIsLoading(false);
       setError(null);
@@ -59,10 +60,9 @@ export function useDoc<T = any>(
 
     setIsLoading(true);
     setError(null);
-    // Optional: setData(null); // Clear previous data instantly
 
     const unsubscribe = onSnapshot(
-      memoizedDocRef,
+      docRef,
       (snapshot: DocumentSnapshot<DocumentData>) => {
         if (snapshot.exists()) {
           setData({ ...(snapshot.data() as T), id: snapshot.id });
@@ -73,23 +73,22 @@ export function useDoc<T = any>(
         setError(null); // Clear any previous error on successful snapshot (even if doc doesn't exist)
         setIsLoading(false);
       },
-      (error: FirestoreError) => {
+      (err: FirestoreError) => {
         const contextualError = new FirestorePermissionError({
           operation: 'get',
-          path: memoizedDocRef.path,
-        }, authUser)
+          path: docRef.path,
+        }, authUser);
 
-        setError(contextualError)
-        setData(null)
-        setIsLoading(false)
+        setError(contextualError);
+        setData(null);
+        setIsLoading(false);
 
-        // trigger global error propagation
         errorEmitter.emit('permission-error', contextualError);
       }
     );
 
     return () => unsubscribe();
-  }, [memoizedDocRef, authUser]); // Re-run if the memoizedDocRef changes.
+  }, [docRef, authUser]); // Re-run if the docRef changes.
 
   return { data, isLoading, error };
 }

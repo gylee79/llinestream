@@ -6,6 +6,7 @@ import type { Episode, Course, Classification, Field } from '@/lib/types';
 import * as admin from 'firebase-admin';
 import { WriteBatch, Firestore } from 'firebase-admin/firestore';
 import { Storage } from 'firebase-admin/storage';
+import { revalidatePath } from 'next/cache';
 
 type DeletionResult = {
   success: boolean;
@@ -50,21 +51,18 @@ const deleteStorageFile = async (storage: Storage, url: string) => {
   }
 
   try {
-    await storage.bucket().file(path).delete();
-    console.log(`Deleted storage file: ${path}`);
+    await storage.bucket().file(path).delete({ ignoreNotFound: true });
+    console.log(`Deleted storage file (or it didn't exist): ${path}`);
   } catch (error: any) {
-    if (error.code === 404) {
-      console.warn(`Storage file not found, but proceeding with DB deletion: ${path}`);
-    } else {
-      console.error(`Failed to delete storage file at path ${path}:`, error);
-      // We will not throw here to allow DB deletion to proceed, but the error is logged.
-    }
+    // Other errors besides "not found"
+    console.error(`Failed to delete storage file at path ${path}:`, error);
+    // We will not throw here to allow DB deletion to proceed, but the error is logged.
   }
 };
 
 
 const deleteEpisodes = async (db: Firestore, storage: Storage, courseId: string, batch: WriteBatch) => {
-  const episodesSnapshot = await db.collectionGroup('episodes').where('courseId', '==', courseId).get();
+  const episodesSnapshot = await db.collection('courses').doc(courseId).collection('episodes').get();
   if (episodesSnapshot.empty) return;
 
   for (const episodeDoc of episodesSnapshot.docs) {
@@ -139,7 +137,7 @@ export async function deleteHierarchyItem(
           const courseData = courseDoc.data() as Course;
           if (courseData.thumbnailUrl) await deleteStorageFile(storage, courseData.thumbnailUrl);
           await deleteEpisodes(db, storage, id, batch);
-          batch.delete(courseRef);
+batch.delete(courseRef);
       }
     } else if (collectionName === 'episodes') {
       if (!itemData || !itemData.courseId) {
@@ -158,6 +156,8 @@ export async function deleteHierarchyItem(
     }
 
     await batch.commit();
+    revalidatePath('/admin/content', 'layout');
+
     return { success: true, message: '항목 및 모든 하위 데이터가 성공적으로 삭제되었습니다.' };
 
   } catch (error) {

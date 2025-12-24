@@ -157,14 +157,14 @@ export default function HierarchyManager() {
             toast({ title: '수정 성공', description: `'${itemData.name}'으로 이름이 수정되었습니다.` });
         } else { // Add mode
             if (type === '분야') {
-                const newField: Omit<Field, 'id'> = {
+                const newField = {
                     name: itemData.name,
                     thumbnailUrl: `https://picsum.photos/seed/${uuidv4()}/400/400`,
                     thumbnailHint: 'placeholder'
                 };
                 await addDoc(collection(firestore, 'fields'), newField);
             } else if (type === '큰분류' && selectedField) {
-                const newClassification: Omit<Classification, 'id'> = {
+                const newClassification = {
                     fieldId: selectedField,
                     name: itemData.name,
                     description: `${itemData.name}에 대한 설명입니다.`,
@@ -174,7 +174,7 @@ export default function HierarchyManager() {
                 };
                 await addDoc(collection(firestore, 'classifications'), newClassification);
             } else if (type === '상세분류' && selectedClassification) {
-                const newCourse: Omit<Course, 'id'> = {
+                const newCourse = {
                     classificationId: selectedClassification,
                     name: itemData.name,
                     description: `${itemData.name}에 대한 상세 설명입니다.`,
@@ -241,7 +241,7 @@ export default function HierarchyManager() {
           <p className="text-sm text-muted-foreground">분야 &gt; 큰분류 &gt; 상세분류 순서로 콘텐츠 계층을 관리합니다. 항목을 클릭하여 하위 항목을 확인하세요.</p>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
+          <div className="flex flex-col md:flex-row gap-4">
             <Column title="분야 (Field)" onAdd={() => openNameDialog('분야')}>
                 {fieldsLoading ? renderSkeletons() : fields?.map(item => (
                     <ItemRow
