@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useTransition } from 'react';
@@ -6,7 +5,7 @@ import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2, Image as ImageIcon } from 'lucide-react';
-import type { Field, Classification, Course, Episode } from '@/lib/types';
+import type { Field, Classification, Course } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, query, where, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -196,10 +195,10 @@ export default function HierarchyManager() {
     }
   };
   
-  const handleDelete = useCallback((e: React.MouseEvent, collectionName: 'fields' | 'classifications' | 'courses' | 'episodes', id: string, name: string) => {
+  const handleDelete = useCallback((e: React.MouseEvent, collectionName: 'fields' | 'classifications' | 'courses', item: Field | Classification | Course) => {
     e.stopPropagation();
 
-    if (!confirm(`정말로 '${name}' 항목과 모든 하위 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+    if (!confirm(`정말로 '${item.name}' 항목과 모든 하위 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
         toast({
             title: '취소됨',
             description: '삭제 작업이 취소되었습니다.',
@@ -211,20 +210,20 @@ export default function HierarchyManager() {
     startTransition(async () => {
         const { id: toastId } = toast({
             title: '삭제 중...',
-            description: `'${name}' 항목과 관련된 모든 데이터를 삭제하고 있습니다.`,
+            description: `'${item.name}' 항목과 관련된 모든 데이터를 삭제하고 있습니다.`,
             duration: 999999,
         });
 
         try {
-            const result = await deleteHierarchyItem(collectionName, id);
+            const result = await deleteHierarchyItem(collectionName, item.id, item);
             
             if (result.success) {
                 toast.dismiss(toastId);
                 toast({ title: '삭제 성공', description: result.message, duration: 5000 });
-                if (collectionName === 'fields' && selectedField === id) {
+                if (collectionName === 'fields' && selectedField === item.id) {
                     setSelectedField(null);
                 }
-                if (collectionName === 'classifications' && selectedClassification === id) {
+                if (collectionName === 'classifications' && selectedClassification === item.id) {
                     setSelectedClassification(null);
                 }
             } else {
@@ -272,7 +271,7 @@ export default function HierarchyManager() {
                         onSelect={() => handleSelectField(item.id)}
                         onEdit={(e) => { e.stopPropagation(); openNameDialog('분야', item); }}
                         onEditThumbnail={(e) => { e.stopPropagation(); openThumbnailDialog('fields', item); }}
-                        onDelete={(e) => handleDelete(e, 'fields', item.id, item.name)}
+                        onDelete={(e) => handleDelete(e, 'fields', item)}
                     />
                 ))}
             </Column>
@@ -286,7 +285,7 @@ export default function HierarchyManager() {
                         selected={selectedClassification === item.id}
                         onSelect={() => handleSelectClassification(item.id)}
                         onEdit={(e) => { e.stopPropagation(); openNameDialog('큰분류', item); }}
-                        onDelete={(e) => handleDelete(e, 'classifications', item.id, item.name)}
+                        onDelete={(e) => handleDelete(e, 'classifications', item)}
                         onEditThumbnail={(e) => { e.stopPropagation(); openThumbnailDialog('classifications', item); }}
                      />
                  ))
@@ -302,7 +301,7 @@ export default function HierarchyManager() {
                        selected={false} // No selection action for the last column
                        onSelect={() => {}}
                        onEdit={(e) => { e.stopPropagation(); openNameDialog('상세분류', item); }}
-                       onDelete={(e) => handleDelete(e, 'courses', item.id, item.name)}
+                       onDelete={(e) => handleDelete(e, 'courses', item)}
                        onEditThumbnail={(e) => { e.stopPropagation(); openThumbnailDialog('courses', item); }}
                     />
                 ))
