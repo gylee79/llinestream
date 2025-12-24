@@ -191,5 +191,17 @@ service cloud.firestore {
       allow create: if isAdmin();
       allow update, delete: if isAdmin() && isExistingDoc();
     }
+
+    /**
+     * @description Stores global application settings like footer info and hero content.
+     * @path /settings/{settingId}
+     * @allow (get, list) Allows any user to read application settings.
+     * @deny (create, update) Prevents non-admins from changing settings.
+     * @principle Public information should be readable, but modification must be restricted to admins.
+     */
+    match /settings/{settingId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
   }
 }
