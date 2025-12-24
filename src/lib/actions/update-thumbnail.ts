@@ -13,10 +13,10 @@ type UpdateResult = {
 };
 
 /**
- * Deletes a file from Firebase Storage using the official SDK method, ignoring not-found errors.
- * This function is robust and handles various Firebase Storage URL formats.
+ * Robustly deletes a file from Firebase Storage given its URL.
+ * It decodes the URL and handles potential not-found errors gracefully.
  * @param storage The Firebase Admin Storage instance.
- * @param url The full URL of the file to delete.
+ * @param url The full HTTP URL of the file to delete.
  */
 const deleteStorageFile = async (storage: Storage, url: string) => {
   if (!url || !url.startsWith('http')) {
@@ -25,13 +25,28 @@ const deleteStorageFile = async (storage: Storage, url: string) => {
   }
 
   try {
-    const file = storage.bucket().file(decodeURIComponent(new URL(url).pathname.split('/o/')[1].split('?')[0]));
+    // Decode the URL component to handle characters like '%2F' for '/'
+    const decodedPath = decodeURIComponent(new URL(url).pathname);
     
-    console.log(`[ATTEMPT DELETE] Attempting to delete storage file at path: ${file.name}`);
+    // Extract the file path after the bucket name and '/o/' marker
+    const pathParts = decodedPath.split('/o/');
+    if (pathParts.length < 2) {
+      console.warn(`[SKIP DELETE] Could not determine file path from URL: ${url}`);
+      return;
+    }
+    
+    const filePath = pathParts[1].split('?')[0]; // Remove query params like alt=media
+    if (!filePath) {
+        console.warn(`[SKIP DELETE] Empty file path extracted from URL: ${url}`);
+        return;
+    }
+
+    const file = storage.bucket().file(filePath);
+    
+    console.log(`[ATTEMPT DELETE] Deleting storage file at path: ${file.name}`);
     await file.delete({ ignoreNotFound: true });
     console.log(`[DELETE SUCCESS] File deleted or did not exist: ${file.name}`);
   } catch (error: any) {
-    // Log the error but do not throw, to allow other deletions to proceed.
     console.error(`[DELETE FAILED] Could not delete storage file from URL ${url}. Error: ${error.message}`);
   }
 };
@@ -56,7 +71,6 @@ export async function updateThumbnail(formData: FormData): Promise<UpdateResult>
   if (!imageFile || imageFile.size === 0) {
       return { success: false, message: '업데이트를 위해 새로운 이미지 파일을 제공해야 합니다.' };
   }
-
 
   try {
     const adminApp = initializeAdminApp();
