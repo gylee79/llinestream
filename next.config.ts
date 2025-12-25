@@ -2,6 +2,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverActions: {
+    bodySizeLimit: '10mb',
+  },
   images: {
     remotePatterns: [
       {
@@ -17,7 +20,7 @@ const nextConfig: NextConfig = {
         hostname: "firebasestorage.googleapis.com",
       },
       {
-        protocol: "https",
+        protocol: "https" ,
         hostname: "storage.googleapis.com",
       },
     ],
