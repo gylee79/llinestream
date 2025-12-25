@@ -50,7 +50,7 @@ const extractPathFromUrl = (url: string | undefined): string | undefined => {
         }
         // GCS public URL: https://storage.googleapis.com/<bucket-name>/<path/to/file>
         if (urlObject.hostname === 'storage.googleapis.com') {
-            // Path starts after the bucket name, which is the 4th segment
+            // Path starts after the bucket name, which is the 3rd segment (index 2)
             return decodeURIComponent(urlObject.pathname.split('/').slice(2).join('/'));
         }
     } catch (e) {
@@ -107,8 +107,11 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
         const file = storage.bucket().file(filePath);
         await file.save(fileBuffer, {
           metadata: { contentType: imageContentType },
-          public: true,
+          public: true, // IMPORTANT: Make the file publicly accessible
         });
+
+        // Ensure we make it public which is required for publicUrl() to work as expected
+        await file.makePublic();
 
         downloadUrl = file.publicUrl();
     } else {
