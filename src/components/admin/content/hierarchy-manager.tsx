@@ -15,6 +15,17 @@ import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
 import ThumbnailEditorDialog from './thumbnail-editor-dialog';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 type Item = (Field | Classification | Course) & { type: 'field' | 'classification' | 'course' };
 
@@ -89,6 +100,11 @@ type ThumbnailDialogState = {
     item: Field | Classification | Course | null;
     type: 'fields' | 'classifications' | 'courses';
 }
+type DeleteAlertState = {
+    isOpen: boolean;
+    item: Item | null;
+    collectionName: 'fields' | 'classifications' | 'courses' | null;
+};
 
 export default function HierarchyManager() {
   const firestore = useFirestore();
@@ -100,6 +116,8 @@ export default function HierarchyManager() {
 
   const [nameDialog, setNameDialog] = useState<NameDialogState>({ isOpen: false, item: null, type: '분야' });
   const [thumbnailDialog, setThumbnailDialog] = useState<ThumbnailDialogState>({ isOpen: false, item: null, type: 'fields' });
+  const [deleteAlert, setDeleteAlert] = useState<DeleteAlertState>({ isOpen: false, item: null, collectionName: null });
+
 
   const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
@@ -153,6 +171,10 @@ export default function HierarchyManager() {
       setNameDialog({ isOpen: false, item: null, type: '분야' });
       setThumbnailDialog({ isOpen: false, item: null, type: 'fields' });
   };
+  
+  const closeDeleteAlert = () => {
+    setDeleteAlert({ isOpen: false, item: null, collectionName: null });
+  }
 
   const handleSaveName = async (itemData: HierarchyItem) => {
     if (!firestore) return;
@@ -195,17 +217,14 @@ export default function HierarchyManager() {
     }
   };
   
-  const handleDelete = useCallback((e: React.MouseEvent, collectionName: 'fields' | 'classifications' | 'courses', item: Field | Classification | Course) => {
+  const handleDeleteRequest = (e: React.MouseEvent, collectionName: 'fields' | 'classifications' | 'courses', item: Item) => {
     e.stopPropagation();
+    setDeleteAlert({ isOpen: true, item, collectionName });
+  };
 
-    if (!confirm(`정말로 '${item.name}' 항목과 모든 하위 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
-        toast({
-            title: '취소됨',
-            description: '삭제 작업이 취소되었습니다.',
-            duration: 3000,
-        });
-        return;
-    }
+  const executeDelete = useCallback(() => {
+    const { item, collectionName } = deleteAlert;
+    if (!item || !collectionName) return;
 
     startTransition(async () => {
         const { id: toastId } = toast({
@@ -238,9 +257,12 @@ export default function HierarchyManager() {
                 description: errorMessage,
                 duration: 9000,
             });
+        } finally {
+            closeDeleteAlert();
         }
     });
-}, [toast, startTransition, selectedField, selectedClassification]);
+  }, [toast, startTransition, selectedField, selectedClassification, deleteAlert]);
+
 
   const renderSkeletons = () => (
     <div className="flex flex-col gap-2">
@@ -271,7 +293,7 @@ export default function HierarchyManager() {
                         onSelect={() => handleSelectField(item.id)}
                         onEdit={(e) => { e.stopPropagation(); openNameDialog('분야', item); }}
                         onEditThumbnail={(e) => { e.stopPropagation(); openThumbnailDialog('fields', item); }}
-                        onDelete={(e) => handleDelete(e, 'fields', item)}
+                        onDelete={(e) => handleDeleteRequest(e, 'fields', {...item, type: 'field'})}
                     />
                 ))}
             </Column>
@@ -285,7 +307,7 @@ export default function HierarchyManager() {
                         selected={selectedClassification === item.id}
                         onSelect={() => handleSelectClassification(item.id)}
                         onEdit={(e) => { e.stopPropagation(); openNameDialog('큰분류', item); }}
-                        onDelete={(e) => handleDelete(e, 'classifications', item)}
+                        onDelete={(e) => handleDeleteRequest(e, 'classifications', {...item, type: 'classification'})}
                         onEditThumbnail={(e) => { e.stopPropagation(); openThumbnailDialog('classifications', item); }}
                      />
                  ))
@@ -301,7 +323,7 @@ export default function HierarchyManager() {
                        selected={false} // No selection action for the last column
                        onSelect={() => {}}
                        onEdit={(e) => { e.stopPropagation(); openNameDialog('상세분류', item); }}
-                       onDelete={(e) => handleDelete(e, 'courses', item)}
+                       onDelete={(e) => handleDeleteRequest(e, 'courses', {...item, type: 'course'})}
                        onEditThumbnail={(e) => { e.stopPropagation(); openThumbnailDialog('courses', item); }}
                     />
                 ))
@@ -330,6 +352,26 @@ export default function HierarchyManager() {
             itemType={thumbnailDialog.type}
         />
       )}
+
+      <AlertDialog open={deleteAlert.isOpen} onOpenChange={(open) => !open && closeDeleteAlert()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>정말 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &apos;{deleteAlert.item?.name}&apos; 항목과 모든 하위 데이터(분류, 강좌, 에피소드, 파일 등)가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={closeDeleteAlert}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
