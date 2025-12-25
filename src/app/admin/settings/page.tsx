@@ -79,7 +79,7 @@ function HeroImageManager() {
         }));
     };
     
-    const handleTextChange = (type: 'home' | 'about', field: 'title' | 'description' | 'hint' | 'hintMobile', value: string) => {
+    const handleTextChange = (type: 'home' | 'about', field: 'title' | 'description', value: string) => {
       setSettings(prev => ({
         ...prev,
         [type]: { ...(prev[type] || {}), [field]: value }
@@ -163,8 +163,7 @@ function HeroImageManager() {
           <Separator />
 
           {/* PC Image */}
-          <div className="grid md:grid-cols-2 gap-4 items-start">
-            <div className="space-y-2">
+          <div className="space-y-2">
               <Label>PC 배경 이미지</Label>
               {settings[type]?.url && <Image src={settings[type]!.url!} alt={`${type} hero preview`} width={500} height={200} className="rounded-md object-cover"/>}
               <div className="flex items-center gap-2">
@@ -174,21 +173,11 @@ function HeroImageManager() {
                 )}
               </div>
             </div>
-            <div className="space-y-2">
-                <Label>PC 이미지 검색 힌트 (AI용)</Label>
-                <Input
-                    value={settings[type]?.hint || ''}
-                    onChange={e => handleTextChange(type, 'hint', e.target.value)}
-                    placeholder="e.g., modern laptop"
-                />
-            </div>
-          </div>
           
           <Separator />
           
           {/* Mobile Image */}
-          <div className="grid md:grid-cols-2 gap-4 items-start">
-            <div className="space-y-2">
+          <div className="space-y-2">
               <Label>모바일 배경 이미지</Label>
               {settings[type]?.urlMobile && <Image src={settings[type]!.urlMobile!} alt={`${type} mobile hero preview`} width={500} height={200} className="rounded-md object-cover"/>}
               <div className="flex items-center gap-2">
@@ -198,15 +187,6 @@ function HeroImageManager() {
                 )}
               </div>
             </div>
-            <div className="space-y-2">
-                <Label>모바일 이미지 검색 힌트 (AI용)</Label>
-                <Input
-                    value={settings[type]?.hintMobile || ''}
-                    onChange={e => handleTextChange(type, 'hintMobile', e.target.value)}
-                    placeholder="e.g., vertical screen, smartphone"
-                />
-            </div>
-          </div>
       </div>
   );
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -43,6 +43,26 @@ const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
+const dataURLtoFile = (dataurl: string, filename: string): File => {
+    const arr = dataurl.split(',');
+    if (arr.length < 2) {
+        throw new Error('Invalid data URL');
+    }
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    if (!mimeMatch) {
+        throw new Error('Could not find MIME type');
+    }
+    const mime = mimeMatch[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, {type:mime});
+}
+
+
 interface VideoUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -71,7 +91,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
-  const [thumbnailHint, setThumbnailHint] = useState('');
+
+  const videoRef = useRef<HTMLVideoElement>(null);
 
 
   const [hierarchyDialogState, setHierarchyDialogState] = useState<HierarchyDialogState>({ isOpen: false, item: null, type: '분야' });
@@ -103,7 +124,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setVideoFile(null);
     setThumbnailFile(null);
     setThumbnailPreview(null);
-    setThumbnailHint('');
     setIsProcessing(false);
     setUploadProgress(null);
   };
@@ -117,7 +137,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             setIsFree(episode.isFree);
             setSelectedCourseId(episode.courseId);
             setThumbnailPreview(episode.thumbnailUrl || null);
-            setThumbnailHint(episode.thumbnailHint || '');
 
             try {
               const courseDocRef = doc(firestore, 'courses', episode.courseId);
@@ -159,6 +178,47 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
       reader.readAsDataURL(file);
     }
   };
+  
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        setVideoFile(file);
+        
+        // Auto-generate thumbnail only if user hasn't selected one
+        if (!thumbnailFile && !thumbnailPreview) {
+            const videoUrl = URL.createObjectURL(file);
+            const videoElement = document.createElement('video');
+            videoElement.src = videoUrl;
+            videoElement.muted = true;
+            
+            videoElement.onloadeddata = () => {
+                videoElement.currentTime = 1; // Seek to 1 second
+            };
+
+            videoElement.onseeked = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = videoElement.videoWidth;
+                canvas.height = videoElement.videoHeight;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                    const dataUrl = canvas.toDataURL('image/jpeg');
+                    setThumbnailPreview(dataUrl);
+                    // Also set this as a file to be uploaded
+                    const generatedThumbnailFile = dataURLtoFile(dataUrl, 'thumbnail.jpg');
+                    setThumbnailFile(generatedThumbnailFile);
+                }
+                URL.revokeObjectURL(videoUrl); // Clean up
+            };
+
+            videoElement.onerror = () => {
+                console.error("Error loading video for thumbnail generation.");
+                URL.revokeObjectURL(videoUrl);
+            }
+        }
+    }
+  };
+
 
   const uploadFileAndGetUrl = async (file: File, courseId: string, episodeId: string): Promise<{uploadUrl: string, downloadUrl: string, filePath: string}> => {
       const signedUrlResult = await getSignedUploadUrl(courseId, file.name, file.type, episodeId);
@@ -223,7 +283,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 itemType: 'episodes',
                 itemId: episodeId,
                 parentItemId: selectedCourseId,
-                hint: thumbnailHint,
                 base64Image,
                 imageContentType: thumbnailFile.type,
                 imageName: thumbnailFile.name,
@@ -311,7 +370,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             const docRef = await addDoc(collection(firestore, 'fields'), { 
                 name: item.name, 
                 thumbnailUrl: '', 
-                thumbnailHint: '' 
             });
             newDocId = docRef.id;
             setSelectedFieldId(newDocId);
@@ -324,7 +382,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 description: `${item.name}에 대한 설명입니다.`,
                 prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
                 thumbnailUrl: '',
-                thumbnailHint: ''
             });
             newDocId = docRef.id;
             setSelectedClassificationId(newDocId);
@@ -335,7 +392,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 name: item.name,
                 description: `${item.name}에 대한 상세 설명입니다.`,
                 thumbnailUrl: '',
-                thumbnailHint: ''
             });
             newDocId = docRef.id;
             setSelectedCourseId(newDocId);
@@ -356,7 +412,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
           <DialogHeader>
             <DialogTitle className="font-headline">{isEditMode ? '에피소드 수정' : '비디오 업로드'}</DialogTitle>
             <DialogDescription>
-              {isEditMode ? '에피소드 정보를 수정합니다.' : '새 에피소드를 추가합니다. 썸네일은 별도로 등록해야 합니다.'}
+              {isEditMode ? '에피소드 정보를 수정합니다.' : '새 에피소드를 추가합니다.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
@@ -426,17 +482,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                     <Input id="thumbnail-file" type="file" accept="image/*" onChange={handleThumbnailFileChange} disabled={isLoading} />
                 </div>
             </div>
-             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="thumbnail-hint" className="text-right">썸네일 힌트</Label>
-              <Input
-                  id="thumbnail-hint"
-                  value={thumbnailHint}
-                  onChange={e => setThumbnailHint(e.target.value)}
-                  placeholder="e.g., abstract code"
-                  disabled={isLoading}
-                  className="col-span-3"
-              />
-            </div>
             <Separator />
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="video-file" className="text-right">
@@ -446,7 +491,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                   id="video-file" 
                   type="file" 
                   className="col-span-3" 
-                  onChange={(e) => setVideoFile(e.target.files ? e.target.files[0] : null)}
+                  onChange={handleVideoFileChange}
                   accept="video/*"
                   disabled={isLoading}
               />

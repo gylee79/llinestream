@@ -68,9 +68,6 @@ export default function AboutPage() {
   const heroImageUrl = isMobile 
     ? (heroImagesData?.about?.urlMobile || heroImagesData?.about?.url) 
     : heroImagesData?.about?.url;
-  const heroImageHint = isMobile
-    ? (heroImagesData?.about?.hintMobile || heroImagesData?.about?.hint)
-    : heroImagesData?.about?.hint;
 
 
   return (
@@ -85,7 +82,6 @@ export default function AboutPage() {
                 alt="스마트 뷰티 교육"
                 fill
                 className="object-cover brightness-50"
-                data-ai-hint={heroImageHint || "bright modern beauty academy"}
             />
         )}
         <motion.div 

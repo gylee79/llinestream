@@ -17,7 +17,6 @@ type UpdateResult = {
 type UpdateThumbnailPayload = {
     itemType: 'fields' | 'classifications' | 'courses' | 'episodes';
     itemId: string;
-    hint: string;
     base64Image: string | null; // Allow null for deletion
     imageContentType?: string;
     imageName?: string;
@@ -61,7 +60,7 @@ const extractPathFromUrl = (url: string | undefined): string | undefined => {
 
 
 export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<UpdateResult> {
-  const { itemType, itemId, hint, base64Image, imageContentType, imageName, parentItemId } = payload;
+  const { itemType, itemId, base64Image, imageContentType, imageName, parentItemId } = payload;
 
   if (!itemType || !itemId) {
     return { success: false, message: '필수 항목(itemType, itemId)이 누락되었습니다.' };
@@ -90,7 +89,6 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     }
 
     let downloadUrl: string | null = null;
-    let newHint: string = hint || '';
 
     // If a new image is provided, upload it. Otherwise, we are deleting the thumbnail.
     if (base64Image && imageContentType && imageName) {
@@ -114,13 +112,9 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
         await file.makePublic();
 
         downloadUrl = file.publicUrl();
-    } else {
-        // Deleting the thumbnail, so clear the hint as well.
-        newHint = '';
     }
 
     const dataToUpdate = {
-      thumbnailHint: newHint,
       thumbnailUrl: downloadUrl || '', // Save new URL or empty string if deleted
     };
 

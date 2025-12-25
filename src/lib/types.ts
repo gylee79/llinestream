@@ -26,7 +26,6 @@ export interface Field {
   id: string; // This will be the document ID from Firestore, added on the client
   name: string;
   thumbnailUrl: string;
-  thumbnailHint: string;
 }
 
 export interface Classification {
@@ -41,7 +40,6 @@ export interface Classification {
     day90: number;
   };
   thumbnailUrl: string;
-  thumbnailHint: string;
 }
 
 export interface Course {
@@ -50,7 +48,6 @@ export interface Course {
   name: string;
   description: string;
   thumbnailUrl: string;
-  thumbnailHint: string;
 }
 
 export interface Episode {
@@ -63,7 +60,6 @@ export interface Episode {
   videoUrl: string;
   filePath?: string; // Path in Firebase Storage
   thumbnailUrl: string;
-  thumbnailHint: string;
 }
 
 export interface ViewHistoryItem {

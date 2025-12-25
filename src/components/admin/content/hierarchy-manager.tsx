@@ -51,7 +51,6 @@ const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }
                         key={item.thumbnailUrl} // Add key to force re-render on URL change
                         src={item.thumbnailUrl}
                         alt={item.name}
-                        data-ai-hint={item.thumbnailHint}
                         fill
                         className="object-cover"
                         sizes="40px"
@@ -188,7 +187,7 @@ export default function HierarchyManager() {
         } else { // Add mode
              const docRef = doc(firestore, collectionName, uuidv4());
             if (type === '분야') {
-                await setDoc(docRef, { name: itemData.name, thumbnailUrl: '', thumbnailHint: '' });
+                await setDoc(docRef, { name: itemData.name, thumbnailUrl: '' });
             } else if (type === '큰분류' && selectedField) {
                 await setDoc(docRef, {
                     fieldId: selectedField,
@@ -196,7 +195,6 @@ export default function HierarchyManager() {
                     description: `${itemData.name}에 대한 설명입니다.`,
                     prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
                     thumbnailUrl: '',
-                    thumbnailHint: ''
                 });
             } else if (type === '상세분류' && selectedClassification) {
                 await setDoc(docRef, {
@@ -204,7 +202,6 @@ export default function HierarchyManager() {
                     name: itemData.name,
                     description: `${itemData.name}에 대한 상세 설명입니다.`,
                     thumbnailUrl: '',
-                    thumbnailHint: ''
                 });
             }
             toast({ title: '추가 성공', description: `${type} '${itemData.name}'이(가) 추가되었습니다.` });

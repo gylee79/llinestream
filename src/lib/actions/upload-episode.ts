@@ -141,7 +141,6 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             videoUrl, // Already contains the public URL
             filePath,
             thumbnailUrl: '',
-            thumbnailHint: '',
         };
 
         await episodeRef.set(newEpisode);

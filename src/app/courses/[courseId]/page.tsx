@@ -58,7 +58,6 @@ export default function CourseDetailPage() {
         <Image
           src={course.thumbnailUrl}
           alt={course.name}
-          data-ai-hint={course.thumbnailHint}
           fill
           className="object-cover"
         />

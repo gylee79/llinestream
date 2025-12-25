@@ -51,14 +51,12 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
   const [isProcessing, setIsProcessing] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(item.thumbnailUrl || null);
-  const [thumbnailHint, setThumbnailHint] = useState(item.thumbnailHint || '');
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
 
   useEffect(() => {
     if (isOpen) {
       setImagePreview(item.thumbnailUrl || null);
-      setThumbnailHint(item.thumbnailHint || '');
       setImageFile(null);
     }
   }, [isOpen, item]);
@@ -95,7 +93,6 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
             itemType,
             itemId: item.id,
             parentItemId: itemType === 'episodes' ? item.courseId : undefined,
-            hint: thumbnailHint,
             base64Image,
             imageContentType: imageFile.type,
             imageName: imageFile.name,
@@ -124,7 +121,6 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
             itemType,
             itemId: item.id,
             parentItemId: itemType === 'episodes' ? item.courseId : undefined,
-            hint: '',
             base64Image: null, // Sending null indicates deletion
         });
 
@@ -148,7 +144,7 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
         <DialogHeader>
           <DialogTitle>썸네일 수정: {item.name}</DialogTitle>
           <DialogDescription>
-            썸네일 이미지와 AI 생성 힌트를 수정합니다.
+            썸네일 이미지를 수정합니다.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -170,16 +166,6 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
                 <Input id="thumbnail-file" type="file" accept="image/*" onChange={handleFileChange} disabled={isProcessing} className="flex-1" />
                 {imageFile && <Button variant="outline" onClick={handleCancelFile}>취소</Button>}
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="thumbnail-hint">AI 이미지 힌트</Label>
-            <Input 
-                id="thumbnail-hint" 
-                value={thumbnailHint}
-                onChange={e => setThumbnailHint(e.target.value)}
-                placeholder="e.g. abstract code"
-                disabled={isProcessing}
-            />
           </div>
         </div>
         <DialogFooter className="justify-between">

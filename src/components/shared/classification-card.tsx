@@ -16,7 +16,6 @@ export default function ClassificationCard({ classification }: ClassificationCar
           <Image
             src={classification.thumbnailUrl || 'https://picsum.photos/seed/placeholder/600/400'}
             alt={classification.name}
-            data-ai-hint={classification.thumbnailHint}
             fill
             className="object-cover transition-transform duration-300 group-hover:scale-105"
           />

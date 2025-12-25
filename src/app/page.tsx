@@ -46,9 +46,7 @@ export default function Home() {
           title={heroImagesData?.home?.title}
           description={heroImagesData?.home?.description}
           imageUrl={heroImagesData?.home?.url}
-          imageHint={heroImagesData?.home?.hint}
           imageUrlMobile={heroImagesData?.home?.urlMobile}
-          imageHintMobile={heroImagesData?.home?.hintMobile}
         />
       <div className="container mx-auto space-y-16 py-12">
         {user && <ContinueWatching />}

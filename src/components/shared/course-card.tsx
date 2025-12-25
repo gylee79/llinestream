@@ -16,7 +16,6 @@ export default function CourseCard({ course }: CourseCardProps) {
           <Image
             src={course.thumbnailUrl}
             alt={course.name}
-            data-ai-hint={course.thumbnailHint}
             width={600}
             height={400}
             className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"

@@ -20,15 +20,13 @@ const MotionImage = motion(Image);
 export default function Hero({ title, description, imageUrl, imageHint, imageUrlMobile, imageHintMobile }: HeroProps) {
   const isMobile = useIsMobile();
   const finalImageUrl = isMobile ? (imageUrlMobile || imageUrl) : imageUrl;
-  const finalImageHint = isMobile ? (imageHintMobile || imageHint) : imageHint;
 
   return (
     <div className="relative h-[70vh] min-h-[500px] w-full overflow-hidden">
       {finalImageUrl ? (
         <MotionImage
           src={finalImageUrl}
-          alt={finalImageHint || title || 'Hero background'}
-          data-ai-hint={finalImageHint}
+          alt={title || 'Hero background'}
           fill
           className="object-cover"
           priority
