@@ -48,7 +48,7 @@ type UpdateEpisodePayload = {
     oldFilePath?: string;
 }
 
-const deleteStorageFileByPath = async (storage: Storage, filePath: string) => {
+const deleteStorageFileByPath = async (storage: Storage, filePath: string | undefined) => {
     if (!filePath) {
         console.warn(`[SKIP DELETE] No file path provided.`);
         return;
