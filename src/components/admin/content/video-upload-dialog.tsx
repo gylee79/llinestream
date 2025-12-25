@@ -27,10 +27,21 @@ import { collection, doc, addDoc, updateDoc, getDoc, query, where } from 'fireba
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, ImageIcon } from 'lucide-react';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
 import { getSignedUploadUrl, saveEpisodeMetadata, updateEpisode } from '@/lib/actions/upload-episode';
+import { updateThumbnail } from '@/lib/actions/update-thumbnail';
 import { v4 as uuidv4 } from 'uuid';
+import Image from 'next/image';
+
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+    });
+};
 
 interface VideoUploadDialogProps {
   open: boolean;
@@ -58,6 +69,10 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const [selectedClassificationId, setSelectedClassificationId] = useState<string>('');
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [thumbnailHint, setThumbnailHint] = useState('');
+
 
   const [hierarchyDialogState, setHierarchyDialogState] = useState<HierarchyDialogState>({ isOpen: false, item: null, type: '분야' });
 
@@ -86,6 +101,9 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setSelectedClassificationId('');
     setSelectedCourseId('');
     setVideoFile(null);
+    setThumbnailFile(null);
+    setThumbnailPreview(null);
+    setThumbnailHint('');
     setIsProcessing(false);
     setUploadProgress(null);
   };
@@ -98,6 +116,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             setDescription(episode.description || '');
             setIsFree(episode.isFree);
             setSelectedCourseId(episode.courseId);
+            setThumbnailPreview(episode.thumbnailUrl || null);
+            setThumbnailHint(episode.thumbnailHint || '');
 
             try {
               const courseDocRef = doc(firestore, 'courses', episode.courseId);
@@ -128,14 +148,24 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     }
 }, [open, episode, isEditMode, firestore, toast]);
 
+  const handleThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setThumbnailFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setThumbnailPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const uploadFileAndGetUrl = async (file: File, courseId: string, episodeId: string): Promise<{uploadUrl: string, downloadUrl: string, filePath: string}> => {
-      // 1. Get signed URL from server
       const signedUrlResult = await getSignedUploadUrl(courseId, file.name, file.type, episodeId);
       if (!signedUrlResult.success || !signedUrlResult.uploadUrl || !signedUrlResult.downloadUrl || !signedUrlResult.filePath) {
           throw new Error(signedUrlResult.message || '서명된 업로드 URL을 가져오지 못했습니다.');
       }
 
-      // 2. Upload file directly to Google Cloud Storage
       setUploadProgress(0);
       const xhr = new XMLHttpRequest();
       xhr.open('PUT', signedUrlResult.uploadUrl, true);
@@ -184,6 +214,23 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setIsProcessing(true);
 
     try {
+        let episodeId = isEditMode ? episode.id : uuidv4();
+
+        // 1. Handle Thumbnail Upload (if any)
+        if (thumbnailFile) {
+            const base64Image = await fileToBase64(thumbnailFile);
+            await updateThumbnail({
+                itemType: 'episodes',
+                itemId: episodeId,
+                parentItemId: selectedCourseId,
+                hint: thumbnailHint,
+                base64Image,
+                imageContentType: thumbnailFile.type,
+                imageName: thumbnailFile.name,
+            });
+        }
+        
+        // 2. Handle Video Upload & Metadata
         if (isEditMode && episode) { // Update existing episode
             let newVideoData: { videoUrl: string; filePath: string } | undefined = undefined;
             
@@ -199,7 +246,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 courseId: selectedCourseId,
                 episodeId: episode.id,
                 newVideoData: newVideoData,
-                oldVideoUrl: newVideoData ? episode.videoUrl : undefined, // Only pass old URL if new one is uploaded
+                oldVideoUrl: newVideoData ? episode.videoUrl : undefined,
                 oldFilePath: newVideoData ? episode.filePath : undefined
             });
 
@@ -210,7 +257,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             }
 
         } else if (videoFile) { // Create new episode
-            const episodeId = uuidv4();
             const { downloadUrl, filePath } = await uploadFileAndGetUrl(videoFile, selectedCourseId, episodeId);
             
             const metadataResult = await saveEpisodeMetadata({
@@ -313,7 +359,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
               {isEditMode ? '에피소드 정보를 수정합니다.' : '새 에피소드를 추가합니다. 썸네일은 별도로 등록해야 합니다.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="title" className="text-right">제목</Label>
               <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" disabled={isLoading} />
@@ -364,6 +410,34 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                   <Label htmlFor="isFree">무료 콘텐츠</Label>
               </div>
             </div>
+            <Separator />
+             <div className="grid grid-cols-4 items-start gap-4">
+                <Label className="text-right pt-2">썸네일</Label>
+                <div className="col-span-3 space-y-2">
+                    <div className="relative w-full aspect-video rounded-md overflow-hidden bg-muted border">
+                        {thumbnailPreview ? (
+                            <Image src={thumbnailPreview} alt="썸네일 미리보기" fill className="object-cover" />
+                        ) : (
+                            <div className="flex items-center justify-center h-full w-full">
+                                <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                            </div>
+                        )}
+                    </div>
+                    <Input id="thumbnail-file" type="file" accept="image/*" onChange={handleThumbnailFileChange} disabled={isLoading} />
+                </div>
+            </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="thumbnail-hint" className="text-right">썸네일 힌트</Label>
+              <Input
+                  id="thumbnail-hint"
+                  value={thumbnailHint}
+                  onChange={e => setThumbnailHint(e.target.value)}
+                  placeholder="e.g., abstract code"
+                  disabled={isLoading}
+                  className="col-span-3"
+              />
+            </div>
+            <Separator />
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="video-file" className="text-right">
                 {isEditMode ? '비디오 교체' : '비디오 파일'}
