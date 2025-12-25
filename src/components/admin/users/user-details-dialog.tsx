@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -150,15 +149,15 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
             <div className="space-y-4">
                 <div>
                     <Label htmlFor="name">이름</Label>
-                    <Input id="name" value={name} onChange={e => setName(e.target.value)} />
+                    <Input id="name" value={name || ''} onChange={e => setName(e.target.value)} />
                 </div>
                 <div>
                     <Label htmlFor="phone">연락처</Label>
-                    <Input id="phone" value={phone} onChange={e => setPhone(e.target.value)} />
+                    <Input id="phone" value={phone || ''} onChange={e => setPhone(e.target.value)} />
                 </div>
                 <div>
                     <Label htmlFor="dob">생년월일</Label>
-                    <Input id="dob" value={dob} onChange={e => setDob(e.target.value)} />
+                    <Input id="dob" value={dob || ''} onChange={e => setDob(e.target.value)} />
                 </div>
             </div>
              <DialogFooter className="mt-4">
@@ -208,3 +207,5 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
     </Dialog>
   );
 }
+
+    
