@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   Table,
   TableBody,
@@ -15,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, PlusCircle } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, ImageIcon } from 'lucide-react';
 import type { Episode, Course } from '@/lib/types';
 import VideoUploadDialog from '@/components/admin/content/video-upload-dialog';
 import {
@@ -29,6 +30,8 @@ import { collection, doc, query, collectionGroup, updateDoc } from 'firebase/fir
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
+import ThumbnailEditorDialog from '@/components/admin/content/thumbnail-editor-dialog';
+
 
 export default function VideoManager() {
   const firestore = useFirestore();
@@ -40,13 +43,20 @@ export default function VideoManager() {
   const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
   
-  const [isDialogOpen, setDialogOpen] = useState(false);
+  const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [isThumbnailDialogOpen, setThumbnailDialogOpen] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
 
-  const handleOpenDialog = (episode: Episode | null = null) => {
+  const handleOpenUploadDialog = (episode: Episode | null = null) => {
     setSelectedEpisode(episode);
-    setDialogOpen(true);
+    setUploadDialogOpen(true);
   };
+  
+  const handleOpenThumbnailDialog = (episode: Episode) => {
+    setSelectedEpisode(episode);
+    setThumbnailDialogOpen(true);
+  };
+
 
   const getCourseName = (courseId: string) => {
     return courses?.find(c => c.id === courseId)?.name || 'N/A';
@@ -96,7 +106,7 @@ export default function VideoManager() {
             <CardTitle>비디오 관리</CardTitle>
             <p className="text-sm text-muted-foreground">개별 에피소드를 업로드하고 관리합니다.</p>
           </div>
-          <Button onClick={() => handleOpenDialog()}>
+          <Button onClick={() => handleOpenUploadDialog()}>
             <PlusCircle className="mr-2 h-4 w-4" />
             비디오 업로드
           </Button>
@@ -105,6 +115,7 @@ export default function VideoManager() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[80px]">썸네일</TableHead>
                 <TableHead>제목</TableHead>
                 <TableHead>소속 상세분류</TableHead>
                 <TableHead>재생 시간(초)</TableHead>
@@ -116,12 +127,29 @@ export default function VideoManager() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                        <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
+                        <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
                     </TableRow>
                 ))
               ) : (
                 episodes?.map((episode) => (
                   <TableRow key={episode.id}>
+                    <TableCell>
+                        <div className="relative aspect-video w-20 rounded-md overflow-hidden bg-muted border">
+                            {episode.thumbnailUrl ? (
+                                <Image
+                                    src={episode.thumbnailUrl}
+                                    alt={episode.title}
+                                    fill
+                                    className="object-cover"
+                                    sizes="80px"
+                                />
+                            ) : (
+                                <div className="flex items-center justify-center h-full w-full">
+                                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                            )}
+                        </div>
+                    </TableCell>
                     <TableCell className="font-medium">{episode.title}</TableCell>
                     <TableCell>{getCourseName(episode.courseId)}</TableCell>
                     <TableCell>{episode.duration}</TableCell>
@@ -151,8 +179,11 @@ export default function VideoManager() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleOpenDialog(episode)}>
-                            수정
+                          <DropdownMenuItem onClick={() => handleOpenUploadDialog(episode)}>
+                            정보 수정
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenThumbnailDialog(episode)}>
+                            썸네일 수정
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteEpisode(episode)}>
                             삭제
@@ -167,12 +198,23 @@ export default function VideoManager() {
           </Table>
         </CardContent>
       </Card>
-      <VideoUploadDialog 
-        key={selectedEpisode?.id || 'new'} 
-        open={isDialogOpen} 
-        onOpenChange={setDialogOpen} 
-        episode={selectedEpisode}
-      />
+      {isUploadDialogOpen && (
+          <VideoUploadDialog 
+            key={selectedEpisode?.id || 'new-upload'} 
+            open={isUploadDialogOpen} 
+            onOpenChange={setUploadDialogOpen} 
+            episode={selectedEpisode}
+          />
+      )}
+      {isThumbnailDialogOpen && selectedEpisode && (
+          <ThumbnailEditorDialog
+              key={`${selectedEpisode.id}-thumb`}
+              isOpen={isThumbnailDialogOpen}
+              onClose={() => setThumbnailDialogOpen(false)}
+              item={selectedEpisode}
+              itemType="episodes"
+          />
+      )}
     </>
   );
 }

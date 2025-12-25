@@ -14,15 +14,27 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import type { Field, Classification, Course } from '@/lib/types';
+import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { updateThumbnail } from '@/lib/actions/update-thumbnail';
+import { ImageIcon, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface ThumbnailEditorDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  item: Field | Classification | Course;
-  itemType: 'fields' | 'classifications' | 'courses';
+  item: (Field | Classification | Course | Episode) & { courseId?: string }; // courseId for episodes
+  itemType: 'fields' | 'classifications' | 'courses' | 'episodes';
 }
 
 const fileToBase64 = (file: File): Promise<string> => {
@@ -36,10 +48,12 @@ const fileToBase64 = (file: File): Promise<string> => {
 
 export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType }: ThumbnailEditorDialogProps) {
   const { toast } = useToast();
-  const [isSaving, setIsSaving] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(item.thumbnailUrl || null);
   const [thumbnailHint, setThumbnailHint] = useState(item.thumbnailHint || '');
+  const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
 
   useEffect(() => {
     if (isOpen) {
@@ -60,19 +74,19 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
       reader.readAsDataURL(file);
     }
   };
+  
+  const handleCancelFile = () => {
+    setImageFile(null);
+    setImagePreview(item.thumbnailUrl || null); // Revert to original
+  }
 
   const handleSave = async () => {
-    if (!item) {
-        toast({ variant: 'destructive', title: '오류', description: '항목 정보가 없습니다.' });
-        return;
-    }
-    
-    if (!imageFile) {
+    if (!item || !imageFile) {
         toast({ variant: 'destructive', title: '오류', description: '새로운 이미지 파일을 선택해주세요.' });
         return;
     }
 
-    setIsSaving(true);
+    setIsProcessing(true);
     
     try {
         const base64Image = await fileToBase64(imageFile);
@@ -80,6 +94,7 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
         const result = await updateThumbnail({
             itemType,
             itemId: item.id,
+            parentItemId: itemType === 'episodes' ? item.courseId : undefined,
             hint: thumbnailHint,
             base64Image,
             imageContentType: imageFile.type,
@@ -87,25 +102,45 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
         });
         
         if (result.success) {
-            toast({
-                title: '저장 성공',
-                description: '썸네일 정보가 성공적으로 업데이트되었습니다.',
-            });
+            toast({ title: '저장 성공', description: '썸네일 정보가 성공적으로 업데이트되었습니다.' });
             onClose();
         } else {
             throw new Error(result.message);
         }
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
-        toast({
-            variant: 'destructive',
-            title: '저장 실패',
-            description: errorMessage,
-        });
+        toast({ variant: 'destructive', title: '저장 실패', description: errorMessage });
     } finally {
-        setIsSaving(false);
+        setIsProcessing(false);
     }
   };
+
+  const handleDelete = async () => {
+     if (!item) return;
+
+    setIsProcessing(true);
+    try {
+        const result = await updateThumbnail({
+            itemType,
+            itemId: item.id,
+            parentItemId: itemType === 'episodes' ? item.courseId : undefined,
+            hint: '',
+            base64Image: null, // Sending null indicates deletion
+        });
+
+        if (result.success) {
+            toast({ title: '삭제 성공', description: '썸네일이 삭제되었습니다.' });
+            onClose();
+        } else {
+            throw new Error(result.message);
+        }
+    } catch (error) {
+         const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
+        toast({ variant: 'destructive', title: '삭제 실패', description: errorMessage });
+    } finally {
+        setIsProcessing(false);
+    }
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -119,17 +154,22 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>썸네일 미리보기</Label>
-            <div className="relative w-full aspect-video rounded-md overflow-hidden bg-muted">
+            <div className="relative w-full aspect-video rounded-md overflow-hidden bg-muted border">
                 {imagePreview ? (
                     <Image src={imagePreview} alt="썸네일 미리보기" fill className="object-cover" />
                 ) : (
-                    <Skeleton className="h-full w-full" />
+                    <div className="flex items-center justify-center h-full w-full">
+                        <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                    </div>
                 )}
             </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="thumbnail-file">새 이미지 업로드</Label>
-            <Input id="thumbnail-file" type="file" accept="image/*" onChange={handleFileChange} disabled={isSaving} />
+            <div className="flex gap-2">
+                <Input id="thumbnail-file" type="file" accept="image/*" onChange={handleFileChange} disabled={isProcessing} className="flex-1" />
+                {imageFile && <Button variant="outline" onClick={handleCancelFile}>취소</Button>}
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="thumbnail-hint">AI 이미지 힌트</Label>
@@ -138,17 +178,38 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
                 value={thumbnailHint}
                 onChange={e => setThumbnailHint(e.target.value)}
                 placeholder="e.g. abstract code"
-                disabled={isSaving}
+                disabled={isProcessing}
             />
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isSaving}>
-            취소
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving || !imageFile}>
-            {isSaving ? '저장 중...' : '저장'}
-          </Button>
+        <DialogFooter className="justify-between">
+           <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={isProcessing || !imagePreview}>
+                    <Trash2 className="mr-2 h-4 w-4" /> 삭제
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>정말 썸네일을 삭제하시겠습니까?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    이 작업은 되돌릴 수 없으며, 썸네일이 기본 이미지로 초기화됩니다.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>취소</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">삭제</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose} disabled={isProcessing}>
+                취소
+            </Button>
+            <Button onClick={handleSave} disabled={isProcessing || !imageFile}>
+                {isProcessing ? '저장 중...' : '저장'}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
