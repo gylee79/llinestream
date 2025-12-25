@@ -29,7 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { PlusCircle } from 'lucide-react';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
-import { getSignedUploadUrl, saveEpisodeMetadata } from '@/lib/actions/upload-episode';
+import { getSignedUploadUrl, saveEpisodeMetadata, updateEpisode } from '@/lib/actions/upload-episode';
 import { v4 as uuidv4 } from 'uuid';
 
 interface VideoUploadDialogProps {
@@ -128,6 +128,47 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     }
 }, [open, episode, isEditMode, firestore, toast]);
 
+  const uploadFileAndGetUrl = async (file: File, courseId: string, episodeId: string): Promise<{uploadUrl: string, downloadUrl: string, filePath: string}> => {
+      // 1. Get signed URL from server
+      const signedUrlResult = await getSignedUploadUrl(courseId, file.name, file.type, episodeId);
+      if (!signedUrlResult.success || !signedUrlResult.uploadUrl || !signedUrlResult.downloadUrl || !signedUrlResult.filePath) {
+          throw new Error(signedUrlResult.message || '서명된 업로드 URL을 가져오지 못했습니다.');
+      }
+
+      // 2. Upload file directly to Google Cloud Storage
+      setUploadProgress(0);
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', signedUrlResult.uploadUrl, true);
+      xhr.setRequestHeader('Content-Type', file.type);
+      
+      xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+              const percentComplete = (event.loaded / event.total) * 100;
+              setUploadProgress(percentComplete);
+          }
+      };
+
+      await new Promise((resolve, reject) => {
+          xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                  resolve(xhr.response);
+              } else {
+                  reject(new Error(`파일 업로드 실패: ${xhr.statusText}`));
+              }
+          };
+          xhr.onerror = () => reject(new Error('네트워크 오류로 파일 업로드에 실패했습니다.'));
+          xhr.send(file);
+      });
+      setUploadProgress(100);
+      
+      return {
+          uploadUrl: signedUrlResult.uploadUrl,
+          downloadUrl: signedUrlResult.downloadUrl,
+          filePath: signedUrlResult.filePath,
+      };
+  }
+
+
   const handleSaveEpisode = async () => {
     if (!firestore) return;
 
@@ -143,60 +184,43 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setIsProcessing(true);
 
     try {
-        if (isEditMode && episode) { // Update existing episode metadata
-            const episodeRef = doc(firestore, 'courses', selectedCourseId, 'episodes', episode.id);
+        if (isEditMode && episode) { // Update existing episode
+            let newVideoData: { videoUrl: string; filePath: string } | undefined = undefined;
             
-            const updatedData: Partial<Episode> = { 
-              title, 
-              description, 
-              isFree, 
-              courseId: selectedCourseId 
-            };
-            
-            await updateDoc(episodeRef, updatedData);
-            toast({ title: '수정 완료', description: `'${title}' 에피소드 정보가 업데이트되었습니다.` });
-
-        } else if (videoFile) { // Create new episode via direct upload
-            // 1. Get signed URL from server
-            const signedUrlResult = await getSignedUploadUrl(selectedCourseId, videoFile.name, videoFile.type);
-            if (!signedUrlResult.success || !signedUrlResult.uploadUrl || !signedUrlResult.downloadUrl || !signedUrlResult.filePath) {
-                throw new Error(signedUrlResult.message || '서명된 업로드 URL을 가져오지 못했습니다.');
+            if (videoFile) { // If a new video is uploaded
+                const urls = await uploadFileAndGetUrl(videoFile, selectedCourseId, episode.id);
+                newVideoData = { videoUrl: urls.downloadUrl, filePath: urls.filePath };
             }
 
-            // 2. Upload file directly to Google Cloud Storage
-            setUploadProgress(0);
-            const xhr = new XMLHttpRequest();
-            xhr.open('PUT', signedUrlResult.uploadUrl, true);
-            xhr.setRequestHeader('Content-Type', videoFile.type);
-            
-            xhr.upload.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    const percentComplete = (event.loaded / event.total) * 100;
-                    setUploadProgress(percentComplete);
-                }
-            };
-
-            await new Promise((resolve, reject) => {
-                xhr.onload = () => {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        resolve(xhr.response);
-                    } else {
-                        reject(new Error(`파일 업로드 실패: ${xhr.statusText}`));
-                    }
-                };
-                xhr.onerror = () => reject(new Error('네트워크 오류로 파일 업로드에 실패했습니다.'));
-                xhr.send(videoFile);
+            const result = await updateEpisode({
+                title,
+                description,
+                isFree,
+                courseId: selectedCourseId,
+                episodeId: episode.id,
+                newVideoData: newVideoData,
+                oldVideoUrl: newVideoData ? episode.videoUrl : undefined, // Only pass old URL if new one is uploaded
+                oldFilePath: newVideoData ? episode.filePath : undefined
             });
-            setUploadProgress(100);
 
-            // 3. Save metadata to Firestore
+            if (result.success) {
+                toast({ title: '수정 완료', description: `'${title}' 에피소드 정보가 업데이트되었습니다.` });
+            } else {
+                throw new Error(result.message);
+            }
+
+        } else if (videoFile) { // Create new episode
+            const episodeId = uuidv4();
+            const { downloadUrl, filePath } = await uploadFileAndGetUrl(videoFile, selectedCourseId, episodeId);
+            
             const metadataResult = await saveEpisodeMetadata({
+                episodeId,
                 title,
                 description,
                 isFree,
                 selectedCourseId,
-                videoUrl: signedUrlResult.downloadUrl,
-                filePath: signedUrlResult.filePath
+                videoUrl: downloadUrl,
+                filePath: filePath
             });
             
             if (metadataResult.success) {
@@ -340,17 +364,25 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                   <Label htmlFor="isFree">무료 콘텐츠</Label>
               </div>
             </div>
-            {!isEditMode && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="video-file" className="text-right">
+                {isEditMode ? '비디오 교체' : '비디오 파일'}
+              </Label>
+              <Input 
+                  id="video-file" 
+                  type="file" 
+                  className="col-span-3" 
+                  onChange={(e) => setVideoFile(e.target.files ? e.target.files[0] : null)}
+                  accept="video/*"
+                  disabled={isLoading}
+              />
+            </div>
+            {isEditMode && !videoFile && (
                 <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="video-file" className="text-right">비디오 파일</Label>
-                <Input 
-                    id="video-file" 
-                    type="file" 
-                    className="col-span-3" 
-                    onChange={(e) => setVideoFile(e.target.files ? e.target.files[0] : null)}
-                    accept="video/*"
-                    disabled={isLoading}
-                />
+                    <div />
+                    <p className="col-span-3 text-sm text-muted-foreground">
+                        새 비디오 파일을 선택하면 기존 영상이 교체됩니다. 선택하지 않으면 영상은 변경되지 않습니다.
+                    </p>
                 </div>
             )}
              {uploadProgress !== null && (

@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Timestamp as FirebaseTimestamp } from 'firebase/firestore';
@@ -62,6 +61,7 @@ export interface Episode {
   duration: number; // in seconds
   isFree: boolean;
   videoUrl: string;
+  filePath?: string; // Path in Firebase Storage
   thumbnailUrl: string;
   thumbnailHint: string;
 }

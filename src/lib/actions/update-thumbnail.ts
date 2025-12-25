@@ -30,30 +30,44 @@ type UpdateThumbnailPayload = {
  * @param url - The public HTTPS URL of the file to delete.
  */
 const deleteStorageFile = async (storage: Storage, url: string) => {
-    // Ignore invalid, empty, or non-Firebase Storage URLs
-    if (!url || !url.startsWith('https://firebasestorage.googleapis.com')) {
-        console.warn(`[SKIP DELETE] Invalid or non-Firebase Storage URL provided: "${url}"`);
-        return;
-    }
+  if (!url) return;
 
-    try {
-        // Extract the file path from the URL.
-        // Example URL: https://firebasestorage.googleapis.com/v0/b/your-bucket.appspot.com/o/path%2Fto%2Ffile.jpg?alt=media&token=...
-        // We need to extract "path/to/file.jpg"
-        const filePathWithQuery = url.split('/o/')[1];
-        const filePath = decodeURIComponent(filePathWithQuery.split('?')[0]);
-        
-        const file = storage.bucket().file(filePath);
-        
-        console.log(`[ATTEMPT DELETE] Deleting storage file at path: ${file.name}`);
-        // Use ignoreNotFound: true to prevent errors if the file is already gone.
-        await file.delete({ ignoreNotFound: true });
-        console.log(`[DELETE SUCCESS] File deleted or did not exist: ${file.name}`);
-    } catch (error: any) {
-        // Log the error but don't re-throw, as we don't want to block the entire deletion process
-        // just because a file cleanup failed.
-        console.error(`[DELETE FAILED] Could not delete storage file from URL ${url}. Error: ${error.message}`);
-    }
+  let filePath = '';
+
+  try {
+      // CASE 1: Client SDK 스타일 (firebasestorage.googleapis.com)
+      if (url.includes('firebasestorage.googleapis.com')) {
+          const pathPart = url.split('/o/')[1]; // "/o/" 뒷부분 추출
+          if (pathPart) {
+              filePath = decodeURIComponent(pathPart.split('?')[0]);
+          }
+      } 
+      // CASE 2: Admin SDK 스타일 (storage.googleapis.com)
+      else if (url.includes('storage.googleapis.com')) {
+          // 예: https://storage.googleapis.com/bucket-name/path/to/file.jpg
+          // 도메인과 버킷명을 건너뛰고 경로만 추출해야 함
+          const parts = url.split('/');
+          // parts[0]: "https:", parts[1]: "", parts[2]: "storage.googleapis.com", parts[3]: "bucket-name"
+          // parts[4]부터가 진짜 파일 경로
+          if (parts.length >= 5) {
+              filePath = decodeURIComponent(parts.slice(4).join('/'));
+          }
+      }
+
+      if (!filePath) {
+          console.warn(`[SKIP DELETE] Could not parse file path from URL: "${url}"`);
+          return;
+      }
+
+      const file = storage.bucket().file(filePath);
+      
+      console.log(`[ATTEMPT DELETE] Deleting storage file at path: ${filePath}`);
+      await file.delete({ ignoreNotFound: true });
+      console.log(`[DELETE SUCCESS] File deleted: ${filePath}`);
+
+  } catch (error: any) {
+      console.error(`[DELETE FAILED] Error deleting file: ${error.message}`);
+  }
 };
 
 export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<UpdateResult> {
