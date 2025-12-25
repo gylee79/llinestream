@@ -1,3 +1,4 @@
+
 'use server';
 
 import { config } from 'dotenv';
@@ -107,12 +108,6 @@ export async function getSignedUploadUrl(courseId: string, fileName: string, fil
 }
 
 
-async function getVideoDuration(fileBuffer: Buffer): Promise<number> {
-    // This is a placeholder. In a real scenario, you'd use a library like fluent-ffmpeg
-    // on the server to get the video duration. For now, returning a mock duration.
-    return Math.floor(Math.random() * (3600 - 60 + 1)) + 60; // Random duration between 60s and 1hr
-}
-
 /**
  * Saves the metadata of an already uploaded episode to Firestore.
  */
@@ -125,7 +120,13 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
     try {
         const adminApp = initializeAdminApp();
         const db = admin.firestore(adminApp);
+        const storage = admin.storage(adminApp);
         
+        // Make the newly uploaded file public
+        const file = storage.bucket().file(filePath);
+        await file.makePublic();
+        console.log(`[PUBLIC SUCCESS] File made public: ${filePath}`);
+
         // Mock duration for now, as we can't analyze the file on the server anymore.
         const duration = Math.floor(Math.random() * (3600 - 60 + 1)) + 60;
         
@@ -137,7 +138,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             description,
             duration,
             isFree,
-            videoUrl,
+            videoUrl, // Already contains the public URL
             filePath,
             thumbnailUrl: '',
             thumbnailHint: '',
@@ -184,6 +185,11 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         };
 
         if (newVideoData) {
+            // Make the new file public before saving its URL
+            const file = storage.bucket().file(newVideoData.filePath);
+            await file.makePublic();
+            console.log(`[PUBLIC SUCCESS] New file made public: ${newVideoData.filePath}`);
+
             dataToUpdate.videoUrl = newVideoData.videoUrl;
             dataToUpdate.filePath = newVideoData.filePath;
             // You might want to update duration here if you can get it from the new video
