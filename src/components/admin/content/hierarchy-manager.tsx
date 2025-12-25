@@ -108,7 +108,7 @@ type DeleteAlertState = {
 
 export default function HierarchyManager() {
   const firestore = useFirestore();
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
   const [isPending, startTransition] = useTransition();
 
   const [selectedField, setSelectedField] = useState<string | null>(null);
@@ -237,7 +237,7 @@ export default function HierarchyManager() {
             const result = await deleteHierarchyItem(collectionName, item.id, item);
             
             if (result.success) {
-                toast.dismiss(toastId);
+                dismiss(toastId);
                 toast({ title: '삭제 성공', description: result.message, duration: 5000 });
                 if (collectionName === 'fields' && selectedField === item.id) {
                     setSelectedField(null);
@@ -250,7 +250,7 @@ export default function HierarchyManager() {
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            toast.dismiss(toastId);
+            dismiss(toastId);
             toast({
                 variant: "destructive",
                 title: "삭제 중 오류 발생",
@@ -261,7 +261,7 @@ export default function HierarchyManager() {
             closeDeleteAlert();
         }
     });
-  }, [toast, startTransition, selectedField, selectedClassification, deleteAlert]);
+  }, [toast, dismiss, startTransition, selectedField, selectedClassification, deleteAlert]);
 
 
   const renderSkeletons = () => (
