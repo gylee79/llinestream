@@ -1,3 +1,4 @@
+
 'use client';
 
 import Image from 'next/image';
@@ -10,14 +11,12 @@ interface HeroProps {
   title?: string;
   description?: string;
   imageUrl?: string;
-  imageHint?: string;
   imageUrlMobile?: string;
-  imageHintMobile?: string;
 }
 
 const MotionImage = motion(Image);
 
-export default function Hero({ title, description, imageUrl, imageHint, imageUrlMobile, imageHintMobile }: HeroProps) {
+export default function Hero({ title, description, imageUrl, imageUrlMobile }: HeroProps) {
   const isMobile = useIsMobile();
   const finalImageUrl = isMobile ? (imageUrlMobile || imageUrl) : imageUrl;
 

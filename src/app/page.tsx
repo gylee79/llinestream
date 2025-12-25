@@ -1,7 +1,7 @@
 
 'use client';
 import Hero from '@/components/home/hero';
-import { useCollection, useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
 import { collection, doc } from 'firebase/firestore';
 import { Course, Classification, Episode, HeroImageSettings, Field } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';

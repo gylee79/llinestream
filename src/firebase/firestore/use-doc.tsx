@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { useFirebase } from '@/firebase/provider'; 
+import { useUser } from '../hooks'; 
 
 /** Utility type to add an 'id' field to a given type T. */
 type WithId<T> = T & { id: string };
@@ -44,7 +44,7 @@ export function useDoc<T = any>(
   docRef: DocumentReference<DocumentData> | null | undefined,
 ): UseDocResult<T> {
   type StateDataType = WithId<T> | null;
-  const { authUser } = useFirebase();
+  const { authUser } = useUser();
 
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -53,7 +53,7 @@ export function useDoc<T = any>(
   useEffect(() => {
     if (!docRef) {
       setData(null);
-      setIsLoading(false);
+      setIsLoading(false); // Set to false because there is no operation pending.
       setError(null);
       return;
     }

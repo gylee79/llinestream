@@ -3,7 +3,7 @@
 
 import Image from 'next/image';
 import { useParams, notFound } from 'next/navigation';
-import { useDoc, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useDoc, useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { doc, collection, query, where } from 'firebase/firestore';
 import type { Classification, Course } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';

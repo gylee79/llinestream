@@ -16,7 +16,7 @@ import { Button } from "../ui/button"
 import type { Classification } from "@/lib/types"
 import type { PortOnePaymentRequest, PortOnePaymentResponse } from "@/lib/portone";
 import { useToast } from "@/hooks/use-toast"
-import { useUser } from "@/firebase"
+import { useUser } from "@/firebase/hooks"
 import { v4 as uuidv4 } from "uuid";
 
 declare global {

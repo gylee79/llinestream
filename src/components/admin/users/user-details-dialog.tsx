@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -29,7 +30,7 @@ import {
     SelectValue,
   } from '@/components/ui/select';
 import type { User, Classification, Subscription } from '@/lib/types';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, where, doc, updateDoc, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { add } from 'date-fns';

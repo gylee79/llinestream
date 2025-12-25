@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Award, BrainCircuit, HandHeart, Users } from 'lucide-react';
 import Image from 'next/image';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { doc } from 'firebase/firestore';
 import type { HeroImageSettings } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';

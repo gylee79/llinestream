@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useMemo } from 'react';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import type { ViewHistoryItem, Course } from '@/lib/types';
 import ContentCarousel from '@/components/shared/content-carousel';

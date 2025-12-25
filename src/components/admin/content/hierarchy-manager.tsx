@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useTransition } from 'react';
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2, Image as ImageIcon } from 'lucide-react';
 import type { Field, Classification, Course } from '@/lib/types';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, where, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';

@@ -1,15 +1,12 @@
 
 'use client';
 
-import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
+import React, { createContext, ReactNode, useMemo, useState, useEffect, useContext } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore, doc } from 'firebase/firestore';
+import { Firestore } from 'firebase/firestore';
 import { Auth, User as AuthUser, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseStorage } from 'firebase/storage';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
-import { useDoc as useFirestoreDoc } from './firestore/use-doc'; // Renamed to avoid conflict
-import type { User as AppUser } from '@/lib/types'; // Renamed to avoid conflict
-
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -17,13 +14,6 @@ interface FirebaseProviderProps {
   firestore: Firestore;
   auth: Auth;
   storage: FirebaseStorage;
-}
-
-// Internal state for user authentication
-interface UserAuthState {
-  authUser: AuthUser | null;
-  isAuthLoading: boolean;
-  authError: Error | null;
 }
 
 // Combined state for the Firebase context
@@ -50,13 +40,6 @@ export interface FirebaseServicesAndUser {
   authError: Error | null;
 }
 
-// Return type for useUser() - specific to user auth state
-export interface UserHookResult {
-  user: AppUser | null; // Firestore user profile
-  authUser: AuthUser | null; // Raw Firebase Auth user
-  isUserLoading: boolean;
-  userError: Error | null;
-}
 
 // React Context
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
@@ -71,7 +54,11 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   auth,
   storage
 }) => {
-  const [userAuthState, setUserAuthState] = useState<UserAuthState>({
+  const [userAuthState, setUserAuthState] = useState<{
+    authUser: AuthUser | null;
+    isAuthLoading: boolean;
+    authError: Error | null;
+  }>({
     authUser: null,
     isAuthLoading: true, // Start loading until first auth event
     authError: null,
@@ -120,6 +107,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   );
 };
 
+
 /**
  * Hook to access core Firebase services and user authentication state.
  * Throws error if core services are not available or used outside provider.
@@ -143,74 +131,5 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     authUser: context.authUser,
     isAuthLoading: context.isAuthLoading,
     authError: context.authError,
-  };
-};
-
-/** Hook to access Firebase Auth instance. */
-export const useAuth = (): Auth => {
-  const { auth } = useFirebase();
-  return auth;
-};
-
-/** Hook to access Firestore instance. */
-export const useFirestore = (): Firestore => {
-  const { firestore } = useFirebase();
-  return firestore;
-};
-
-/** Hook to access Firebase Storage instance. */
-export const useStorage = (): FirebaseStorage => {
-    const { storage } = useFirebase();
-    return storage;
-}
-
-/** Hook to access Firebase App instance. */
-export const useFirebaseApp = (): FirebaseApp => {
-  const { firebaseApp } = useFirebase();
-  return firebaseApp;
-};
-
-type MemoFirebase <T> = T & {__memo?: boolean};
-
-export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T {
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const memoized = useMemo(factory, deps);
-  
-  if(memoized && typeof memoized === 'object' && memoized !== null) {
-    Object.defineProperty(memoized, '__memo', {
-        value: true,
-        writable: false,
-        enumerable: false,
-    });
-  }
-  
-  return memoized;
-}
-
-/**
- * Hook specifically for accessing the authenticated user's state, including Firestore profile data.
- * This provides the full User object (with role), loading status, and any auth errors.
- * @returns {UserHookResult} Object with user, authUser, isUserLoading, userError.
- */
-export const useUser = (): UserHookResult => {
-  const { firestore, authUser, isAuthLoading, authError } = useFirebase();
-  
-  const userDocRef = useMemoFirebase(() => {
-    if (firestore && authUser) {
-      return doc(firestore, 'users', authUser.uid);
-    }
-    return null;
-  }, [firestore, authUser]);
-
-  const { data: userProfile, isLoading: isProfileLoading, error: profileError } = useFirestoreDoc<AppUser>(userDocRef);
-
-  const isUserLoading = isAuthLoading || (!!authUser && isProfileLoading);
-  const userError = authError || profileError;
-
-  return { 
-    user: userProfile, 
-    authUser,
-    isUserLoading, 
-    userError 
   };
 };

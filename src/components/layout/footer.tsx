@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { LlineStreamLogo, KakaoIcon } from '@/components/icons';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { doc } from 'firebase/firestore';
 import type { FooterSettings } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';

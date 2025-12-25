@@ -4,7 +4,7 @@
 import { useParams, notFound } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { doc } from 'firebase/firestore';
 import type { Policy } from '@/lib/types';
 

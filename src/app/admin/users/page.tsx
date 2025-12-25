@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import type { User } from '@/lib/types';
 import { UserDetailsDialog } from '@/components/admin/users/user-details-dialog';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';

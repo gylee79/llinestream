@@ -1,7 +1,7 @@
 
 'use client';
 import ContentCarousel from '@/components/shared/content-carousel';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection } from 'firebase/firestore';
 import type { Course, Classification } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';

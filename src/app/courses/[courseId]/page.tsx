@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import PaymentDialog from '@/components/shared/payment-dialog';
-import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
 import { doc, collection, query } from 'firebase/firestore';
 import type { Course, Episode, Classification } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';

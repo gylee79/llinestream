@@ -39,7 +39,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { useUser, useAuth, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUser, useAuth, useDoc, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { signOut } from 'firebase/auth';
 import { useCart } from '@/context/cart-context';
 import { Badge } from '../ui/badge';

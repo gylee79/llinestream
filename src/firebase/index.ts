@@ -28,7 +28,6 @@ export function initializeFirebase(): FirebaseServices {
 
 export * from './provider';
 export * from './client-provider';
-export * from './firestore/use-collection';
-export * from './firestore/use-doc';
+export * from './hooks'; // Re-export from the new hooks file
 export * from './errors';
 export * from './error-emitter';

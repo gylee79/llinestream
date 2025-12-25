@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { useFirebase } from '../provider';
+import { useUser } from '../hooks';
 
 /** Utility type to add an 'id' field to a given type T. */
 export type WithId<T> = T & { id: string };
@@ -55,7 +55,7 @@ export function useCollection<T = any>(
   type ResultItemType = WithId<T>;
   type StateDataType = ResultItemType[] | null;
 
-  const { authUser } = useFirebase();
+  const { authUser } = useUser();
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);

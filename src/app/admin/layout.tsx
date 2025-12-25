@@ -17,7 +17,7 @@ import { LlineStreamLogo } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import type { FooterSettings } from '@/lib/types';
 import { doc } from 'firebase/firestore';
 

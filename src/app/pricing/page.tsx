@@ -1,7 +1,7 @@
 
 'use client';
 import PricingCard from '@/components/pricing/pricing-card';
-import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, where } from 'firebase/firestore';
 import type { Classification } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
