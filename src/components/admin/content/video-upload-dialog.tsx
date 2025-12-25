@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -30,7 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { PlusCircle } from 'lucide-react';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
-import { uploadEpisode } from '@/lib/actions/upload-episode';
+import { getSignedUploadUrl, saveEpisodeMetadata } from '@/lib/actions/upload-episode';
 import { v4 as uuidv4 } from 'uuid';
 
 interface VideoUploadDialogProps {
@@ -50,6 +49,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const { toast } = useToast();
   
   const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -87,6 +87,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setSelectedCourseId('');
     setVideoFile(null);
     setIsProcessing(false);
+    setUploadProgress(null);
   };
   
   useEffect(() => {
@@ -143,8 +144,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
 
     try {
         if (isEditMode && episode) { // Update existing episode metadata
-            const courseDocRef = doc(firestore, 'courses', selectedCourseId);
-            const episodeRef = doc(courseDocRef, 'episodes', episode.id);
+            const episodeRef = doc(firestore, 'courses', selectedCourseId, 'episodes', episode.id);
             
             const updatedData: Partial<Episode> = { 
               title, 
@@ -156,19 +156,53 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             await updateDoc(episodeRef, updatedData);
             toast({ title: '수정 완료', description: `'${title}' 에피소드 정보가 업데이트되었습니다.` });
 
-        } else if (videoFile) { // Create new episode via Server Action
-            const formData = new FormData();
-            formData.append('title', title);
-            formData.append('description', description);
-            formData.append('isFree', String(isFree));
-            formData.append('selectedCourseId', selectedCourseId!);
-            formData.append('videoFile', videoFile);
+        } else if (videoFile) { // Create new episode via direct upload
+            // 1. Get signed URL from server
+            const signedUrlResult = await getSignedUploadUrl(selectedCourseId, videoFile.name, videoFile.type);
+            if (!signedUrlResult.success || !signedUrlResult.uploadUrl || !signedUrlResult.downloadUrl || !signedUrlResult.filePath) {
+                throw new Error(signedUrlResult.message || '서명된 업로드 URL을 가져오지 못했습니다.');
+            }
 
-            const result = await uploadEpisode(formData);
-            if (result.success) {
-                toast({ title: '업로드 성공', description: result.message });
+            // 2. Upload file directly to Google Cloud Storage
+            setUploadProgress(0);
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', signedUrlResult.uploadUrl, true);
+            xhr.setRequestHeader('Content-Type', videoFile.type);
+            
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percentComplete = (event.loaded / event.total) * 100;
+                    setUploadProgress(percentComplete);
+                }
+            };
+
+            await new Promise((resolve, reject) => {
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve(xhr.response);
+                    } else {
+                        reject(new Error(`파일 업로드 실패: ${xhr.statusText}`));
+                    }
+                };
+                xhr.onerror = () => reject(new Error('네트워크 오류로 파일 업로드에 실패했습니다.'));
+                xhr.send(videoFile);
+            });
+            setUploadProgress(100);
+
+            // 3. Save metadata to Firestore
+            const metadataResult = await saveEpisodeMetadata({
+                title,
+                description,
+                isFree,
+                selectedCourseId,
+                videoUrl: signedUrlResult.downloadUrl,
+                filePath: signedUrlResult.filePath
+            });
+            
+            if (metadataResult.success) {
+                toast({ title: '업로드 성공', description: metadataResult.message });
             } else {
-                throw new Error(result.message);
+                throw new Error(metadataResult.message);
             }
         }
       
@@ -183,6 +217,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
       });
     } finally {
       setIsProcessing(false);
+      setUploadProgress(null);
     }
   };
 
@@ -318,6 +353,14 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 />
                 </div>
             )}
+             {uploadProgress !== null && (
+                <div className="col-span-full mt-2">
+                    <Progress value={uploadProgress} />
+                    <p className="text-sm text-center text-muted-foreground mt-2">
+                        {uploadProgress < 100 ? `업로드 중... ${Math.round(uploadProgress)}%` : '업로드 완료! 메타데이터 저장 중...'}
+                    </p>
+                </div>
+            )}
             {isLoading && isEditMode && (
               <div className="col-span-full mt-2">
                 <p className="text-sm text-center text-muted-foreground mt-2">
@@ -329,7 +372,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>취소</Button>
             <Button type="button" onClick={handleSaveEpisode} disabled={isLoading || (isEditMode ? false : !videoFile) || !selectedCourseId }>
-              {isLoading ? '저장 중...' : '에피소드 저장'}
+              {isLoading ? '처리 중...' : '에피소드 저장'}
             </Button>
           </DialogFooter>
         </DialogContent>
