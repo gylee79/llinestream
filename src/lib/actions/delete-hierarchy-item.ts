@@ -15,19 +15,35 @@ type DeletionResult = {
   message: string;
 };
 
+/**
+ * Deletes a file from Firebase Storage using its public URL.
+ * It correctly parses the URL to extract the file path for deletion.
+ * @param storage - The Firebase Admin Storage instance.
+ * @param url - The public HTTPS URL of the file to delete.
+ */
 const deleteStorageFile = async (storage: Storage, url: string) => {
-    if (!url || !url.startsWith('http')) {
-        console.warn(`[SKIP DELETE] Invalid or empty URL provided: "${url}"`);
+    // Ignore invalid, empty, or non-Firebase Storage URLs
+    if (!url || !url.startsWith('https://firebasestorage.googleapis.com')) {
+        console.warn(`[SKIP DELETE] Invalid or non-Firebase Storage URL provided: "${url}"`);
         return;
     }
 
     try {
-        const file = storage.bucket().file(decodeURIComponent(new URL(url).pathname.split('/o/')[1].split('?')[0]));
+        // Extract the file path from the URL.
+        // Example URL: https://firebasestorage.googleapis.com/v0/b/your-bucket.appspot.com/o/path%2Fto%2Ffile.jpg?alt=media&token=...
+        // We need to extract "path/to/file.jpg"
+        const filePathWithQuery = url.split('/o/')[1];
+        const filePath = decodeURIComponent(filePathWithQuery.split('?')[0]);
+        
+        const file = storage.bucket().file(filePath);
         
         console.log(`[ATTEMPT DELETE] Deleting storage file at path: ${file.name}`);
+        // Use ignoreNotFound: true to prevent errors if the file is already gone.
         await file.delete({ ignoreNotFound: true });
         console.log(`[DELETE SUCCESS] File deleted or did not exist: ${file.name}`);
     } catch (error: any) {
+        // Log the error but don't re-throw, as we don't want to block the entire deletion process
+        // just because a file cleanup failed.
         console.error(`[DELETE FAILED] Could not delete storage file from URL ${url}. Error: ${error.message}`);
     }
 };
@@ -39,6 +55,7 @@ const deleteEpisodes = async (db: Firestore, storage: Storage, courseId: string,
   console.log(`[DELETE] Found ${episodesSnapshot.size} episodes under course ${courseId} to delete.`);
   for (const episodeDoc of episodesSnapshot.docs) {
     const episodeData = episodeDoc.data() as Episode;
+    // Delete associated video and thumbnail files from Storage
     if (episodeData.videoUrl) await deleteStorageFile(storage, episodeData.videoUrl);
     if (episodeData.thumbnailUrl) await deleteStorageFile(storage, episodeData.thumbnailUrl);
     batch.delete(episodeDoc.ref);
@@ -52,6 +69,7 @@ const deleteCourses = async (db: Firestore, storage: Storage, classificationId: 
   console.log(`[DELETE] Found ${coursesSnapshot.size} courses under classification ${classificationId} to delete.`);
   for (const courseDoc of coursesSnapshot.docs) {
     const courseData = courseDoc.data() as Course;
+    // Delete associated thumbnail file from Storage
     if (courseData.thumbnailUrl) await deleteStorageFile(storage, courseData.thumbnailUrl);
     await deleteEpisodes(db, storage, courseDoc.id, batch);
     batch.delete(courseDoc.ref);
@@ -65,6 +83,7 @@ const deleteClassifications = async (db: Firestore, storage: Storage, fieldId: s
   console.log(`[DELETE] Found ${classificationsSnapshot.size} classifications under field ${fieldId} to delete.`);
   for (const classDoc of classificationsSnapshot.docs) {
     const classData = classDoc.data() as Classification;
+    // Delete associated thumbnail file from Storage
     if (classData.thumbnailUrl) await deleteStorageFile(storage, classData.thumbnailUrl);
     await deleteCourses(db, storage, classDoc.id, batch);
     batch.delete(classDoc.ref);
@@ -95,10 +114,11 @@ export async function deleteHierarchyItem(
         return { success: false, message: '에피소드 삭제를 위해서는 courseId가 포함된 itemData가 필요합니다.' };
       }
       docRef = db.collection('courses').doc(itemData.courseId).collection('episodes').doc(id);
-      docData = itemData;
+      docData = itemData; // Use passed data as it might not be in the DB yet
     } else {
       docRef = db.collection(collectionName).doc(id);
       const docSnap = await docRef.get();
+      // If itemData is provided, use it, otherwise use data from snapshot
       docData = itemData || docSnap.data();
     }
     
