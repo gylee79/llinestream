@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -23,7 +22,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, addDoc, updateDoc, getDoc, query, where } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -221,8 +220,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   };
 
 
-  const uploadFileAndGetUrl = async (file: File, courseId: string, episodeId: string): Promise<{uploadUrl: string, downloadUrl: string, filePath: string}> => {
-      const signedUrlResult = await getSignedUploadUrl(courseId, file.name, file.type, episodeId);
+  const uploadFileAndGetUrl = async (file: File, episodeId: string): Promise<{uploadUrl: string, downloadUrl: string, filePath: string}> => {
+      const signedUrlResult = await getSignedUploadUrl(file.name, file.type, episodeId);
       if (!signedUrlResult.success || !signedUrlResult.uploadUrl || !signedUrlResult.downloadUrl || !signedUrlResult.filePath) {
           throw new Error(signedUrlResult.message || '서명된 업로드 URL을 가져오지 못했습니다.');
       }
@@ -283,7 +282,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             await updateThumbnail({
                 itemType: 'episodes',
                 itemId: episodeId,
-                parentItemId: selectedCourseId,
                 base64Image,
                 imageContentType: thumbnailFile.type,
                 imageName: thumbnailFile.name,
@@ -295,7 +293,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             let newVideoData: { videoUrl: string; filePath: string } | undefined = undefined;
             
             if (videoFile) { // If a new video is uploaded
-                const urls = await uploadFileAndGetUrl(videoFile, selectedCourseId, episode.id);
+                const urls = await uploadFileAndGetUrl(videoFile, episode.id);
                 newVideoData = { videoUrl: urls.downloadUrl, filePath: urls.filePath };
             }
 
@@ -317,7 +315,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             }
 
         } else if (videoFile) { // Create new episode
-            const { downloadUrl, filePath } = await uploadFileAndGetUrl(videoFile, selectedCourseId, episodeId);
+            const { downloadUrl, filePath } = await uploadFileAndGetUrl(videoFile, episodeId);
             
             const metadataResult = await saveEpisodeMetadata({
                 episodeId,
@@ -541,3 +539,5 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     </>
   );
 }
+
+    

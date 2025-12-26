@@ -33,7 +33,7 @@ import {
 interface ThumbnailEditorDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  item: (Field | Classification | Course | Episode) & { courseId?: string }; // courseId for episodes
+  item: (Field | Classification | Course | Episode);
   itemType: 'fields' | 'classifications' | 'courses' | 'episodes';
 }
 
@@ -92,7 +92,6 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
         const result = await updateThumbnail({
             itemType,
             itemId: item.id,
-            parentItemId: itemType === 'episodes' ? item.courseId : undefined,
             base64Image,
             imageContentType: imageFile.type,
             imageName: imageFile.name,
@@ -120,7 +119,6 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
         const result = await updateThumbnail({
             itemType,
             itemId: item.id,
-            parentItemId: itemType === 'episodes' ? item.courseId : undefined,
             base64Image: null, // Sending null indicates deletion
         });
 
@@ -201,3 +199,5 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
     </Dialog>
   );
 }
+
+    

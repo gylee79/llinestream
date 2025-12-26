@@ -20,7 +20,6 @@ type UpdateThumbnailPayload = {
     base64Image: string | null; // Allow null for deletion
     imageContentType?: string;
     imageName?: string;
-    parentItemId?: string; // e.g., courseId for an episode
 }
 
 const deleteStorageFileByPath = async (storage: Storage, filePath: string | undefined) => {
@@ -60,7 +59,7 @@ const extractPathFromUrl = (url: string | undefined): string | undefined => {
 
 
 export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<UpdateResult> {
-  const { itemType, itemId, base64Image, imageContentType, imageName, parentItemId } = payload;
+  const { itemType, itemId, base64Image, imageContentType, imageName } = payload;
 
   if (!itemType || !itemId) {
     return { success: false, message: '필수 항목(itemType, itemId)이 누락되었습니다.' };
@@ -71,13 +70,7 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     const db = admin.firestore(adminApp);
     const storage = admin.storage(adminApp);
     
-    let docRef: admin.firestore.DocumentReference;
-    if (itemType === 'episodes') {
-        if (!parentItemId) return { success: false, message: '에피소드 썸네일 수정에는 상위 강좌 ID(parentItemId)가 필요합니다.' };
-        docRef = db.collection('courses').doc(parentItemId).collection('episodes').doc(itemId);
-    } else {
-        docRef = db.collection(itemType).doc(itemId);
-    }
+    const docRef = db.collection(itemType).doc(itemId);
 
     const currentDoc = await docRef.get();
     if (currentDoc.exists) {
@@ -92,12 +85,7 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
 
     // If a new image is provided, upload it. Otherwise, we are deleting the thumbnail.
     if (base64Image && imageContentType && imageName) {
-        let filePath = '';
-        if (itemType === 'episodes') {
-             filePath = `courses/${parentItemId}/episodes/${itemId}/thumbnails/${Date.now()}-${imageName}`;
-        } else {
-            filePath = `${itemType}/${itemId}/thumbnails/${Date.now()}-${imageName}`;
-        }
+        const filePath = `${itemType}/${itemId}/thumbnails/${Date.now()}-${imageName}`;
         
         const base64EncodedImageString = base64Image.replace(/^data:image\/\w+;base64,/, '');
         const fileBuffer = Buffer.from(base64EncodedImageString, 'base64');
@@ -130,3 +118,5 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     return { success: false, message: `작업 실패: ${errorMessage}` };
   }
 }
+
+    

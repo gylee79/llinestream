@@ -32,7 +32,7 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
 
 
 const deleteEpisodes = async (db: Firestore, storage: Storage, courseId: string, batch: WriteBatch) => {
-  const episodesSnapshot = await db.collection('courses').doc(courseId).collection('episodes').get();
+  const episodesSnapshot = await db.collection('episodes').where('courseId', '==', courseId).get();
   if (episodesSnapshot.empty) return;
 
   console.log(`[DELETE] Found ${episodesSnapshot.size} episodes under course ${courseId} to delete.`);
@@ -41,7 +41,7 @@ const deleteEpisodes = async (db: Firestore, storage: Storage, courseId: string,
     // Delete associated video and thumbnail files from Storage using filePath
     await deleteStorageFileByPath(storage, episodeData.filePath);
     if (episodeData.thumbnailUrl) { // Thumbnails might still be direct URLs, handle both
-         const thumbPath = extractPathFromUrl(episodeData.thumbnailUrl, storage.bucket().name);
+         const thumbPath = extractPathFromUrl(episodeData.thumbnailUrl);
          await deleteStorageFileByPath(storage, thumbPath);
     }
     batch.delete(episodeDoc.ref);
@@ -56,7 +56,7 @@ const deleteCourses = async (db: Firestore, storage: Storage, classificationId: 
   for (const courseDoc of coursesSnapshot.docs) {
     const courseData = courseDoc.data() as Course;
     // Delete associated thumbnail file from Storage
-    const thumbPath = extractPathFromUrl(courseData.thumbnailUrl, storage.bucket().name);
+    const thumbPath = extractPathFromUrl(courseData.thumbnailUrl);
     await deleteStorageFileByPath(storage, thumbPath);
     await deleteEpisodes(db, storage, courseDoc.id, batch);
     batch.delete(courseDoc.ref);
@@ -70,7 +70,7 @@ const deleteClassifications = async (db: Firestore, storage: Storage, fieldId: s
   console.log(`[DELETE] Found ${classificationsSnapshot.size} classifications under field ${fieldId} to delete.`);
   for (const classDoc of classificationsSnapshot.docs) {
     const classData = classDoc.data() as Classification;
-    const thumbPath = extractPathFromUrl(classData.thumbnailUrl, storage.bucket().name);
+    const thumbPath = extractPathFromUrl(classData.thumbnailUrl);
     await deleteStorageFileByPath(storage, thumbPath);
     await deleteCourses(db, storage, classDoc.id, batch);
     batch.delete(classDoc.ref);
@@ -78,20 +78,22 @@ const deleteClassifications = async (db: Firestore, storage: Storage, fieldId: s
 };
 
 // Helper to get file path from URL
-const extractPathFromUrl = (url: string, bucketName: string): string | undefined => {
+const extractPathFromUrl = (url: string | undefined): string | undefined => {
     if (!url) return undefined;
     try {
         const urlObject = new URL(url);
-        // Standard GCS public URL: https://storage.googleapis.com/<bucket-name>/<path/to/file>
         // Firebase Storage URL: https://firebasestorage.googleapis.com/v0/b/<bucket-name>/o/<path%2Fto%2Ffile>?...
-        if (urlObject.hostname === 'storage.googleapis.com') {
-            return decodeURIComponent(urlObject.pathname.substring(`/${bucketName}/`.length));
-        } else if (urlObject.hostname === 'firebasestorage.googleapis.com') {
+        if (urlObject.hostname === 'firebasestorage.googleapis.com') {
             const pathPart = urlObject.pathname.split('/o/')[1];
-            return pathPart ? decodeURIComponent(pathPart) : undefined;
+            return pathPart ? decodeURIComponent(pathPart.split('?')[0]) : undefined;
+        }
+        // GCS public URL: https://storage.googleapis.com/<bucket-name>/<path/to/file>
+        if (urlObject.hostname === 'storage.googleapis.com') {
+            // Path starts after the bucket name, which is the 3rd segment (index 2)
+            return decodeURIComponent(urlObject.pathname.split('/').slice(2).join('/'));
         }
     } catch (e) {
-        console.error(`Could not parse URL: ${url}`, e);
+        console.warn(`Could not parse URL to extract path: ${url}`, e);
     }
     return undefined;
 };
@@ -113,49 +115,37 @@ export async function deleteHierarchyItem(
     const storage = admin.storage(adminApp);
     const batch = db.batch();
 
-    let docRef: admin.firestore.DocumentReference;
-    let docData: admin.firestore.DocumentData | undefined;
-    
-    // For episodes, the itemData must contain courseId to build the reference
-    if (collectionName === 'episodes') {
-        if (!itemData?.courseId) {
-            return { success: false, message: '에피소드 삭제를 위해서는 courseId가 포함된 itemData가 필요합니다.' };
-        }
-        docRef = db.collection('courses').doc(itemData.courseId).collection('episodes').doc(id);
-    } else {
-        docRef = db.collection(collectionName).doc(id);
-    }
+    const docRef = db.collection(collectionName).doc(id);
 
     const docSnap = await docRef.get();
     // Use live data if available, otherwise fall back to itemData passed from client (for unsaved/new items)
-    docData = docSnap.exists ? docSnap.data() : itemData;
+    const docData = docSnap.exists ? docSnap.data() : itemData;
     
     if (!docSnap.exists && !itemData) {
       console.warn(`[NOT FOUND] Document with ID ${id} not found in ${collectionName}. Assuming deleted.`);
       return { success: true, message: '항목을 찾을 수 없지만, 삭제된 것으로 처리합니다.' };
     }
 
-    const bucketName = storage.bucket().name;
 
     if (collectionName === 'fields') {
-      const thumbPath = extractPathFromUrl(docData?.thumbnailUrl, bucketName);
+      const thumbPath = extractPathFromUrl(docData?.thumbnailUrl);
       await deleteStorageFileByPath(storage, thumbPath);
       await deleteClassifications(db, storage, id, batch);
       batch.delete(docRef);
     } else if (collectionName === 'classifications') {
-      const thumbPath = extractPathFromUrl(docData?.thumbnailUrl, bucketName);
+      const thumbPath = extractPathFromUrl(docData?.thumbnailUrl);
       await deleteStorageFileByPath(storage, thumbPath);
       await deleteCourses(db, storage, id, batch);
       batch.delete(docRef);
     } else if (collectionName === 'courses') {
-      const thumbPath = extractPathFromUrl(docData?.thumbnailUrl, bucketName);
+      const thumbPath = extractPathFromUrl(docData?.thumbnailUrl);
       await deleteStorageFileByPath(storage, thumbPath);
       await deleteEpisodes(db, storage, id, batch);
       batch.delete(docRef);
     } else if (collectionName === 'episodes') {
       const episode = docData as Episode;
       await deleteStorageFileByPath(storage, episode.filePath); // Main video file
-      const thumbPath = extractPathFromUrl(episode.thumbnailUrl, bucketName);
+      const thumbPath = extractPathFromUrl(episode.thumbnailUrl);
       await deleteStorageFileByPath(storage, thumbPath); // Thumbnail file
       batch.delete(docRef);
     } else {
@@ -177,3 +167,5 @@ export async function deleteHierarchyItem(
     return { success: false, message: `삭제 실패: ${errorMessage}` };
   }
 }
+
+    

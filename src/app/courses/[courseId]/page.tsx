@@ -1,4 +1,3 @@
-
 'use client';
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
@@ -7,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import PaymentDialog from '@/components/shared/payment-dialog';
-import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
-import { doc, collection, query } from 'firebase/firestore';
+import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { doc, collection, query, where } from 'firebase/firestore';
 import type { Course, Episode, Classification } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -21,7 +20,7 @@ export default function CourseDetailPage() {
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
 
   const episodesQuery = useMemoFirebase(() => 
-    firestore && course?.id ? query(collection(firestore, 'courses', course.id, 'episodes')) : null, 
+    firestore && course?.id ? query(collection(firestore, 'episodes'), where('courseId', '==', course.id)) : null, 
     [firestore, course?.id]
   );
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
@@ -162,3 +161,5 @@ export default function CourseDetailPage() {
     </div>
   );
 }
+
+    

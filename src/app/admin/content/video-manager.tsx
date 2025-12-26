@@ -25,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, collectionGroup, updateDoc } from 'firebase/firestore';
+import { collection, doc, query, updateDoc, orderBy } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
@@ -36,7 +36,7 @@ export default function VideoManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const episodesQuery = useMemoFirebase(() => (firestore ? query(collectionGroup(firestore, 'episodes')) : null), [firestore]);
+  const episodesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'episodes'), orderBy('createdAt', 'desc')) : null), [firestore]);
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
   
   const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
@@ -63,7 +63,7 @@ export default function VideoManager() {
 
   const toggleFreeStatus = async (episode: Episode) => {
     if (!firestore) return;
-    const docRef = doc(firestore, 'courses', episode.courseId, 'episodes', episode.id);
+    const docRef = doc(firestore, 'episodes', episode.id);
     await updateDoc(docRef, { isFree: !episode.isFree });
     toast({
       title: '상태 변경',
@@ -217,3 +217,5 @@ export default function VideoManager() {
     </>
   );
 }
+
+    

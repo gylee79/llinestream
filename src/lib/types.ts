@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Timestamp as FirebaseTimestamp } from 'firebase/firestore';
@@ -61,6 +60,7 @@ export interface Episode {
   videoUrl: string;
   filePath?: string; // Path in Firebase Storage
   thumbnailUrl: string;
+  createdAt: Timestamp;
 }
 
 export interface ViewHistoryItem {
@@ -115,3 +115,5 @@ export interface HeroImageSettings {
   home: HeroContent;
   about: HeroContent;
 }
+
+    

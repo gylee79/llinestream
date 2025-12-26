@@ -1,4 +1,3 @@
-
 'use server';
 
 import { config } from 'dotenv';
@@ -68,9 +67,9 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
 /**
  * Generates a signed URL that allows the client to directly upload a file to Firebase Storage.
  */
-export async function getSignedUploadUrl(courseId: string, fileName: string, fileType: string, episodeId: string = uuidv4()): Promise<SignedUrlResult> {
-    if (!courseId || !fileName || !fileType) {
-        return { success: false, message: '강좌 ID, 파일 이름, 파일 타입은 필수입니다.' };
+export async function getSignedUploadUrl(fileName: string, fileType: string, episodeId: string = uuidv4()): Promise<SignedUrlResult> {
+    if (!fileName || !fileType) {
+        return { success: false, message: '파일 이름, 파일 타입은 필수입니다.' };
     }
 
     try {
@@ -78,7 +77,7 @@ export async function getSignedUploadUrl(courseId: string, fileName: string, fil
         const storage = admin.storage(adminApp);
         const bucket = storage.bucket();
 
-        const filePath = `courses/${courseId}/episodes/${episodeId}/${Date.now()}-${fileName}`;
+        const filePath = `episodes/${episodeId}/videos/${Date.now()}-${fileName}`;
         const file = bucket.file(filePath);
 
         // Generate a v4 signed URL for PUT requests
@@ -130,7 +129,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
         // Mock duration for now, as we can't analyze the file on the server anymore.
         const duration = Math.floor(Math.random() * (3600 - 60 + 1)) + 60;
         
-        const episodeRef = db.collection('courses').doc(selectedCourseId).collection('episodes').doc(episodeId);
+        const episodeRef = db.collection('episodes').doc(episodeId);
         
         const newEpisode: Omit<Episode, 'id'> = {
             courseId: selectedCourseId,
@@ -141,6 +140,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             videoUrl, // Already contains the public URL
             filePath,
             thumbnailUrl: '',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
         };
 
         await episodeRef.set(newEpisode);
@@ -175,12 +175,13 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             await deleteStorageFileByPath(storage, oldFilePath);
         }
 
-        const episodeRef = db.collection('courses').doc(courseId).collection('episodes').doc(episodeId);
+        const episodeRef = db.collection('episodes').doc(episodeId);
 
         const dataToUpdate: Partial<Episode> = {
             title,
             description,
             isFree,
+            courseId,
         };
 
         if (newVideoData) {
@@ -205,3 +206,5 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         return { success: false, message: `에피소드 업데이트 실패: ${errorMessage}` };
     }
 }
+
+    
