@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Timestamp as FirebaseTimestamp } from 'firebase/firestore';
@@ -26,6 +27,7 @@ export interface Field {
   id: string; // This will be the document ID from Firestore, added on the client
   name: string;
   thumbnailUrl: string;
+  thumbnailPath?: string;
 }
 
 export interface Classification {
@@ -40,6 +42,7 @@ export interface Classification {
     day90: number;
   };
   thumbnailUrl: string;
+  thumbnailPath?: string;
 }
 
 export interface Course {
@@ -48,6 +51,7 @@ export interface Course {
   name: string;
   description: string;
   thumbnailUrl: string;
+  thumbnailPath?: string;
 }
 
 export interface Episode {
@@ -60,6 +64,7 @@ export interface Episode {
   videoUrl: string;
   filePath?: string; // Path in Firebase Storage
   thumbnailUrl: string;
+  thumbnailPath?: string;
   createdAt: Timestamp;
 }
 
@@ -115,5 +120,3 @@ export interface HeroImageSettings {
   home: HeroContent;
   about: HeroContent;
 }
-
-    

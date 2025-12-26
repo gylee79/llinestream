@@ -1,3 +1,4 @@
+
 'use server';
 
 import { config } from 'dotenv';
@@ -7,7 +8,7 @@ import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
-import { Episode } from '../types';
+import type { Episode } from '../types';
 import { Storage } from 'firebase-admin/storage';
 
 
@@ -32,6 +33,8 @@ type SaveMetadataPayload = {
     selectedCourseId: string;
     videoUrl: string;
     filePath: string;
+    thumbnailUrl: string;
+    thumbnailPath: string | undefined;
 }
 
 type UpdateEpisodePayload = {
@@ -40,11 +43,12 @@ type UpdateEpisodePayload = {
     title: string;
     description: string;
     isFree: boolean;
+    thumbnailUrl: string;
+    thumbnailPath: string | undefined;
     newVideoData?: {
         videoUrl: string;
         filePath: string;
     };
-    oldVideoUrl?: string;
     oldFilePath?: string;
 }
 
@@ -55,11 +59,17 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
     }
     try {
         const file = storage.bucket().file(filePath);
-        console.log(`[ATTEMPT DELETE] Deleting storage file at path: ${filePath}`);
-        await file.delete({ ignoreNotFound: true });
-        console.log(`[DELETE SUCCESS] File deleted or did not exist: ${filePath}`);
+        const [exists] = await file.exists();
+        if (exists) {
+            console.log(`[ATTEMPT DELETE] Deleting storage file at path: ${filePath}`);
+            await file.delete();
+            console.log(`[DELETE SUCCESS] File deleted: ${filePath}`);
+        } else {
+            console.log(`[SKIP DELETE] File does not exist, skipping deletion: ${filePath}`);
+        }
     } catch (error: any) {
         console.error(`[DELETE FAILED] Could not delete storage file at path ${filePath}. Error: ${error.message}`);
+        // Do not re-throw, as this shouldn't block the main operation.
     }
 };
 
@@ -67,7 +77,7 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
 /**
  * Generates a signed URL that allows the client to directly upload a file to Firebase Storage.
  */
-export async function getSignedUploadUrl(fileName: string, fileType: string, episodeId: string = uuidv4()): Promise<SignedUrlResult> {
+export async function getSignedUploadUrl(fileName: string, fileType: string, episodeId: string, itemType: 'videos' | 'thumbnails'): Promise<SignedUrlResult> {
     if (!fileName || !fileType) {
         return { success: false, message: '파일 이름, 파일 타입은 필수입니다.' };
     }
@@ -77,7 +87,7 @@ export async function getSignedUploadUrl(fileName: string, fileType: string, epi
         const storage = admin.storage(adminApp);
         const bucket = storage.bucket();
 
-        const filePath = `episodes/${episodeId}/videos/${Date.now()}-${fileName}`;
+        const filePath = `episodes/${episodeId}/${itemType}/${Date.now()}-${fileName}`;
         const file = bucket.file(filePath);
 
         // Generate a v4 signed URL for PUT requests
@@ -111,7 +121,7 @@ export async function getSignedUploadUrl(fileName: string, fileType: string, epi
  * Saves the metadata of an already uploaded episode to Firestore.
  */
 export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise<UploadResult> {
-    const { episodeId, title, description, isFree, selectedCourseId, videoUrl, filePath } = payload;
+    const { episodeId, title, description, isFree, selectedCourseId, videoUrl, filePath, thumbnailUrl, thumbnailPath } = payload;
      if (!title || !selectedCourseId || !videoUrl || !episodeId || !filePath) {
         return { success: false, message: '필수 정보(에피소드ID, 제목, 강좌, 비디오 URL, 파일 경로)가 누락되었습니다.' };
     }
@@ -126,6 +136,12 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
         await file.makePublic();
         console.log(`[PUBLIC SUCCESS] File made public: ${filePath}`);
 
+        if (thumbnailPath) {
+          const thumbFile = storage.bucket().file(thumbnailPath);
+          await thumbFile.makePublic();
+          console.log(`[PUBLIC SUCCESS] Thumbnail file made public: ${thumbnailPath}`);
+        }
+
         // Mock duration for now, as we can't analyze the file on the server anymore.
         const duration = Math.floor(Math.random() * (3600 - 60 + 1)) + 60;
         
@@ -139,13 +155,14 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             isFree,
             videoUrl, // Already contains the public URL
             filePath,
-            thumbnailUrl: '',
+            thumbnailUrl: thumbnailUrl,
+            thumbnailPath: thumbnailPath,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         };
 
         await episodeRef.set(newEpisode);
 
-        revalidatePath('/admin/content');
+        revalidatePath('/admin/content', 'layout');
         return { success: true, message: `에피소드 '${title}'의 정보가 성공적으로 저장되었습니다.` };
 
     } catch (error) {
@@ -159,7 +176,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
  * Updates an existing episode's metadata and optionally replaces its video file.
  */
 export async function updateEpisode(payload: UpdateEpisodePayload): Promise<UploadResult> {
-    const { episodeId, courseId, title, description, isFree, newVideoData, oldFilePath } = payload;
+    const { episodeId, courseId, title, description, isFree, thumbnailUrl, thumbnailPath, newVideoData, oldFilePath } = payload;
     
     if (!episodeId || !courseId || !title) {
         return { success: false, message: '에피소드 ID, 강좌 ID, 제목은 필수입니다.' };
@@ -169,26 +186,28 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         const adminApp = initializeAdminApp();
         const db = admin.firestore(adminApp);
         const storage = admin.storage(adminApp);
+        const episodeRef = db.collection('episodes').doc(episodeId);
 
         // If a new video was uploaded, delete the old one.
         if (newVideoData && oldFilePath) {
+            console.log(`[UPDATE] New video provided. Deleting old file: ${oldFilePath}`);
             await deleteStorageFileByPath(storage, oldFilePath);
         }
-
-        const episodeRef = db.collection('episodes').doc(episodeId);
 
         const dataToUpdate: Partial<Episode> = {
             title,
             description,
             isFree,
             courseId,
+            thumbnailUrl,
+            thumbnailPath,
         };
 
         if (newVideoData) {
             // Make the new file public before saving its URL
             const file = storage.bucket().file(newVideoData.filePath);
             await file.makePublic();
-            console.log(`[PUBLIC SUCCESS] New file made public: ${newVideoData.filePath}`);
+            console.log(`[PUBLIC SUCCESS] New video file made public: ${newVideoData.filePath}`);
 
             dataToUpdate.videoUrl = newVideoData.videoUrl;
             dataToUpdate.filePath = newVideoData.filePath;
@@ -197,7 +216,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
 
         await episodeRef.update(dataToUpdate);
 
-        revalidatePath('/admin/content');
+        revalidatePath('/admin/content', 'layout');
         return { success: true, message: `에피소드 '${title}' 정보가 업데이트되었습니다.` };
 
     } catch (error) {
@@ -206,5 +225,3 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         return { success: false, message: `에피소드 업데이트 실패: ${errorMessage}` };
     }
 }
-
-    

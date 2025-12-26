@@ -1,3 +1,4 @@
+
 'use server';
 
 import { config } from 'dotenv';
@@ -24,14 +25,19 @@ type UpdateThumbnailPayload = {
 
 const deleteStorageFileByPath = async (storage: Storage, filePath: string | undefined) => {
     if (!filePath) {
-        console.warn(`[SKIP DELETE] No file path provided.`);
+        console.warn(`[SKIP DELETE] No file path provided for deletion.`);
         return;
     }
     try {
         const file = storage.bucket().file(filePath);
-        console.log(`[ATTEMPT DELETE] Deleting storage file at path: ${filePath}`);
-        await file.delete({ ignoreNotFound: true });
-        console.log(`[DELETE SUCCESS] File deleted or did not exist: ${filePath}`);
+        const [exists] = await file.exists();
+        if (exists) {
+            console.log(`[ATTEMPT DELETE] Deleting storage file at path: ${filePath}`);
+            await file.delete();
+            console.log(`[DELETE SUCCESS] File deleted: ${filePath}`);
+        } else {
+            console.log(`[SKIP DELETE] File does not exist, skipping deletion: ${filePath}`);
+        }
     } catch (error: any) {
         console.error(`[DELETE FAILED] Could not delete storage file at path ${filePath}. Error: ${error.message}`);
     }
@@ -42,14 +48,18 @@ const extractPathFromUrl = (url: string | undefined): string | undefined => {
     try {
         const urlObject = new URL(url);
         // Firebase Storage URL: https://firebasestorage.googleapis.com/v0/b/<bucket-name>/o/<path%2Fto%2Ffile>?...
-        if (urlObject.hostname === 'firebasestorage.googleapis.com') {
-            const pathPart = urlObject.pathname.split('/o/')[1];
-            return pathPart ? decodeURIComponent(pathPart.split('?')[0]) : undefined;
-        }
-        // GCS public URL: https://storage.googleapis.com/<bucket-name>/<path/to/file>
-        if (urlObject.hostname === 'storage.googleapis.com') {
-            // Path starts after the bucket name, which is the 3rd segment (index 2)
-            return decodeURIComponent(urlObject.pathname.split('/').slice(2).join('/'));
+        if (urlObject.hostname === 'firebasestorage.googleapis.com' || urlObject.hostname === 'storage.googleapis.com') {
+            const pathPart = urlObject.pathname.split('/o/').pop();
+            const decodedPath = pathPart ? decodeURIComponent(pathPart.split('?')[0]) : undefined;
+            // The decoded path can sometimes include the bucket name. Let's remove it if present.
+            if (decodedPath) {
+                const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+                const prefix = `${bucketName}/`;
+                if (decodedPath.startsWith(prefix)) {
+                    return decodedPath.substring(prefix.length);
+                }
+            }
+            return decodedPath;
         }
     } catch (e) {
         console.warn(`Could not parse URL to extract path: ${url}`, e);
@@ -72,43 +82,45 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     
     const docRef = db.collection(itemType).doc(itemId);
 
+    // Get current data to find the old file path for deletion
     const currentDoc = await docRef.get();
     if (currentDoc.exists) {
-        const oldThumbnailUrl = (currentDoc.data() as Field | Classification | Course | Episode)?.thumbnailUrl;
-        const oldThumbnailPath = extractPathFromUrl(oldThumbnailUrl);
+        const currentData = currentDoc.data() as Field | Classification | Course | Episode;
+        const oldThumbnailPath = currentData.thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl);
         if (oldThumbnailPath) {
-             await deleteStorageFileByPath(storage, oldThumbnailPath);
+            console.log(`[UPDATE] Deleting old thumbnail file: ${oldThumbnailPath}`);
+            await deleteStorageFileByPath(storage, oldThumbnailPath);
         }
     }
 
     let downloadUrl: string | null = null;
+    let newThumbnailPath: string | undefined = undefined;
 
     // If a new image is provided, upload it. Otherwise, we are deleting the thumbnail.
     if (base64Image && imageContentType && imageName) {
-        const filePath = `${itemType}/${itemId}/thumbnails/${Date.now()}-${imageName}`;
+        newThumbnailPath = `${itemType}/${itemId}/thumbnails/${Date.now()}-${imageName}`;
         
         const base64EncodedImageString = base64Image.replace(/^data:image\/\w+;base64,/, '');
         const fileBuffer = Buffer.from(base64EncodedImageString, 'base64');
         
-        const file = storage.bucket().file(filePath);
+        const file = storage.bucket().file(newThumbnailPath);
         await file.save(fileBuffer, {
           metadata: { contentType: imageContentType },
-          public: true, // IMPORTANT: Make the file publicly accessible
+          public: true,
         });
 
-        // Ensure we make it public which is required for publicUrl() to work as expected
         await file.makePublic();
-
         downloadUrl = file.publicUrl();
     }
 
     const dataToUpdate = {
-      thumbnailUrl: downloadUrl || '', // Save new URL or empty string if deleted
+      thumbnailUrl: downloadUrl || '',
+      thumbnailPath: newThumbnailPath || '',
     };
 
     await docRef.update(dataToUpdate);
 
-    revalidatePath('/admin/content');
+    revalidatePath('/admin/content', 'layout');
 
     return { success: true, message: `썸네일이 성공적으로 ${downloadUrl ? '업데이트' : '삭제'}되었습니다.` };
 
@@ -118,5 +130,3 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     return { success: false, message: `작업 실패: ${errorMessage}` };
   }
 }
-
-    
