@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2, Image as ImageIcon } from 'lucide-react';
-import type { Field, Classification, Course } from '@/lib/types';
+import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, where, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -248,10 +248,10 @@ export default function HierarchyManager() {
             } else {
                  toast({
                     variant: "destructive",
-                    title: result.message,
+                    title: "하위 비디오(에피소드)가 존재하여 삭제할 수 없습니다.",
                     description: (
                         <div className="mt-2 w-full rounded-md bg-slate-950 p-4">
-                           <p className="text-white">먼저 삭제해야 할 하위 에피소드 목록:</p>
+                           <p className="text-white">아래 비디오를 먼저 삭제해야 합니다:</p>
                            <ul className="list-disc pl-5 mt-2 text-sm text-white/80">
                                 {result.dependencies?.map((dep, i) => <li key={i}>{dep}</li>)}
                            </ul>
