@@ -115,6 +115,21 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setUploadProgress(null);
   }, []);
   
+  const handleSafeClose = (openState: boolean) => {
+    if (isProcessing) return;
+    onOpenChange(openState);
+  };
+
+  useEffect(() => {
+    if (!open) {
+      // Add a short delay to allow the dialog to animate out before resetting form
+      const timer = setTimeout(() => {
+        resetForm();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [open, resetForm]);
+
   useEffect(() => {
     async function setInitialState() {
         if (isEditMode && episode && firestore) {
@@ -145,14 +160,12 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             } finally {
               setIsProcessing(false);
             }
-        } else {
-          resetForm();
         }
     }
     if (open) {
         setInitialState();
     }
-  }, [open, episode, isEditMode, firestore, toast, resetForm]);
+  }, [open, episode, isEditMode, firestore, toast]);
 
   const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -338,15 +351,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   };
   
   const closeHierarchyDialog = () => setHierarchyDialogState({ isOpen: false, item: null, type: '분야' });
-
-  const handleSafeClose = (openState: boolean) => {
-      if (isProcessing) return;
-      onOpenChange(openState);
-      if (!openState) {
-        setTimeout(resetForm, 150);
-      }
-  };
-
 
   const handleSaveHierarchy = async (item: HierarchyItem) => {
     if (!firestore) return;

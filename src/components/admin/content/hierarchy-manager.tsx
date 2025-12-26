@@ -53,8 +53,8 @@ const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }
                         src={item.thumbnailUrl}
                         alt={item.name}
                         fill
-                        className="object-cover"
                         sizes="40px"
+                        className="object-cover"
                     />
                 ) : (
                     <div className="flex items-center justify-center h-full w-full">
@@ -373,5 +373,3 @@ export default function HierarchyManager() {
     </>
   );
 }
-
-    
