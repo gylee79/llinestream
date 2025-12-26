@@ -47,20 +47,30 @@ const extractPathFromUrl = (url: string | undefined): string | undefined => {
     if (!url) return undefined;
     try {
         const urlObject = new URL(url);
-        // Firebase Storage URL: https://firebasestorage.googleapis.com/v0/b/<bucket-name>/o/<path%2Fto%2Ffile>?...
-        if (urlObject.hostname === 'firebasestorage.googleapis.com' || urlObject.hostname === 'storage.googleapis.com') {
-            const pathPart = urlObject.pathname.split('/o/').pop();
-            const decodedPath = pathPart ? decodeURIComponent(pathPart.split('?')[0]) : undefined;
-            // The decoded path can sometimes include the bucket name. Let's remove it if present.
-            if (decodedPath) {
-                const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-                const prefix = `${bucketName}/`;
-                if (decodedPath.startsWith(prefix)) {
-                    return decodedPath.substring(prefix.length);
-                }
+        const hostname = urlObject.hostname;
+        
+        let path: string | null = null;
+
+        // Handles URLs like: https://firebasestorage.googleapis.com/v0/b/your-bucket.appspot.com/o/path%2Fto%2Ffile.jpg?alt=media&token=...
+        if (hostname === 'firebasestorage.googleapis.com') {
+            const match = urlObject.pathname.match(/\/o\/(.+)/);
+            if (match && match[1]) {
+                path = match[1];
             }
-            return decodedPath;
+        // Handles URLs like: https://storage.googleapis.com/your-bucket.appspot.com/path/to/file.jpg
+        } else if (hostname === 'storage.googleapis.com') {
+            // Pathname is /your-bucket.appspot.com/path/to/file.jpg
+            const pathSegments = urlObject.pathname.split('/').slice(2); // Remove the leading empty string and the bucket name
+            if (pathSegments.length > 0) {
+              path = pathSegments.join('/');
+            }
         }
+        
+        if (path) {
+            // Decode URI component and remove query parameters
+            return decodeURIComponent(path.split('?')[0]);
+        }
+
     } catch (e) {
         console.warn(`Could not parse URL to extract path: ${url}`, e);
     }
@@ -86,6 +96,7 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     const currentDoc = await docRef.get();
     if (currentDoc.exists) {
         const currentData = currentDoc.data() as Field | Classification | Course | Episode;
+        // Prefer the explicit path, fallback to extracting from URL for legacy data
         const oldThumbnailPath = currentData.thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl);
         if (oldThumbnailPath) {
             console.log(`[UPDATE] Deleting old thumbnail file: ${oldThumbnailPath}`);

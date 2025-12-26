@@ -82,28 +82,29 @@ const extractPathFromUrl = (url: string | undefined): string | undefined => {
     try {
         const urlObject = new URL(url);
         const hostname = urlObject.hostname;
-        if (hostname === 'firebasestorage.googleapis.com' || hostname === 'storage.googleapis.com') {
-            const pathname = urlObject.pathname;
-            // For firebasestorage.googleapis.com, path is /v0/b/bucket-name/o/path%2Fto%2Ffile
-            // For storage.googleapis.com, path is /bucket-name/path/to/file
-            const pathSegments = pathname.split('/');
-            const bucketNameIndex = pathSegments.findIndex(segment => segment.endsWith('.appspot.com') || segment.endsWith('.firebasestorage.app'));
-            
-            let finalPath = '';
-            if (hostname === 'firebasestorage.googleapis.com' && pathSegments.includes('o')) {
-                finalPath = decodeURIComponent(pathSegments.slice(pathSegments.indexOf('o') + 1).join('/'));
-            } else if (hostname === 'storage.googleapis.com' && bucketNameIndex !== -1) {
-                finalPath = decodeURIComponent(pathSegments.slice(bucketNameIndex + 1).join('/'));
-            } else if (hostname === 'storage.googleapis.com') {
-                 // Public URL format: /bucket-name/path/to/file
-                finalPath = decodeURIComponent(pathSegments.slice(2).join('/'));
-            }
+        
+        let path: string | null = null;
 
-            if(finalPath) {
-                // Remove query parameters from the path
-                return finalPath.split('?')[0];
+        // Handles URLs like: https://firebasestorage.googleapis.com/v0/b/your-bucket.appspot.com/o/path%2Fto%2Ffile.jpg?alt=media&token=...
+        if (hostname === 'firebasestorage.googleapis.com') {
+            const match = urlObject.pathname.match(/\/o\/(.+)/);
+            if (match && match[1]) {
+                path = match[1];
+            }
+        // Handles URLs like: https://storage.googleapis.com/your-bucket.appspot.com/path/to/file.jpg
+        } else if (hostname === 'storage.googleapis.com') {
+            // Pathname is /your-bucket.appspot.com/path/to/file.jpg
+            const pathSegments = urlObject.pathname.split('/').slice(2); // Remove the leading empty string and the bucket name
+            if (pathSegments.length > 0) {
+              path = pathSegments.join('/');
             }
         }
+        
+        if (path) {
+            // Decode URI component and remove query parameters
+            return decodeURIComponent(path.split('?')[0]);
+        }
+
     } catch (e) {
         console.warn(`Could not parse URL to extract path: ${url}`, e);
     }
