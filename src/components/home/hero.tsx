@@ -14,24 +14,24 @@ interface HeroProps {
   imageUrlMobile?: string;
 }
 
-const MotionImage = motion(Image);
-
 export default function Hero({ title, description, imageUrl, imageUrlMobile }: HeroProps) {
   const isMobile = useIsMobile();
   const finalImageUrl = isMobile ? (imageUrlMobile || imageUrl) : imageUrl;
 
   return (
-    <div className="relative h-[70vh] min-h-[500px] w-full overflow-hidden">
+    <motion.div 
+      className="relative h-[70vh] min-h-[500px] w-full overflow-hidden"
+      initial={{ scale: 1.1 }}
+      animate={{ scale: 1 }}
+      transition={{ duration: 8, ease: "easeOut" }}
+    >
       {finalImageUrl ? (
-        <MotionImage
+        <Image
           src={finalImageUrl}
           alt={title || 'Hero background'}
           fill
           className="object-cover"
           priority
-          initial={{ scale: 1.1 }}
-          animate={{ scale: 1 }}
-          transition={{ duration: 8, ease: "easeOut" }}
         />
       ) : (
         <Skeleton className="h-full w-full" />
@@ -58,6 +58,6 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
           </motion.div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
