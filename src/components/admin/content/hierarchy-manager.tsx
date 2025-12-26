@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useTransition } from 'react';
@@ -49,7 +48,7 @@ const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }
             <div className="relative flex-shrink-0 h-10 w-10 rounded-md overflow-hidden bg-muted border">
                 {item.thumbnailUrl ? (
                     <Image 
-                        key={item.thumbnailUrl} // Add key to force re-render on URL change
+                        key={item.thumbnailUrl}
                         src={item.thumbnailUrl}
                         alt={item.name}
                         fill

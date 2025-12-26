@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -163,7 +162,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     if (file) {
         setVideoFile(file);
         
-        // Auto-generate thumbnail from video
         const videoUrl = URL.createObjectURL(file);
         const videoElement = document.createElement('video');
         videoElement.src = videoUrl;
@@ -222,7 +220,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
       xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
               const percentComplete = (event.loaded / event.total) * 100;
-              setUploadProgress(percentComplete); // This updates the progress
+              setUploadProgress(percentComplete);
           }
       };
 
@@ -392,7 +390,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleSafeClose(); }}>
         <DialogContent className="sm:max-w-[625px]">
           <DialogHeader>
             <DialogTitle className="font-headline">{isEditMode ? '에피소드 수정' : '비디오 업로드'}</DialogTitle>
@@ -478,7 +476,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 <div className="col-span-3 space-y-2">
                     <div className="relative w-full aspect-video rounded-md overflow-hidden bg-muted border">
                         {thumbnailPreview ? (
-                            <Image src={thumbnailPreview} alt="썸네일 미리보기" fill className="object-cover" />
+                            <Image src={thumbnailPreview} alt="썸네일 미리보기" fill sizes="300px" className="object-cover" />
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full w-full text-center">
                                 <ImageIcon className="h-10 w-10 text-muted-foreground" />
