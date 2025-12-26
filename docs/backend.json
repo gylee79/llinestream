@@ -254,6 +254,41 @@
         "content",
         "lastUpdated"
       ]
+    },
+    "Instructor": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Instructor",
+      "type": "object",
+      "description": "Represents an instructor who creates and manages courses.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the instructor entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Instructor's full name."
+        },
+        "email": {
+          "type": "string",
+          "description": "Instructor's email address.",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Instructor's contact phone number."
+        },
+        "dob": {
+          "type": "string",
+          "description": "Instructor's date of birth (YYYY-MM-DD)."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The date the instructor was registered.",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "name", "email", "phone", "dob", "createdAt"]
     }
   },
   "auth": {
@@ -376,6 +411,22 @@
             {
               "name": "policyId",
               "description": "The unique identifier of the policy."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/instructors/{instructorId}",
+        "definition": {
+          "entityName": "Instructor",
+          "schema": {
+            "$ref": "#/backend/entities/Instructor"
+          },
+          "description": "Stores instructor profiles. Writable only by admins.",
+          "params": [
+            {
+              "name": "instructorId",
+              "description": "The unique identifier of the instructor."
             }
           ]
         }

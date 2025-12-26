@@ -178,6 +178,17 @@ service cloud.firestore {
       allow create: if isAdmin();
       allow update, delete: if isAdmin() && isExistingDoc();
     }
+
+    /**
+     * @description Stores instructor profiles. Writable and readable only by admins.
+     * @path /instructors/{instructorId}
+     * @allow (get, list, create, update, delete) An admin can manage instructor profiles.
+     * @deny (any) Non-admins cannot access instructor data.
+     * @principle Secures sensitive instructor information to administrators only.
+     */
+    match /instructors/{instructorId} {
+        allow read, write: if isAdmin();
+    }
     
     /**
      * @description Stores legal and informational policies. Publicly readable, but writable only by admins.
@@ -205,3 +216,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

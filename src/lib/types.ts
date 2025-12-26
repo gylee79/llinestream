@@ -106,6 +106,7 @@ export interface FooterSettings {
   address: string;
   supportPhone: string;
   supportHours: string;
+
   kakaoTalkUrl?: string;
 }
 
@@ -120,3 +121,14 @@ export interface HeroImageSettings {
   home: HeroContent;
   about: HeroContent;
 }
+
+export interface Instructor {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  dob: string; // YYYY-MM-DD
+  createdAt: Timestamp;
+}
+
+    
