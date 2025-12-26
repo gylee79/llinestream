@@ -20,6 +20,7 @@ import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { toDisplayDate, toJSDate } from '@/lib/date-helpers';
 
 export default function AdminUsersPage() {
   const firestore = useFirestore();
@@ -39,7 +40,7 @@ export default function AdminUsersPage() {
 
   const getFinalExpiry = (user: User) => {
     if (!user.activeSubscriptions) return 'N/A';
-    const dates = Object.values(user.activeSubscriptions).map(s => s.expiresAt.toDate().getTime());
+    const dates = Object.values(user.activeSubscriptions).map(s => toJSDate(s.expiresAt).getTime());
     if (dates.length === 0) return 'N/A';
     const maxDate = new Date(Math.max(...dates));
     return maxDate.toLocaleDateString('ko-KR');
@@ -109,7 +110,7 @@ export default function AdminUsersPage() {
                           {user.role}
                         </Badge>
                       </TableCell>
-                      <TableCell>{user.createdAt?.toDate().toLocaleDateString('ko-KR') || 'N/A'}</TableCell>
+                      <TableCell>{toDisplayDate(user.createdAt) || 'N/A'}</TableCell>
                       <TableCell>{getActiveSubscriptions(user)}</TableCell>
                       <TableCell>{getFinalExpiry(user)}</TableCell>
                       <TableCell className="text-right">
