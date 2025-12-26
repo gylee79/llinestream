@@ -34,6 +34,7 @@ import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, where, doc, updateDoc, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { add } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
 
 interface UserDetailsDialogProps {
   user: User;
@@ -208,5 +209,3 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
     </Dialog>
   );
 }
-
-    
