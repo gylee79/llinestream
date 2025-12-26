@@ -115,17 +115,15 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setUploadProgress(null);
   }, []);
   
-  const handleSafeClose = (openState: boolean) => {
+  const handleSafeClose = () => {
     if (isProcessing) return;
-    onOpenChange(openState);
+    onOpenChange(false);
+    setTimeout(resetForm, 150);
   };
 
   useEffect(() => {
     if (!open) {
-      // Add a short delay to allow the dialog to animate out before resetting form
-      const timer = setTimeout(() => {
-        resetForm();
-      }, 150);
+      const timer = setTimeout(resetForm, 150);
       return () => clearTimeout(timer);
     }
   }, [open, resetForm]);
@@ -231,7 +229,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
       xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
               const percentComplete = (event.loaded / event.total) * 100;
-              setUploadProgress(percentComplete);
+              setUploadProgress(percentComplete); // This updates the progress
           }
       };
 
@@ -327,7 +325,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
              toast({ title: '업로드 성공', description: metadataResult.message });
         }
       
-      onOpenChange(false);
+      handleSafeClose();
       
     } catch (error: any) {
       console.error("Episode save process failed:", error);
@@ -350,7 +348,12 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setHierarchyDialogState({ isOpen: true, item: null, type });
   };
   
-  const closeHierarchyDialog = () => setHierarchyDialogState({ isOpen: false, item: null, type: '분야' });
+  const closeHierarchyDialog = () => {
+    setHierarchyDialogState({ isOpen: false, item: null, type: '분야' });
+    setTimeout(() => {
+       // Focus management logic if needed
+    }, 150);
+  }
 
   const handleSaveHierarchy = async (item: HierarchyItem) => {
     if (!firestore) return;
@@ -396,7 +399,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
 
   return (
     <>
-      <Dialog open={open} onOpenChange={handleSafeClose}>
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[625px]">
           <DialogHeader>
             <DialogTitle className="font-headline">{isEditMode ? '에피소드 수정' : '비디오 업로드'}</DialogTitle>
@@ -507,7 +510,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             )}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => handleSafeClose(false)} disabled={isProcessing}>취소</Button>
+            <Button type="button" variant="outline" onClick={handleSafeClose} disabled={isProcessing}>취소</Button>
             <Button type="button" onClick={handleSaveEpisode} disabled={isProcessing || (isEditMode ? false : !videoFile) || !selectedCourseId }>
               {isProcessing ? '처리 중...' : '에피소드 저장'}
             </Button>
