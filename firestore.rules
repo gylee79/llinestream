@@ -180,14 +180,16 @@ service cloud.firestore {
     }
 
     /**
-     * @description Stores instructor profiles. Writable and readable only by admins.
+     * @description Stores instructor profiles. Read-only for signed in users, writable by admins.
      * @path /instructors/{instructorId}
-     * @allow (get, list, create, update, delete) An admin can manage instructor profiles.
-     * @deny (any) Non-admins cannot access instructor data.
-     * @principle Secures sensitive instructor information to administrators only.
+     * @allow (read) Authenticated users can view instructor profiles.
+     * @allow (write) Admins can manage instructor profiles.
+     * @deny (any) Unauthenticated users cannot access instructor data.
+     * @principle Balances public visibility of instructors with secure data management.
      */
     match /instructors/{instructorId} {
-        allow read, write: if isAdmin();
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
     }
     
     /**
@@ -216,5 +218,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
