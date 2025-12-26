@@ -82,8 +82,17 @@ export async function deleteHierarchyItem(
     const docRef = db.collection(collectionName).doc(id);
     
     let dependencies: string[] = [];
+    const docSnap = await docRef.get();
+    const item = (docSnap.exists ? docSnap.data() : itemData) as Field | Classification | Course | Episode;
+
+    if (!item) {
+      console.warn(`[NOT FOUND] Document with ID ${id} not found in ${collectionName} and no itemData provided. Assuming deleted.`);
+      return { success: true, message: '항목을 찾을 수 없지만, 삭제된 것으로 처리합니다.' };
+    }
+
     if (collectionName === 'fields') {
-        dependencies = await getEpisodeDependenciesRecursive(db, id, 'field');
+        const fieldDeps = await getEpisodeDependenciesRecursive(db, id, 'field');
+        dependencies = fieldDeps.map(dep => `${item.name} > ${dep}`);
     } else if (collectionName === 'classifications') {
         dependencies = await getEpisodeDependenciesRecursive(db, id, 'classification');
     } else if (collectionName === 'courses') {
@@ -93,31 +102,21 @@ export async function deleteHierarchyItem(
     if (dependencies.length > 0) {
       return {
         success: false,
-        message: '삭제 실패: 하위 에피소드가 존재합니다. 가장 하위의 에피소드를 먼저 삭제해주세요.',
+        message: '하위 에피소드가 존재하여 삭제할 수 없습니다. 가장 하위의 에피소드를 먼저 삭제해주세요.',
         dependencies,
       };
     }
 
     // No dependencies, proceed with deletion
-    const docSnap = await docRef.get();
-    const docData = docSnap.exists ? docSnap.data() : itemData;
-
-    if (!docSnap.exists && !itemData) {
-      console.warn(`[NOT FOUND] Document with ID ${id} not found in ${collectionName}. Assuming deleted.`);
-      return { success: true, message: '항목을 찾을 수 없지만, 삭제된 것으로 처리합니다.' };
-    }
-
-    // Delete associated storage files if any
     if (collectionName === 'episodes') {
-        const episode = docData as Episode;
+        const episode = item as Episode;
         await deleteStorageFileByPath(storage, episode.filePath);
         await deleteStorageFileByPath(storage, episode.thumbnailPath);
-    } else { // For Field, Classification, Course
-        const item = docData as Field | Classification | Course;
-        await deleteStorageFileByPath(storage, item.thumbnailPath);
+    } else {
+        const hierarchyItem = item as Field | Classification | Course;
+        await deleteStorageFileByPath(storage, hierarchyItem.thumbnailPath);
     }
 
-    // Delete the document itself
     if (docSnap.exists) {
         await docRef.delete();
     }
