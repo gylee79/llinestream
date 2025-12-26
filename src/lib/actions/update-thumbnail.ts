@@ -92,23 +92,22 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     
     const docRef = db.collection(itemType).doc(itemId);
 
-    // Get current data to find the old file path for deletion
-    const currentDoc = await docRef.get();
-    if (currentDoc.exists) {
-        const currentData = currentDoc.data() as Field | Classification | Course | Episode;
-        // Prefer the explicit path, fallback to extracting from URL for legacy data
-        const oldThumbnailPath = currentData.thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl);
-        if (oldThumbnailPath) {
-            console.log(`[UPDATE] Deleting old thumbnail file: ${oldThumbnailPath}`);
-            await deleteStorageFileByPath(storage, oldThumbnailPath);
-        }
-    }
-
     let downloadUrl: string | null = null;
     let newThumbnailPath: string | undefined = undefined;
 
     // If a new image is provided, upload it. Otherwise, we are deleting the thumbnail.
     if (base64Image && imageContentType && imageName) {
+        // Get current data to find the old file path for deletion
+        const currentDoc = await docRef.get();
+        if (currentDoc.exists) {
+            const currentData = currentDoc.data() as Field | Classification | Course | Episode;
+            const oldThumbnailPath = currentData.thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl);
+            if (oldThumbnailPath) {
+                console.log(`[UPDATE] Deleting old thumbnail file: ${oldThumbnailPath}`);
+                await deleteStorageFileByPath(storage, oldThumbnailPath);
+            }
+        }
+        
         newThumbnailPath = `${itemType}/${itemId}/thumbnails/${Date.now()}-${imageName}`;
         
         const base64EncodedImageString = base64Image.replace(/^data:image\/\w+;base64,/, '');
@@ -122,11 +121,23 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
 
         await file.makePublic();
         downloadUrl = file.publicUrl();
+    } else if (base64Image === null) { // Explicit deletion request
+        const currentDoc = await docRef.get();
+        if (currentDoc.exists) {
+            const currentData = currentDoc.data() as Field | Classification | Course | Episode;
+            const oldThumbnailPath = currentData.thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl);
+            await deleteStorageFileByPath(storage, oldThumbnailPath);
+        }
+        downloadUrl = ''; // Set to empty string for deletion
+        newThumbnailPath = '';
+    } else {
+        // No new image and not a deletion request, so do nothing.
+        return { success: true, message: '새로운 썸네일이 제공되지 않아 스킵합니다.' };
     }
 
     const dataToUpdate = {
-      thumbnailUrl: downloadUrl || '',
-      thumbnailPath: newThumbnailPath || '',
+      thumbnailUrl: downloadUrl,
+      thumbnailPath: newThumbnailPath,
     };
 
     await docRef.update(dataToUpdate);
