@@ -1,19 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // ... 기존 규칙들 ...
-
-    // 사용자 데이터 규칙
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-
-      // 👇 [추가] 본인의 시청 기록(viewHistory)은 본인만 읽고 쓸 수 있다.
-      match /viewHistory/{historyId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
+    match /{document=**} {
+      // 개발 중에는 모든 읽기/쓰기/삭제를 허용합니다.
+      // 주의: 프로덕션 배포 전에는 반드시 보안 규칙을 강화해야 합니다.
+      allow read, write: if true;
     }
-    
-    // ...
   }
 }

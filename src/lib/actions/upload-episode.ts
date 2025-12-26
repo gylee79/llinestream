@@ -31,6 +31,7 @@ type SaveMetadataPayload = {
     description: string;
     isFree: boolean;
     selectedCourseId: string;
+    instructorId?: string;
     videoUrl: string;
     filePath: string;
     thumbnailUrl: string;
@@ -40,6 +41,7 @@ type SaveMetadataPayload = {
 type UpdateEpisodePayload = {
     episodeId: string;
     courseId: string;
+    instructorId?: string;
     title: string;
     description: string;
     isFree: boolean;
@@ -121,7 +123,7 @@ export async function getSignedUploadUrl(fileName: string, fileType: string, epi
  * Saves the metadata of an already uploaded episode to Firestore.
  */
 export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise<UploadResult> {
-    const { episodeId, title, description, isFree, selectedCourseId, videoUrl, filePath, thumbnailUrl, thumbnailPath } = payload;
+    const { episodeId, title, description, isFree, selectedCourseId, instructorId, videoUrl, filePath, thumbnailUrl, thumbnailPath } = payload;
      if (!title || !selectedCourseId || !videoUrl || !episodeId || !filePath) {
         return { success: false, message: '필수 정보(에피소드ID, 제목, 강좌, 비디오 URL, 파일 경로)가 누락되었습니다.' };
     }
@@ -149,6 +151,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
         
         const newEpisode = {
             courseId: selectedCourseId,
+            instructorId: instructorId || null,
             title,
             description,
             duration,
@@ -176,7 +179,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
  * Updates an existing episode's metadata and optionally replaces its video file.
  */
 export async function updateEpisode(payload: UpdateEpisodePayload): Promise<UploadResult> {
-    const { episodeId, courseId, title, description, isFree, thumbnailUrl, thumbnailPath, newVideoData, oldFilePath } = payload;
+    const { episodeId, courseId, instructorId, title, description, isFree, thumbnailUrl, thumbnailPath, newVideoData, oldFilePath } = payload;
     
     if (!episodeId || !courseId || !title) {
         return { success: false, message: '에피소드 ID, 강좌 ID, 제목은 필수입니다.' };
@@ -199,6 +202,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             description,
             isFree,
             courseId,
+            instructorId: instructorId || null,
             thumbnailUrl,
             thumbnailPath,
         };
@@ -225,3 +229,5 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         return { success: false, message: `에피소드 업데이트 실패: ${errorMessage}` };
     }
 }
+
+    

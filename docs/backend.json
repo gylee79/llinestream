@@ -160,6 +160,10 @@
           "type": "string",
           "description": "Reference to Course. (Relationship: Course 1:N Episode)"
         },
+        "instructorId": {
+            "type": "string",
+            "description": "Reference to Instructor. (Relationship: Instructor 1:N Episode)"
+        },
         "title": {
           "type": "string",
           "description": "Title of the episode."

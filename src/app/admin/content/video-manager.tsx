@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, PlusCircle, ImageIcon } from 'lucide-react';
-import type { Episode, Course, Classification, Field } from '@/lib/types';
+import type { Episode, Course, Classification, Field, Instructor } from '@/lib/types';
 import VideoUploadDialog from '@/components/admin/content/video-upload-dialog';
 import {
   DropdownMenu,
@@ -49,6 +49,9 @@ export default function VideoManager() {
   const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
 
+  const instructorsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'instructors') : null), [firestore]);
+  const { data: instructors, isLoading: instructorsLoading } = useCollection<Instructor>(instructorsQuery);
+
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [isThumbnailDialogOpen, setThumbnailDialogOpen] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
@@ -76,6 +79,11 @@ export default function VideoManager() {
     if (!field) return `? > ${classification.name} > ${course.name}`;
 
     return `${field.name} > ${classification.name} > ${course.name}`;
+  };
+
+  const getInstructorName = (instructorId?: string): string => {
+    if (!instructorId || !instructors) return 'N/A';
+    return instructors.find(i => i.id === instructorId)?.name || '알 수 없음';
   };
 
   const toggleFreeStatus = async (episode: Episode) => {
@@ -112,7 +120,7 @@ export default function VideoManager() {
     }
   };
 
-  const isLoading = episodesLoading || coursesLoading || classLoading || fieldsLoading;
+  const isLoading = episodesLoading || coursesLoading || classLoading || fieldsLoading || instructorsLoading;
 
   return (
     <>
@@ -135,6 +143,7 @@ export default function VideoManager() {
                 <TableHead>제목</TableHead>
                 <TableHead>소속 상세분류</TableHead>
                 <TableHead>재생 시간(초)</TableHead>
+                <TableHead>강사</TableHead>
                 <TableHead>무료 여부</TableHead>
                 <TableHead className="text-right">관리</TableHead>
               </TableRow>
@@ -143,7 +152,7 @@ export default function VideoManager() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                        <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
+                        <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
                     </TableRow>
                 ))
               ) : (
@@ -169,6 +178,7 @@ export default function VideoManager() {
                     <TableCell className="font-medium">{episode.title}</TableCell>
                     <TableCell>{getFullCoursePath(episode.courseId)}</TableCell>
                     <TableCell>{episode.duration}</TableCell>
+                    <TableCell>{getInstructorName(episode.instructorId)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Switch
@@ -234,3 +244,5 @@ export default function VideoManager() {
     </>
   );
 }
+
+    

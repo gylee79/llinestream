@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -24,7 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, addDoc, updateDoc, getDoc, query, where, setDoc } from 'firebase/firestore';
-import type { Field, Classification, Course, Episode } from '@/lib/types';
+import type { Field, Classification, Course, Episode, Instructor } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { PlusCircle, ImageIcon } from 'lucide-react';
@@ -79,6 +80,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const [selectedFieldId, setSelectedFieldId] = useState<string>('');
   const [selectedClassificationId, setSelectedClassificationId] = useState<string>('');
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
+  const [selectedInstructorId, setSelectedInstructorId] = useState<string>('');
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
@@ -100,6 +102,9 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   ), [firestore, selectedClassificationId]);
   const { data: filteredCourses } = useCollection<Course>(coursesQuery);
 
+  const instructorsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'instructors') : null), [firestore]);
+  const { data: instructors } = useCollection<Instructor>(instructorsQuery);
+
 
   const resetForm = useCallback(() => {
     setTitle('');
@@ -108,6 +113,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setSelectedFieldId('');
     setSelectedClassificationId('');
     setSelectedCourseId('');
+    setSelectedInstructorId('');
     setVideoFile(null);
     setThumbnailFile(null);
     setThumbnailPreview(null);
@@ -129,6 +135,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             setDescription(episode.description || '');
             setIsFree(episode.isFree);
             setSelectedCourseId(episode.courseId);
+            setSelectedInstructorId(episode.instructorId || '');
             setThumbnailPreview(episode.thumbnailUrl || null);
 
             try {
@@ -286,6 +293,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 description,
                 isFree,
                 courseId: selectedCourseId,
+                instructorId: selectedInstructorId,
                 episodeId: episode.id,
                 thumbnailUrl: finalThumbnailUrl,
                 thumbnailPath: thumbnailFilePath,
@@ -307,6 +315,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 description,
                 isFree,
                 selectedCourseId,
+                instructorId: selectedInstructorId,
                 videoUrl: downloadUrl,
                 filePath: filePath,
                 thumbnailUrl: finalThumbnailUrl,
@@ -446,6 +455,17 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="instructor" className="text-right">강사</Label>
+                <div className="col-span-3">
+                    <Select value={selectedInstructorId} onValueChange={setSelectedInstructorId} disabled={isProcessing}>
+                        <SelectTrigger><SelectValue placeholder="강사 선택" /></SelectTrigger>
+                        <SelectContent>
+                            {instructors?.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
               <div />
               <div className="col-span-3 flex items-center space-x-2">
                   <Checkbox id="isFree" checked={isFree} onCheckedChange={(checked) => setIsFree(!!checked)} disabled={isProcessing} />
@@ -523,3 +543,5 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     </>
   );
 }
+
+    

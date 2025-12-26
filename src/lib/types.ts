@@ -57,6 +57,7 @@ export interface Course {
 export interface Episode {
   id: string; // This will be the document ID from Firestore, added on the client
   courseId: string;
+  instructorId?: string;
   title: string;
   description?: string;
   duration: number; // in seconds
@@ -131,4 +132,5 @@ export interface Instructor {
   createdAt: Timestamp;
 }
 
+    
     
