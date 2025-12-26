@@ -271,7 +271,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     try {
         const episodeId = isEditMode ? episode.id : uuidv4();
         let finalThumbnailUrl = isEditMode ? episode.thumbnailUrl : '';
-        let thumbnailFilePath: string | undefined = isEditMode ? episode.thumbnailPath : undefined;
+        let thumbnailFilePath: string | null = isEditMode ? (episode.thumbnailPath || null) : null;
 
 
         if (thumbnailFile) {
@@ -296,7 +296,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 instructorId: selectedInstructorId,
                 episodeId: episode.id,
                 thumbnailUrl: finalThumbnailUrl,
-                thumbnailPath: thumbnailFilePath,
+                thumbnailPath: thumbnailFilePath, // Pass null if it's null
                 newVideoData: newVideoData,
                 oldFilePath: newVideoData ? episode.filePath : undefined
             }));
@@ -319,7 +319,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 videoUrl: downloadUrl,
                 filePath: filePath,
                 thumbnailUrl: finalThumbnailUrl,
-                thumbnailPath: thumbnailFilePath
+                thumbnailPath: thumbnailFilePath,
             }));
             
             if (!metadataResult.success) {

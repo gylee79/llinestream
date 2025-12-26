@@ -35,7 +35,7 @@ type SaveMetadataPayload = {
     videoUrl: string;
     filePath: string;
     thumbnailUrl: string;
-    thumbnailPath: string | undefined;
+    thumbnailPath: string | null;
 }
 
 type UpdateEpisodePayload = {
@@ -46,7 +46,7 @@ type UpdateEpisodePayload = {
     description: string;
     isFree: boolean;
     thumbnailUrl: string;
-    thumbnailPath: string | undefined;
+    thumbnailPath: string | null;
     newVideoData?: {
         videoUrl: string;
         filePath: string;
@@ -204,12 +204,8 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             courseId,
             instructorId: instructorId || null,
             thumbnailUrl,
+            thumbnailPath: thumbnailPath || null, // Ensure we send null instead of undefined
         };
-        
-        // Only include thumbnailPath if it's not undefined
-        if (thumbnailPath !== undefined) {
-            dataToUpdate.thumbnailPath = thumbnailPath;
-        }
 
         if (newVideoData) {
             // Make the new file public before saving its URL
