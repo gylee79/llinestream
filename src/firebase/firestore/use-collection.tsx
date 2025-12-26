@@ -55,6 +55,7 @@ export function useCollection<T = any>(
   type ResultItemType = WithId<T>;
   type StateDataType = ResultItemType[] | null;
 
+  // This is the key change: useFirebase provides authUser without triggering the useUser -> useDoc loop.
   const { authUser } = useFirebase();
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);

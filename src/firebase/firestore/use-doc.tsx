@@ -1,4 +1,3 @@
-
 'use client';
     
 import { useState, useEffect } from 'react';
@@ -44,6 +43,7 @@ export function useDoc<T = any>(
   docRef: DocumentReference<DocumentData> | null | undefined,
 ): UseDocResult<T> {
   type StateDataType = WithId<T> | null;
+  // This is the key change: useFirebase provides authUser without triggering the useUser -> useDoc loop.
   const { authUser } = useFirebase();
 
   const [data, setData] = useState<StateDataType>(null);
@@ -92,4 +92,3 @@ export function useDoc<T = any>(
 
   return { data, isLoading, error };
 }
-
