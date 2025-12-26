@@ -30,7 +30,6 @@ import { Separator } from '@/components/ui/separator';
 import { PlusCircle, ImageIcon } from 'lucide-react';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
 import { getSignedUploadUrl, saveEpisodeMetadata, updateEpisode } from '@/lib/actions/upload-episode';
-import { updateThumbnail } from '@/lib/actions/update-thumbnail';
 import { v4 as uuidv4 } from 'uuid';
 import Image from 'next/image';
 
@@ -161,7 +160,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     } else {
         resetForm();
     }
-}, [open, episode, isEditMode, firestore, toast]);
+  }, [open, episode, isEditMode, firestore, toast]);
 
   const handleThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -243,7 +242,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
           xhr.onerror = () => reject(new Error('네트워크 오류로 파일 업로드에 실패했습니다.'));
           xhr.send(file);
       });
-      setUploadProgress(100);
       
       return {
           uploadUrl: signedUrlResult.uploadUrl,
@@ -346,7 +344,14 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     }
     setHierarchyDialogState({ isOpen: true, item: null, type });
   };
+  
   const closeHierarchyDialog = () => setHierarchyDialogState({ isOpen: false, item: null, type: '분야' });
+
+  const handleSafeClose = (open: boolean) => {
+      if (!open && isProcessing) return; // Don't close while processing
+      onOpenChange(open);
+  };
+
 
   const handleSaveHierarchy = async (item: HierarchyItem) => {
     if (!firestore) return;
@@ -396,7 +401,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleSafeClose}>
         <DialogContent className="sm:max-w-[625px]">
           <DialogHeader>
             <DialogTitle className="font-headline">{isEditMode ? '에피소드 수정' : '비디오 업로드'}</DialogTitle>
@@ -494,23 +499,19 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 </div>
             )}
              {uploadProgress !== null && (
-                <div className="col-span-full mt-2">
-                    <Progress value={uploadProgress} />
-                    <p className="text-sm text-center text-muted-foreground mt-2">
-                        {uploadProgress < 100 ? `업로드 중... ${Math.round(uploadProgress)}%` : '업로드 완료! 메타데이터 저장 중...'}
-                    </p>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <div />
+                    <div className="col-span-3 mt-2">
+                        <Progress value={uploadProgress} />
+                        <p className="text-sm text-center text-muted-foreground mt-2">
+                            {uploadProgress < 100 ? `업로드 중... ${Math.round(uploadProgress)}%` : '업로드 완료! 메타데이터 저장 중...'}
+                        </p>
+                    </div>
                 </div>
-            )}
-            {isProcessing && isEditMode && (
-              <div className="col-span-full mt-2">
-                <p className="text-sm text-center text-muted-foreground mt-2">
-                  분류 정보 로딩 중...
-                </p>
-              </div>
             )}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>취소</Button>
+            <Button type="button" variant="outline" onClick={() => handleSafeClose(false)} disabled={isProcessing}>취소</Button>
             <Button type="button" onClick={handleSaveEpisode} disabled={isProcessing || (isEditMode ? false : !videoFile) || !selectedCourseId }>
               {isProcessing ? '처리 중...' : '에피소드 저장'}
             </Button>

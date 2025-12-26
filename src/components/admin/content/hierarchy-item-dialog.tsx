@@ -44,7 +44,7 @@ export default function HierarchyItemDialog({
       setName(item?.name || '');
     }
   }, [isOpen, item]);
-
+  
   const handleSave = () => {
     if (!name.trim()) return;
     onSave({ id: item?.id || '', name });
@@ -67,6 +67,7 @@ export default function HierarchyItemDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-3"
+              onKeyDown={(e) => e.key === 'Enter' && handleSave()}
             />
           </div>
         </div>

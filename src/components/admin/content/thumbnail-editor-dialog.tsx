@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import {
   Dialog,
@@ -15,7 +15,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
-import { Skeleton } from '@/components/ui/skeleton';
 import { updateThumbnail } from '@/lib/actions/update-thumbnail';
 import { ImageIcon, Trash2 } from 'lucide-react';
 import {
@@ -37,22 +36,11 @@ interface ThumbnailEditorDialogProps {
   itemType: 'fields' | 'classifications' | 'courses' | 'episodes';
 }
 
-const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = error => reject(error);
-    });
-};
-
 export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType }: ThumbnailEditorDialogProps) {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(item.thumbnailUrl || null);
-  const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
-
 
   useEffect(() => {
     if (isOpen) {
@@ -60,6 +48,11 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
       setImageFile(null);
     }
   }, [isOpen, item]);
+
+  const handleSafeClose = () => {
+    if (isProcessing) return;
+    onClose();
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -87,7 +80,13 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
     setIsProcessing(true);
     
     try {
-        const base64Image = await fileToBase64(imageFile);
+        const reader = new FileReader();
+        const base64Image = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = (error) => reject(error);
+            reader.readAsDataURL(imageFile);
+        });
+
 
         const result = await updateThumbnail({
             itemType,
@@ -137,7 +136,7 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleSafeClose}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>썸네일 수정: {item.name}</DialogTitle>
@@ -187,7 +186,7 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
               </AlertDialogContent>
             </AlertDialog>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={isProcessing}>
+            <Button variant="outline" onClick={handleSafeClose} disabled={isProcessing}>
                 취소
             </Button>
             <Button onClick={handleSave} disabled={isProcessing || !imageFile}>
@@ -199,5 +198,3 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
     </Dialog>
   );
 }
-
-    
