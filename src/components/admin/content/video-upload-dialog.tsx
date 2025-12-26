@@ -271,7 +271,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     try {
         const episodeId = isEditMode ? episode.id : uuidv4();
         let finalThumbnailUrl = isEditMode ? episode.thumbnailUrl : '';
-        let thumbnailFilePath: string | undefined = undefined;
+        let thumbnailFilePath: string | undefined = isEditMode ? episode.thumbnailPath : undefined;
 
 
         if (thumbnailFile) {
@@ -543,5 +543,3 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     </>
   );
 }
-
-    

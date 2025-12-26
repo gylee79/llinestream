@@ -197,15 +197,19 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             await deleteStorageFileByPath(storage, oldFilePath);
         }
 
-        const dataToUpdate: Partial<Episode> = {
+        const dataToUpdate: { [key: string]: any } = {
             title,
             description,
             isFree,
             courseId,
             instructorId: instructorId || null,
             thumbnailUrl,
-            thumbnailPath,
         };
+        
+        // Only include thumbnailPath if it's not undefined
+        if (thumbnailPath !== undefined) {
+            dataToUpdate.thumbnailPath = thumbnailPath;
+        }
 
         if (newVideoData) {
             // Make the new file public before saving its URL
@@ -229,5 +233,3 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         return { success: false, message: `에피소드 업데이트 실패: ${errorMessage}` };
     }
 }
-
-    
