@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -139,8 +140,8 @@ export default function VideoManager() {
                                     src={episode.thumbnailUrl}
                                     alt={episode.title}
                                     fill
-                                    className="object-cover"
                                     sizes="80px"
+                                    className="object-cover"
                                 />
                             ) : (
                                 <div className="flex items-center justify-center h-full w-full">

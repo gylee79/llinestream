@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import {
   Dialog,
@@ -42,16 +43,22 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(item.thumbnailUrl || null);
 
+  const resetState = useCallback(() => {
+    setImagePreview(item.thumbnailUrl || null);
+    setImageFile(null);
+    setIsProcessing(false);
+  }, [item.thumbnailUrl]);
+
   useEffect(() => {
     if (isOpen) {
-      setImagePreview(item.thumbnailUrl || null);
-      setImageFile(null);
+        resetState();
     }
-  }, [isOpen, item]);
+  }, [isOpen, resetState]);
 
   const handleSafeClose = () => {
     if (isProcessing) return;
     onClose();
+    setTimeout(resetState, 150);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,7 +105,7 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
         
         if (result.success) {
             toast({ title: '저장 성공', description: '썸네일 정보가 성공적으로 업데이트되었습니다.' });
-            onClose();
+            handleSafeClose();
         } else {
             throw new Error(result.message);
         }
@@ -123,7 +130,7 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
 
         if (result.success) {
             toast({ title: '삭제 성공', description: '썸네일이 삭제되었습니다.' });
-            onClose();
+            handleSafeClose();
         } else {
             throw new Error(result.message);
         }
@@ -136,10 +143,10 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleSafeClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleSafeClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>썸네일 수정: {item.name}</DialogTitle>
+          <DialogTitle>썸네일 수정: {item.name || (item as Episode).title}</DialogTitle>
           <DialogDescription>
             썸네일 이미지를 수정합니다.
           </DialogDescription>

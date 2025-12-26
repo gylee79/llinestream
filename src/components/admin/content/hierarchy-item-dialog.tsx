@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -49,9 +50,13 @@ export default function HierarchyItemDialog({
     if (!name.trim()) return;
     onSave({ id: item?.id || '', name });
   };
+  
+  const handleSafeClose = () => {
+    setTimeout(onClose, 150);
+  }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleSafeClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
@@ -72,7 +77,7 @@ export default function HierarchyItemDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={handleSafeClose}>
             취소
           </Button>
           <Button onClick={handleSave}>저장</Button>

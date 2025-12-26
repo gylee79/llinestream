@@ -154,18 +154,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     }
   }, [open, episode, isEditMode, firestore, toast, resetForm]);
 
-  const handleThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setThumbnailFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setThumbnailPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-  
   const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -190,7 +178,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
                 const dataUrl = canvas.toDataURL('image/jpeg');
                 setThumbnailPreview(dataUrl);
-                // Create a File object from the data URL to be uploaded
                 const generatedThumbnailFile = dataURLtoFile(dataUrl, 'thumbnail.jpg');
                 setThumbnailFile(generatedThumbnailFile);
             }
@@ -201,6 +188,18 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             console.error("Error loading video for thumbnail generation.");
             URL.revokeObjectURL(videoUrl);
         }
+    }
+  };
+
+  const handleThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setThumbnailFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setThumbnailPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -341,8 +340,11 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const closeHierarchyDialog = () => setHierarchyDialogState({ isOpen: false, item: null, type: '분야' });
 
   const handleSafeClose = (openState: boolean) => {
-      if (!openState && isProcessing) return;
+      if (isProcessing) return;
       onOpenChange(openState);
+      if (!openState) {
+        setTimeout(resetForm, 150);
+      }
   };
 
 
@@ -354,12 +356,13 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     try {
         const id = uuidv4();
         if (type === '분야') {
-            await setDoc(doc(firestore, 'fields', id), { name: item.name, thumbnailUrl: '' });
+            await setDoc(doc(firestore, 'fields', id), { id, name: item.name, thumbnailUrl: '' });
             setSelectedFieldId(id);
             setSelectedClassificationId('');
             setSelectedCourseId('');
         } else if (type === '큰분류' && selectedFieldId) {
             await setDoc(doc(firestore, 'classifications', id), {
+                id,
                 fieldId: selectedFieldId,
                 name: item.name,
                 description: `${item.name}에 대한 설명입니다.`,
@@ -370,6 +373,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             setSelectedCourseId('');
         } else if (type === '상세분류' && selectedClassificationId) {
             await setDoc(doc(firestore, 'courses', id), {
+                id,
                 classificationId: selectedClassificationId,
                 name: item.name,
                 description: `${item.name}에 대한 상세 설명입니다.`,
@@ -460,6 +464,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                       accept="video/*"
                       disabled={isProcessing}
                   />
+                  {videoFile && <p className="text-sm text-muted-foreground">선택된 파일: {videoFile.name}</p>}
                   {isEditMode && !videoFile && (
                     <p className="text-sm text-muted-foreground">
                         새 비디오 파일을 선택하면 기존 영상이 교체됩니다.
@@ -475,12 +480,13 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                         {thumbnailPreview ? (
                             <Image src={thumbnailPreview} alt="썸네일 미리보기" fill className="object-cover" />
                         ) : (
-                            <div className="flex items-center justify-center h-full w-full">
+                            <div className="flex flex-col items-center justify-center h-full w-full text-center">
                                 <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground mt-2">비디오 파일을 선택하면<br/>자동으로 썸네일이 생성됩니다.</span>
                             </div>
                         )}
                     </div>
-                    <Label htmlFor="thumbnail-file" className="text-sm font-medium text-muted-foreground">커스텀 썸네일 업로드</Label>
+                    <Label htmlFor="thumbnail-file" className="text-sm font-medium text-muted-foreground">또는, 커스텀 썸네일 업로드</Label>
                     <Input id="thumbnail-file" type="file" accept="image/*" onChange={handleThumbnailFileChange} disabled={isProcessing} />
                 </div>
             </div>
@@ -516,5 +522,3 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     </>
   );
 }
-
-    
