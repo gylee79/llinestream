@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -33,6 +32,7 @@ interface InternalQuery extends Query<DocumentData> {
         path: {
             canonicalString(): string;
             toString(): string;
+            segments: string[];
         }
     }
 }
@@ -55,7 +55,6 @@ export function useCollection<T = any>(
   type ResultItemType = WithId<T>;
   type StateDataType = ResultItemType[] | null;
 
-  // This is the key change: useFirebase provides authUser without triggering the useUser -> useDoc loop.
   const { authUser } = useFirebase();
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -90,10 +89,10 @@ export function useCollection<T = any>(
   }, [targetRefOrQuery, authUser]);
 
   useEffect(() => {
-    // If the query is not ready, reset the state
-    if (!targetRefOrQuery) {
+    // If the query is not ready, or is invalid, reset the state and wait.
+    if (!targetRefOrQuery || !(targetRefOrQuery as InternalQuery)._query?.path.segments.length) {
       setData(null);
-      setIsLoading(true); // Set to true to show loading state until a valid query is provided
+      setIsLoading(true); // Keep loading until a valid query is provided
       setError(null);
       return;
     }

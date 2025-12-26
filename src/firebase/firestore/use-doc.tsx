@@ -43,7 +43,6 @@ export function useDoc<T = any>(
   docRef: DocumentReference<DocumentData> | null | undefined,
 ): UseDocResult<T> {
   type StateDataType = WithId<T> | null;
-  // This is the key change: useFirebase provides authUser without triggering the useUser -> useDoc loop.
   const { authUser } = useFirebase();
 
   const [data, setData] = useState<StateDataType>(null);
@@ -51,9 +50,10 @@ export function useDoc<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
+    // If the ref is not ready, reset the state and wait.
     if (!docRef) {
       setData(null);
-      setIsLoading(false); // Set to false because there is no operation pending.
+      setIsLoading(true); // Keep loading until a valid ref is provided
       setError(null);
       return;
     }
