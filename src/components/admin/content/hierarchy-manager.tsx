@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useTransition } from 'react';
@@ -227,15 +228,16 @@ export default function HierarchyManager() {
     startTransition(async () => {
         const { id: toastId } = toast({
             title: '삭제 중...',
-            description: `'${item.name}' 항목과 관련된 모든 데이터를 삭제하고 있습니다.`,
+            description: `'${item.name}' 항목을 삭제하고 있습니다.`,
             duration: 999999,
         });
 
         try {
             const result = await deleteHierarchyItem(collectionName, item.id, sanitize(item));
             
+            dismiss(toastId);
+
             if (result.success) {
-                dismiss(toastId);
                 toast({ title: '삭제 성공', description: result.message, duration: 5000 });
                 if (collectionName === 'fields' && selectedField === item.id) {
                     setSelectedField(null);
@@ -244,7 +246,19 @@ export default function HierarchyManager() {
                     setSelectedClassification(null);
                 }
             } else {
-                throw new Error(result.message);
+                 toast({
+                    variant: "destructive",
+                    title: result.message,
+                    description: (
+                        <div className="mt-2 w-full rounded-md bg-slate-950 p-4">
+                           <p className="text-white">먼저 삭제해야 할 항목 목록:</p>
+                           <ul className="list-disc pl-5 mt-2">
+                                {result.dependencies?.map((dep, i) => <li key={i} className="text-white">{dep}</li>)}
+                           </ul>
+                        </div>
+                    ),
+                    duration: 10000,
+                });
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -356,7 +370,7 @@ export default function HierarchyManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>정말 삭제하시겠습니까?</AlertDialogTitle>
             <AlertDialogDescription>
-              &apos;{deleteAlert.item?.name}&apos; 항목과 모든 하위 데이터(분류, 강좌, 에피소드, 파일 등)가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+              &apos;{deleteAlert.item?.name}&apos; 항목은 하위 항목이 없을 경우에만 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
