@@ -157,7 +157,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             filePath,
             thumbnailUrl: thumbnailUrl,
             thumbnailPath: thumbnailPath,
-            createdAt: admin.firestore.FieldValue.serverTimestamp() as admin.firestore.Timestamp,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
         };
 
         await episodeRef.set(newEpisode);
