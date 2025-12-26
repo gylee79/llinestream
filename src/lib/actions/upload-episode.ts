@@ -147,7 +147,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
         
         const episodeRef = db.collection('episodes').doc(episodeId);
         
-        const newEpisode: Omit<Episode, 'id'> = {
+        const newEpisode = {
             courseId: selectedCourseId,
             title,
             description,
