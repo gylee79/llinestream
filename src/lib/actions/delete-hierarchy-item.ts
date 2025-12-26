@@ -91,12 +91,17 @@ export async function deleteHierarchyItem(
     }
 
     if (collectionName === 'fields') {
+        const fieldItem = item as Field;
         const fieldDeps = await getEpisodeDependenciesRecursive(db, id, 'field');
-        dependencies = fieldDeps.map(dep => `${item.name} > ${dep}`);
+        dependencies = fieldDeps.map(dep => `${fieldItem.name} > ${dep}`);
     } else if (collectionName === 'classifications') {
-        dependencies = await getEpisodeDependenciesRecursive(db, id, 'classification');
+        const classItem = item as Classification;
+        const classDeps = await getEpisodeDependenciesRecursive(db, id, 'classification');
+        dependencies = classDeps.map(dep => `${classItem.name} > ${dep}`);
     } else if (collectionName === 'courses') {
-        dependencies = await getEpisodeDependenciesRecursive(db, id, 'course');
+        const courseItem = item as Course;
+        const courseDeps = await getEpisodeDependenciesRecursive(db, id, 'course');
+        dependencies = courseDeps.map(dep => `${courseItem.name} > ${dep}`);
     }
 
     if (dependencies.length > 0) {
