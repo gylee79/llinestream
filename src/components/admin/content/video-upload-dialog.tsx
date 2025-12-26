@@ -122,13 +122,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   };
 
   useEffect(() => {
-    if (!open) {
-      const timer = setTimeout(resetForm, 150);
-      return () => clearTimeout(timer);
-    }
-  }, [open, resetForm]);
-
-  useEffect(() => {
     async function setInitialState() {
         if (isEditMode && episode && firestore) {
             setIsProcessing(true);
@@ -512,7 +505,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleSafeClose} disabled={isProcessing}>취소</Button>
             <Button type="button" onClick={handleSaveEpisode} disabled={isProcessing || (isEditMode ? false : !videoFile) || !selectedCourseId }>
-              {isProcessing ? '처리 중...' : '에피소드 저장'}
+              {isProcessing ? `처리 중... ${uploadProgress !== null ? Math.round(uploadProgress) + '%' : ''}`.trim() : '에피소드 저장'}
             </Button>
           </DialogFooter>
         </DialogContent>
