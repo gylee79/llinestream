@@ -37,15 +37,32 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
     }
 };
 
-const getDependencies = async (db: Firestore, collectionName: string, whereField: string, id: string): Promise<string[]> => {
-    const snapshot = await db.collection(collectionName).where(whereField, '==', id).get();
-    if (snapshot.empty) return [];
-    return snapshot.docs.map(doc => {
-        const data = doc.data();
-        // Episode uses 'title', others use 'name'
-        return data.title || data.name || doc.id;
-    });
-};
+const getEpisodeDependenciesRecursive = async (db: Firestore, parentId: string, parentType: 'field' | 'classification' | 'course'): Promise<string[]> => {
+    let finalDependencies: string[] = [];
+
+    if (parentType === 'field') {
+        const classificationsSnap = await db.collection('classifications').where('fieldId', '==', parentId).get();
+        for (const classDoc of classificationsSnap.docs) {
+            const classification = classDoc.data() as Classification;
+            const deps = await getEpisodeDependenciesRecursive(db, classDoc.id, 'classification');
+            finalDependencies = finalDependencies.concat(deps.map(dep => `${classification.name} > ${dep}`));
+        }
+    } else if (parentType === 'classification') {
+        const coursesSnap = await db.collection('courses').where('classificationId', '==', parentId).get();
+        for (const courseDoc of coursesSnap.docs) {
+            const course = courseDoc.data() as Course;
+            const deps = await getEpisodeDependenciesRecursive(db, courseDoc.id, 'course');
+            finalDependencies = finalDependencies.concat(deps.map(dep => `${course.name} > ${dep}`));
+        }
+    } else if (parentType === 'course') {
+        const episodesSnap = await db.collection('episodes').where('courseId', '==', parentId).get();
+        if (!episodesSnap.empty) {
+            return episodesSnap.docs.map(doc => (doc.data() as Episode).title);
+        }
+    }
+    return finalDependencies;
+}
+
 
 export async function deleteHierarchyItem(
   collectionName: 'fields' | 'classifications' | 'courses' | 'episodes',
@@ -63,26 +80,20 @@ export async function deleteHierarchyItem(
     const storage = admin.storage(adminApp);
     
     const docRef = db.collection(collectionName).doc(id);
-
-    // Check for dependencies before deleting
+    
     let dependencies: string[] = [];
-    let dependencyType = '';
-
     if (collectionName === 'fields') {
-        dependencies = await getDependencies(db, 'classifications', 'fieldId', id);
-        dependencyType = '큰분류';
+        dependencies = await getEpisodeDependenciesRecursive(db, id, 'field');
     } else if (collectionName === 'classifications') {
-        dependencies = await getDependencies(db, 'courses', 'classificationId', id);
-        dependencyType = '상세분류';
+        dependencies = await getEpisodeDependenciesRecursive(db, id, 'classification');
     } else if (collectionName === 'courses') {
-        dependencies = await getDependencies(db, 'episodes', 'courseId', id);
-        dependencyType = '에피소드';
+        dependencies = await getEpisodeDependenciesRecursive(db, id, 'course');
     }
 
     if (dependencies.length > 0) {
       return {
         success: false,
-        message: `삭제 실패: 하위 ${dependencyType}가 존재합니다. 먼저 삭제해주세요.`,
+        message: '삭제 실패: 하위 에피소드가 존재합니다. 가장 하위의 에피소드를 먼저 삭제해주세요.',
         dependencies,
       };
     }

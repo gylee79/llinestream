@@ -251,13 +251,13 @@ export default function HierarchyManager() {
                     title: result.message,
                     description: (
                         <div className="mt-2 w-full rounded-md bg-slate-950 p-4">
-                           <p className="text-white">먼저 삭제해야 할 항목 목록:</p>
-                           <ul className="list-disc pl-5 mt-2">
-                                {result.dependencies?.map((dep, i) => <li key={i} className="text-white">{dep}</li>)}
+                           <p className="text-white">먼저 삭제해야 할 하위 에피소드 목록:</p>
+                           <ul className="list-disc pl-5 mt-2 text-sm text-white/80">
+                                {result.dependencies?.map((dep, i) => <li key={i}>{dep}</li>)}
                            </ul>
                         </div>
                     ),
-                    duration: 10000,
+                    duration: 15000,
                 });
             }
         } catch (error) {
