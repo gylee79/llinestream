@@ -26,7 +26,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { sanitize } from '@/lib/utils';
 
 
 type Item = (Field | Classification | Course) & { type: 'field' | 'classification' | 'course' };
@@ -233,7 +232,7 @@ export default function HierarchyManager() {
         });
 
         try {
-            const result = await deleteHierarchyItem(collectionName, item.id, sanitize(item));
+            const result = await deleteHierarchyItem(collectionName, item.id);
             
             dismiss(toastId);
 

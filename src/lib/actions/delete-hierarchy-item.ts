@@ -66,8 +66,7 @@ const getEpisodeDependenciesRecursive = async (db: Firestore, parentId: string, 
 
 export async function deleteHierarchyItem(
   collectionName: 'fields' | 'classifications' | 'courses' | 'episodes',
-  id: string,
-  itemData?: any
+  id: string
 ): Promise<DeletionResult> {
   if (!id || !collectionName) {
     return { success: false, message: '삭제할 항목의 ID와 컬렉션 이름이 제공되지 않았습니다.' };
@@ -80,15 +79,16 @@ export async function deleteHierarchyItem(
     const storage = admin.storage(adminApp);
     
     const docRef = db.collection(collectionName).doc(id);
+    const docSnap = await docRef.get();
+
+    if (!docSnap.exists) {
+        console.warn(`[NOT FOUND] Document with ID ${id} not found in ${collectionName}.`);
+        return { success: false, message: '삭제할 항목을 찾을 수 없습니다.' };
+    }
+
+    const item = docSnap.data() as Field | Classification | Course | Episode;
     
     let dependencies: string[] = [];
-    const docSnap = await docRef.get();
-    const item = (docSnap.exists ? docSnap.data() : itemData) as Field | Classification | Course | Episode;
-
-    if (!item) {
-      console.warn(`[NOT FOUND] Document with ID ${id} not found in ${collectionName} and no itemData provided. Assuming deleted.`);
-      return { success: true, message: '항목을 찾을 수 없지만, 삭제된 것으로 처리합니다.' };
-    }
 
     if (collectionName === 'fields') {
         const fieldItem = item as Field;
@@ -122,9 +122,7 @@ export async function deleteHierarchyItem(
         await deleteStorageFileByPath(storage, hierarchyItem.thumbnailPath);
     }
 
-    if (docSnap.exists) {
-        await docRef.delete();
-    }
+    await docRef.delete();
     
     revalidatePath('/admin/content', 'layout');
 
