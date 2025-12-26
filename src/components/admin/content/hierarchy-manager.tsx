@@ -250,9 +250,9 @@ export default function HierarchyManager() {
                     variant: "destructive",
                     title: "하위 비디오(에피소드)가 존재하여 삭제할 수 없습니다.",
                     description: (
-                        <div className="mt-2 w-full rounded-md bg-slate-950 p-4">
-                           <p className="text-white">아래 비디오를 먼저 삭제해야 합니다:</p>
-                           <ul className="list-disc pl-5 mt-2 text-sm text-white/80">
+                        <div>
+                           <p className="font-semibold">아래 비디오를 먼저 삭제해야 합니다:</p>
+                           <ul className="list-disc pl-5 mt-2 text-sm">
                                 {result.dependencies?.map((dep, i) => <li key={i}>{dep}</li>)}
                            </ul>
                         </div>
