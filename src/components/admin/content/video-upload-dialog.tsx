@@ -32,6 +32,7 @@ import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog
 import { getSignedUploadUrl, saveEpisodeMetadata, updateEpisode } from '@/lib/actions/upload-episode';
 import { v4 as uuidv4 } from 'uuid';
 import Image from 'next/image';
+import { sanitize } from '@/lib/utils';
 
 const dataURLtoFile = (dataurl: string, filename: string): File => {
     const arr = dataurl.split(',');
@@ -154,8 +155,10 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     }
     if (open) {
         setInitialState();
+    } else {
+        resetForm();
     }
-  }, [open, episode, isEditMode, firestore, toast]);
+  }, [open, episode, isEditMode, firestore, toast, resetForm]);
 
   const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -278,7 +281,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 newVideoData = { videoUrl: urls.downloadUrl, filePath: urls.filePath };
             }
 
-            const result = await updateEpisode({
+            const result = await updateEpisode(sanitize({
                 title,
                 description,
                 isFree,
@@ -288,7 +291,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 thumbnailPath: thumbnailFilePath,
                 newVideoData: newVideoData,
                 oldFilePath: newVideoData ? episode.filePath : undefined
-            });
+            }));
 
             if (!result.success) {
                 throw new Error(result.message);
@@ -298,7 +301,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
         } else if (videoFile) {
             const { downloadUrl, filePath } = await uploadFileAndGetUrl(videoFile, episodeId, 'videos');
             
-            const metadataResult = await saveEpisodeMetadata({
+            const metadataResult = await saveEpisodeMetadata(sanitize({
                 episodeId,
                 title,
                 description,
@@ -308,7 +311,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 filePath: filePath,
                 thumbnailUrl: finalThumbnailUrl,
                 thumbnailPath: thumbnailFilePath
-            });
+            }));
             
             if (!metadataResult.success) {
                 throw new Error(metadataResult.message);
