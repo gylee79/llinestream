@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, PlusCircle, ImageIcon } from 'lucide-react';
-import type { Episode, Course } from '@/lib/types';
+import type { Episode, Course, Classification, Field } from '@/lib/types';
 import VideoUploadDialog from '@/components/admin/content/video-upload-dialog';
 import {
   DropdownMenu,
@@ -42,7 +42,13 @@ export default function VideoManager() {
   
   const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
+
+  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
+  const { data: classifications, isLoading: classLoading } = useCollection<Classification>(classificationsQuery);
   
+  const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
+  const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
+
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [isThumbnailDialogOpen, setThumbnailDialogOpen] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
@@ -57,9 +63,19 @@ export default function VideoManager() {
     setThumbnailDialogOpen(true);
   };
 
+  const getFullCoursePath = (courseId: string): string => {
+    if (!courses || !classifications || !fields) return '? > ? > ?';
+    
+    const course = courses.find(c => c.id === courseId);
+    if (!course) return `? > ? > ${courseId}`;
 
-  const getCourseName = (courseId: string) => {
-    return courses?.find(c => c.id === courseId)?.name || 'N/A';
+    const classification = classifications.find(c => c.id === course.classificationId);
+    if (!classification) return `? > ? > ${course.name}`;
+
+    const field = fields.find(f => f.id === classification.fieldId);
+    if (!field) return `? > ${classification.name} > ${course.name}`;
+
+    return `${field.name} > ${classification.name} > ${course.name}`;
   };
 
   const toggleFreeStatus = async (episode: Episode) => {
@@ -96,7 +112,7 @@ export default function VideoManager() {
     }
   };
 
-  const isLoading = episodesLoading || coursesLoading;
+  const isLoading = episodesLoading || coursesLoading || classLoading || fieldsLoading;
 
   return (
     <>
@@ -151,7 +167,7 @@ export default function VideoManager() {
                         </div>
                     </TableCell>
                     <TableCell className="font-medium">{episode.title}</TableCell>
-                    <TableCell>{getCourseName(episode.courseId)}</TableCell>
+                    <TableCell>{getFullCoursePath(episode.courseId)}</TableCell>
                     <TableCell>{episode.duration}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
