@@ -30,14 +30,18 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toDisplayDate } from '@/lib/date-helpers';
 
-const instructorSchema = z.object({
+const instructorFormSchema = z.object({
   name: z.string().min(2, { message: '이름은 2자 이상이어야 합니다.' }),
-  phone: z.string().regex(/^\d{3}-\d{3,4}-\d{4}$/, { message: '연락처 형식을 확인해주세요. (010-XXXX-XXXX)' }),
   email: z.string().email({ message: '유효한 이메일을 입력해주세요.' }),
-  dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: '생년월일 형식을 확인해주세요. (YYYY-MM-DD)' }),
+  phone1: z.string().length(3, { message: '3자리' }),
+  phone2: z.string().min(3, { message: '3-4자리' }).max(4, { message: '3-4자리' }),
+  phone3: z.string().length(4, { message: '4자리' }),
+  year: z.string().length(4, { message: '4자리' }),
+  month: z.string().min(1, { message: '1-2자리' }).max(2, { message: '1-2자리' }),
+  day: z.string().min(1, { message: '1-2자리' }).max(2, { message: '1-2자리' }),
 });
 
-type InstructorFormValues = z.infer<typeof instructorSchema>;
+type InstructorFormValues = z.infer<typeof instructorFormSchema>;
 
 export default function InstructorManager() {
   const firestore = useFirestore();
@@ -47,52 +51,38 @@ export default function InstructorManager() {
   const { data: instructors, isLoading } = useCollection<Instructor>(instructorsQuery);
 
   const form = useForm<InstructorFormValues>({
-    resolver: zodResolver(instructorSchema),
+    resolver: zodResolver(instructorFormSchema),
     defaultValues: {
       name: '',
-      phone: '',
       email: '',
-      dob: '',
+      phone1: '',
+      phone2: '',
+      phone3: '',
+      year: '',
+      month: '',
+      day: '',
     },
   });
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>, field: any) => {
-    const value = e.target.value.replace(/\D/g, '');
-    let formattedValue = value;
-
-    if (value.length > 3 && value.length <= 7) {
-      formattedValue = `${value.slice(0, 3)}-${value.slice(3)}`;
-    } else if (value.length > 7) {
-      formattedValue = `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7, 11)}`;
-    }
-    field.onChange(formattedValue);
-  };
-
-  const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>, field: any) => {
-    const value = e.target.value.replace(/\D/g, '');
-    let formattedValue = value;
-
-    if (value.length > 4 && value.length <= 6) {
-      formattedValue = `${value.slice(0, 4)}-${value.slice(4)}`;
-    } else if (value.length > 6) {
-      formattedValue = `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
-    }
-    field.onChange(formattedValue);
-  };
   
   const onSubmit: SubmitHandler<InstructorFormValues> = async (data) => {
     if (!firestore) return;
 
     try {
-      await addDoc(collection(firestore, 'instructors'), {
-        ...data,
-        createdAt: serverTimestamp(),
-      });
-      toast({
-        title: '등록 성공',
-        description: `${data.name} 강사님이 성공적으로 등록되었습니다.`,
-      });
-      form.reset();
+        const fullPhone = `${data.phone1}-${data.phone2}-${data.phone3}`;
+        const fullDob = `${data.year}-${data.month.padStart(2, '0')}-${data.day.padStart(2, '0')}`;
+
+        await addDoc(collection(firestore, 'instructors'), {
+            name: data.name,
+            email: data.email,
+            phone: fullPhone,
+            dob: fullDob,
+            createdAt: serverTimestamp(),
+        });
+        toast({
+            title: '등록 성공',
+            description: `${data.name} 강사님이 성공적으로 등록되었습니다.`,
+        });
+        form.reset();
     } catch (error) {
       console.error('Error adding instructor:', error);
       toast({
@@ -125,24 +115,7 @@ export default function InstructorManager() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>연락처</FormLabel>
-                      <FormControl>
-                        <Input 
-                            placeholder="010-1234-5678" 
-                            {...field}
-                            onChange={(e) => handlePhoneChange(e, field)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
+                 <FormField
                   control={form.control}
                   name="email"
                   render={({ field }) => (
@@ -153,23 +126,32 @@ export default function InstructorManager() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="dob"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>생년월일</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="YYYY-MM-DD" 
-                          {...field}
-                          onChange={(e) => handleDobChange(e, field)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-2">
+                    <FormLabel>연락처</FormLabel>
+                    <div className="flex items-center gap-2">
+                        <FormField control={form.control} name="phone1" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input maxLength={3} {...field} /></FormControl></FormItem>)} />
+                        <span>-</span>
+                        <FormField control={form.control} name="phone2" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input maxLength={4} {...field} /></FormControl></FormItem>)} />
+                        <span>-</span>
+                        <FormField control={form.control} name="phone3" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input maxLength={4} {...field} /></FormControl></FormItem>)} />
+                    </div>
+                    <FormMessage>
+                        {form.formState.errors.phone1?.message || form.formState.errors.phone2?.message || form.formState.errors.phone3?.message}
+                    </FormMessage>
+                </div>
+                 <div className="space-y-2">
+                    <FormLabel>생년월일</FormLabel>
+                    <div className="flex items-center gap-2">
+                        <FormField control={form.control} name="year" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input placeholder="YYYY" maxLength={4} {...field} /></FormControl></FormItem>)} />
+                        <span>-</span>
+                        <FormField control={form.control} name="month" render={({ field }) => (<FormItem className="w-20"><FormControl><Input placeholder="MM" maxLength={2} {...field} /></FormControl></FormItem>)} />
+                        <span>-</span>
+                        <FormField control={form.control} name="day" render={({ field }) => (<FormItem className="w-20"><FormControl><Input placeholder="DD" maxLength={2} {...field} /></FormControl></FormItem>)} />
+                    </div>
+                     <FormMessage>
+                        {form.formState.errors.year?.message || form.formState.errors.month?.message || form.formState.errors.day?.message}
+                    </FormMessage>
+                </div>
               </div>
               <Button type="submit" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? '등록 중...' : '강사 등록'}
@@ -225,5 +207,3 @@ export default function InstructorManager() {
     </div>
   );
 }
-
-    
