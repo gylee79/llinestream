@@ -92,13 +92,9 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-
   const [hierarchyDialogState, setHierarchyDialogState] = useState<HierarchyDialogState>({ isOpen: false, item: null, type: '분야' });
 
   const isEditMode = !!episode;
-  const isLoading = isProcessing;
 
   const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: dbFields } = useCollection<Field>(fieldsQuery);
@@ -184,7 +180,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     if (file) {
         setVideoFile(file);
         
-        // Auto-generate thumbnail only if user hasn't selected one
         if (!thumbnailFile && !thumbnailPreview) {
             const videoUrl = URL.createObjectURL(file);
             const videoElement = document.createElement('video');
@@ -192,7 +187,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             videoElement.muted = true;
             
             videoElement.onloadeddata = () => {
-                videoElement.currentTime = 1; // Seek to 1 second
+                videoElement.currentTime = 1;
             };
 
             videoElement.onseeked = () => {
@@ -204,11 +199,10 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                     ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
                     const dataUrl = canvas.toDataURL('image/jpeg');
                     setThumbnailPreview(dataUrl);
-                    // Also set this as a file to be uploaded
                     const generatedThumbnailFile = dataURLtoFile(dataUrl, 'thumbnail.jpg');
                     setThumbnailFile(generatedThumbnailFile);
                 }
-                URL.revokeObjectURL(videoUrl); // Clean up
+                URL.revokeObjectURL(videoUrl);
             };
 
             videoElement.onerror = () => {
@@ -220,8 +214,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   };
 
 
-  const uploadFileAndGetUrl = async (file: File, episodeId: string): Promise<{uploadUrl: string, downloadUrl: string, filePath: string}> => {
-      const signedUrlResult = await getSignedUploadUrl(file.name, file.type, episodeId);
+  const uploadFileAndGetUrl = async (file: File, episodeId: string, itemType: 'videos' | 'thumbnails'): Promise<{uploadUrl: string, downloadUrl: string, filePath: string}> => {
+      const signedUrlResult = await getSignedUploadUrl(file.name, file.type, episodeId, itemType);
       if (!signedUrlResult.success || !signedUrlResult.uploadUrl || !signedUrlResult.downloadUrl || !signedUrlResult.filePath) {
           throw new Error(signedUrlResult.message || '서명된 업로드 URL을 가져오지 못했습니다.');
       }
@@ -274,18 +268,13 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setIsProcessing(true);
 
     try {
-        let episodeId = isEditMode ? episode.id : uuidv4();
+        const episodeId = isEditMode ? episode.id : uuidv4();
+        let finalThumbnailUrl = isEditMode ? episode.thumbnailUrl : '';
 
         // 1. Handle Thumbnail Upload (if any)
         if (thumbnailFile) {
-            const base64Image = await fileToBase64(thumbnailFile);
-            await updateThumbnail({
-                itemType: 'episodes',
-                itemId: episodeId,
-                base64Image,
-                imageContentType: thumbnailFile.type,
-                imageName: thumbnailFile.name,
-            });
+            const thumbnailUrls = await uploadFileAndGetUrl(thumbnailFile, episodeId, 'thumbnails');
+            finalThumbnailUrl = thumbnailUrls.downloadUrl;
         }
         
         // 2. Handle Video Upload & Metadata
@@ -293,7 +282,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             let newVideoData: { videoUrl: string; filePath: string } | undefined = undefined;
             
             if (videoFile) { // If a new video is uploaded
-                const urls = await uploadFileAndGetUrl(videoFile, episode.id);
+                const urls = await uploadFileAndGetUrl(videoFile, episode.id, 'videos');
                 newVideoData = { videoUrl: urls.downloadUrl, filePath: urls.filePath };
             }
 
@@ -303,19 +292,20 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 isFree,
                 courseId: selectedCourseId,
                 episodeId: episode.id,
+                thumbnailUrl: finalThumbnailUrl,
                 newVideoData: newVideoData,
-                oldVideoUrl: newVideoData ? episode.videoUrl : undefined,
                 oldFilePath: newVideoData ? episode.filePath : undefined
             });
 
             if (result.success) {
                 toast({ title: '수정 완료', description: `'${title}' 에피소드 정보가 업데이트되었습니다.` });
+                onOpenChange(false);
             } else {
                 throw new Error(result.message);
             }
 
         } else if (videoFile) { // Create new episode
-            const { downloadUrl, filePath } = await uploadFileAndGetUrl(videoFile, episodeId);
+            const { downloadUrl, filePath } = await uploadFileAndGetUrl(videoFile, episodeId, 'videos');
             
             const metadataResult = await saveEpisodeMetadata({
                 episodeId,
@@ -324,18 +314,18 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 isFree,
                 selectedCourseId,
                 videoUrl: downloadUrl,
-                filePath: filePath
+                filePath: filePath,
+                thumbnailUrl: finalThumbnailUrl,
             });
             
             if (metadataResult.success) {
                 toast({ title: '업로드 성공', description: metadataResult.message });
+                onOpenChange(false);
             } else {
                 throw new Error(metadataResult.message);
             }
         }
       
-      onOpenChange(false);
-
     } catch (error: any) {
       console.error("Episode save process failed:", error);
       toast({
@@ -344,8 +334,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
         description: error.message || '에피소드 저장 중 오류가 발생했습니다.',
       });
     } finally {
-      setIsProcessing(false);
-      setUploadProgress(null);
+        setIsProcessing(false);
+        setUploadProgress(null);
     }
   };
 
@@ -417,16 +407,16 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
           <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="title" className="text-right">제목</Label>
-              <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" disabled={isLoading} />
+              <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} className="col-span-3" disabled={isProcessing} />
             </div>
             <div className="grid grid-cols-4 items-start gap-4">
               <Label htmlFor="description" className="text-right pt-2">설명</Label>
-              <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" disabled={isLoading} />
+              <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" disabled={isProcessing} />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">분류</Label>
               <div className="col-span-3 grid grid-cols-3 gap-2 items-center">
-                <Select value={selectedFieldId} onValueChange={(v) => { setSelectedFieldId(v); setSelectedClassificationId(''); setSelectedCourseId(''); }} disabled={isLoading}>
+                <Select value={selectedFieldId} onValueChange={(v) => { setSelectedFieldId(v); setSelectedClassificationId(''); setSelectedCourseId(''); }} disabled={isProcessing}>
                   <SelectTrigger><SelectValue placeholder="분야" /></SelectTrigger>
                   <SelectContent>
                     {dbFields?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
@@ -436,7 +426,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                     </Button>
                   </SelectContent>
                 </Select>
-                <Select value={selectedClassificationId} onValueChange={(v) => { setSelectedClassificationId(v); setSelectedCourseId(''); }} disabled={!selectedFieldId || isLoading}>
+                <Select value={selectedClassificationId} onValueChange={(v) => { setSelectedClassificationId(v); setSelectedCourseId(''); }} disabled={!selectedFieldId || isProcessing}>
                   <SelectTrigger><SelectValue placeholder="큰분류" /></SelectTrigger>
                   <SelectContent>
                     {filteredClassifications?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -446,7 +436,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                     </Button>
                   </SelectContent>
                 </Select>
-                <Select value={selectedCourseId} onValueChange={setSelectedCourseId} disabled={!selectedClassificationId || isLoading}>
+                <Select value={selectedCourseId} onValueChange={setSelectedCourseId} disabled={!selectedClassificationId || isProcessing}>
                   <SelectTrigger><SelectValue placeholder="상세분류" /></SelectTrigger>
                   <SelectContent>
                     {filteredCourses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -461,7 +451,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             <div className="grid grid-cols-4 items-center gap-4">
               <div />
               <div className="col-span-3 flex items-center space-x-2">
-                  <Checkbox id="isFree" checked={isFree} onCheckedChange={(checked) => setIsFree(!!checked)} disabled={isLoading} />
+                  <Checkbox id="isFree" checked={isFree} onCheckedChange={(checked) => setIsFree(!!checked)} disabled={isProcessing} />
                   <Label htmlFor="isFree">무료 콘텐츠</Label>
               </div>
             </div>
@@ -478,7 +468,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                             </div>
                         )}
                     </div>
-                    <Input id="thumbnail-file" type="file" accept="image/*" onChange={handleThumbnailFileChange} disabled={isLoading} />
+                    <Input id="thumbnail-file" type="file" accept="image/*" onChange={handleThumbnailFileChange} disabled={isProcessing} />
                 </div>
             </div>
             <Separator />
@@ -492,7 +482,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                   className="col-span-3" 
                   onChange={handleVideoFileChange}
                   accept="video/*"
-                  disabled={isLoading}
+                  disabled={isProcessing}
               />
             </div>
             {isEditMode && !videoFile && (
@@ -511,7 +501,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                     </p>
                 </div>
             )}
-            {isLoading && isEditMode && (
+            {isProcessing && isEditMode && (
               <div className="col-span-full mt-2">
                 <p className="text-sm text-center text-muted-foreground mt-2">
                   분류 정보 로딩 중...
@@ -520,9 +510,9 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             )}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>취소</Button>
-            <Button type="button" onClick={handleSaveEpisode} disabled={isLoading || (isEditMode ? false : !videoFile) || !selectedCourseId }>
-              {isLoading ? '처리 중...' : '에피소드 저장'}
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>취소</Button>
+            <Button type="button" onClick={handleSaveEpisode} disabled={isProcessing || (isEditMode ? false : !videoFile) || !selectedCourseId }>
+              {isProcessing ? '처리 중...' : '에피소드 저장'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -539,5 +529,3 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     </>
   );
 }
-
-    
