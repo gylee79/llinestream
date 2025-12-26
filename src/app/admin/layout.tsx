@@ -66,25 +66,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="flex min-h-screen w-full">
       <aside className="hidden w-64 flex-col border-r bg-muted/40 md:flex">
         <div className="flex h-16 items-center border-b px-6">
-          <Link href="/admin/dashboard" className="flex items-center gap-2 font-semibold">
-            <LlineStreamLogo appName={appName} />
+          <Link href="/" className="flex items-center gap-2 font-semibold">
+            <span className="font-headline text-lg">관리자 패널</span>
           </Link>
         </div>
         <AdminNav />
       </aside>
       <div className="flex flex-1 flex-col">
-        <header className="flex h-16 items-center gap-4 border-b bg-muted/40 px-6">
+        <header className="flex h-16 items-center gap-4 border-b bg-muted/40 px-6 md:hidden">
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="shrink-0 md:hidden">
+              <Button variant="outline" size="icon" className="shrink-0">
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">Toggle navigation menu</span>
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col p-0">
-              <SheetHeader className="flex h-16 flex-row items-center justify-between border-b px-6">
-                <Link href="/admin/dashboard">
-                  <LlineStreamLogo appName={appName} />
+               <SheetHeader className="flex h-16 flex-row items-center justify-between border-b px-6">
+                <Link href="/" className="flex items-center gap-2 font-semibold">
+                   <span className="font-headline text-lg">관리자 패널</span>
                 </Link>
                 <SheetTitle className="sr-only">Admin Menu</SheetTitle>
               </SheetHeader>
