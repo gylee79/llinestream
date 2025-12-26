@@ -8,7 +8,7 @@ import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
-import type { Episode } from '../types';
+import type { Episode, Timestamp } from '../types';
 import { Storage } from 'firebase-admin/storage';
 
 
@@ -157,7 +157,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             filePath,
             thumbnailUrl: thumbnailUrl,
             thumbnailPath: thumbnailPath,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp() as admin.firestore.Timestamp,
         };
 
         await episodeRef.set(newEpisode);

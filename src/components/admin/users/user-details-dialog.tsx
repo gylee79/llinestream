@@ -29,9 +29,9 @@ import {
     SelectTrigger,
     SelectValue,
   } from '@/components/ui/select';
-import type { User, Classification, Subscription } from '@/lib/types';
+import type { User, Classification, Subscription, Timestamp } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
-import { collection, query, where, doc, updateDoc, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, addDoc, serverTimestamp, writeBatch, Timestamp as FirebaseTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { add } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -91,13 +91,13 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
             const now = new Date();
             
             const currentSub = user.activeSubscriptions?.[bonusClassification];
-            const currentExpiry = currentSub?.expiresAt.toDate();
+            const currentExpiry = currentSub?.expiresAt ? (currentSub.expiresAt as FirebaseTimestamp).toDate() : null;
             
             const startDate = currentExpiry && currentExpiry > now ? currentExpiry : now;
             const newExpiryDate = add(startDate, { days });
 
             const newActiveSub = {
-                expiresAt: newExpiryDate,
+                expiresAt: FirebaseTimestamp.fromDate(newExpiryDate),
                 purchasedAt: currentSub?.purchasedAt || serverTimestamp()
             };
             
@@ -110,8 +110,8 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
             const bonusSubscriptionData: Omit<Subscription, 'id'> = {
                 userId: user.id,
                 classificationId: bonusClassification,
-                purchasedAt: serverTimestamp(),
-                expiresAt: newExpiryDate,
+                purchasedAt: serverTimestamp() as Timestamp,
+                expiresAt: FirebaseTimestamp.fromDate(newExpiryDate) as Timestamp,
                 amount: 0,
                 orderName: `보너스 ${days}일`,
                 paymentId: `bonus-${bonusSubscriptionRef.id}`,
@@ -174,7 +174,7 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
                     {user.activeSubscriptions && Object.entries(user.activeSubscriptions).map(([id, sub]) => (
                         <TableRow key={id}>
                             <TableCell>{getClassificationName(id)}</TableCell>
-                            <TableCell>{sub.expiresAt.toDate().toLocaleDateString('ko-KR')}</TableCell>
+                            <TableCell>{(sub.expiresAt as FirebaseTimestamp).toDate().toLocaleDateString('ko-KR')}</TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
@@ -195,7 +195,7 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
                 <TableBody>
                     {subscriptions?.map((sub) => (
                         <TableRow key={sub.id}>
-                            <TableCell>{sub.purchasedAt.toDate().toLocaleDateString('ko-KR')}</TableCell>
+                            <TableCell>{(sub.purchasedAt as FirebaseTimestamp).toDate().toLocaleDateString('ko-KR')}</TableCell>
                             <TableCell><Badge variant={sub.status === 'PAID' ? 'default' : 'secondary'}>{sub.status}</Badge></TableCell>
                             <TableCell>{sub.orderName}</TableCell>
                             <TableCell>{sub.amount.toLocaleString('ko-KR')}원</TableCell>

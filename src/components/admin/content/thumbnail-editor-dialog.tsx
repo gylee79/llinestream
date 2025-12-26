@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -145,7 +146,7 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleSafeClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>썸네일 수정: {item.name || (item as Episode).title}</DialogTitle>
+          <DialogTitle>썸네일 수정: {(item as any).name || (item as Episode).title}</DialogTitle>
           <DialogDescription>
             썸네일 이미지를 수정합니다.
           </DialogDescription>

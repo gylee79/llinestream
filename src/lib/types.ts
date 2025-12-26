@@ -5,7 +5,7 @@ import type { Timestamp as FirebaseTimestamp } from 'firebase/firestore';
 
 // We use the client-side Timestamp for all client-facing components and types.
 // For server-side operations (like in `complete/route.ts`), we will convert as needed.
-export type Timestamp = FirebaseTimestamp;
+export type Timestamp = FirebaseTimestamp | Date;
 
 export interface User {
   id: string; // This will be the document ID from Firestore, added on the client

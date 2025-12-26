@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import type { Policy, FooterSettings, HeroImageSettings } from '@/lib/types';
-import { useCollection, useDoc, useFirestore, useFirebase, errorEmitter, useStorage, useMemoFirebase } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useUser, errorEmitter, useStorage, useMemoFirebase } from '@/firebase';
 import { collection, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
@@ -21,7 +21,7 @@ import { Separator } from "@/components/ui/separator";
 function HeroImageManager() {
     const firestore = useFirestore();
     const storage = useStorage();
-    const { user } = useFirebase();
+    const { user } = useUser();
     const { toast } = useToast();
     const heroImagesRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
     const { data: heroImageData, isLoading } = useDoc<HeroImageSettings>(heroImagesRef);

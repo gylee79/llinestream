@@ -1,3 +1,4 @@
+
 'use server';
 
 import { config } from 'dotenv';
@@ -11,7 +12,7 @@ import { User, Subscription } from './types';
 import { revalidatePath } from 'next/cache';
 
 // Helper function to handle potential auth user creation
-async function ensureAuthUser(auth: admin.auth.Auth, user: Omit<User, 'id'|'activeSubscriptions'>) {
+async function ensureAuthUser(auth: admin.auth.Auth, user: Omit<User, 'id'|'activeSubscriptions'|'createdAt'> & { createdAt: Date }) {
     try {
         return await auth.getUserByEmail(user.email);
     } catch (error: any) {
@@ -77,8 +78,8 @@ export async function uploadMockData() {
     for (let i = 0; i < episodes.length; i++) {
         const episode = episodes[i];
         const courseId = courseIds[i % courseIds.length];
-        const docRef = firestore.collection('courses').doc(courseId).collection('episodes').doc();
-        batch.set(docRef, { ...episode, courseId });
+        const docRef = firestore.collection('episodes').doc();
+        batch.set(docRef, { ...episode, courseId, createdAt: Timestamp.fromDate(episode.createdAt as Date) });
     }
 
     // 5. Upload Users and create Auth users
@@ -90,7 +91,7 @@ export async function uploadMockData() {
         const userRef = firestore.collection('users').doc(authUser.uid);
         batch.set(userRef, {
             ...user,
-            createdAt: Timestamp.fromDate(user.createdAt),
+            createdAt: Timestamp.fromDate(user.createdAt as Date),
             activeSubscriptions: {}, // Initialize empty
         });
     }
@@ -110,15 +111,15 @@ export async function uploadMockData() {
                 ...sub,
                 userId,
                 classificationId,
-                purchasedAt: Timestamp.fromDate(sub.purchasedAt),
-                expiresAt: Timestamp.fromDate(sub.expiresAt),
+                purchasedAt: Timestamp.fromDate(sub.purchasedAt as Date),
+                expiresAt: Timestamp.fromDate(sub.expiresAt as Date),
             });
             // Update the activeSubscriptions map on the user
             const userRef = firestore.collection('users').doc(userId);
             batch.update(userRef, {
                 [`activeSubscriptions.${classificationId}`]: {
-                    purchasedAt: Timestamp.fromDate(sub.purchasedAt),
-                    expiresAt: Timestamp.fromDate(sub.expiresAt),
+                    purchasedAt: Timestamp.fromDate(sub.purchasedAt as Date),
+                    expiresAt: Timestamp.fromDate(sub.expiresAt as Date),
                 }
             });
         }
