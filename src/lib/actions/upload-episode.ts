@@ -1,3 +1,4 @@
+
 'use server';
 
 import { config } from 'dotenv';
@@ -37,10 +38,8 @@ type UpdateEpisodePayload = {
     isFree: boolean;
     thumbnailUrl: string;
     thumbnailPath: string;
-    newVideoData?: {
-        videoUrl: string;
-        filePath: string;
-    };
+    videoUrl?: string;
+    filePath?: string;
     oldFilePath?: string;
     oldThumbnailPath?: string;
 }
@@ -115,7 +114,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
  * Updates an existing episode's metadata and handles deletion of old files.
  */
 export async function updateEpisode(payload: UpdateEpisodePayload): Promise<UploadResult> {
-    const { episodeId, courseId, instructorId, title, description, isFree, thumbnailUrl, thumbnailPath, newVideoData, oldFilePath, oldThumbnailPath } = payload;
+    const { episodeId, courseId, instructorId, title, description, isFree, thumbnailUrl, thumbnailPath, videoUrl, filePath, oldFilePath, oldThumbnailPath } = payload;
     
     if (!episodeId || !courseId || !title) {
         return { success: false, message: '에피소드 ID, 강좌 ID, 제목은 필수입니다.' };
@@ -128,7 +127,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         const episodeRef = db.collection('episodes').doc(episodeId);
 
         // If a new video was uploaded, delete the old one.
-        if (newVideoData && oldFilePath) {
+        if (videoUrl && filePath && oldFilePath) {
             console.log(`[UPDATE] New video provided. Deleting old file: ${oldFilePath}`);
             await deleteStorageFileByPath(storage, oldFilePath);
         }
@@ -149,9 +148,9 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             thumbnailPath: thumbnailPath,
         };
 
-        if (newVideoData) {
-            dataToUpdate.videoUrl = newVideoData.videoUrl;
-            dataToUpdate.filePath = newVideoData.filePath;
+        if (videoUrl && filePath) {
+            dataToUpdate.videoUrl = videoUrl;
+            dataToUpdate.filePath = filePath;
         }
 
         await episodeRef.update(dataToUpdate);
