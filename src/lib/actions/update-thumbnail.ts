@@ -9,6 +9,7 @@ import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { Storage } from 'firebase-admin/storage';
+import { getPublicUrl, extractPathFromUrl } from '@/lib/utils';
 
 type UpdateResult = {
   success: boolean;
@@ -22,15 +23,6 @@ type UpdateThumbnailPayload = {
     imageContentType?: string;
     imageName?: string;
 }
-
-const getSignedUrl = async (storage: Storage, filePath: string) => {
-    const options = {
-      action: 'read' as const,
-      expires: '01-01-2200', // Set a very distant future expiration date
-    };
-    const [url] = await storage.bucket().file(filePath).getSignedUrl(options);
-    return url;
-};
 
 const deleteStorageFileByPath = async (storage: Storage, filePath: string | undefined) => {
     if (!filePath) {
@@ -52,24 +44,6 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
     }
 };
 
-const extractPathFromUrl = (url: string | undefined): string | undefined => {
-    if (!url) return undefined;
-    try {
-        const urlObject = new URL(url);
-        // The path we want is after the bucket name in the pathname.
-        // e.g., /<bucket_name>/<path_to_file>
-        const pathSegments = urlObject.pathname.split('/');
-        if (pathSegments.length > 2) {
-            // Decode URI component to handle encoded characters like %2F for /
-            return decodeURIComponent(pathSegments.slice(2).join('/'));
-        }
-    } catch (e) {
-        console.warn(`Could not parse URL to extract path: ${url}`, e);
-    }
-    return undefined;
-};
-
-
 export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<UpdateResult> {
   const { itemType, itemId, base64Image, imageContentType, imageName } = payload;
 
@@ -81,6 +55,7 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     const adminApp = initializeAdminApp();
     const db = admin.firestore(adminApp);
     const storage = admin.storage(adminApp);
+    const bucketName = storage.bucket().name;
     
     const docRef = db.collection(itemType).doc(itemId);
 
@@ -95,8 +70,9 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
 
     // Determine which thumbnail path to use (custom or default)
     const oldThumbnailPath = itemType === 'episodes' 
-        ? (currentData as Episode).customThumbnailPath || extractPathFromUrl((currentData as Episode).customThumbnailUrl)
-        : currentData.thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl);
+        ? ((currentData as Episode).customThumbnailPath || extractPathFromUrl((currentData as Episode).customThumbnailUrl))
+        : (currentData.thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl));
+
 
     // If a new image is provided, upload it.
     if (base64Image && imageContentType && imageName) {
@@ -115,7 +91,7 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
           metadata: { contentType: imageContentType },
         });
 
-        downloadUrl = await getSignedUrl(storage, newThumbnailPath);
+        downloadUrl = getPublicUrl(bucketName, newThumbnailPath);
 
     } else if (base64Image === null) { // Explicit deletion request for custom thumbnail
         if (oldThumbnailPath) {

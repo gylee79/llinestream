@@ -8,7 +8,8 @@ import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
 import type { Episode, Timestamp } from '../types';
-import { Storage, getDownloadURL } from 'firebase-admin/storage';
+import { Storage } from 'firebase-admin/storage';
+import { extractPathFromUrl } from '../utils';
 
 
 type UploadResult = {
@@ -46,14 +47,15 @@ type UpdateEpisodePayload = {
     newDefaultThumbnailData?: { downloadUrl: string; filePath: string; };
     newCustomThumbnailData?: { downloadUrl: string | null; filePath: string | null; }; // null indicates deletion
 
-    // Old file paths for deletion
-    oldFilePath?: string;
-    oldDefaultThumbnailPath?: string;
-    oldCustomThumbnailPath?: string;
+    // Old file URLs for path extraction
+    oldVideoUrl?: string;
+    oldDefaultThumbnailUrl?: string;
+    oldCustomThumbnailUrl?: string;
 }
 
 const deleteStorageFileByPath = async (storage: Storage, filePath: string | undefined) => {
     if (!filePath) {
+        console.warn(`[SKIP DELETE] No file path provided.`);
         return;
     }
     try {
@@ -130,7 +132,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
     const { 
         episodeId, courseId, instructorId, title, description, isFree, 
         newVideoData, newDefaultThumbnailData, newCustomThumbnailData,
-        oldFilePath, oldDefaultThumbnailPath, oldCustomThumbnailPath
+        oldVideoUrl, oldDefaultThumbnailUrl, oldCustomThumbnailUrl
     } = payload;
     
     if (!episodeId || !courseId || !title) {
@@ -144,12 +146,17 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         const episodeRef = db.collection('episodes').doc(episodeId);
 
         // --- File Deletion Logic ---
+        const oldFilePath = extractPathFromUrl(oldVideoUrl);
         if (newVideoData?.filePath && oldFilePath && newVideoData.filePath !== oldFilePath) {
           await deleteStorageFileByPath(storage, oldFilePath);
         }
+        
+        const oldDefaultThumbnailPath = extractPathFromUrl(oldDefaultThumbnailUrl);
         if (newDefaultThumbnailData?.filePath && oldDefaultThumbnailPath && newDefaultThumbnailData.filePath !== oldDefaultThumbnailPath) {
           await deleteStorageFileByPath(storage, oldDefaultThumbnailPath);
         }
+
+        const oldCustomThumbnailPath = extractPathFromUrl(oldCustomThumbnailUrl);
         if (newCustomThumbnailData && oldCustomThumbnailPath && newCustomThumbnailData.filePath !== oldCustomThumbnailPath) {
            await deleteStorageFileByPath(storage, oldCustomThumbnailPath);
         }

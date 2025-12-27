@@ -142,12 +142,13 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setTimeout(resetForm, 150);
   };
   
-  const generateDefaultThumbnail = useCallback((videoSrc: string, episodeId: string): Promise<File | null> => {
+ const generateDefaultThumbnail = useCallback((videoSrc: string, episodeId: string): Promise<File | null> => {
     return new Promise((resolve, reject) => {
         const videoElement = document.createElement('video');
         videoElement.src = videoSrc;
         videoElement.crossOrigin = "anonymous";
         videoElement.muted = true;
+        videoElement.preload = "metadata";
 
         const cleanup = () => {
             videoElement.removeEventListener('seeked', onSeeked);
@@ -306,20 +307,17 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             newVideoUploadResult = await uploadFile(storage, videoPath, videoFile, setUploadProgress);
         }
 
-        // Always ensure we have a default thumbnail file to upload if a video exists
-        const finalDefaultThumbnailFile = defaultThumbnailFile || (initialEpisode?.defaultThumbnailUrl ? await dataURLtoFile(initialEpisode.defaultThumbnailUrl, `default-thumb-${episodeId}.jpg`): null)
-        
-        if (finalDefaultThumbnailFile && (videoFile || isEditMode)) {
+        if (defaultThumbnailFile && (videoFile || isEditMode)) {
              setUploadMessage('대표 썸네일 업로드 중...');
-            const thumbPath = `episodes/${episodeId}/default-thumbnail/${Date.now()}-${finalDefaultThumbnailFile.name}`;
-            newDefaultThumbUploadResult = await uploadFile(storage, thumbPath, finalDefaultThumbnailFile, setUploadProgress);
+            const thumbPath = `episodes/${episodeId}/default-thumbnail/${Date.now()}-${defaultThumbnailFile.name}`;
+            newDefaultThumbUploadResult = await uploadFile(storage, thumbPath, defaultThumbnailFile, setUploadProgress);
         }
         
         if (customThumbnailFile) {
             setUploadMessage('커스텀 썸네일 업로드 중...');
             const thumbPath = `episodes/${episodeId}/custom-thumbnail/${Date.now()}-${customThumbnailFile.name}`;
             newCustomThumbUploadResult = await uploadFile(storage, thumbPath, customThumbnailFile, setUploadProgress);
-        } else if (customThumbnailPreview === null && initialEpisode?.customThumbnailPath) {
+        } else if (customThumbnailPreview === null && initialEpisode?.customThumbnailUrl) {
             // This indicates user wants to delete the custom thumbnail
             newCustomThumbUploadResult = { downloadUrl: null, filePath: null };
         }
@@ -332,9 +330,9 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 newVideoData: newVideoUploadResult,
                 newDefaultThumbnailData: newDefaultThumbUploadResult,
                 newCustomThumbnailData: newCustomThumbUploadResult,
-                oldFilePath: initialEpisode?.filePath,
-                oldDefaultThumbnailPath: initialEpisode?.defaultThumbnailPath,
-                oldCustomThumbnailPath: initialEpisode?.customThumbnailPath,
+                oldVideoUrl: initialEpisode?.videoUrl,
+                oldDefaultThumbnailUrl: initialEpisode?.defaultThumbnailUrl,
+                oldCustomThumbnailUrl: initialEpisode?.customThumbnailUrl,
             };
             const result = await updateEpisode(sanitize(payload));
             if (!result.success) throw new Error(result.message);

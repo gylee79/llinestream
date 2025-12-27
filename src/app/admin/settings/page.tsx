@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import type { Policy, FooterSettings, HeroImageSettings } from '@/lib/types';
 import { useCollection, useDoc, useFirestore, useUser, errorEmitter, useStorage, useMemoFirebase } from '@/firebase';
 import { collection, doc, updateDoc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useRef } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
@@ -95,6 +95,11 @@ function HeroImageManager() {
         let updatedSettings: Partial<HeroImageSettings> = JSON.parse(JSON.stringify(settings));
 
         try {
+            const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+            if (!bucketName) {
+                throw new Error('Firebase Storage bucket name is not configured in environment variables.');
+            }
+
             for (const key of Object.keys(files) as Array<FileType>) {
                 const file = files[key];
                 if (file) {
@@ -112,11 +117,10 @@ function HeroImageManager() {
                         );
                     });
                     
-                    const bucketName = storage.app.options.storageBucket;
-                    if (!bucketName) {
-                        throw new Error('Firebase Storage bucket name is not configured.');
-                    }
                     const downloadUrl = getPublicUrl(bucketName, filePath);
+                    if (!downloadUrl) {
+                        throw new Error(`Failed to generate public URL for ${filePath}`);
+                    }
 
                     if (!updatedSettings[page]) updatedSettings[page] = {};
                     const urlProp = device === 'pc' ? 'url' : 'urlMobile';
