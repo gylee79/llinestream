@@ -33,12 +33,10 @@ export function sanitize<T>(data: T): T {
 export function getPublicUrl(bucketName: string, filePath: string): string {
     if (!bucketName) {
       console.error("getPublicUrl: bucketName is missing.");
-      // To prevent broken URLs, return an empty string or a placeholder.
-      // Returning an empty string will trigger Next.js's invalid src warning, which is helpful for debugging.
       return '';
     }
-    // The bucket name for GCS URLs should not contain '.firebasestorage.app'
-    const correctBucketName = bucketName.replace('.firebasestorage.app', '');
+    // The bucket name for GCS URLs should be the project ID, not the full storage domain.
+    const correctBucketName = bucketName.replace('.appspot.com', '').replace('.firebasestorage.app', '');
     
     // Do not encode the full file path, as it may contain directory slashes which should not be encoded.
     // Individual segments of a path should be encoded if they contain special characters,
