@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -145,6 +145,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             setIsFree(episode.isFree);
             setSelectedCourseId(episode.courseId);
             setSelectedInstructorId(episode.instructorId || '');
+            setDefaultThumbnailPreview(episode.thumbnailUrl); // Set initial preview
             
             try {
               const courseDocRef = doc(firestore, 'courses', episode.courseId);
@@ -208,7 +209,9 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     const file = e.target.files?.[0];
     if (file) {
         setVideoFile(file);
+        // When a new video is selected, always generate a new default thumbnail
         generateDefaultThumbnail(file);
+        // Do not clear the custom thumbnail automatically, let the user decide.
     }
   };
 
@@ -262,7 +265,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
       return {
           uploadUrl: signedUrlResult.uploadUrl,
           downloadUrl: signedUrlResult.downloadUrl,
-filePath: signedUrlResult.filePath,
+          filePath: signedUrlResult.filePath,
       };
   }
 
@@ -283,10 +286,11 @@ filePath: signedUrlResult.filePath,
 
     try {
         const episodeId = isEditMode ? episode.id : uuidv4();
+        
         let finalThumbnailUrl: string | null = null;
         let finalThumbnailPath: string | null = null;
 
-        const defaultThumbFile = dataURLtoFile(defaultThumbnailPreview, `default-thumb-${episodeId}.jpg`);
+        const defaultThumbFile = dataURLtoFile(defaultThumbnailPreview || '', `default-thumb-${episodeId}.jpg`);
         const thumbToUpload = customThumbnailFile || (!customThumbnailPreview && defaultThumbFile);
         
         if (thumbToUpload) {
@@ -294,19 +298,9 @@ filePath: signedUrlResult.filePath,
              finalThumbnailUrl = thumbnailResult.downloadUrl;
              finalThumbnailPath = thumbnailResult.filePath;
         } else if (isEditMode) {
-            // If no new thumb is uploaded, but we had a custom one that was removed, we need to clear it.
-            // If there was no custom thumb to begin with, retain the old one.
-            if (customThumbnailPreview === null && initialEpisode?.thumbnailUrl && customThumbnailFile === null) {
-                finalThumbnailUrl = initialEpisode.thumbnailUrl;
-                finalThumbnailPath = initialEpisode.thumbnailPath || null;
-            } else if (customThumbnailPreview === null && customThumbnailFile === null) {
-                // This means the custom thumb was explicitly removed
-                finalThumbnailUrl = null;
-                finalThumbnailPath = null;
-            } else {
-                finalThumbnailUrl = initialEpisode?.thumbnailUrl || null;
-                finalThumbnailPath = initialEpisode?.thumbnailPath || null;
-            }
+            // Retain old one if no custom thumbnail is provided and default one isn't changed.
+            finalThumbnailUrl = initialEpisode?.thumbnailUrl || null;
+            finalThumbnailPath = initialEpisode?.thumbnailPath || null;
         }
         
         if (isEditMode && episode) {
@@ -317,7 +311,7 @@ filePath: signedUrlResult.filePath,
                 newVideoData = { videoUrl: urls.downloadUrl, filePath: urls.filePath };
             }
 
-            const result = await updateEpisode({
+            const result = await updateEpisode(sanitize({
                 episodeId: episode.id,
                 title,
                 description,
@@ -328,8 +322,8 @@ filePath: signedUrlResult.filePath,
                 thumbnailPath: finalThumbnailPath,
                 newVideoData: newVideoData,
                 oldFilePath: videoFile ? episode.filePath : undefined,
-                oldThumbnailPath: thumbToUpload ? episode.thumbnailPath : (customThumbnailPreview === null && customThumbnailFile === null ? episode.thumbnailPath : undefined),
-            });
+                oldThumbnailPath: thumbToUpload ? episode.thumbnailPath : undefined,
+            }));
 
             if (!result.success) throw new Error(result.message);
             toast({ title: '수정 완료', description: `'${title}' 에피소드 정보가 업데이트되었습니다.` });
@@ -337,7 +331,7 @@ filePath: signedUrlResult.filePath,
         } else if (videoFile) { // Create mode
             const { downloadUrl: videoDownloadUrl, filePath: videoFilePath } = await uploadFileAndGetUrl(videoFile, episodeId, 'videos');
             
-            const metadataResult = await saveEpisodeMetadata({
+            const metadataResult = await saveEpisodeMetadata(sanitize({
                 episodeId,
                 title,
                 description,
@@ -348,7 +342,7 @@ filePath: signedUrlResult.filePath,
                 filePath: videoFilePath,
                 thumbnailUrl: finalThumbnailUrl,
                 thumbnailPath: finalThumbnailPath,
-            });
+            }));
             
             if (!metadataResult.success) throw new Error(metadataResult.message);
             toast({ title: '업로드 성공', description: metadataResult.message });
@@ -586,3 +580,5 @@ filePath: signedUrlResult.filePath,
     </>
   );
 }
+
+    
