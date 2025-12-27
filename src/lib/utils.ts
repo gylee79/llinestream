@@ -22,3 +22,15 @@ export function formatPrice(price: number) {
 export function sanitize<T>(data: T): T {
   return JSON.parse(JSON.stringify(data));
 }
+
+/**
+ * Constructs the public URL for a file in a Google Cloud Storage bucket.
+ * @param bucketName The name of your Firebase Storage bucket (e.g., 'your-project-id.appspot.com').
+ * @param filePath The full path to the file within the bucket (e.g., 'images/profile.jpg').
+ * @returns The full public URL to access the file.
+ */
+export function getPublicUrl(bucketName: string, filePath: string): string {
+    // Encode the file path to handle special characters
+    const encodedFilePath = encodeURIComponent(filePath);
+    return `https://storage.googleapis.com/${bucketName}/${filePath}`;
+}

@@ -17,6 +17,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
+import { getPublicUrl } from "@/lib/utils";
+
 
 function HeroImageManager() {
     const firestore = useFirestore();
@@ -98,15 +100,20 @@ function HeroImageManager() {
                 if (file) {
                     const page = key.startsWith('home') ? 'home' : 'about';
                     const device = key.endsWith('Mobile') ? 'mobile' : 'pc';
-                    const storageRef = ref(storage, `settings/hero-${page}-${device}/${file.name}`);
+                    const filePath = `settings/hero-${page}-${device}/${file.name}`;
+                    const storageRef = ref(storage, filePath);
                     const uploadTask = uploadBytesResumable(storageRef, file);
-                    const downloadUrl = await new Promise<string>((resolve, reject) => {
+                    
+                    await new Promise<void>((resolve, reject) => {
                         uploadTask.on('state_changed',
                             () => {}, // progress
                             (error) => reject(error),
-                            async () => resolve(await getDownloadURL(uploadTask.snapshot.ref))
+                            () => resolve()
                         );
                     });
+
+                    const downloadUrl = getPublicUrl(storage.app.options.storageBucket!, filePath);
+
                     if (!updatedSettings[page]) updatedSettings[page] = {};
                     const urlProp = device === 'pc' ? 'url' : 'urlMobile';
                     (updatedSettings[page]! as any)[urlProp] = downloadUrl;
