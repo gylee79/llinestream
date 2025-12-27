@@ -66,7 +66,8 @@ const getEpisodeDependenciesRecursive = async (db: Firestore, parentId: string, 
 
 export async function deleteHierarchyItem(
   collectionName: 'fields' | 'classifications' | 'courses' | 'episodes',
-  id: string
+  id: string,
+  itemData?: any
 ): Promise<DeletionResult> {
   if (!id || !collectionName) {
     return { success: false, message: '삭제할 항목의 ID와 컬렉션 이름이 제공되지 않았습니다.' };
