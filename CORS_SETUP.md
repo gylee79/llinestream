@@ -9,7 +9,7 @@
 ## 명령어 (아래 박스 안의 전체 라인을 복사하세요)
 
 ```bash
-gcloud storage buckets update gs://studio-6929130257-b96ff.firebasestorage.app --cors-file=cors.json
+gcloud storage buckets update gs://studio-6929130257-b96ff.appspot.com --cors-file=cors.json
 ```
 
 ---
@@ -17,7 +17,7 @@ gcloud storage buckets update gs://studio-6929130257-b96ff.firebasestorage.app -
 ### 명령어 설명
 
 *   `gcloud storage buckets update`: Google Cloud Storage 버킷의 설정을 업데이트하는 명령어입니다.
-*   `gs://studio-6929130257-b96ff.firebasestorage.app`: 이 프로젝트의 올바른 Firebase Storage 버킷 주소입니다.
+*   `gs://studio-6929130257-b96ff.appspot.com`: 이 프로젝트의 올바른 Firebase Storage 버킷 주소입니다.
 *   `--cors-file=cors.json`: 함께 제공된 `cors.json` 파일의 내용을 버킷의 CORS 정책으로 설정합니다.
 
 ### 실행 후
