@@ -41,6 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { sanitize } from '@/lib/utils';
 
 
 export default function VideoManager() {
@@ -118,7 +119,7 @@ export default function VideoManager() {
     if (!episodeToDelete) return;
     
     try {
-        const result = await deleteHierarchyItem('episodes', episodeToDelete.id, episodeToDelete);
+        const result = await deleteHierarchyItem('episodes', episodeToDelete.id, sanitize(episodeToDelete));
         if (result.success) {
             toast({
                 title: '삭제 완료',
@@ -288,5 +289,3 @@ export default function VideoManager() {
     </>
   );
 }
-
-    
