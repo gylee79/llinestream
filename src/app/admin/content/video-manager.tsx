@@ -31,7 +31,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
 import ThumbnailEditorDialog from '@/components/admin/content/thumbnail-editor-dialog';
-import { sanitize } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 export default function VideoManager() {
@@ -56,6 +65,9 @@ export default function VideoManager() {
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [isThumbnailDialogOpen, setThumbnailDialogOpen] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [episodeToDelete, setEpisodeToDelete] = useState<Episode | null>(null);
 
   const handleOpenUploadDialog = (episode: Episode | null = null) => {
     setSelectedEpisode(episode);
@@ -97,10 +109,16 @@ export default function VideoManager() {
     });
   };
 
-  const handleDeleteEpisode = async (episode: Episode) => {
-    if (!confirm(`정말로 '${episode.title}' 에피소드와 관련 비디오 파일을 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
+  const requestDeleteEpisode = (episode: Episode) => {
+    setEpisodeToDelete(episode);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!episodeToDelete) return;
+    
     try {
-        const result = await deleteHierarchyItem('episodes', episode.id);
+        const result = await deleteHierarchyItem('episodes', episodeToDelete.id, episodeToDelete);
         if (result.success) {
             toast({
                 title: '삭제 완료',
@@ -117,8 +135,12 @@ export default function VideoManager() {
             title: '삭제 실패',
             description: errorMessage,
         });
+    } finally {
+        setIsDeleteDialogOpen(false);
+        setEpisodeToDelete(null);
     }
   };
+
 
   const isLoading = episodesLoading || coursesLoading || classLoading || fieldsLoading || instructorsLoading;
 
@@ -211,7 +233,7 @@ export default function VideoManager() {
                           <DropdownMenuItem onClick={() => handleOpenThumbnailDialog(episode)}>
                             썸네일 수정
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteEpisode(episode)}>
+                          <DropdownMenuItem className="text-destructive" onClick={() => requestDeleteEpisode(episode)}>
                             삭제
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -224,6 +246,7 @@ export default function VideoManager() {
           </Table>
         </CardContent>
       </Card>
+      
       {isUploadDialogOpen && (
           <VideoUploadDialog 
             key={selectedEpisode?.id || 'new-upload'} 
@@ -232,6 +255,7 @@ export default function VideoManager() {
             episode={selectedEpisode}
           />
       )}
+
       {isThumbnailDialogOpen && selectedEpisode && (
           <ThumbnailEditorDialog
               key={`${selectedEpisode.id}-thumb`}
@@ -241,6 +265,28 @@ export default function VideoManager() {
               itemType="episodes"
           />
       )}
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>정말 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &apos;{episodeToDelete?.title}&apos; 에피소드와 관련된 비디오 파일을 모두 삭제합니다. 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
+
+    
