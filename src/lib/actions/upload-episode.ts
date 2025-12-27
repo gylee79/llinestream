@@ -36,10 +36,14 @@ type UpdateEpisodePayload = {
     title: string;
     description: string;
     isFree: boolean;
-    thumbnailUrl: string;
-    thumbnailPath: string;
-    videoUrl?: string;
-    filePath?: string;
+    newThumbnailData?: {
+        downloadUrl: string;
+        filePath: string;
+    };
+    newVideoData?: {
+        downloadUrl: string;
+        filePath: string;
+    };
     oldFilePath?: string;
     oldThumbnailPath?: string;
 }
@@ -114,7 +118,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
  * Updates an existing episode's metadata and handles deletion of old files.
  */
 export async function updateEpisode(payload: UpdateEpisodePayload): Promise<UploadResult> {
-    const { episodeId, courseId, instructorId, title, description, isFree, thumbnailUrl, thumbnailPath, videoUrl, filePath, oldFilePath, oldThumbnailPath } = payload;
+    const { episodeId, courseId, instructorId, title, description, isFree, newThumbnailData, newVideoData, oldFilePath, oldThumbnailPath } = payload;
     
     if (!episodeId || !courseId || !title) {
         return { success: false, message: '에피소드 ID, 강좌 ID, 제목은 필수입니다.' };
@@ -127,13 +131,13 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         const episodeRef = db.collection('episodes').doc(episodeId);
 
         // If a new video was uploaded, delete the old one.
-        if (videoUrl && filePath && oldFilePath) {
+        if (newVideoData && oldFilePath) {
             console.log(`[UPDATE] New video provided. Deleting old file: ${oldFilePath}`);
             await deleteStorageFileByPath(storage, oldFilePath);
         }
         
         // If a new thumbnail was uploaded, delete the old one.
-        if (thumbnailPath !== oldThumbnailPath && oldThumbnailPath) {
+        if (newThumbnailData && oldThumbnailPath) {
              console.log(`[UPDATE] New thumbnail provided. Deleting old thumbnail: ${oldThumbnailPath}`);
              await deleteStorageFileByPath(storage, oldThumbnailPath);
         }
@@ -144,13 +148,16 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             isFree,
             courseId,
             instructorId: instructorId || null,
-            thumbnailUrl: thumbnailUrl,
-            thumbnailPath: thumbnailPath,
         };
 
-        if (videoUrl && filePath) {
-            dataToUpdate.videoUrl = videoUrl;
-            dataToUpdate.filePath = filePath;
+        if (newVideoData) {
+            dataToUpdate.videoUrl = newVideoData.downloadUrl;
+            dataToUpdate.filePath = newVideoData.filePath;
+        }
+
+        if (newThumbnailData) {
+            dataToUpdate.thumbnailUrl = newThumbnailData.downloadUrl;
+            dataToUpdate.thumbnailPath = newThumbnailData.filePath;
         }
 
         await episodeRef.update(dataToUpdate);
