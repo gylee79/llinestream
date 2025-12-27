@@ -32,6 +32,7 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
           sizes="100vw"
           className="object-cover"
           priority
+          quality={90}
         />
       ) : (
         <Skeleton className="h-full w-full" />
