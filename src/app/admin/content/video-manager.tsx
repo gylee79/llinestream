@@ -100,8 +100,7 @@ export default function VideoManager() {
   const handleDeleteEpisode = async (episode: Episode) => {
     if (!confirm(`정말로 '${episode.title}' 에피소드와 관련 비디오 파일을 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
     try {
-        // Pass the entire episode object to the server action, but sanitize it first
-        const result = await deleteHierarchyItem('episodes', episode.id, sanitize(episode));
+        const result = await deleteHierarchyItem('episodes', episode.id);
         if (result.success) {
             toast({
                 title: '삭제 완료',
