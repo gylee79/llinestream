@@ -178,41 +178,43 @@ export default function HierarchyManager() {
 
   const handleSaveName = async (itemData: HierarchyItem) => {
     if (!firestore) return;
-    try {
-        const { type, item: existingItem } = nameDialog;
-        const collectionName = type === '분야' ? 'fields' : type === '큰분류' ? 'classifications' : 'courses';
+    startTransition(async () => {
+        try {
+            const { type, item: existingItem } = nameDialog;
+            const collectionName = type === '분야' ? 'fields' : type === '큰분류' ? 'classifications' : 'courses';
 
-        if (existingItem?.id) { // Edit mode
-            await updateDoc(doc(firestore, collectionName, existingItem.id), { name: itemData.name });
-            toast({ title: '수정 성공', description: `'${itemData.name}'으로 이름이 수정되었습니다.` });
-        } else { // Add mode
-             const docRef = doc(firestore, collectionName, uuidv4());
-            if (type === '분야') {
-                await setDoc(docRef, { name: itemData.name, thumbnailUrl: '' });
-            } else if (type === '큰분류' && selectedField) {
-                await setDoc(docRef, {
-                    fieldId: selectedField,
-                    name: itemData.name,
-                    description: `${itemData.name}에 대한 설명입니다.`,
-                    prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
-                    thumbnailUrl: '',
-                });
-            } else if (type === '상세분류' && selectedClassification) {
-                await setDoc(docRef, {
-                    classificationId: selectedClassification,
-                    name: itemData.name,
-                    description: `${itemData.name}에 대한 상세 설명입니다.`,
-                    thumbnailUrl: '',
-                });
+            if (existingItem?.id) { // Edit mode
+                await updateDoc(doc(firestore, collectionName, existingItem.id), { name: itemData.name });
+                toast({ title: '수정 성공', description: `'${itemData.name}'으로 이름이 수정되었습니다.` });
+            } else { // Add mode
+                 const docRef = doc(firestore, collectionName, uuidv4());
+                if (type === '분야') {
+                    await setDoc(docRef, { name: itemData.name, thumbnailUrl: '' });
+                } else if (type === '큰분류' && selectedField) {
+                    await setDoc(docRef, {
+                        fieldId: selectedField,
+                        name: itemData.name,
+                        description: `${itemData.name}에 대한 설명입니다.`,
+                        prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
+                        thumbnailUrl: '',
+                    });
+                } else if (type === '상세분류' && selectedClassification) {
+                    await setDoc(docRef, {
+                        classificationId: selectedClassification,
+                        name: itemData.name,
+                        description: `${itemData.name}에 대한 상세 설명입니다.`,
+                        thumbnailUrl: '',
+                    });
+                }
+                toast({ title: '추가 성공', description: `${type} '${itemData.name}'이(가) 추가되었습니다.` });
             }
-            toast({ title: '추가 성공', description: `${type} '${itemData.name}'이(가) 추가되었습니다.` });
+        } catch (error: any) {
+            console.error("Error saving document: ", error);
+            toast({ variant: 'destructive', title: '저장 실패', description: error.message || '항목 저장 중 오류가 발생했습니다.' });
+        } finally {
+            closeDialogs();
         }
-    } catch (error: any) {
-        console.error("Error saving document: ", error);
-        toast({ variant: 'destructive', title: '저장 실패', description: error.message || '항목 저장 중 오류가 발생했습니다.' });
-    } finally {
-        closeDialogs();
-    }
+    });
   };
   
   const handleDeleteRequest = (e: React.MouseEvent, collectionName: 'fields' | 'classifications' | 'courses', item: Item) => {
@@ -377,8 +379,9 @@ export default function HierarchyManager() {
             <AlertDialogAction
               onClick={executeDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isPending}
             >
-              삭제
+              {isPending ? '삭제 중...' : '삭제'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -386,3 +389,5 @@ export default function HierarchyManager() {
     </>
   );
 }
+
+    

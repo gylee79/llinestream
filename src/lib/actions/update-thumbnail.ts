@@ -5,7 +5,7 @@ import { config } from 'dotenv';
 config();
 
 import { initializeAdminApp } from '@/lib/firebase-admin';
-import * as admin from 'firebase-admin';
+import * * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { Storage } from 'firebase-admin/storage';
@@ -71,7 +71,7 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     // Determine which thumbnail path to use (custom or default)
     const oldThumbnailPath = itemType === 'episodes' 
         ? ((currentData as Episode).customThumbnailPath || extractPathFromUrl((currentData as Episode).customThumbnailUrl))
-        : ((currentData as Field | Classification | Course).thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl));
+        : (currentData.thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl));
 
 
     // If a new image is provided, upload it.
@@ -123,7 +123,7 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     
     await docRef.update(dataToUpdate);
 
-    revalidatePath('/admin/content', 'layout');
+    revalidatePath('/admin/content', 'page');
 
     return { success: true, message: `썸네일이 성공적으로 ${downloadUrl ? '업데이트' : '삭제'}되었습니다.` };
 
@@ -133,3 +133,5 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     return { success: false, message: `작업 실패: ${errorMessage}` };
   }
 }
+
+    
