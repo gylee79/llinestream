@@ -1,4 +1,3 @@
-
 'use server';
 
 import { config } from 'dotenv';
@@ -7,7 +6,6 @@ config();
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
-import { v4 as uuidv4 } from 'uuid';
 import type { Episode, Timestamp } from '../types';
 import { Storage } from 'firebase-admin/storage';
 
@@ -16,14 +14,6 @@ type UploadResult = {
   success: boolean;
   message: string;
 };
-
-type SignedUrlResult = {
-    success: boolean;
-    message: string;
-    uploadUrl?: string;
-    downloadUrl?: string;
-    filePath?: string;
-}
 
 type SaveMetadataPayload = {
     episodeId: string;
@@ -34,8 +24,8 @@ type SaveMetadataPayload = {
     instructorId?: string;
     videoUrl: string;
     filePath: string;
-    thumbnailUrl: string | null;
-    thumbnailPath: string | null;
+    thumbnailUrl: string;
+    thumbnailPath: string;
 }
 
 type UpdateEpisodePayload = {
@@ -45,8 +35,8 @@ type UpdateEpisodePayload = {
     title: string;
     description: string;
     isFree: boolean;
-    thumbnailUrl: string | null;
-    thumbnailPath: string | null;
+    thumbnailUrl: string;
+    thumbnailPath: string;
     newVideoData?: {
         videoUrl: string;
         filePath: string;
@@ -72,52 +62,8 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
         }
     } catch (error: any) {
         console.error(`[DELETE FAILED] Could not delete storage file at path ${filePath}. Error: ${error.message}`);
-        // Do not re-throw, as this shouldn't block the main operation.
     }
 };
-
-
-/**
- * Generates a signed URL that allows the client to directly upload a file to Firebase Storage.
- */
-export async function getSignedUploadUrl(fileName: string, fileType: string, episodeId: string, itemType: 'videos' | 'thumbnails'): Promise<SignedUrlResult> {
-    if (!fileName || !fileType) {
-        return { success: false, message: '파일 이름, 파일 타입은 필수입니다.' };
-    }
-
-    try {
-        const adminApp = initializeAdminApp();
-        const storage = admin.storage(adminApp);
-        const bucket = storage.bucket();
-
-        const filePath = `episodes/${episodeId}/${itemType}/${Date.now()}-${fileName}`;
-        const file = bucket.file(filePath);
-
-        // Generate a v4 signed URL for PUT requests
-        const [uploadUrl] = await file.getSignedUrl({
-            version: 'v4',
-            action: 'write',
-            expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-            contentType: fileType,
-        });
-
-        // The public URL for the file after it's uploaded
-        const downloadUrl = file.publicUrl();
-
-        return {
-            success: true,
-            message: '업로드 URL이 생성되었습니다.',
-            uploadUrl,
-            downloadUrl,
-            filePath
-        };
-
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : '알 수 없는 서버 오류가 발생했습니다.';
-        console.error('getSignedUploadUrl Error:', errorMessage, error);
-        return { success: false, message: `서명된 URL 생성 실패: ${errorMessage}` };
-    }
-}
 
 
 /**
@@ -132,20 +78,9 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
     try {
         const adminApp = initializeAdminApp();
         const db = admin.firestore(adminApp);
-        const storage = admin.storage(adminApp);
         
-        // Make the newly uploaded file public
-        const file = storage.bucket().file(filePath);
-        await file.makePublic();
-        console.log(`[PUBLIC SUCCESS] File made public: ${filePath}`);
-
-        if (thumbnailPath) {
-          const thumbFile = storage.bucket().file(thumbnailPath);
-          await thumbFile.makePublic();
-          console.log(`[PUBLIC SUCCESS] Thumbnail file made public: ${thumbnailPath}`);
-        }
-
-        // Mock duration for now, as we can't analyze the file on the server anymore.
+        // Mock duration for now. A more robust solution might involve a Cloud Function
+        // that analyzes the video upon upload to get the actual duration.
         const duration = Math.floor(Math.random() * (3600 - 60 + 1)) + 60;
         
         const episodeRef = db.collection('episodes').doc(episodeId);
@@ -157,10 +92,10 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             description,
             duration,
             isFree,
-            videoUrl, // Already contains the public URL
+            videoUrl,
             filePath,
-            thumbnailUrl: thumbnailUrl || '',
-            thumbnailPath: thumbnailPath || undefined,
+            thumbnailUrl: thumbnailUrl,
+            thumbnailPath: thumbnailPath,
             createdAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
         };
 
@@ -177,7 +112,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
 }
 
 /**
- * Updates an existing episode's metadata and optionally replaces its video file.
+ * Updates an existing episode's metadata and handles deletion of old files.
  */
 export async function updateEpisode(payload: UpdateEpisodePayload): Promise<UploadResult> {
     const { episodeId, courseId, instructorId, title, description, isFree, thumbnailUrl, thumbnailPath, newVideoData, oldFilePath, oldThumbnailPath } = payload;
@@ -198,9 +133,9 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             await deleteStorageFileByPath(storage, oldFilePath);
         }
         
-        // If a new thumbnail was uploaded OR if the thumbnail was removed, delete the old one.
-        if (oldThumbnailPath) {
-             console.log(`[UPDATE] New/removed thumbnail. Deleting old thumbnail: ${oldThumbnailPath}`);
+        // If a new thumbnail was uploaded, delete the old one.
+        if (thumbnailPath !== oldThumbnailPath && oldThumbnailPath) {
+             console.log(`[UPDATE] New thumbnail provided. Deleting old thumbnail: ${oldThumbnailPath}`);
              await deleteStorageFileByPath(storage, oldThumbnailPath);
         }
 
@@ -215,14 +150,8 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         };
 
         if (newVideoData) {
-            // Make the new file public before saving its URL
-            const file = storage.bucket().file(newVideoData.filePath);
-            await file.makePublic();
-            console.log(`[PUBLIC SUCCESS] New video file made public: ${newVideoData.filePath}`);
-
             dataToUpdate.videoUrl = newVideoData.videoUrl;
             dataToUpdate.filePath = newVideoData.filePath;
-            // You might want to update duration here if you can get it from the new video
         }
 
         await episodeRef.update(dataToUpdate);

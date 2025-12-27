@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -23,14 +22,15 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, getDoc, query, where, setDoc } from 'firebase/firestore';
+import { useCollection, useFirestore, useStorage, useMemoFirebase } from '@/firebase';
+import { collection, doc, getDoc, query, where, setDoc } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode, Instructor } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { PlusCircle, ImageIcon, XCircle, Video } from 'lucide-react';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
-import { getSignedUploadUrl, saveEpisodeMetadata, updateEpisode } from '@/lib/actions/upload-episode';
+import { saveEpisodeMetadata, updateEpisode } from '@/lib/actions/upload-episode';
+import { uploadFile } from '@/firebase/storage/upload';
 import { v4 as uuidv4 } from 'uuid';
 import Image from 'next/image';
 import { sanitize } from '@/lib/utils';
@@ -69,11 +69,13 @@ type HierarchyDialogState = {
 
 export default function VideoUploadDialog({ open, onOpenChange, episode }: VideoUploadDialogProps) {
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  
+  const [uploadMessage, setUploadMessage] = useState<string>('');
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isFree, setIsFree] = useState(false);
@@ -84,8 +86,10 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
 
   const [videoFile, setVideoFile] = useState<File | null>(null);
   
-  const [defaultThumbnailPreview, setDefaultThumbnailPreview] = useState<string | null>(null);
+  const [defaultThumbnailFile, setDefaultThumbnailFile] = useState<File | null>(null);
   const [customThumbnailFile, setCustomThumbnailFile] = useState<File | null>(null);
+  
+  const [defaultThumbnailPreview, setDefaultThumbnailPreview] = useState<string | null>(null);
   const [customThumbnailPreview, setCustomThumbnailPreview] = useState<string | null>(null);
   
   const [initialEpisode, setInitialEpisode] = useState<Episode | null>(null);
@@ -93,6 +97,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const [hierarchyDialogState, setHierarchyDialogState] = useState<HierarchyDialogState>({ isOpen: false, item: null, type: '분야' });
 
   const isEditMode = !!episode;
+  const finalThumbnailPreview = customThumbnailPreview || defaultThumbnailPreview || initialEpisode?.thumbnailUrl;
 
   const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: dbFields } = useCollection<Field>(fieldsQuery);
@@ -110,9 +115,10 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const instructorsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'instructors') : null), [firestore]);
   const { data: instructors } = useCollection<Instructor>(instructorsQuery);
 
-  const finalThumbnailPreview = customThumbnailPreview || defaultThumbnailPreview || initialEpisode?.thumbnailUrl;
-
   const resetForm = useCallback(() => {
+    setIsProcessing(false);
+    setUploadProgress(null);
+    setUploadMessage('');
     setTitle('');
     setDescription('');
     setIsFree(false);
@@ -121,12 +127,11 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setSelectedCourseId('');
     setSelectedInstructorId('');
     setVideoFile(null);
-    setDefaultThumbnailPreview(null);
+    setDefaultThumbnailFile(null);
     setCustomThumbnailFile(null);
+    setDefaultThumbnailPreview(null);
     setCustomThumbnailPreview(null);
     setInitialEpisode(null);
-    setIsProcessing(false);
-    setUploadProgress(null);
   }, []);
   
   const handleSafeClose = () => {
@@ -194,6 +199,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
         if (ctx) {
             ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
             const dataUrl = canvas.toDataURL('image/jpeg');
+            const generatedFile = dataURLtoFile(dataUrl, 'default-thumbnail.jpg');
+            setDefaultThumbnailFile(generatedFile);
             setDefaultThumbnailPreview(dataUrl);
         }
         URL.revokeObjectURL(videoUrl); // Clean up
@@ -209,9 +216,10 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     const file = e.target.files?.[0];
     if (file) {
         setVideoFile(file);
-        // When a new video is selected, always generate a new default thumbnail
         generateDefaultThumbnail(file);
-        // Do not clear the custom thumbnail automatically, let the user decide.
+        // User has to re-select custom thumbnail if they change the video
+        setCustomThumbnailFile(null);
+        setCustomThumbnailPreview(null);
     }
   };
 
@@ -232,46 +240,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
       setCustomThumbnailPreview(null);
   }
 
-  const uploadFileAndGetUrl = async (file: File, episodeId: string, itemType: 'videos' | 'thumbnails'): Promise<{uploadUrl: string, downloadUrl: string, filePath: string}> => {
-      const signedUrlResult = await getSignedUploadUrl(file.name, file.type, episodeId, itemType);
-      if (!signedUrlResult.success || !signedUrlResult.uploadUrl || !signedUrlResult.downloadUrl || !signedUrlResult.filePath) {
-          throw new Error(signedUrlResult.message || '서명된 업로드 URL을 가져오지 못했습니다.');
-      }
-
-      setUploadProgress(0);
-      const xhr = new XMLHttpRequest();
-      xhr.open('PUT', signedUrlResult.uploadUrl, true);
-      xhr.setRequestHeader('Content-Type', file.type);
-      
-      xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-              const percentComplete = (event.loaded / event.total) * 100;
-              setUploadProgress(percentComplete);
-          }
-      };
-
-      await new Promise<void>((resolve, reject) => {
-          xhr.onload = () => {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                  resolve();
-              } else {
-                  reject(new Error(`파일 업로드 실패: ${xhr.statusText}`));
-              }
-          };
-          xhr.onerror = () => reject(new Error('네트워크 오류로 파일 업로드에 실패했습니다.'));
-          xhr.send(file);
-      });
-      
-      return {
-          uploadUrl: signedUrlResult.uploadUrl,
-          downloadUrl: signedUrlResult.downloadUrl,
-          filePath: signedUrlResult.filePath,
-      };
-  }
-
-
   const handleSaveEpisode = async () => {
-    if (!firestore) return;
+    if (!firestore || !storage) return;
 
     if (!title || !selectedCourseId) {
       toast({ variant: 'destructive', title: '입력 오류', description: '제목과 소속 상세분류는 필수입니다.' });
@@ -283,67 +253,64 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     }
 
     setIsProcessing(true);
+    setUploadProgress(0);
 
     try {
         const episodeId = isEditMode ? episode.id : uuidv4();
+        let videoUploadResult = { downloadUrl: initialEpisode?.videoUrl || '', filePath: initialEpisode?.filePath || '' };
+        let thumbnailUploadResult = { downloadUrl: initialEpisode?.thumbnailUrl || '', filePath: initialEpisode?.thumbnailPath || ''};
         
-        let finalThumbnailUrl: string | null = null;
-        let finalThumbnailPath: string | null = null;
-
-        const defaultThumbFile = dataURLtoFile(defaultThumbnailPreview || '', `default-thumb-${episodeId}.jpg`);
-        const thumbToUpload = customThumbnailFile || (!customThumbnailPreview && defaultThumbFile);
-        
-        if (thumbToUpload) {
-             const thumbnailResult = await uploadFileAndGetUrl(thumbToUpload, episodeId, 'thumbnails');
-             finalThumbnailUrl = thumbnailResult.downloadUrl;
-             finalThumbnailPath = thumbnailResult.filePath;
-        } else if (isEditMode) {
-            // Retain old one if no custom thumbnail is provided and default one isn't changed.
-            finalThumbnailUrl = initialEpisode?.thumbnailUrl || null;
-            finalThumbnailPath = initialEpisode?.thumbnailPath || null;
+        // 1. Upload Video (if a new one is selected)
+        if (videoFile) {
+            setUploadMessage('비디오 업로드 중...');
+            const videoPath = `episodes/${episodeId}/videos/${Date.now()}-${videoFile.name}`;
+            videoUploadResult = await uploadFile(storage, videoPath, videoFile, setUploadProgress);
         }
         
-        if (isEditMode && episode) {
-            let newVideoData: { videoUrl: string; filePath: string } | undefined = undefined;
-            
-            if (videoFile) {
-                const urls = await uploadFileAndGetUrl(videoFile, episode.id, 'videos');
-                newVideoData = { videoUrl: urls.downloadUrl, filePath: urls.filePath };
-            }
+        // 2. Determine and Upload Thumbnail
+        const thumbToUpload = customThumbnailFile || defaultThumbnailFile;
+        if (thumbToUpload) {
+            setUploadMessage('썸네일 업로드 중...');
+            const thumbPath = `episodes/${episodeId}/thumbnails/${Date.now()}-${thumbToUpload.name}`;
+            thumbnailUploadResult = await uploadFile(storage, thumbPath, thumbToUpload, setUploadProgress);
+        } else if (!isEditMode) {
+             throw new Error('새 에피소드에는 썸네일이 필요합니다.');
+        }
 
-            const result = await updateEpisode(sanitize({
+        setUploadMessage('정보 저장 중...');
+        
+        if (isEditMode && episode) {
+            const payload: Parameters<typeof updateEpisode>[0] = {
                 episodeId: episode.id,
                 title,
                 description,
                 isFree,
                 courseId: selectedCourseId,
                 instructorId: selectedInstructorId,
-                thumbnailUrl: finalThumbnailUrl,
-                thumbnailPath: finalThumbnailPath,
-                newVideoData: newVideoData,
+                thumbnailUrl: thumbnailUploadResult.downloadUrl,
+                thumbnailPath: thumbnailUploadResult.filePath,
+                newVideoData: videoFile ? videoUploadResult : undefined,
                 oldFilePath: videoFile ? episode.filePath : undefined,
                 oldThumbnailPath: thumbToUpload ? episode.thumbnailPath : undefined,
-            }));
-
+            };
+            const result = await updateEpisode(sanitize(payload));
             if (!result.success) throw new Error(result.message);
             toast({ title: '수정 완료', description: `'${title}' 에피소드 정보가 업데이트되었습니다.` });
 
-        } else if (videoFile) { // Create mode
-            const { downloadUrl: videoDownloadUrl, filePath: videoFilePath } = await uploadFileAndGetUrl(videoFile, episodeId, 'videos');
-            
-            const metadataResult = await saveEpisodeMetadata(sanitize({
+        } else { // Create mode
+            const payload: Parameters<typeof saveEpisodeMetadata>[0] = {
                 episodeId,
                 title,
                 description,
                 isFree,
                 selectedCourseId,
                 instructorId: selectedInstructorId,
-                videoUrl: videoDownloadUrl,
-                filePath: videoFilePath,
-                thumbnailUrl: finalThumbnailUrl,
-                thumbnailPath: finalThumbnailPath,
-            }));
-            
+                videoUrl: videoUploadResult.downloadUrl,
+                filePath: videoUploadResult.filePath,
+                thumbnailUrl: thumbnailUploadResult.downloadUrl,
+                thumbnailPath: thumbnailUploadResult.filePath,
+            };
+            const metadataResult = await saveEpisodeMetadata(sanitize(payload));
             if (!metadataResult.success) throw new Error(metadataResult.message);
             toast({ title: '업로드 성공', description: metadataResult.message });
         }
@@ -360,6 +327,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     } finally {
         setIsProcessing(false);
         setUploadProgress(null);
+        setUploadMessage('');
     }
   };
 
@@ -373,18 +341,15 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   
   const closeHierarchyDialog = () => {
     setHierarchyDialogState({ isOpen: false, item: null, type: '분야' });
-    setTimeout(() => {
-       // Focus management logic if needed
-    }, 150);
   }
 
   const handleSaveHierarchy = async (item: HierarchyItem) => {
     if (!firestore) return;
     const { type } = hierarchyDialogState;
-
+    const id = uuidv4();
+    
     setIsProcessing(true);
     try {
-        const id = uuidv4();
         if (type === '분야') {
             await setDoc(doc(firestore, 'fields', id), { id, name: item.name, thumbnailUrl: '' });
             setSelectedFieldId(id);
@@ -554,7 +519,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                     <div className="col-span-3 mt-2">
                         <Progress value={uploadProgress} />
                         <p className="text-sm text-center text-muted-foreground mt-2">
-                            {uploadProgress < 100 ? `업로드 중... ${Math.round(uploadProgress)}%` : '업로드 완료! 메타데이터 저장 중...'}
+                            {uploadMessage} {Math.round(uploadProgress)}%
                         </p>
                     </div>
                 </div>
@@ -562,8 +527,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleSafeClose} disabled={isProcessing}>취소</Button>
-            <Button type="button" onClick={handleSaveEpisode} disabled={isProcessing || (isEditMode ? false : !videoFile) || !selectedCourseId }>
-              {isProcessing ? `처리 중... ${uploadProgress !== null ? Math.round(uploadProgress) + '%' : ''}`.trim() : '에피소드 저장'}
+            <Button type="button" onClick={handleSaveEpisode} disabled={isProcessing || (!isEditMode && !videoFile) || !selectedCourseId }>
+              {isProcessing ? `처리 중...` : '에피소드 저장'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -580,5 +545,3 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     </>
   );
 }
-
-    
