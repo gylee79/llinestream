@@ -53,13 +53,15 @@ export default function CourseDetailPage() {
       return <Skeleton className="aspect-video w-full" />;
     }
     return (
-      <div className="relative aspect-video w-full">
-        <Image
-          src={course.thumbnailUrl}
-          alt={course.name}
-          fill
-          className="object-cover"
-        />
+      <div className="relative aspect-video w-full bg-black">
+        {course.thumbnailUrl ? (
+            <Image
+                src={course.thumbnailUrl}
+                alt={course.name}
+                fill
+                className="object-cover"
+            />
+        ) : null}
         <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white p-4">
           {!hasSubscription && classification && classification.prices.day30 > 0 ? (
             <div className="text-center bg-black/70 p-8 rounded-lg">
@@ -161,5 +163,3 @@ export default function CourseDetailPage() {
     </div>
   );
 }
-
-    
