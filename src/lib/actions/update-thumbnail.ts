@@ -5,7 +5,7 @@ import { config } from 'dotenv';
 config();
 
 import { initializeAdminApp } from '@/lib/firebase-admin';
-import * * as admin from 'firebase-admin';
+import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { Storage } from 'firebase-admin/storage';
@@ -69,7 +69,7 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     const currentData = currentDoc.data() as Field | Classification | Course | Episode;
 
     // Determine which thumbnail path to use (custom or default)
-    const oldThumbnailPath = itemType === 'episodes' 
+    const oldThumbnailPath = itemType === 'episodes'
         ? ((currentData as Episode).customThumbnailPath || extractPathFromUrl((currentData as Episode).customThumbnailUrl))
         : (currentData.thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl));
 
@@ -133,5 +133,3 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     return { success: false, message: `작업 실패: ${errorMessage}` };
   }
 }
-
-    
