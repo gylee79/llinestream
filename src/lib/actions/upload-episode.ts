@@ -57,7 +57,7 @@ type UpdateEpisodePayload = {
 
 const deleteStorageFileByPath = async (storage: Storage, filePath: string | undefined) => {
     if (!filePath) {
-        console.warn(`[SKIP DELETE] No file path provided.`);
+        console.log(`[SKIP DELETE] No file path provided.`);
         return;
     }
     try {
@@ -150,18 +150,18 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
         
         const episodeRef = db.collection('episodes').doc(episodeId);
         
-        const newEpisode = {
+        const newEpisode: Omit<Episode, 'id'> = {
             courseId: selectedCourseId,
-            instructorId: instructorId || null,
+            instructorId: instructorId || undefined,
             title,
             description,
             duration,
             isFree,
             videoUrl, // Already contains the public URL
             filePath,
-            thumbnailUrl: thumbnailUrl,
-            thumbnailPath: thumbnailPath,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            thumbnailUrl: thumbnailUrl || '',
+            thumbnailPath: thumbnailPath || undefined,
+            createdAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
         };
 
         await episodeRef.set(newEpisode);
@@ -198,9 +198,9 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             await deleteStorageFileByPath(storage, oldFilePath);
         }
         
-        // If a new thumbnail was uploaded, delete the old one.
-        if (thumbnailPath !== undefined && oldThumbnailPath) {
-             console.log(`[UPDATE] New thumbnail provided. Deleting old thumbnail: ${oldThumbnailPath}`);
+        // If a new thumbnail was uploaded OR if the thumbnail was removed, delete the old one.
+        if (oldThumbnailPath) {
+             console.log(`[UPDATE] New/removed thumbnail. Deleting old thumbnail: ${oldThumbnailPath}`);
              await deleteStorageFileByPath(storage, oldThumbnailPath);
         }
 
