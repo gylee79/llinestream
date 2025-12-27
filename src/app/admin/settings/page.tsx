@@ -111,8 +111,12 @@ function HeroImageManager() {
                             () => resolve()
                         );
                     });
-
-                    const downloadUrl = getPublicUrl(storage.app.options.storageBucket!, filePath);
+                    
+                    const bucketName = storage.app.options.storageBucket;
+                    if (!bucketName) {
+                        throw new Error('Firebase Storage bucket name is not configured.');
+                    }
+                    const downloadUrl = getPublicUrl(bucketName, filePath);
 
                     if (!updatedSettings[page]) updatedSettings[page] = {};
                     const urlProp = device === 'pc' ? 'url' : 'urlMobile';
@@ -424,3 +428,5 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
+
+    
