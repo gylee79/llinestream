@@ -64,8 +64,16 @@ export interface Episode {
   isFree: boolean;
   videoUrl: string;
   filePath?: string; // Path in Firebase Storage
+  // The single source of truth for the thumbnail to be displayed.
+  // This will be the customThumbnailUrl if it exists, otherwise the defaultThumbnailUrl.
   thumbnailUrl: string;
-  thumbnailPath?: string;
+  
+  // Paths and URLs for the two types of thumbnails
+  defaultThumbnailUrl?: string;
+  defaultThumbnailPath?: string;
+  customThumbnailUrl?: string;
+  customThumbnailPath?: string;
+
   createdAt: Timestamp;
 }
 
@@ -131,6 +139,3 @@ export interface Instructor {
   dob: string; // YYYY-MM-DD
   createdAt: Timestamp;
 }
-
-    
-    

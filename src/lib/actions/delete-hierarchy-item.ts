@@ -117,7 +117,8 @@ export async function deleteHierarchyItem(
     if (collectionName === 'episodes') {
         const episode = item as Episode;
         await deleteStorageFileByPath(storage, episode.filePath);
-        await deleteStorageFileByPath(storage, episode.thumbnailPath);
+        await deleteStorageFileByPath(storage, episode.defaultThumbnailPath);
+        await deleteStorageFileByPath(storage, episode.customThumbnailPath);
     } else {
         const hierarchyItem = item as Field | Classification | Course;
         await deleteStorageFileByPath(storage, hierarchyItem.thumbnailPath);

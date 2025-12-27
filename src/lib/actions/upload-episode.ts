@@ -25,8 +25,12 @@ type SaveMetadataPayload = {
     instructorId?: string;
     videoUrl: string;
     filePath: string;
-    thumbnailUrl: string;
-    thumbnailPath: string;
+    // Default thumbnail is required for new episodes
+    defaultThumbnailUrl: string;
+    defaultThumbnailPath: string;
+    // Custom thumbnail is optional
+    customThumbnailUrl?: string;
+    customThumbnailPath?: string;
 }
 
 type UpdateEpisodePayload = {
@@ -36,21 +40,20 @@ type UpdateEpisodePayload = {
     title: string;
     description: string;
     isFree: boolean;
-    newThumbnailData?: {
-        downloadUrl: string;
-        filePath: string;
-    };
-    newVideoData?: {
-        downloadUrl: string;
-        filePath: string;
-    };
+    
+    // New files data
+    newVideoData?: { downloadUrl: string; filePath: string; };
+    newDefaultThumbnailData?: { downloadUrl: string; filePath: string; };
+    newCustomThumbnailData?: { downloadUrl: string | null; filePath: string | null; }; // null indicates deletion
+
+    // Old file paths for deletion
     oldFilePath?: string;
-    oldThumbnailPath?: string;
+    oldDefaultThumbnailPath?: string;
+    oldCustomThumbnailPath?: string;
 }
 
 const deleteStorageFileByPath = async (storage: Storage, filePath: string | undefined) => {
     if (!filePath) {
-        console.log(`[SKIP DELETE] No file path provided.`);
         return;
     }
     try {
@@ -73,17 +76,20 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
  * Saves the metadata of an already uploaded episode to Firestore.
  */
 export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise<UploadResult> {
-    const { episodeId, title, description, isFree, selectedCourseId, instructorId, videoUrl, filePath, thumbnailUrl, thumbnailPath } = payload;
-     if (!title || !selectedCourseId || !videoUrl || !episodeId || !filePath) {
-        return { success: false, message: '필수 정보(에피소드ID, 제목, 강좌, 비디오 URL, 파일 경로)가 누락되었습니다.' };
+    const { 
+        episodeId, title, description, isFree, selectedCourseId, instructorId, 
+        videoUrl, filePath, defaultThumbnailUrl, defaultThumbnailPath,
+        customThumbnailUrl, customThumbnailPath
+    } = payload;
+
+     if (!title || !selectedCourseId || !videoUrl || !episodeId || !filePath || !defaultThumbnailUrl || !defaultThumbnailPath) {
+        return { success: false, message: '필수 정보(에피소드ID, 제목, 강좌, 비디오 URL/경로, 대표 썸네일 URL/경로)가 누락되었습니다.' };
     }
 
     try {
         const adminApp = initializeAdminApp();
         const db = admin.firestore(adminApp);
         
-        // Mock duration for now. A more robust solution might involve a Cloud Function
-        // that analyzes the video upon upload to get the actual duration.
         const duration = Math.floor(Math.random() * (3600 - 60 + 1)) + 60;
         
         const episodeRef = db.collection('episodes').doc(episodeId);
@@ -97,8 +103,11 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             isFree,
             videoUrl,
             filePath,
-            thumbnailUrl: thumbnailUrl,
-            thumbnailPath: thumbnailPath,
+            thumbnailUrl: customThumbnailUrl || defaultThumbnailUrl, // Use custom if available
+            defaultThumbnailUrl,
+            defaultThumbnailPath,
+            customThumbnailUrl: customThumbnailUrl || '', // Store empty string if not provided
+            customThumbnailPath: customThumbnailPath || '',
             createdAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
         };
 
@@ -118,7 +127,11 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
  * Updates an existing episode's metadata and handles deletion of old files.
  */
 export async function updateEpisode(payload: UpdateEpisodePayload): Promise<UploadResult> {
-    const { episodeId, courseId, instructorId, title, description, isFree, newThumbnailData, newVideoData, oldFilePath, oldThumbnailPath } = payload;
+    const { 
+        episodeId, courseId, instructorId, title, description, isFree, 
+        newVideoData, newDefaultThumbnailData, newCustomThumbnailData,
+        oldFilePath, oldDefaultThumbnailPath, oldCustomThumbnailPath
+    } = payload;
     
     if (!episodeId || !courseId || !title) {
         return { success: false, message: '에피소드 ID, 강좌 ID, 제목은 필수입니다.' };
@@ -130,18 +143,14 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         const storage = admin.storage(adminApp);
         const episodeRef = db.collection('episodes').doc(episodeId);
 
-        // If a new video was uploaded, delete the old one.
-        if (newVideoData && oldFilePath) {
-            console.log(`[UPDATE] New video provided. Deleting old file: ${oldFilePath}`);
-            await deleteStorageFileByPath(storage, oldFilePath);
-        }
-        
-        // If a new thumbnail was uploaded, delete the old one.
-        if (newThumbnailData && oldThumbnailPath) {
-             console.log(`[UPDATE] New thumbnail provided. Deleting old thumbnail: ${oldThumbnailPath}`);
-             await deleteStorageFileByPath(storage, oldThumbnailPath);
-        }
+        // --- File Deletion Logic ---
+        if (newVideoData) await deleteStorageFileByPath(storage, oldFilePath);
+        if (newDefaultThumbnailData) await deleteStorageFileByPath(storage, oldDefaultThumbnailPath);
+        // Delete old custom thumb if a new one is uploaded OR if it's explicitly deleted (newCustomThumbnailData is not undefined)
+        if (newCustomThumbnailData) await deleteStorageFileByPath(storage, oldCustomThumbnailPath);
 
+
+        // --- Data Update Logic ---
         const dataToUpdate: { [key: string]: any } = {
             title,
             description,
@@ -155,10 +164,24 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             dataToUpdate.filePath = newVideoData.filePath;
         }
 
-        if (newThumbnailData) {
-            dataToUpdate.thumbnailUrl = newThumbnailData.downloadUrl;
-            dataToUpdate.thumbnailPath = newThumbnailData.filePath;
+        if (newDefaultThumbnailData) {
+            dataToUpdate.defaultThumbnailUrl = newDefaultThumbnailData.downloadUrl;
+            dataToUpdate.defaultThumbnailPath = newDefaultThumbnailData.filePath;
         }
+
+        // Handle custom thumbnail updates (upload, delete, or no change)
+        if (newCustomThumbnailData) {
+            dataToUpdate.customThumbnailUrl = newCustomThumbnailData.downloadUrl || '';
+            dataToUpdate.customThumbnailPath = newCustomThumbnailData.filePath || '';
+        }
+
+        // Determine final display thumbnail URL
+        const currentDoc = await episodeRef.get();
+        const currentData = currentDoc.data() as Episode | undefined;
+
+        const finalCustomUrl = dataToUpdate.customThumbnailUrl ?? currentData?.customThumbnailUrl;
+        const finalDefaultUrl = dataToUpdate.defaultThumbnailUrl ?? currentData?.defaultThumbnailUrl;
+        dataToUpdate.thumbnailUrl = finalCustomUrl || finalDefaultUrl || '';
 
         await episodeRef.update(dataToUpdate);
 

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -76,6 +77,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadMessage, setUploadMessage] = useState<string>('');
 
+  // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isFree, setIsFree] = useState(false);
@@ -84,20 +86,22 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const [selectedInstructorId, setSelectedInstructorId] = useState<string>('');
 
+  // File state
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  
   const [defaultThumbnailFile, setDefaultThumbnailFile] = useState<File | null>(null);
   const [customThumbnailFile, setCustomThumbnailFile] = useState<File | null>(null);
   
+  // Preview state
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const [defaultThumbnailPreview, setDefaultThumbnailPreview] = useState<string | null>(null);
   const [customThumbnailPreview, setCustomThumbnailPreview] = useState<string | null>(null);
   
   const [initialEpisode, setInitialEpisode] = useState<Episode | null>(null);
-
   const [hierarchyDialogState, setHierarchyDialogState] = useState<HierarchyDialogState>({ isOpen: false, item: null, type: '분야' });
 
   const isEditMode = !!episode;
-  const finalThumbnailPreview = customThumbnailPreview || defaultThumbnailPreview;
+  const displayThumbnailUrl = customThumbnailPreview || defaultThumbnailPreview;
+
 
   const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: dbFields } = useCollection<Field>(fieldsQuery);
@@ -129,6 +133,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setVideoFile(null);
     setDefaultThumbnailFile(null);
     setCustomThumbnailFile(null);
+    setVideoPreviewUrl(null);
     setDefaultThumbnailPreview(null);
     setCustomThumbnailPreview(null);
     setInitialEpisode(null);
@@ -140,11 +145,11 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setTimeout(resetForm, 150);
   };
   
-  const generateDefaultThumbnail = useCallback((videoSrc: string, episodeId: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
+  const generateDefaultThumbnail = useCallback((videoSrc: string, episodeId: string): Promise<File | null> => {
+    return new Promise((resolve) => {
         const videoElement = document.createElement('video');
         videoElement.src = videoSrc;
-        videoElement.crossOrigin = "anonymous"; // Important for CORS
+        videoElement.crossOrigin = "anonymous";
         videoElement.muted = true;
 
         const onSeeked = () => {
@@ -155,23 +160,27 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             if (ctx) {
                 ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
                 const dataUrl = canvas.toDataURL('image/jpeg');
-                const generatedFile = dataURLtoFile(dataUrl, `default-thumb-${episodeId}.jpg`);
-                
-                setDefaultThumbnailFile(generatedFile);
                 setDefaultThumbnailPreview(dataUrl);
+                const generatedFile = dataURLtoFile(dataUrl, `default-thumb-${episodeId}.jpg`);
+                setDefaultThumbnailFile(generatedFile);
+                resolve(generatedFile);
+            } else {
+                resolve(null);
             }
-            URL.revokeObjectURL(videoSrc);
-            videoElement.removeEventListener('seeked', onSeeked);
-            videoElement.removeEventListener('error', onError);
-            resolve();
+            cleanup();
         };
 
         const onError = (e: Event | string) => {
             console.error("Error loading video for thumbnail generation.", e);
+            toast({variant: 'destructive', title:'썸네일 생성 실패', description: '비디오 파일에서 대표 썸네일을 생성하지 못했습니다.'});
+            cleanup();
+            resolve(null);
+        };
+        
+        const cleanup = () => {
             URL.revokeObjectURL(videoSrc);
             videoElement.removeEventListener('seeked', onSeeked);
             videoElement.removeEventListener('error', onError);
-            reject(new Error("비디오에서 썸네일을 생성하지 못했습니다."));
         };
         
         videoElement.addEventListener('seeked', onSeeked);
@@ -181,7 +190,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             videoElement.currentTime = 1; // Seek to 1 second
         };
     });
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     async function setInitialState() {
@@ -189,24 +198,17 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             setIsProcessing(true);
             setInitialEpisode(episode);
             setTitle(episode.title);
-            setDescription(episode.description || '');
+setDescription(episode.description || '');
             setIsFree(episode.isFree);
             setSelectedCourseId(episode.courseId);
             setSelectedInstructorId(episode.instructorId || '');
-            // In edit mode, we assume the initial thumbnail is a custom one if it exists,
-            // or we generate a default one from the existing video.
-            if(episode.thumbnailUrl) {
-                setCustomThumbnailPreview(episode.thumbnailUrl);
-            }
-             if (episode.videoUrl) {
-                try {
-                    await generateDefaultThumbnail(episode.videoUrl, episode.id);
-                } catch (e) {
-                    console.error(e);
-                    toast({variant: 'destructive', title:'썸네일 생성 실패', description: '기존 비디오에서 대표 썸네일을 생성하는데 실패했습니다.'})
-                }
-            }
             
+            // Set previews from existing data
+            if (episode.videoUrl) setVideoPreviewUrl(episode.videoUrl);
+            if (episode.defaultThumbnailUrl) setDefaultThumbnailPreview(episode.defaultThumbnailUrl);
+            if (episode.customThumbnailUrl) setCustomThumbnailPreview(episode.customThumbnailUrl);
+
+            // Fetch hierarchy
             try {
               const courseDocRef = doc(firestore, 'courses', episode.courseId);
               const courseDocSnap = await getDoc(courseDocRef);
@@ -234,20 +236,17 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     } else {
         resetForm();
     }
-  }, [open, episode, isEditMode, firestore, toast, resetForm, generateDefaultThumbnail]);
+  }, [open, episode, isEditMode, firestore, toast, resetForm]);
 
   const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
         setVideoFile(file);
-        const episodeId = episode?.id || uuidv4();
-        const videoUrl = URL.createObjectURL(file);
-        try {
-            await generateDefaultThumbnail(videoUrl, episodeId);
-        } catch (e) {
-            console.error(e);
-            toast({variant: 'destructive', title:'썸네일 생성 실패', description: '선택한 비디오에서 대표 썸네일을 생성하지 못했습니다.'});
-        }
+        setVideoPreviewUrl(URL.createObjectURL(file));
+        // When a new video is selected, clear custom thumbnail and generate new default
+        setCustomThumbnailFile(null);
+        setCustomThumbnailPreview(null);
+        await generateDefaultThumbnail(URL.createObjectURL(file), episode?.id || uuidv4());
     }
   };
 
@@ -270,10 +269,9 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
 
   const handleSaveEpisode = async () => {
     if (!firestore || !storage) return;
-
     if (!title || !selectedCourseId) {
-      toast({ variant: 'destructive', title: '입력 오류', description: '제목과 소속 상세분류는 필수입니다.' });
-      return;
+        toast({ variant: 'destructive', title: '입력 오류', description: '제목과 소속 상세분류는 필수입니다.' });
+        return;
     }
     if (!isEditMode && !videoFile) {
         toast({ variant: 'destructive', title: '입력 오류', description: '새 에피소드에는 비디오 파일이 필수입니다.' });
@@ -284,84 +282,69 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setUploadProgress(0);
 
     try {
-        const episodeId = isEditMode ? episode.id : uuidv4();
-        let newVideoUploadResult: { downloadUrl: string; filePath: string; } | undefined;
-        let finalThumbnailUploadResult: { downloadUrl: string; filePath: string; } | undefined;
+        const episodeId = episode?.id || uuidv4();
+        let newVideoUploadResult, newDefaultThumbUploadResult, newCustomThumbUploadResult;
 
+        // 1. Upload new video if it exists
         if (videoFile) {
             setUploadMessage('비디오 업로드 중...');
-            const videoPath = `episodes/${episodeId}/videos/${Date.now()}-${videoFile.name}`;
+            const videoPath = `episodes/${episodeId}/video/${Date.now()}-${videoFile.name}`;
             newVideoUploadResult = await uploadFile(storage, videoPath, videoFile, setUploadProgress);
         }
-        
-        // Use custom thumbnail if available, otherwise use default.
-        const finalThumbFile = customThumbnailFile || defaultThumbnailFile;
-        const isCustomThumbUsed = !!customThumbnailFile;
 
-        if (finalThumbFile) {
-            setUploadMessage('썸네일 업로드 중...');
-            const thumbPath = `episodes/${episodeId}/thumbnails/${Date.now()}-${finalThumbFile.name}`;
-            finalThumbnailUploadResult = await uploadFile(storage, thumbPath, finalThumbFile, setUploadProgress);
+        // 2. Upload new default thumbnail if it exists
+        if (defaultThumbnailFile) {
+             setUploadMessage('대표 썸네일 업로드 중...');
+            const thumbPath = `episodes/${episodeId}/default-thumbnail/${Date.now()}-${defaultThumbnailFile.name}`;
+            newDefaultThumbUploadResult = await uploadFile(storage, thumbPath, defaultThumbnailFile, setUploadProgress);
+        }
+        
+        // 3. Handle custom thumbnail (upload or deletion)
+        if (customThumbnailFile) {
+            setUploadMessage('커스텀 썸네일 업로드 중...');
+            const thumbPath = `episodes/${episodeId}/custom-thumbnail/${Date.now()}-${customThumbnailFile.name}`;
+            newCustomThumbUploadResult = await uploadFile(storage, thumbPath, customThumbnailFile, setUploadProgress);
+        } else if (isEditMode && initialEpisode?.customThumbnailPath) {
+             // This case means the custom thumbnail was removed
+            newCustomThumbUploadResult = { downloadUrl: null, filePath: null };
         }
 
         setUploadMessage('정보 저장 중...');
         
-        if (isEditMode && episode) {
+        if (isEditMode) {
             const payload = {
-                episodeId: episode.id,
-                title,
-                description,
-                isFree,
-                courseId: selectedCourseId,
-                instructorId: selectedInstructorId,
+                episodeId, title, description, isFree, courseId: selectedCourseId, instructorId: selectedInstructorId,
                 newVideoData: newVideoUploadResult,
-                newThumbnailData: finalThumbnailUploadResult,
-                oldFilePath: newVideoUploadResult ? episode.filePath : undefined,
-                oldThumbnailPath: finalThumbnailUploadResult ? episode.thumbnailPath : undefined,
+                newDefaultThumbnailData: newDefaultThumbUploadResult,
+                newCustomThumbnailData: newCustomThumbUploadResult,
+                oldFilePath: initialEpisode?.filePath,
+                oldDefaultThumbnailPath: initialEpisode?.defaultThumbnailPath,
+                oldCustomThumbnailPath: initialEpisode?.customThumbnailPath,
             };
             const result = await updateEpisode(sanitize(payload));
             if (!result.success) throw new Error(result.message);
             toast({ title: '수정 완료', description: `'${title}' 에피소드 정보가 업데이트되었습니다.` });
-
         } else { // Create mode
-            if (!newVideoUploadResult) {
-                throw new Error("새 에피소드는 비디오 파일이 필수입니다.");
+            if (!newVideoUploadResult || !newDefaultThumbUploadResult) {
+                throw new Error("새 에피소드에는 비디오와 대표 썸네일이 필수입니다.");
             }
-             if (!finalThumbnailUploadResult) {
-                 await generateDefaultThumbnail(newVideoUploadResult.downloadUrl, episodeId);
-                 if (!defaultThumbnailFile) throw new Error("대표 썸네일 생성에 실패했습니다.");
-                 
-                 setUploadMessage('썸네일 업로드 중...');
-                 const thumbPath = `episodes/${episodeId}/thumbnails/${Date.now()}-${defaultThumbnailFile.name}`;
-                 finalThumbnailUploadResult = await uploadFile(storage, thumbPath, defaultThumbnailFile, setUploadProgress);
-            }
-
             const payload = {
-                episodeId,
-                title,
-                description,
-                isFree,
-                selectedCourseId,
-                instructorId: selectedInstructorId,
+                episodeId, title, description, isFree, selectedCourseId, instructorId: selectedInstructorId,
                 videoUrl: newVideoUploadResult.downloadUrl,
                 filePath: newVideoUploadResult.filePath,
-                thumbnailUrl: finalThumbnailUploadResult.downloadUrl,
-                thumbnailPath: finalThumbnailUploadResult.filePath,
+                defaultThumbnailUrl: newDefaultThumbUploadResult.downloadUrl,
+                defaultThumbnailPath: newDefaultThumbUploadResult.filePath,
+                customThumbnailUrl: newCustomThumbUploadResult?.downloadUrl,
+                customThumbnailPath: newCustomThumbUploadResult?.filePath,
             };
-            const metadataResult = await saveEpisodeMetadata(sanitize(payload));
-            if (!metadataResult.success) throw new Error(metadataResult.message);
-            toast({ title: '업로드 성공', description: metadataResult.message });
+            const result = await saveEpisodeMetadata(sanitize(payload));
+            if (!result.success) throw new Error(result.message);
+            toast({ title: '업로드 성공', description: result.message });
         }
-      
-      handleSafeClose();
-      
+        handleSafeClose();
     } catch (error: any) {
       console.error("Episode save process failed:", error);
-      toast({
-        variant: 'destructive',
-        title: '저장 실패',
-        description: error.message || '에피소드 저장 중 오류가 발생했습니다.',
-      });
+      toast({ variant: 'destructive', title: '저장 실패', description: error.message || '에피소드 저장 중 오류가 발생했습니다.' });
     } finally {
         setIsProcessing(false);
         setUploadProgress(null);
@@ -395,9 +378,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             setSelectedCourseId('');
         } else if (type === '큰분류' && selectedFieldId) {
             await setDoc(doc(firestore, 'classifications', id), {
-                id,
-                fieldId: selectedFieldId,
-                name: item.name,
+                id, fieldId: selectedFieldId, name: item.name,
                 description: `${item.name}에 대한 설명입니다.`,
                 prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
                 thumbnailUrl: '',
@@ -406,9 +387,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             setSelectedCourseId('');
         } else if (type === '상세분류' && selectedClassificationId) {
             await setDoc(doc(firestore, 'courses', id), {
-                id,
-                classificationId: selectedClassificationId,
-                name: item.name,
+                id, classificationId: selectedClassificationId, name: item.name,
                 description: `${item.name}에 대한 상세 설명입니다.`,
                 thumbnailUrl: '',
             });
@@ -525,8 +504,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 <Label className="text-right pt-2">썸네일</Label>
                 <div className="col-span-3 space-y-2">
                     <div className="relative w-full aspect-video rounded-md overflow-hidden bg-muted border">
-                        {finalThumbnailPreview ? (
-                            <Image src={finalThumbnailPreview} alt="썸네일 미리보기" fill sizes="300px" className="object-cover" />
+                        {displayThumbnailUrl ? (
+                            <Image src={displayThumbnailUrl} alt="썸네일 미리보기" fill sizes="300px" className="object-cover" />
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full w-full text-center">
                                 <ImageIcon className="h-10 w-10 text-muted-foreground" />
