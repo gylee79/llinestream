@@ -31,7 +31,7 @@ type SaveMetadataPayload = {
     defaultThumbnailPath: string;
     // Custom thumbnail is optional
     customThumbnailUrl?: string | null;
-    customThumbnailPath?: string;
+    customThumbnailPath?: string | null;
 }
 
 type UpdateEpisodePayload = {
