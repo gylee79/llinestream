@@ -30,7 +30,7 @@ type SaveMetadataPayload = {
     defaultThumbnailUrl: string;
     defaultThumbnailPath: string;
     // Custom thumbnail is optional
-    customThumbnailUrl?: string;
+    customThumbnailUrl?: string | null;
     customThumbnailPath?: string;
 }
 

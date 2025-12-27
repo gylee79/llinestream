@@ -71,7 +71,7 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     // Determine which thumbnail path to use (custom or default)
     const oldThumbnailPath = itemType === 'episodes' 
         ? ((currentData as Episode).customThumbnailPath || extractPathFromUrl((currentData as Episode).customThumbnailUrl))
-        : (currentData.thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl));
+        : ((currentData as Field | Classification | Course).thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl));
 
 
     // If a new image is provided, upload it.
