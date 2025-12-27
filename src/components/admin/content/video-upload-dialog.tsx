@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -97,7 +97,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const [hierarchyDialogState, setHierarchyDialogState] = useState<HierarchyDialogState>({ isOpen: false, item: null, type: '분야' });
 
   const isEditMode = !!episode;
-  const finalThumbnailPreview = customThumbnailPreview || defaultThumbnailPreview || initialEpisode?.thumbnailUrl;
+  const finalThumbnailPreview = customThumbnailPreview || defaultThumbnailPreview;
 
   const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: dbFields } = useCollection<Field>(fieldsQuery);
@@ -139,6 +139,49 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     onOpenChange(false);
     setTimeout(resetForm, 150);
   };
+  
+  const generateDefaultThumbnail = useCallback((videoSrc: string, episodeId: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        const videoElement = document.createElement('video');
+        videoElement.src = videoSrc;
+        videoElement.crossOrigin = "anonymous"; // Important for CORS
+        videoElement.muted = true;
+
+        const onSeeked = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                const dataUrl = canvas.toDataURL('image/jpeg');
+                const generatedFile = dataURLtoFile(dataUrl, `default-thumb-${episodeId}.jpg`);
+                
+                setDefaultThumbnailFile(generatedFile);
+                setDefaultThumbnailPreview(dataUrl);
+            }
+            URL.revokeObjectURL(videoSrc);
+            videoElement.removeEventListener('seeked', onSeeked);
+            videoElement.removeEventListener('error', onError);
+            resolve();
+        };
+
+        const onError = (e: Event | string) => {
+            console.error("Error loading video for thumbnail generation.", e);
+            URL.revokeObjectURL(videoSrc);
+            videoElement.removeEventListener('seeked', onSeeked);
+            videoElement.removeEventListener('error', onError);
+            reject(new Error("비디오에서 썸네일을 생성하지 못했습니다."));
+        };
+        
+        videoElement.addEventListener('seeked', onSeeked);
+        videoElement.addEventListener('error', onError);
+
+        videoElement.onloadeddata = () => {
+            videoElement.currentTime = 1; // Seek to 1 second
+        };
+    });
+  }, []);
 
   useEffect(() => {
     async function setInitialState() {
@@ -150,7 +193,19 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             setIsFree(episode.isFree);
             setSelectedCourseId(episode.courseId);
             setSelectedInstructorId(episode.instructorId || '');
-            setDefaultThumbnailPreview(episode.thumbnailUrl); // Set initial preview
+            // In edit mode, we assume the initial thumbnail is a custom one if it exists,
+            // or we generate a default one from the existing video.
+            if(episode.thumbnailUrl) {
+                setCustomThumbnailPreview(episode.thumbnailUrl);
+            }
+             if (episode.videoUrl) {
+                try {
+                    await generateDefaultThumbnail(episode.videoUrl, episode.id);
+                } catch (e) {
+                    console.error(e);
+                    toast({variant: 'destructive', title:'썸네일 생성 실패', description: '기존 비디오에서 대표 썸네일을 생성하는데 실패했습니다.'})
+                }
+            }
             
             try {
               const courseDocRef = doc(firestore, 'courses', episode.courseId);
@@ -179,45 +234,20 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     } else {
         resetForm();
     }
-  }, [open, episode, isEditMode, firestore, toast, resetForm]);
+  }, [open, episode, isEditMode, firestore, toast, resetForm, generateDefaultThumbnail]);
 
-  const generateDefaultThumbnail = useCallback((file: File, episodeId: string) => {
-    const videoUrl = URL.createObjectURL(file);
-    const videoElement = document.createElement('video');
-    videoElement.src = videoUrl;
-    videoElement.muted = true;
-    
-    videoElement.onloadeddata = () => {
-        videoElement.currentTime = 1; // Seek to 1 second
-    };
-
-    videoElement.onseeked = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = videoElement.videoWidth;
-        canvas.height = videoElement.videoHeight;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-            ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/jpeg');
-            const generatedFile = dataURLtoFile(dataUrl, `default-thumb-${episodeId}.jpg`);
-            setDefaultThumbnailFile(generatedFile);
-            setDefaultThumbnailPreview(dataUrl);
-        }
-        URL.revokeObjectURL(videoUrl); // Clean up
-    };
-
-    videoElement.onerror = () => {
-        console.error("Error loading video for thumbnail generation.");
-        URL.revokeObjectURL(videoUrl);
-    }
-  }, []);
-
-  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
         setVideoFile(file);
         const episodeId = episode?.id || uuidv4();
-        generateDefaultThumbnail(file, episodeId);
+        const videoUrl = URL.createObjectURL(file);
+        try {
+            await generateDefaultThumbnail(videoUrl, episodeId);
+        } catch (e) {
+            console.error(e);
+            toast({variant: 'destructive', title:'썸네일 생성 실패', description: '선택한 비디오에서 대표 썸네일을 생성하지 못했습니다.'});
+        }
     }
   };
 
@@ -256,21 +286,22 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     try {
         const episodeId = isEditMode ? episode.id : uuidv4();
         let newVideoUploadResult: { downloadUrl: string; filePath: string; } | undefined;
-        let newThumbnailUploadResult: { downloadUrl: string; filePath: string; } | undefined;
+        let finalThumbnailUploadResult: { downloadUrl: string; filePath: string; } | undefined;
 
-        // 1. Upload Video if a new one is selected
         if (videoFile) {
             setUploadMessage('비디오 업로드 중...');
             const videoPath = `episodes/${episodeId}/videos/${Date.now()}-${videoFile.name}`;
             newVideoUploadResult = await uploadFile(storage, videoPath, videoFile, setUploadProgress);
         }
         
-        // 2. Determine and Upload Thumbnail
+        // Use custom thumbnail if available, otherwise use default.
         const finalThumbFile = customThumbnailFile || defaultThumbnailFile;
+        const isCustomThumbUsed = !!customThumbnailFile;
+
         if (finalThumbFile) {
             setUploadMessage('썸네일 업로드 중...');
             const thumbPath = `episodes/${episodeId}/thumbnails/${Date.now()}-${finalThumbFile.name}`;
-            newThumbnailUploadResult = await uploadFile(storage, thumbPath, finalThumbFile, setUploadProgress);
+            finalThumbnailUploadResult = await uploadFile(storage, thumbPath, finalThumbFile, setUploadProgress);
         }
 
         setUploadMessage('정보 저장 중...');
@@ -284,18 +315,27 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 courseId: selectedCourseId,
                 instructorId: selectedInstructorId,
                 newVideoData: newVideoUploadResult,
-                newThumbnailData: newThumbnailUploadResult,
+                newThumbnailData: finalThumbnailUploadResult,
                 oldFilePath: newVideoUploadResult ? episode.filePath : undefined,
-                oldThumbnailPath: newThumbnailUploadResult ? episode.thumbnailPath : undefined,
+                oldThumbnailPath: finalThumbnailUploadResult ? episode.thumbnailPath : undefined,
             };
             const result = await updateEpisode(sanitize(payload));
             if (!result.success) throw new Error(result.message);
             toast({ title: '수정 완료', description: `'${title}' 에피소드 정보가 업데이트되었습니다.` });
 
         } else { // Create mode
-            if (!newVideoUploadResult || !newThumbnailUploadResult) {
-                throw new Error("새 에피소드는 비디오와 썸네일 파일이 모두 필요합니다.");
+            if (!newVideoUploadResult) {
+                throw new Error("새 에피소드는 비디오 파일이 필수입니다.");
             }
+             if (!finalThumbnailUploadResult) {
+                 await generateDefaultThumbnail(newVideoUploadResult.downloadUrl, episodeId);
+                 if (!defaultThumbnailFile) throw new Error("대표 썸네일 생성에 실패했습니다.");
+                 
+                 setUploadMessage('썸네일 업로드 중...');
+                 const thumbPath = `episodes/${episodeId}/thumbnails/${Date.now()}-${defaultThumbnailFile.name}`;
+                 finalThumbnailUploadResult = await uploadFile(storage, thumbPath, defaultThumbnailFile, setUploadProgress);
+            }
+
             const payload = {
                 episodeId,
                 title,
@@ -305,8 +345,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 instructorId: selectedInstructorId,
                 videoUrl: newVideoUploadResult.downloadUrl,
                 filePath: newVideoUploadResult.filePath,
-                thumbnailUrl: newThumbnailUploadResult.downloadUrl,
-                thumbnailPath: newThumbnailUploadResult.filePath,
+                thumbnailUrl: finalThumbnailUploadResult.downloadUrl,
+                thumbnailPath: finalThumbnailUploadResult.filePath,
             };
             const metadataResult = await saveEpisodeMetadata(sanitize(payload));
             if (!metadataResult.success) throw new Error(metadataResult.message);
