@@ -34,7 +34,7 @@ type SaveMetadataPayload = {
     instructorId?: string;
     videoUrl: string;
     filePath: string;
-    thumbnailUrl: string;
+    thumbnailUrl: string | null;
     thumbnailPath: string | null;
 }
 
@@ -45,13 +45,14 @@ type UpdateEpisodePayload = {
     title: string;
     description: string;
     isFree: boolean;
-    thumbnailUrl: string;
+    thumbnailUrl: string | null;
     thumbnailPath: string | null;
     newVideoData?: {
         videoUrl: string;
         filePath: string;
     };
     oldFilePath?: string;
+    oldThumbnailPath?: string;
 }
 
 const deleteStorageFileByPath = async (storage: Storage, filePath: string | undefined) => {
@@ -179,7 +180,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
  * Updates an existing episode's metadata and optionally replaces its video file.
  */
 export async function updateEpisode(payload: UpdateEpisodePayload): Promise<UploadResult> {
-    const { episodeId, courseId, instructorId, title, description, isFree, thumbnailUrl, thumbnailPath, newVideoData, oldFilePath } = payload;
+    const { episodeId, courseId, instructorId, title, description, isFree, thumbnailUrl, thumbnailPath, newVideoData, oldFilePath, oldThumbnailPath } = payload;
     
     if (!episodeId || !courseId || !title) {
         return { success: false, message: '에피소드 ID, 강좌 ID, 제목은 필수입니다.' };
@@ -196,6 +197,12 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             console.log(`[UPDATE] New video provided. Deleting old file: ${oldFilePath}`);
             await deleteStorageFileByPath(storage, oldFilePath);
         }
+        
+        // If a new thumbnail was uploaded, delete the old one.
+        if (thumbnailPath !== undefined && oldThumbnailPath) {
+             console.log(`[UPDATE] New thumbnail provided. Deleting old thumbnail: ${oldThumbnailPath}`);
+             await deleteStorageFileByPath(storage, oldThumbnailPath);
+        }
 
         const dataToUpdate: { [key: string]: any } = {
             title,
@@ -203,8 +210,8 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             isFree,
             courseId,
             instructorId: instructorId || null,
-            thumbnailUrl,
-            thumbnailPath: thumbnailPath || null, // Ensure we send null instead of undefined
+            thumbnailUrl: thumbnailUrl,
+            thumbnailPath: thumbnailPath,
         };
 
         if (newVideoData) {
