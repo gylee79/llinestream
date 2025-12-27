@@ -149,57 +149,62 @@ function HeroImageManager() {
         return <CardContent className="space-y-6">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-60 w-full" />)}</CardContent>;
     }
 
-    const renderManagerFor = (type: 'home' | 'about') => (
-      <div className="space-y-6 rounded-lg border p-4">
-          <h4 className="font-semibold text-lg">{type === 'home' ? '홈페이지' : '아카데미 소개'} 히어로</h4>
-          
-          {/* Text Content */}
-          <div className="space-y-2">
-              <Label>제목</Label>
-              <Input 
-                  value={settings[type]?.title || ''}
-                  onChange={e => handleTextChange(type, 'title', e.target.value)}
-                  placeholder={`${type === 'home' ? '온라인 동영상 강의' : '뷰티 비즈니스...'}`}
-              />
-          </div>
-          <div className="space-y-2">
-              <Label>설명</Label>
-              <Textarea 
-                  value={settings[type]?.description || ''}
-                  onChange={e => handleTextChange(type, 'description', e.target.value)}
-                  placeholder={`${type === 'home' ? '온라인에서 고품질 강의를 만나보세요' : '엘라인이 뷰티 전문가의 기준을...'}`}
-              />
-          </div>
-
-          <Separator />
-
-          {/* PC Image */}
-          <div className="space-y-2">
-              <Label>PC 배경 이미지</Label>
-              {settings[type]?.url && <Image src={settings[type]!.url!} alt={`${type} hero preview`} width={500} height={200} className="rounded-md object-cover"/>}
-              <div className="flex items-center gap-2">
-                <Input type="file" onChange={e => handleFileChange(type, e.target.files?.[0] || null)} accept="image/*" className="flex-1" />
-                {files[type] && (
-                  <Button variant="outline" size="sm" onClick={() => handleCancelFileChange(type)}>취소</Button>
-                )}
+    const renderManagerFor = (type: 'home' | 'about') => {
+        const pcImageUrl = settings[type]?.url;
+        const mobileImageUrl = settings[type]?.urlMobile;
+      
+        return (
+          <div className="space-y-6 rounded-lg border p-4">
+              <h4 className="font-semibold text-lg">{type === 'home' ? '홈페이지' : '아카데미 소개'} 히어로</h4>
+              
+              {/* Text Content */}
+              <div className="space-y-2">
+                  <Label>제목</Label>
+                  <Input 
+                      value={settings[type]?.title || ''}
+                      onChange={e => handleTextChange(type, 'title', e.target.value)}
+                      placeholder={`${type === 'home' ? '온라인 동영상 강의' : '뷰티 비즈니스...'}`}
+                  />
               </div>
-            </div>
-          
-          <Separator />
-          
-          {/* Mobile Image */}
-          <div className="space-y-2">
-              <Label>모바일 배경 이미지</Label>
-              {settings[type]?.urlMobile && <Image src={settings[type]!.urlMobile!} alt={`${type} mobile hero preview`} width={500} height={200} className="rounded-md object-cover"/>}
-              <div className="flex items-center gap-2">
-                <Input type="file" onChange={e => handleFileChange(`${type}Mobile`, e.target.files?.[0] || null)} accept="image/*" className="flex-1" />
-                {files[`${type}Mobile` as FileType] && (
-                  <Button variant="outline" size="sm" onClick={() => handleCancelFileChange(`${type}Mobile` as FileType)}>취소</Button>
-                )}
+              <div className="space-y-2">
+                  <Label>설명</Label>
+                  <Textarea 
+                      value={settings[type]?.description || ''}
+                      onChange={e => handleTextChange(type, 'description', e.target.value)}
+                      placeholder={`${type === 'home' ? '온라인에서 고품질 강의를 만나보세요' : '엘라인이 뷰티 전문가의 기준을...'}`}
+                  />
               </div>
-            </div>
-      </div>
-  );
+    
+              <Separator />
+    
+              {/* PC Image */}
+              <div className="space-y-2">
+                  <Label>PC 배경 이미지</Label>
+                  {pcImageUrl && <Image src={pcImageUrl} alt={`${type} hero preview`} width={500} height={200} className="rounded-md object-cover"/>}
+                  <div className="flex items-center gap-2">
+                    <Input type="file" onChange={e => handleFileChange(type, e.target.files?.[0] || null)} accept="image/*" className="flex-1" />
+                    {files[type] && (
+                      <Button variant="outline" size="sm" onClick={() => handleCancelFileChange(type)}>취소</Button>
+                    )}
+                  </div>
+                </div>
+              
+              <Separator />
+              
+              {/* Mobile Image */}
+              <div className="space-y-2">
+                  <Label>모바일 배경 이미지</Label>
+                  {mobileImageUrl && <Image src={mobileImageUrl} alt={`${type} mobile hero preview`} width={500} height={200} className="rounded-md object-cover"/>}
+                  <div className="flex items-center gap-2">
+                    <Input type="file" onChange={e => handleFileChange(`${type}Mobile`, e.target.files?.[0] || null)} accept="image/*" className="flex-1" />
+                    {files[`${type}Mobile` as FileType] && (
+                      <Button variant="outline" size="sm" onClick={() => handleCancelFileChange(`${type}Mobile` as FileType)}>취소</Button>
+                    )}
+                  </div>
+                </div>
+          </div>
+      );
+    }
 
     return (
         <CardContent className="space-y-6">
@@ -428,5 +433,3 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
-
-    
