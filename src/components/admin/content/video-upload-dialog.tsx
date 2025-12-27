@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -100,8 +99,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const [hierarchyDialogState, setHierarchyDialogState] = useState<HierarchyDialogState>({ isOpen: false, item: null, type: '분야' });
 
   const isEditMode = !!episode;
-  const displayThumbnailUrl = customThumbnailPreview || defaultThumbnailPreview;
-
 
   const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: dbFields } = useCollection<Field>(fieldsQuery);
@@ -146,7 +143,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   };
   
   const generateDefaultThumbnail = useCallback((videoSrc: string, episodeId: string): Promise<File | null> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         const videoElement = document.createElement('video');
         videoElement.src = videoSrc;
         videoElement.crossOrigin = "anonymous";
@@ -165,7 +162,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 setDefaultThumbnailFile(generatedFile);
                 resolve(generatedFile);
             } else {
-                resolve(null);
+                reject(new Error('Canvas context is not available.'));
             }
             cleanup();
         };
@@ -174,11 +171,10 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             console.error("Error loading video for thumbnail generation.", e);
             toast({variant: 'destructive', title:'썸네일 생성 실패', description: '비디오 파일에서 대표 썸네일을 생성하지 못했습니다.'});
             cleanup();
-            resolve(null);
+            reject(new Error('Failed to load video for thumbnail generation.'));
         };
         
         const cleanup = () => {
-            URL.revokeObjectURL(videoSrc);
             videoElement.removeEventListener('seeked', onSeeked);
             videoElement.removeEventListener('error', onError);
         };
@@ -189,6 +185,13 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
         videoElement.onloadeddata = () => {
             videoElement.currentTime = 1; // Seek to 1 second
         };
+        // Add timeout for browsers that don't fire loadeddata/seeked
+        const timeoutId = setTimeout(() => {
+          onError("Thumbnail generation timed out.");
+        }, 10000);
+        videoElement.addEventListener('seeked', () => clearTimeout(timeoutId));
+
+        videoElement.load();
     });
   }, [toast]);
 
@@ -198,17 +201,24 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             setIsProcessing(true);
             setInitialEpisode(episode);
             setTitle(episode.title);
-setDescription(episode.description || '');
+            setDescription(episode.description || '');
             setIsFree(episode.isFree);
             setSelectedCourseId(episode.courseId);
             setSelectedInstructorId(episode.instructorId || '');
             
-            // Set previews from existing data
-            if (episode.videoUrl) setVideoPreviewUrl(episode.videoUrl);
-            if (episode.defaultThumbnailUrl) setDefaultThumbnailPreview(episode.defaultThumbnailUrl);
-            if (episode.customThumbnailUrl) setCustomThumbnailPreview(episode.customThumbnailUrl);
+            setVideoPreviewUrl(episode.videoUrl);
+            setDefaultThumbnailPreview(episode.defaultThumbnailUrl || null);
+            setCustomThumbnailPreview(episode.customThumbnailUrl || null);
 
-            // Fetch hierarchy
+            // Re-generate default thumbnail from existing video URL
+            if (episode.videoUrl) {
+                try {
+                    await generateDefaultThumbnail(episode.videoUrl, episode.id);
+                } catch (error) {
+                    console.error("Failed to re-generate default thumbnail on edit:", error);
+                }
+            }
+
             try {
               const courseDocRef = doc(firestore, 'courses', episode.courseId);
               const courseDocSnap = await getDoc(courseDocRef);
@@ -236,17 +246,24 @@ setDescription(episode.description || '');
     } else {
         resetForm();
     }
-  }, [open, episode, isEditMode, firestore, toast, resetForm]);
+  }, [open, episode, isEditMode, firestore, toast, resetForm, generateDefaultThumbnail]);
 
   const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+        setIsProcessing(true);
         setVideoFile(file);
         setVideoPreviewUrl(URL.createObjectURL(file));
         // When a new video is selected, clear custom thumbnail and generate new default
         setCustomThumbnailFile(null);
         setCustomThumbnailPreview(null);
-        await generateDefaultThumbnail(URL.createObjectURL(file), episode?.id || uuidv4());
+        try {
+            await generateDefaultThumbnail(URL.createObjectURL(file), episode?.id || uuidv4());
+        } catch (error) {
+            console.error("Error generating thumbnail for new video:", error);
+        } finally {
+            setIsProcessing(false);
+        }
     }
   };
 
@@ -285,27 +302,23 @@ setDescription(episode.description || '');
         const episodeId = episode?.id || uuidv4();
         let newVideoUploadResult, newDefaultThumbUploadResult, newCustomThumbUploadResult;
 
-        // 1. Upload new video if it exists
         if (videoFile) {
             setUploadMessage('비디오 업로드 중...');
             const videoPath = `episodes/${episodeId}/video/${Date.now()}-${videoFile.name}`;
             newVideoUploadResult = await uploadFile(storage, videoPath, videoFile, setUploadProgress);
         }
 
-        // 2. Upload new default thumbnail if it exists
         if (defaultThumbnailFile) {
              setUploadMessage('대표 썸네일 업로드 중...');
             const thumbPath = `episodes/${episodeId}/default-thumbnail/${Date.now()}-${defaultThumbnailFile.name}`;
             newDefaultThumbUploadResult = await uploadFile(storage, thumbPath, defaultThumbnailFile, setUploadProgress);
         }
         
-        // 3. Handle custom thumbnail (upload or deletion)
         if (customThumbnailFile) {
             setUploadMessage('커스텀 썸네일 업로드 중...');
             const thumbPath = `episodes/${episodeId}/custom-thumbnail/${Date.now()}-${customThumbnailFile.name}`;
             newCustomThumbUploadResult = await uploadFile(storage, thumbPath, customThumbnailFile, setUploadProgress);
-        } else if (isEditMode && initialEpisode?.customThumbnailPath) {
-             // This case means the custom thumbnail was removed
+        } else if (customThumbnailPreview === null && initialEpisode?.customThumbnailPath) {
             newCustomThumbUploadResult = { downloadUrl: null, filePath: null };
         }
 
@@ -324,8 +337,8 @@ setDescription(episode.description || '');
             const result = await updateEpisode(sanitize(payload));
             if (!result.success) throw new Error(result.message);
             toast({ title: '수정 완료', description: `'${title}' 에피소드 정보가 업데이트되었습니다.` });
-        } else { // Create mode
-            if (!newVideoUploadResult || !newDefaultThumbUploadResult) {
+        } else {
+            if (!videoFile || !defaultThumbnailFile || !newVideoUploadResult || !newDefaultThumbUploadResult) {
                 throw new Error("새 에피소드에는 비디오와 대표 썸네일이 필수입니다.");
             }
             const payload = {
@@ -401,11 +414,41 @@ setDescription(episode.description || '');
         closeHierarchyDialog();
     }
   };
+  
+  const ThumbnailPreview = ({ src, label, onRemove }: { src: string | null, label: string, onRemove?: () => void }) => (
+    <div className="flex-1 space-y-2">
+      <Label className="text-muted-foreground">{label}</Label>
+      <div className="relative w-full aspect-video rounded-md overflow-hidden bg-muted border">
+        {src ? (
+          <Image src={src} alt={`${label} preview`} fill sizes="200px" className="object-cover" />
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full w-full text-center p-2">
+            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground mt-2">
+                {label === '대표 썸네일' ? '비디오를 선택하면 자동 생성됩니다.' : '사용자 지정 썸네일이 없습니다.'}
+            </span>
+          </div>
+        )}
+        {onRemove && src && (
+          <Button
+            variant="destructive"
+            size="icon"
+            className="absolute top-1 right-1 h-6 w-6 z-10"
+            onClick={onRemove}
+            disabled={isProcessing}
+            aria-label="커스텀 썸네일 삭제"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <>
       <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleSafeClose(); }}>
-        <DialogContent className="sm:max-w-[625px]">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle className="font-headline">{isEditMode ? '에피소드 수정' : '비디오 업로드'}</DialogTitle>
             <DialogDescription>
@@ -477,7 +520,7 @@ setDescription(episode.description || '');
             <Separator />
              <div className="grid grid-cols-4 items-start gap-4">
                 <Label htmlFor="video-file" className="text-right pt-2">
-                  {isEditMode ? '비디오 교체' : '비디오 파일'}
+                  비디오 파일
                 </Label>
                 <div className="col-span-3 space-y-2">
                   <Input 
@@ -487,7 +530,6 @@ setDescription(episode.description || '');
                       accept="video/*"
                       disabled={isProcessing}
                   />
-                  {videoFile && <p className="text-sm text-muted-foreground">새 파일 선택됨: {videoFile.name}</p>}
                   {isEditMode && initialEpisode?.videoUrl && (
                     <div className="text-xs text-muted-foreground flex items-center gap-2">
                         <Video className="h-4 w-4"/>
@@ -497,37 +539,22 @@ setDescription(episode.description || '');
                         </Link>
                     </div>
                   )}
+                  {videoFile && <p className="text-sm text-green-600">새 비디오 파일 선택됨: {videoFile.name}</p>}
                 </div>
             </div>
             <Separator />
              <div className="grid grid-cols-4 items-start gap-4">
                 <Label className="text-right pt-2">썸네일</Label>
-                <div className="col-span-3 space-y-2">
-                    <div className="relative w-full aspect-video rounded-md overflow-hidden bg-muted border">
-                        {displayThumbnailUrl ? (
-                            <Image src={displayThumbnailUrl} alt="썸네일 미리보기" fill sizes="300px" className="object-cover" />
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-full w-full text-center">
-                                <ImageIcon className="h-10 w-10 text-muted-foreground" />
-                                <span className="text-xs text-muted-foreground mt-2">비디오 파일을 선택하면<br/>자동으로 썸네일이 생성됩니다.</span>
-                            </div>
-                        )}
-                        {customThumbnailPreview && (
-                            <Button 
-                                variant="destructive" 
-                                size="icon" 
-                                className="absolute top-1 right-1 h-6 w-6"
-                                onClick={handleRemoveCustomThumbnail}
-                                disabled={isProcessing}
-                            >
-                                <X className="h-4 w-4" />
-                            </Button>
-                        )}
+                <div className="col-span-3 space-y-4">
+                    <div className="flex gap-4">
+                        <ThumbnailPreview src={defaultThumbnailPreview} label="대표 썸네일" />
+                        <ThumbnailPreview src={customThumbnailPreview} label="커스텀 썸네일" onRemove={handleRemoveCustomThumbnail} />
                     </div>
-                    <Label htmlFor="thumbnail-file" className="text-sm font-medium text-muted-foreground">
-                        {customThumbnailFile ? `선택된 파일: ${customThumbnailFile.name}`: '또는, 커스텀 썸네일 업로드'}
-                    </Label>
-                    <Input id="thumbnail-file" type="file" accept="image/*" onChange={handleCustomThumbnailFileChange} disabled={isProcessing} />
+                     <div>
+                        <Label htmlFor="thumbnail-file" className="text-sm font-medium">커스텀 썸네일 업로드</Label>
+                        <Input id="thumbnail-file" type="file" accept="image/*" onChange={handleCustomThumbnailFileChange} disabled={isProcessing} className="mt-1" />
+                        {customThumbnailFile && <p className="text-xs text-green-600 mt-1">새 커스텀 썸네일 선택됨: {customThumbnailFile.name}</p>}
+                    </div>
                 </div>
             </div>
              {uploadProgress !== null && (

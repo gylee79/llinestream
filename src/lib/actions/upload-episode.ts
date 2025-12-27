@@ -144,11 +144,15 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         const episodeRef = db.collection('episodes').doc(episodeId);
 
         // --- File Deletion Logic ---
-        if (newVideoData) await deleteStorageFileByPath(storage, oldFilePath);
-        if (newDefaultThumbnailData) await deleteStorageFileByPath(storage, oldDefaultThumbnailPath);
-        // Delete old custom thumb if a new one is uploaded OR if it's explicitly deleted (newCustomThumbnailData is not undefined)
-        if (newCustomThumbnailData) await deleteStorageFileByPath(storage, oldCustomThumbnailPath);
-
+        if (newVideoData?.filePath && oldFilePath && newVideoData.filePath !== oldFilePath) {
+          await deleteStorageFileByPath(storage, oldFilePath);
+        }
+        if (newDefaultThumbnailData?.filePath && oldDefaultThumbnailPath && newDefaultThumbnailData.filePath !== oldDefaultThumbnailPath) {
+          await deleteStorageFileByPath(storage, oldDefaultThumbnailPath);
+        }
+        if (newCustomThumbnailData && oldCustomThumbnailPath && newCustomThumbnailData.filePath !== oldCustomThumbnailPath) {
+           await deleteStorageFileByPath(storage, oldCustomThumbnailPath);
+        }
 
         // --- Data Update Logic ---
         const dataToUpdate: { [key: string]: any } = {
@@ -168,14 +172,12 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             dataToUpdate.defaultThumbnailUrl = newDefaultThumbnailData.downloadUrl;
             dataToUpdate.defaultThumbnailPath = newDefaultThumbnailData.filePath;
         }
-
-        // Handle custom thumbnail updates (upload, delete, or no change)
+        
         if (newCustomThumbnailData) {
             dataToUpdate.customThumbnailUrl = newCustomThumbnailData.downloadUrl || '';
             dataToUpdate.customThumbnailPath = newCustomThumbnailData.filePath || '';
         }
 
-        // Determine final display thumbnail URL
         const currentDoc = await episodeRef.get();
         const currentData = currentDoc.data() as Episode | undefined;
 
