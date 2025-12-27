@@ -23,6 +23,15 @@ type UpdateThumbnailPayload = {
     imageName?: string;
 }
 
+const getSignedUrl = async (storage: Storage, filePath: string) => {
+    const options = {
+      action: 'read' as const,
+      expires: '01-01-2200', // Set a very distant future expiration date
+    };
+    const [url] = await storage.bucket().file(filePath).getSignedUrl(options);
+    return url;
+};
+
 const deleteStorageFileByPath = async (storage: Storage, filePath: string | undefined) => {
     if (!filePath) {
         console.warn(`[SKIP DELETE] No file path provided for deletion.`);
@@ -47,30 +56,13 @@ const extractPathFromUrl = (url: string | undefined): string | undefined => {
     if (!url) return undefined;
     try {
         const urlObject = new URL(url);
-        const hostname = urlObject.hostname;
-        
-        let path: string | null = null;
-
-        // Handles URLs like: https://firebasestorage.googleapis.com/v0/b/your-bucket.appspot.com/o/path%2Fto%2Ffile.jpg?alt=media&token=...
-        if (hostname === 'firebasestorage.googleapis.com') {
-            const match = urlObject.pathname.match(/\/o\/(.+)/);
-            if (match && match[1]) {
-                path = match[1];
-            }
-        // Handles URLs like: https://storage.googleapis.com/your-bucket.appspot.com/path/to/file.jpg
-        } else if (hostname === 'storage.googleapis.com') {
-            // Pathname is /your-bucket.appspot.com/path/to/file.jpg
-            const pathSegments = urlObject.pathname.split('/').slice(2); // Remove the leading empty string and the bucket name
-            if (pathSegments.length > 0) {
-              path = pathSegments.join('/');
-            }
+        // The path we want is after the bucket name in the pathname.
+        // e.g., /<bucket_name>/<path_to_file>
+        const pathSegments = urlObject.pathname.split('/');
+        if (pathSegments.length > 2) {
+            // Decode URI component to handle encoded characters like %2F for /
+            return decodeURIComponent(pathSegments.slice(2).join('/'));
         }
-        
-        if (path) {
-            // Decode URI component and remove query parameters
-            return decodeURIComponent(path.split('?')[0]);
-        }
-
     } catch (e) {
         console.warn(`Could not parse URL to extract path: ${url}`, e);
     }
@@ -95,17 +87,22 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     let downloadUrl: string | null = null;
     let newThumbnailPath: string | undefined = undefined;
 
-    // If a new image is provided, upload it. Otherwise, we are deleting the thumbnail.
+    const currentDoc = await docRef.get();
+    if (!currentDoc.exists) {
+        return { success: false, message: '문서를 찾을 수 없습니다.' };
+    }
+    const currentData = currentDoc.data() as Field | Classification | Course | Episode;
+
+    // Determine which thumbnail path to use (custom or default)
+    const oldThumbnailPath = itemType === 'episodes' 
+        ? (currentData as Episode).customThumbnailPath || extractPathFromUrl((currentData as Episode).customThumbnailUrl)
+        : currentData.thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl);
+
+    // If a new image is provided, upload it.
     if (base64Image && imageContentType && imageName) {
-        // Get current data to find the old file path for deletion
-        const currentDoc = await docRef.get();
-        if (currentDoc.exists) {
-            const currentData = currentDoc.data() as Field | Classification | Course | Episode;
-            const oldThumbnailPath = currentData.thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl);
-            if (oldThumbnailPath) {
-                console.log(`[UPDATE] Deleting old thumbnail file: ${oldThumbnailPath}`);
-                await deleteStorageFileByPath(storage, oldThumbnailPath);
-            }
+        if (oldThumbnailPath) {
+            console.log(`[UPDATE] Deleting old thumbnail file: ${oldThumbnailPath}`);
+            await deleteStorageFileByPath(storage, oldThumbnailPath);
         }
         
         newThumbnailPath = `${itemType}/${itemId}/thumbnails/${Date.now()}-${imageName}`;
@@ -116,16 +113,12 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
         const file = storage.bucket().file(newThumbnailPath);
         await file.save(fileBuffer, {
           metadata: { contentType: imageContentType },
-          public: true,
         });
 
-        await file.makePublic();
-        downloadUrl = file.publicUrl();
-    } else if (base64Image === null) { // Explicit deletion request
-        const currentDoc = await docRef.get();
-        if (currentDoc.exists) {
-            const currentData = currentDoc.data() as Field | Classification | Course | Episode;
-            const oldThumbnailPath = currentData.thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl);
+        downloadUrl = await getSignedUrl(storage, newThumbnailPath);
+
+    } else if (base64Image === null) { // Explicit deletion request for custom thumbnail
+        if (oldThumbnailPath) {
             await deleteStorageFileByPath(storage, oldThumbnailPath);
         }
         downloadUrl = ''; // Set to empty string for deletion
@@ -135,11 +128,23 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
         return { success: true, message: '새로운 썸네일이 제공되지 않아 스킵합니다.' };
     }
 
-    const dataToUpdate = {
-      thumbnailUrl: downloadUrl,
-      thumbnailPath: newThumbnailPath,
-    };
+    let dataToUpdate: { [key: string]: any };
 
+    if (itemType === 'episodes') {
+        const episodeData = currentData as Episode;
+        dataToUpdate = {
+            customThumbnailUrl: downloadUrl,
+            customThumbnailPath: newThumbnailPath,
+            // If we are deleting a custom thumbnail, the main thumbnailUrl should revert to the default.
+            thumbnailUrl: downloadUrl || episodeData.defaultThumbnailUrl
+        }
+    } else {
+        dataToUpdate = {
+          thumbnailUrl: downloadUrl,
+          thumbnailPath: newThumbnailPath,
+        };
+    }
+    
     await docRef.update(dataToUpdate);
 
     revalidatePath('/admin/content', 'layout');

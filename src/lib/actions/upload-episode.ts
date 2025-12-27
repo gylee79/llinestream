@@ -8,7 +8,7 @@ import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
 import type { Episode, Timestamp } from '../types';
-import { Storage } from 'firebase-admin/storage';
+import { Storage, getDownloadURL } from 'firebase-admin/storage';
 
 
 type UploadResult = {
@@ -174,8 +174,8 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         }
         
         if (newCustomThumbnailData) {
-            dataToUpdate.customThumbnailUrl = newCustomThumbnailData.downloadUrl || '';
-            dataToUpdate.customThumbnailPath = newCustomThumbnailData.filePath || '';
+            dataToUpdate.customThumbnailUrl = newCustomThumbnailData.downloadUrl ?? '';
+            dataToUpdate.customThumbnailPath = newCustomThumbnailData.filePath ?? '';
         }
 
         const currentDoc = await episodeRef.get();
