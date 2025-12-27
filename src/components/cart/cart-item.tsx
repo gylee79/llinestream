@@ -22,6 +22,7 @@ export function CartItem({ item }: CartItemProps) {
           src={item.thumbnailUrl}
           alt={item.name}
           fill
+          sizes="100px"
           className="object-cover"
         />
       </div>

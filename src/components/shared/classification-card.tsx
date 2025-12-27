@@ -1,4 +1,3 @@
-
 import Image from 'next/image';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +16,7 @@ export default function ClassificationCard({ classification }: ClassificationCar
             src={classification.thumbnailUrl || 'https://picsum.photos/seed/placeholder/600/400'}
             alt={classification.name}
             fill
+            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
             className="object-cover transition-transform duration-300 group-hover:scale-105"
           />
         </div>

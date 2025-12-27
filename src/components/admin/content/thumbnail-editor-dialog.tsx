@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -156,7 +155,7 @@ export default function ThumbnailEditorDialog({ isOpen, onClose, item, itemType 
             <Label>썸네일 미리보기</Label>
             <div className="relative w-full aspect-video rounded-md overflow-hidden bg-muted border">
                 {imagePreview ? (
-                    <Image src={imagePreview} alt="썸네일 미리보기" fill sizes="400px" className="object-cover" />
+                    <Image src={imagePreview} alt="썸네일 미리보기" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" />
                 ) : (
                     <div className="flex items-center justify-center h-full w-full">
                         <ImageIcon className="h-10 w-10 text-muted-foreground" />

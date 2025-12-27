@@ -184,9 +184,9 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             videoElement.currentTime = 1; // Seek to 1 second
         };
         
+        videoElement.addEventListener('loadeddata', onLoadedData);
         videoElement.addEventListener('seeked', onSeeked);
         videoElement.addEventListener('error', onError);
-        videoElement.addEventListener('loadeddata', onLoadedData);
 
         videoElement.load(); // Start loading the video
     });
@@ -437,7 +437,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
       </div>
       <div className="relative w-full aspect-video rounded-md overflow-hidden bg-muted border">
         {src ? (
-          <Image src={src} alt={`${label} preview`} fill sizes="200px" className="object-cover" />
+          <Image src={src} alt={`${label} preview`} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" />
         ) : (
           <div className="flex flex-col items-center justify-center h-full w-full text-center p-2">
             <ImageIcon className="h-8 w-8 text-muted-foreground" />

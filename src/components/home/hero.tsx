@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from 'next/image';
@@ -30,6 +29,7 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
           src={finalImageUrl}
           alt={title || 'Hero background'}
           fill
+          sizes="100vw"
           className="object-cover"
           priority
         />

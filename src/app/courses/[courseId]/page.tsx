@@ -59,6 +59,7 @@ export default function CourseDetailPage() {
                 src={course.thumbnailUrl}
                 alt={course.name}
                 fill
+                sizes="100vw"
                 className="object-cover"
             />
         ) : null}

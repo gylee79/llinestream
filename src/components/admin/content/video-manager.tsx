@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -17,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, PlusCircle, ImageIcon } from 'lucide-react';
-import type { Episode, Course } from '@/lib/types';
+import type { Episode, Course, Classification, Field, Instructor } from '@/lib/types';
 import VideoUploadDialog from '@/components/admin/content/video-upload-dialog';
 import {
   DropdownMenu,
@@ -31,6 +30,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
 import ThumbnailEditorDialog from '@/components/admin/content/thumbnail-editor-dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { sanitize } from '@/lib/utils';
 
 
 export default function VideoManager() {
@@ -42,10 +52,22 @@ export default function VideoManager() {
   
   const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
+
+  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
+  const { data: classifications, isLoading: classLoading } = useCollection<Classification>(classificationsQuery);
   
+  const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
+  const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
+
+  const instructorsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'instructors') : null), [firestore]);
+  const { data: instructors, isLoading: instructorsLoading } = useCollection<Instructor>(instructorsQuery);
+
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [isThumbnailDialogOpen, setThumbnailDialogOpen] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [episodeToDelete, setEpisodeToDelete] = useState<Episode | null>(null);
 
   const handleOpenUploadDialog = (episode: Episode | null = null) => {
     setSelectedEpisode(episode);
@@ -57,9 +79,24 @@ export default function VideoManager() {
     setThumbnailDialogOpen(true);
   };
 
+  const getFullCoursePath = (courseId: string): string => {
+    if (!courses || !classifications || !fields) return '? > ? > ?';
+    
+    const course = courses.find(c => c.id === courseId);
+    if (!course) return `? > ? > ${courseId}`;
 
-  const getCourseName = (courseId: string) => {
-    return courses?.find(c => c.id === courseId)?.name || 'N/A';
+    const classification = classifications.find(c => c.id === course.classificationId);
+    if (!classification) return `? > ? > ${course.name}`;
+
+    const field = fields.find(f => f.id === classification.fieldId);
+    if (!field) return `? > ${classification.name} > ${course.name}`;
+
+    return `${field.name} > ${classification.name} > ${course.name}`;
+  };
+
+  const getInstructorName = (instructorId?: string): string => {
+    if (!instructorId || !instructors) return 'N/A';
+    return instructors.find(i => i.id === instructorId)?.name || '알 수 없음';
   };
 
   const toggleFreeStatus = async (episode: Episode) => {
@@ -72,11 +109,16 @@ export default function VideoManager() {
     });
   };
 
-  const handleDeleteEpisode = async (episode: Episode) => {
-    if (!confirm(`정말로 '${episode.title}' 에피소드와 관련 비디오 파일을 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
+  const requestDeleteEpisode = (episode: Episode) => {
+    setEpisodeToDelete(episode);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!episodeToDelete) return;
+    
     try {
-        // Pass the entire episode object to the server action
-        const result = await deleteHierarchyItem('episodes', episode.id, episode);
+        const result = await deleteHierarchyItem('episodes', episodeToDelete.id, sanitize(episodeToDelete));
         if (result.success) {
             toast({
                 title: '삭제 완료',
@@ -93,10 +135,14 @@ export default function VideoManager() {
             title: '삭제 실패',
             description: errorMessage,
         });
+    } finally {
+        setIsDeleteDialogOpen(false);
+        setEpisodeToDelete(null);
     }
   };
 
-  const isLoading = episodesLoading || coursesLoading;
+
+  const isLoading = episodesLoading || coursesLoading || classLoading || fieldsLoading || instructorsLoading;
 
   return (
     <>
@@ -119,6 +165,7 @@ export default function VideoManager() {
                 <TableHead>제목</TableHead>
                 <TableHead>소속 상세분류</TableHead>
                 <TableHead>재생 시간(초)</TableHead>
+                <TableHead>강사</TableHead>
                 <TableHead>무료 여부</TableHead>
                 <TableHead className="text-right">관리</TableHead>
               </TableRow>
@@ -127,7 +174,7 @@ export default function VideoManager() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                        <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
+                        <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
                     </TableRow>
                 ))
               ) : (
@@ -151,8 +198,9 @@ export default function VideoManager() {
                         </div>
                     </TableCell>
                     <TableCell className="font-medium">{episode.title}</TableCell>
-                    <TableCell>{getCourseName(episode.courseId)}</TableCell>
+                    <TableCell>{getFullCoursePath(episode.courseId)}</TableCell>
                     <TableCell>{episode.duration}</TableCell>
+                    <TableCell>{getInstructorName(episode.instructorId)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Switch
@@ -185,7 +233,7 @@ export default function VideoManager() {
                           <DropdownMenuItem onClick={() => handleOpenThumbnailDialog(episode)}>
                             썸네일 수정
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteEpisode(episode)}>
+                          <DropdownMenuItem className="text-destructive" onClick={() => requestDeleteEpisode(episode)}>
                             삭제
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -198,6 +246,7 @@ export default function VideoManager() {
           </Table>
         </CardContent>
       </Card>
+      
       {isUploadDialogOpen && (
           <VideoUploadDialog 
             key={selectedEpisode?.id || 'new-upload'} 
@@ -206,6 +255,7 @@ export default function VideoManager() {
             episode={selectedEpisode}
           />
       )}
+
       {isThumbnailDialogOpen && selectedEpisode && (
           <ThumbnailEditorDialog
               key={`${selectedEpisode.id}-thumb`}
@@ -215,6 +265,26 @@ export default function VideoManager() {
               itemType="episodes"
           />
       )}
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>정말 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &apos;{episodeToDelete?.title}&apos; 에피소드와 관련된 비디오 파일을 모두 삭제합니다. 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

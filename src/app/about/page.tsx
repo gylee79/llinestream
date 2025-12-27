@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,6 +80,7 @@ export default function AboutPage() {
                 src={heroImageUrl || "https://picsum.photos/seed/smart-beauty/1600/900"}
                 alt="스마트 뷰티 교육"
                 fill
+                sizes="100vw"
                 className="object-cover brightness-50"
             />
         )}
@@ -145,7 +145,7 @@ export default function AboutPage() {
                 viewport={{ once: true, amount: 0.5 }}
                 transition={{ duration: 0.8 }}
             >
-                <Image src="https://picsum.photos/seed/ai-beauty/800/600" alt="AI 기반 교육" fill style={{objectFit: "cover"}} data-ai-hint="futuristic beauty technology"/>
+                <Image src="https://picsum.photos/seed/ai-beauty/800/600" alt="AI 기반 교육" fill sizes="(max-width: 768px) 100vw, 50vw" style={{objectFit: "cover"}} data-ai-hint="futuristic beauty technology"/>
             </motion.div>
             <div>
                 <h2 className="text-3xl font-bold tracking-tight">엘라인은 교육 방식부터 다릅니다.</h2>
