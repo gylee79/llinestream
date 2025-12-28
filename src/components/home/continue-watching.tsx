@@ -4,7 +4,7 @@
 import { useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
-import type { ViewHistoryItem, Course } from '@/lib/types';
+import type { ViewHistoryItem, Course, Episode } from '@/lib/types';
 import ContentCarousel from '@/components/shared/content-carousel';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -12,12 +12,11 @@ export default function ContinueWatching() {
     const { user } = useUser();
     const firestore = useFirestore();
 
-    // TODO: This should be replaced with actual view history fetching
-    const mockCourses: Course[] = [
-        { id: 'course-001', classificationId: 'class-01', name: 'React 마스터 클래스', description: 'React의 모든 것을 마스터합니다.', thumbnailUrl: 'https://picsum.photos/seed/101/600/400' },
-        { id: 'course-003', classificationId: 'class-03', name: '매일 30분 요가', description: '하루 30분으로 몸과 마음의 균형을 찾으세요.', thumbnailUrl: 'https://picsum.photos/seed/103/600/400' },
-        { id: 'course-007', classificationId: 'class-05', name: '비즈니스 영어 회화', description: '실전 비즈니스 상황에서 자신있게 소통하는 법을 배웁니다.', thumbnailUrl: 'https://picsum.photos/seed/107/600/400' },
-        { id: 'course-009', classificationId: 'class-01', name: 'Node.js 백엔드 개발', description: 'JavaScript로 확장 가능한 서버를 구축합니다.', thumbnailUrl: 'https://picsum.photos/seed/109/600/400' },
+    const mockEpisodes: Episode[] = [
+        { id: 'ep-001', courseId: 'course-001', title: '1. React 소개 및 환경 설정', duration: 980, isFree: true, videoUrl: '', thumbnailUrl: 'https://picsum.photos/seed/ep-001/600/400', createdAt: new Date() },
+        { id: 'ep-008', courseId: 'course-003', title: 'Week 1: 기본 자세 익히기', duration: 1800, isFree: true, videoUrl: '', thumbnailUrl: 'https://picsum.photos/seed/ep-008/600/400', createdAt: new Date() },
+        { id: 'ep-015', courseId: 'course-007', title: '1. 인사와 소개', duration: 1300, isFree: true, videoUrl: '', thumbnailUrl: 'https://picsum.photos/seed/ep-015/600/400', createdAt: new Date() },
+        { id: 'ep-019', courseId: 'course-009', title: '1. Express.js 시작하기', duration: 1200, isFree: true, videoUrl: '', thumbnailUrl: 'https://picsum.photos/seed/ep-019/600/400', createdAt: new Date() },
     ];
     
     
@@ -32,23 +31,23 @@ export default function ContinueWatching() {
 
     const { data: historyItems, isLoading: historyLoading } = useCollection<ViewHistoryItem>(historyQuery);
 
-    const coursesQuery = useMemoFirebase(() => {
+    const episodesQuery = useMemoFirebase(() => {
         if (!firestore) return null;
-        return collection(firestore, 'courses');
+        return collection(firestore, 'episodes');
     }, [firestore]);
     
-    const { data: allCourses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
+    const { data: allEpisodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
 
-    const watchedCourses = useMemo(() => {
-        if (!historyItems || !allCourses) return [];
-        // Get unique course IDs from history
-        const uniqueCourseIds = [...new Set(historyItems.map(item => item.courseId))];
-        // Map course IDs to actual course objects
-        return uniqueCourseIds.map(courseId => allCourses.find(c => c.id === courseId)).filter(Boolean) as Course[];
-    }, [historyItems, allCourses]);
+    const watchedEpisodes = useMemo(() => {
+        if (!historyItems || !allEpisodes) return [];
+        // Get unique episode IDs from history, preserving order
+        const uniqueEpisodeIds = [...new Set(historyItems.map(item => item.id))];
+        // Map episode IDs to actual episode objects
+        return uniqueEpisodeIds.map(episodeId => allEpisodes.find(e => e.id === episodeId)).filter(Boolean) as Episode[];
+    }, [historyItems, allEpisodes]);
     
-    const isLoading = historyLoading || coursesLoading;
-    const finalCourses = (watchedCourses && watchedCourses.length > 0) ? watchedCourses : mockCourses;
+    const isLoading = historyLoading || episodesLoading;
+    const finalItems = (watchedEpisodes && watchedEpisodes.length > 0) ? watchedEpisodes : mockEpisodes;
 
 
     if (isLoading) {
@@ -65,12 +64,12 @@ export default function ContinueWatching() {
         );
     }
     
-    if (finalCourses.length === 0) {
+    if (finalItems.length === 0) {
         return null;
     }
 
     return (
-        <ContentCarousel title="최근 시청 영상" courses={finalCourses} />
+        <ContentCarousel title="최근 시청 영상" items={finalItems} itemType="episode" />
     );
 }
 

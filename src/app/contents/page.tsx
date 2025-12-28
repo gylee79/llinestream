@@ -55,7 +55,8 @@ export default function ContentsPage() {
               <ContentCarousel
                 key={classification.id}
                 title={classification.name}
-                courses={classificationCourses}
+                items={classificationCourses}
+                itemType="course"
               />
             );
           })
