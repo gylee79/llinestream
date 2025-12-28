@@ -140,13 +140,11 @@ export default function CourseDetailPage() {
 
                 return (
                   <li key={episode.id} className="p-4">
-                    <button
+                    <div
                       className={cn(
                         "w-full flex items-start text-left transition-colors group",
-                        isPlayable ? "hover:bg-muted/50 cursor-pointer rounded-lg" : "opacity-60 cursor-not-allowed"
+                        isPlayable ? "hover:bg-muted/50 rounded-lg" : "opacity-60"
                       )}
-                      disabled={!isPlayable}
-                      aria-label={isPlayable ? `Play ${episode.title}`: `Locked: ${episode.title}`}
                     >
                       <div className="relative aspect-video w-32 md:w-40 rounded-md overflow-hidden bg-muted border flex-shrink-0">
                         {episode.thumbnailUrl ? (
@@ -177,7 +175,9 @@ export default function CourseDetailPage() {
                           <Lock className="w-5 h-5 text-muted-foreground" />
                         ) : (
                           <>
-                            <Play className="w-6 h-6 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                             <Button variant="ghost" size="icon" className="h-8 w-8 text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Play className="w-6 h-6" />
+                             </Button>
                              <Button variant="outline" size="sm" className="mt-2">
                                 <MessageSquare className="w-4 h-4 mr-2"/>
                                 채팅
@@ -185,7 +185,7 @@ export default function CourseDetailPage() {
                           </>
                         )}
                       </div>
-                    </button>
+                    </div>
                   </li>
                 );
               })}
