@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useState, useEffect } from "react"
@@ -31,6 +30,8 @@ interface PaymentDialogProps {
     selectedDuration: keyof Classification['prices'];
     selectedPrice: number;
     selectedLabel: string;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 }
 
 export default function PaymentDialog({ 
@@ -38,7 +39,9 @@ export default function PaymentDialog({
     classification,
     selectedDuration,
     selectedPrice,
-    selectedLabel
+    selectedLabel,
+    open,
+    onOpenChange
 }: PaymentDialogProps) {
     const { toast } = useToast();
     const { user } = useUser();
@@ -123,32 +126,60 @@ export default function PaymentDialog({
         }
     }
 
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        {children}
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="font-headline">{classification.name} 구독</DialogTitle>
-          <DialogDescription>
-            {'결제를 진행하여 \''}{classification.name}{'\' 카테고리의 모든 콘텐츠를 무제한으로 이용하세요.'}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="py-4">
-            <p className="font-semibold">{`결제 금액 (${selectedLabel})`}</p>
-            <p className="text-2xl font-bold">₩{new Intl.NumberFormat('ko-KR').format(selectedPrice)}</p>
-            <p className="text-sm text-muted-foreground mt-4">버튼 클릭 시 포트원 결제창으로 이동합니다.</p>
-        </div>
-        <DialogFooter>
-            <DialogClose asChild>
-                <Button variant="outline">취소</Button>
-            </DialogClose>
-            <Button onClick={handlePayment} disabled={!isSdkReady}>
-                {isSdkReady ? '결제하기' : '결제 모듈 로딩 중...'}
-            </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
+    // If 'open' and 'onOpenChange' are provided, use it as a controlled dialog
+    if (open !== undefined && onOpenChange) {
+        return (
+            <Dialog open={open} onOpenChange={onOpenChange}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="font-headline">이용권 구매</DialogTitle>
+                        <DialogDescription>
+                            이 콘텐츠를 시청하려면 {classification.name} 이용권이 필요합니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <p className="font-semibold">{`결제 상품: ${selectedLabel}`}</p>
+                        <p className="text-2xl font-bold">₩{new Intl.NumberFormat('ko-KR').format(selectedPrice)}</p>
+                        <p className="text-sm text-muted-foreground mt-4">결제하기 버튼을 누르면 포트원 결제창으로 이동합니다.</p>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>다음에</Button>
+                        <Button onClick={handlePayment} disabled={!isSdkReady}>
+                            {isSdkReady ? '결제하기' : '결제 모듈 로딩 중...'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
+    
+    // Default behavior as a triggered dialog
+    return (
+        <Dialog>
+        <DialogTrigger asChild>
+            {children}
+        </DialogTrigger>
+        <DialogContent>
+            <DialogHeader>
+            <DialogTitle className="font-headline">{classification.name} 구독</DialogTitle>
+            <DialogDescription>
+                {'결제를 진행하여 \'}{classification.name}{'\' 카테고리의 모든 콘텐츠를 무제한으로 이용하세요.'}
+            </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <p className="font-semibold">{`결제 금액 (${selectedLabel})`}</p>
+                <p className="text-2xl font-bold">₩{new Intl.NumberFormat('ko-KR').format(selectedPrice)}</p>
+                <p className="text-sm text-muted-foreground mt-4">버튼 클릭 시 포트원 결제창으로 이동합니다.</p>
+            </div>
+            <DialogFooter>
+                <DialogClose asChild>
+                    <Button variant="outline">취소</Button>
+                </DialogClose>
+                <Button onClick={handlePayment} disabled={!isSdkReady}>
+                    {isSdkReady ? '결제하기' : '결제 모듈 로딩 중...'}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+        </Dialog>
+    )
 }

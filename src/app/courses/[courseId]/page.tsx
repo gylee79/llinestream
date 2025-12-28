@@ -1,4 +1,3 @@
-
 'use client';
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
@@ -25,6 +24,7 @@ export default function CourseDetailPage() {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [selectedInstructor, setSelectedInstructor] = useState<Instructor | null>(null);
   const [isPlayerDialogOpen, setPlayerDialogOpen] = useState(false);
+  const [isPaymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', params.courseId) : null), [firestore, params.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
@@ -46,13 +46,18 @@ export default function CourseDetailPage() {
 
   const isLoading = courseLoading || episodesLoading || classificationLoading || instructorsLoading;
   
-  // Check user subscription
   const hasSubscription = !!(user && classification && user.activeSubscriptions?.[classification.id]);
 
   const handlePlayClick = (episode: Episode) => {
+    const isPlayable = episode.isFree || hasSubscription;
     setSelectedEpisode(episode);
     setSelectedInstructor(getInstructor(episode.instructorId) || null);
-    setPlayerDialogOpen(true);
+
+    if (isPlayable) {
+      setPlayerDialogOpen(true);
+    } else {
+      setPaymentDialogOpen(true);
+    }
   }
 
   if (!isLoading && !course) {
@@ -88,20 +93,7 @@ export default function CourseDetailPage() {
         ) : null}
         <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-4">
           <div className="text-center">
-            <h1 className="font-headline text-4xl font-bold">{course.name}</h1>
-            {!hasSubscription && classification && classification.prices.day30 > 0 && (
-              <div className="mt-6">
-                <p className="mb-4 text-white/80">이 강좌의 모든 에피소드를 보려면 이용권이 필요합니다.</p>
-                <PaymentDialog 
-                    classification={classification}
-                    selectedDuration="day30"
-                    selectedPrice={classification.prices.day30}
-                    selectedLabel="30일 이용권"
-                >
-                    <Button size="lg">이용권 구매하기</Button>
-                </PaymentDialog>
-              </div>
-            )}
+            {/* Content removed as per user request */}
           </div>
         </div>
       </div>
@@ -150,10 +142,7 @@ export default function CourseDetailPage() {
                 return (
                   <li key={episode.id} className={cn("p-4 transition-colors", isSelected && "bg-muted")}>
                     <div
-                      className={cn(
-                        "w-full flex items-start text-left group",
-                        !isPlayable && "opacity-60"
-                      )}
+                      className="w-full flex items-start text-left group"
                     >
                       <div className="relative aspect-video w-24 md:w-28 rounded-md overflow-hidden bg-muted border flex-shrink-0">
                         {episode.thumbnailUrl ? (
@@ -186,19 +175,13 @@ export default function CourseDetailPage() {
                          </div>
                       </div>
                       <div className="flex flex-row items-center justify-center gap-2 ml-auto pl-2">
-                        {!isPlayable ? (
-                          <Lock className="w-5 h-5 text-muted-foreground" />
-                        ) : (
-                          <>
-                             <Button variant="outline" size="sm">
-                                <MessageSquare className="w-4 h-4 mr-2"/>
-                                채팅
-                             </Button>
-                             <Button variant="ghost" size="icon" className="h-12 w-12 text-primary" onClick={() => handlePlayClick(episode)}>
-                                <Play className="w-8 h-8" />
-                             </Button>
-                          </>
-                        )}
+                         <Button variant="outline" size="sm">
+                            <MessageSquare className="w-4 h-4 mr-2"/>
+                            채팅
+                         </Button>
+                         <Button variant="ghost" size="icon" className="h-12 w-12 text-primary" onClick={() => handlePlayClick(episode)}>
+                            <Play className="w-8 h-8" />
+                         </Button>
                       </div>
                     </div>
                   </li>
@@ -209,6 +192,7 @@ export default function CourseDetailPage() {
           </CardContent>
         </Card>
       </div>
+      
       {selectedEpisode && (
         <VideoPlayerDialog 
             isOpen={isPlayerDialogOpen}
@@ -216,6 +200,20 @@ export default function CourseDetailPage() {
             episode={selectedEpisode}
             instructor={selectedInstructor}
         />
+      )}
+
+      {selectedEpisode && !selectedEpisode.isFree && classification && (
+         <PaymentDialog
+            open={isPaymentDialogOpen}
+            onOpenChange={setPaymentDialogOpen}
+            classification={classification}
+            selectedDuration="day30"
+            selectedPrice={classification.prices.day30}
+            selectedLabel="30일 이용권"
+        >
+            {/* The trigger is now handled programmatically, so no child needed here */}
+            <div></div> 
+        </PaymentDialog>
       )}
     </div>
   );
