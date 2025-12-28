@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -132,32 +133,90 @@ function InstructorRegistrationDialog({ open, onOpenChange }: { open: boolean, o
                   </FormItem>
                 )}
               />
-              <div className="space-y-2">
-                  <FormLabel>연락처</FormLabel>
-                  <div className="flex items-center gap-2">
-                      <FormField control={form.control} name="phone1" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input maxLength={3} {...field} /></FormControl></FormItem>)} />
-                      <span>-</span>
-                      <FormField control={form.control} name="phone2" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input maxLength={4} {...field} /></FormControl></FormItem>)} />
-                      <span>-</span>
-                      <FormField control={form.control} name="phone3" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input maxLength={4} {...field} /></FormControl></FormItem>)} />
-                  </div>
-                  <FormMessage>
-                      {form.formState.errors.phone1?.message || form.formState.errors.phone2?.message || form.formState.errors.phone3?.message}
-                  </FormMessage>
-              </div>
-               <div className="space-y-2">
-                  <FormLabel>생년월일</FormLabel>
-                  <div className="flex items-center gap-2">
-                      <FormField control={form.control} name="year" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input placeholder="YYYY" maxLength={4} {...field} /></FormControl></FormItem>)} />
-                      <span>-</span>
-                      <FormField control={form.control} name="month" render={({ field }) => (<FormItem className="w-20"><FormControl><Input placeholder="MM" maxLength={2} {...field} /></FormControl></FormItem>)} />
-                      <span>-</span>
-                      <FormField control={form.control} name="day" render={({ field }) => (<FormItem className="w-20"><FormControl><Input placeholder="DD" maxLength={2} {...field} /></FormControl></FormItem>)} />
-                  </div>
-                   <FormMessage>
-                      {form.formState.errors.year?.message || form.formState.errors.month?.message || form.formState.errors.day?.message}
-                  </FormMessage>
-              </div>
+              <FormItem>
+                <FormLabel>연락처</FormLabel>
+                <div className="flex items-center gap-2">
+                  <FormField
+                    control={form.control}
+                    name="phone1"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormControl><Input maxLength={3} {...field} /></FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <span>-</span>
+                  <FormField
+                    control={form.control}
+                    name="phone2"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormControl><Input maxLength={4} {...field} /></FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <span>-</span>
+                  <FormField
+                    control={form.control}
+                    name="phone3"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormControl><Input maxLength={4} {...field} /></FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormMessage>
+                  {form.formState.errors.phone1?.message ||
+                    form.formState.errors.phone2?.message ||
+                    form.formState.errors.phone3?.message}
+                </FormMessage>
+              </FormItem>
+              <FormItem>
+                <FormLabel>생년월일</FormLabel>
+                <div className="flex items-center gap-2">
+                  <FormField
+                    control={form.control}
+                    name="year"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormControl>
+                          <Input placeholder="YYYY" maxLength={4} {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <span>-</span>
+                  <FormField
+                    control={form.control}
+                    name="month"
+                    render={({ field }) => (
+                      <FormItem className="w-20">
+                        <FormControl>
+                          <Input placeholder="MM" maxLength={2} {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <span>-</span>
+                  <FormField
+                    control={form.control}
+                    name="day"
+                    render={({ field }) => (
+                      <FormItem className="w-20">
+                        <FormControl>
+                          <Input placeholder="DD" maxLength={2} {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormMessage>
+                  {form.formState.errors.year?.message ||
+                    form.formState.errors.month?.message ||
+                    form.formState.errors.day?.message}
+                </FormMessage>
+              </FormItem>
             </div>
              <DialogFooter className="pt-4">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>취소</Button>
