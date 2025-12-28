@@ -1,3 +1,4 @@
+
 'use client';
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
@@ -149,6 +150,9 @@ export default function CourseDetailPage() {
                             <MessageSquare className="w-4 h-4 mr-2"/>
                             채팅
                          </Button>
+                        <Badge variant={episode.isFree ? 'default' : 'destructive'} className="whitespace-nowrap">
+                            {episode.isFree ? '무료' : '유료'}
+                        </Badge>
                          <Button variant="ghost" size="icon" className="h-12 w-12 text-primary" onClick={() => handlePlayClick(episode)}>
                             <Play className="w-8 h-8" />
                          </Button>
