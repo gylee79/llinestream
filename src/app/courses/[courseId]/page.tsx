@@ -152,7 +152,7 @@ export default function CourseDetailPage() {
                         !isPlayable && "opacity-60"
                       )}
                     >
-                      <div className="relative aspect-video w-32 md:w-40 rounded-md overflow-hidden bg-muted border flex-shrink-0">
+                      <div className="relative aspect-video w-24 md:w-28 rounded-md overflow-hidden bg-muted border flex-shrink-0">
                         {episode.thumbnailUrl ? (
                            <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="(max-width: 768px) 33vw, 20vw" className="object-cover" />
                         ) : (
@@ -185,7 +185,7 @@ export default function CourseDetailPage() {
                             <span>{formatDuration(episode.duration)}</span>
                          </div>
                       </div>
-                      <div className="flex flex-col items-center justify-center gap-2 ml-auto pl-2">
+                      <div className="flex flex-row items-center justify-center gap-2 ml-auto pl-2">
                         {!isPlayable ? (
                           <Lock className="w-5 h-5 text-muted-foreground" />
                         ) : (
@@ -193,7 +193,7 @@ export default function CourseDetailPage() {
                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handlePlayClick(episode)}>
                                 <Play className="w-6 h-6" />
                              </Button>
-                             <Button variant="outline" size="sm" className="mt-2">
+                             <Button variant="outline" size="sm">
                                 <MessageSquare className="w-4 h-4 mr-2"/>
                                 채팅
                              </Button>
@@ -220,4 +220,3 @@ export default function CourseDetailPage() {
     </div>
   );
 }
-
