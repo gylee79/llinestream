@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -36,29 +37,30 @@ export default function AdminUsersPage() {
   const getActiveSubscriptions = (user: User) => {
     if (coursesLoading) return '로딩 중...';
     if (!user.activeSubscriptions || !courses) return '없음';
-
-    const activeSubIds = Object.keys(user.activeSubscriptions);
-    if (activeSubIds.length === 0) return '없음';
-    
-    const subNames = activeSubIds
-      .map(id => courses.find(c => c.id === id)?.name)
-      .filter(Boolean); // Filter out undefined names
-
-    if (subNames.length === 0) return '없음';
-    
+  
+    const activeSubs = Object.entries(user.activeSubscriptions);
+    if (activeSubs.length === 0) return '없음';
+  
+    const subDetails = activeSubs.map(([courseId, subData]) => {
+      const courseName = courses.find(c => c.id === courseId)?.name;
+      if (!courseName) return null;
+      return {
+        name: courseName,
+        expiresAt: toDisplayDate(subData.expiresAt),
+      };
+    }).filter(Boolean);
+  
+    if (subDetails.length === 0) return '없음';
+  
     return (
       <div className="flex flex-wrap gap-1">
-        {subNames.map(name => <Badge key={name} variant="secondary">{name}</Badge>)}
+        {subDetails.map((sub, index) => (
+          <Badge key={index} variant="secondary">
+            {sub.name} ({sub.expiresAt})
+          </Badge>
+        ))}
       </div>
     );
-  };
-
-  const getFinalExpiry = (user: User) => {
-    if (!user.activeSubscriptions) return 'N/A';
-    const dates = Object.values(user.activeSubscriptions).map(s => toJSDate(s.expiresAt).getTime());
-    if (dates.length === 0) return 'N/A';
-    const maxDate = new Date(Math.max(...dates));
-    return maxDate.toLocaleDateString('ko-KR');
   };
 
   const openDetails = (user: User) => {
@@ -102,8 +104,7 @@ export default function AdminUsersPage() {
                   <TableHead>연락처</TableHead>
                   <TableHead>역할</TableHead>
                   <TableHead>가입일</TableHead>
-                  <TableHead>활성 구독</TableHead>
-                  <TableHead>최종 만료일</TableHead>
+                  <TableHead>활성 구독 (만료일)</TableHead>
                   <TableHead className="text-right">관리</TableHead>
                 </TableRow>
               </TableHeader>
@@ -111,7 +112,7 @@ export default function AdminUsersPage() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={8}>
+                      <TableCell colSpan={7}>
                         <Skeleton className="h-8 w-full" />
                       </TableCell>
                     </TableRow>
@@ -129,7 +130,6 @@ export default function AdminUsersPage() {
                       </TableCell>
                       <TableCell>{toDisplayDate(user.createdAt) || 'N/A'}</TableCell>
                       <TableCell>{getActiveSubscriptions(user)}</TableCell>
-                      <TableCell>{getFinalExpiry(user)}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="outline" size="sm" onClick={() => openDetails(user)}>수정</Button>
                       </TableCell>
