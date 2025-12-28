@@ -1,7 +1,7 @@
 'use client';
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
-import { Lock, Play, MessageSquare, ImageIcon } from 'lucide-react';
+import { Lock, Play, MessageSquare, ImageIcon, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -11,12 +11,16 @@ import { doc, collection, query, where } from 'firebase/firestore';
 import type { Course, Episode, Classification, Instructor } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useState, useEffect } from 'react';
+import { Badge } from '@/components/ui/badge';
 
 
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
   const firestore = useFirestore();
   const { user } = useUser();
+  
+  const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', params.courseId) : null), [firestore, params.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
@@ -37,15 +41,21 @@ export default function CourseDetailPage() {
   const { data: instructors, isLoading: instructorsLoading } = useCollection<Instructor>(instructorsQuery);
 
   const isLoading = courseLoading || episodesLoading || classificationLoading || instructorsLoading;
+  
+  // Check user subscription
+  const hasSubscription = !!(user && classification && user.activeSubscriptions?.[classification.id]);
+
+  useEffect(() => {
+      if (episodes && episodes.length > 0 && !selectedEpisode) {
+          const firstPlayable = episodes.find(ep => ep.isFree || hasSubscription);
+          setSelectedEpisode(firstPlayable || null);
+      }
+  }, [episodes, hasSubscription, selectedEpisode]);
+
 
   if (!isLoading && !course) {
     notFound();
   }
-
-  // Check user subscription
-  const hasSubscription = !!(user && classification && user.activeSubscriptions?.[classification.id]);
-
-  const firstEpisode = episodes?.[0];
   
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -58,10 +68,26 @@ export default function CourseDetailPage() {
     return instructors.find(i => i.id === instructorId);
   }
 
-  const PlayerOverlay = () => {
+  const PlayerContent = () => {
     if (isLoading || !course) {
       return <Skeleton className="aspect-video w-full" />;
     }
+
+    const episodeToPlay = selectedEpisode;
+    const canPlaySelected = episodeToPlay && (episodeToPlay.isFree || hasSubscription);
+
+    if (canPlaySelected) {
+       return (
+            <div className="relative aspect-video w-full bg-black">
+                <video key={episodeToPlay.id} controls autoPlay className="w-full h-full" poster={episodeToPlay.thumbnailUrl}>
+                    <source src={episodeToPlay.videoUrl} type="video/mp4" />
+                    브라우저가 비디오 태그를 지원하지 않습니다.
+                </video>
+            </div>
+       )
+    }
+    
+    // Default overlay for locked content or no selection
     return (
       <div className="relative aspect-video w-full bg-black">
         {course.thumbnailUrl ? (
@@ -74,30 +100,21 @@ export default function CourseDetailPage() {
             />
         ) : null}
         <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white p-4">
-          {!hasSubscription && classification && classification.prices.day30 > 0 ? (
-            <div className="text-center bg-black/70 p-8 rounded-lg">
-              <Lock className="w-12 h-12 mx-auto mb-4"/>
-              <h2 className="text-2xl font-bold">이용권이 필요한 콘텐츠입니다.</h2>
-              <p className="mt-2 mb-6 text-white/80">이 콘텐츠를 시청하려면 이용권을 구매해주세요.</p>
-              <PaymentDialog 
-                classification={classification}
-                selectedDuration="day30"
-                selectedPrice={classification.prices.day30}
-                selectedLabel="30일 이용권"
-              >
-                <Button size="lg">이용권 구매하러 가기</Button>
-              </PaymentDialog>
-            </div>
-          ) : (
-            <>
-              <h2 className="text-3xl font-bold font-headline">{course.name}</h2>
-              <p className="mt-2 max-w-2xl text-center">{course.description}</p>
-              <Button size="lg" className="mt-8">
-                <Play className="mr-2 h-5 w-5 fill-current" />
-                {firstEpisode ? '첫화 재생' : '재생'}
-              </Button>
-            </>
-          )}
+          <div className="text-center bg-black/70 p-8 rounded-lg">
+            <Lock className="w-12 h-12 mx-auto mb-4"/>
+            <h2 className="text-2xl font-bold">이용권이 필요한 콘텐츠입니다.</h2>
+            <p className="mt-2 mb-6 text-white/80">이 콘텐츠를 시청하려면 이용권을 구매해주세요.</p>
+            {classification && classification.prices.day30 > 0 && (
+                <PaymentDialog 
+                    classification={classification}
+                    selectedDuration="day30"
+                    selectedPrice={classification.prices.day30}
+                    selectedLabel="30일 이용권"
+                >
+                    <Button size="lg">이용권 구매하러 가기</Button>
+                </PaymentDialog>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -107,7 +124,7 @@ export default function CourseDetailPage() {
     <div>
       <div className="bg-black">
         <div className="container mx-auto max-w-5xl">
-          <PlayerOverlay />
+          <PlayerContent />
         </div>
       </div>
       <div className="container mx-auto max-w-5xl py-8">
@@ -137,13 +154,14 @@ export default function CourseDetailPage() {
               {episodes?.map((episode, index) => {
                 const isPlayable = episode.isFree || hasSubscription;
                 const instructor = getInstructor(episode.instructorId);
+                const isSelected = selectedEpisode?.id === episode.id;
 
                 return (
-                  <li key={episode.id} className="p-4">
+                  <li key={episode.id} className={cn("p-4 transition-colors", isSelected && "bg-muted")}>
                     <div
                       className={cn(
-                        "w-full flex items-start text-left transition-colors group",
-                        isPlayable ? "hover:bg-muted/50 rounded-lg" : "opacity-60"
+                        "w-full flex items-start text-left group",
+                        !isPlayable && "opacity-60"
                       )}
                     >
                       <div className="relative aspect-video w-32 md:w-40 rounded-md overflow-hidden bg-muted border flex-shrink-0">
@@ -154,9 +172,15 @@ export default function CourseDetailPage() {
                                 <ImageIcon className="w-8 h-8 text-muted-foreground" />
                             </div>
                         )}
+                         <Badge variant={episode.isFree ? "secondary" : "destructive"} className="absolute top-2 left-2">
+                            {episode.isFree ? '무료' : '구독 필요'}
+                         </Badge>
                       </div>
                       <div className="flex-grow px-4">
-                        <p className="text-muted-foreground text-sm font-mono">{`EP ${index + 1}`}</p>
+                        <div className="flex items-center gap-2">
+                           {isSelected && <CheckCircle2 className="w-5 h-5 text-primary" />}
+                           <p className="text-muted-foreground text-sm font-mono">{`EP ${index + 1}`}</p>
+                        </div>
                         <p className="font-medium leading-tight mt-1">{episode.title}</p>
                          {instructor && (
                             <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
@@ -175,7 +199,7 @@ export default function CourseDetailPage() {
                           <Lock className="w-5 h-5 text-muted-foreground" />
                         ) : (
                           <>
-                             <Button variant="ghost" size="icon" className="h-8 w-8 text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                             <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setSelectedEpisode(episode)}>
                                 <Play className="w-6 h-6" />
                              </Button>
                              <Button variant="outline" size="sm" className="mt-2">
