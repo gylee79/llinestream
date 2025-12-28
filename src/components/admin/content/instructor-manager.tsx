@@ -1,9 +1,17 @@
-
 'use client';
 
+import { useState } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -29,6 +37,7 @@ import type { Instructor } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toDisplayDate } from '@/lib/date-helpers';
+import { PlusCircle } from 'lucide-react';
 
 const instructorFormSchema = z.object({
   name: z.string().min(2, { message: '이름은 2자 이상이어야 합니다.' }),
@@ -43,13 +52,10 @@ const instructorFormSchema = z.object({
 
 type InstructorFormValues = z.infer<typeof instructorFormSchema>;
 
-export default function InstructorManager() {
+function InstructorRegistrationDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const instructorsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'instructors'), orderBy('createdAt', 'desc')) : null), [firestore]);
-  const { data: instructors, isLoading } = useCollection<Instructor>(instructorsQuery);
-
   const form = useForm<InstructorFormValues>({
     resolver: zodResolver(instructorFormSchema),
     defaultValues: {
@@ -63,7 +69,7 @@ export default function InstructorManager() {
       day: '',
     },
   });
-  
+
   const onSubmit: SubmitHandler<InstructorFormValues> = async (data) => {
     if (!firestore) return;
 
@@ -83,6 +89,7 @@ export default function InstructorManager() {
             description: `${data.name} 강사님이 성공적으로 등록되었습니다.`,
         });
         form.reset();
+        onOpenChange(false);
     } catch (error) {
       console.error('Error adding instructor:', error);
       toast({
@@ -94,76 +101,96 @@ export default function InstructorManager() {
   };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>새 강사 등록</CardTitle>
-          <CardDescription>아래 폼을 작성하여 새로운 강사를 시스템에 등록합니다.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>이름</FormLabel>
-                      <FormControl><Input placeholder="홍길동" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>이메일</FormLabel>
-                      <FormControl><Input type="email" placeholder="instructor@example.com" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="space-y-2">
-                    <FormLabel>연락처</FormLabel>
-                    <div className="flex items-center gap-2">
-                        <FormField control={form.control} name="phone1" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input maxLength={3} {...field} /></FormControl></FormItem>)} />
-                        <span>-</span>
-                        <FormField control={form.control} name="phone2" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input maxLength={4} {...field} /></FormControl></FormItem>)} />
-                        <span>-</span>
-                        <FormField control={form.control} name="phone3" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input maxLength={4} {...field} /></FormControl></FormItem>)} />
-                    </div>
-                    <FormMessage>
-                        {form.formState.errors.phone1?.message || form.formState.errors.phone2?.message || form.formState.errors.phone3?.message}
-                    </FormMessage>
-                </div>
-                 <div className="space-y-2">
-                    <FormLabel>생년월일</FormLabel>
-                    <div className="flex items-center gap-2">
-                        <FormField control={form.control} name="year" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input placeholder="YYYY" maxLength={4} {...field} /></FormControl></FormItem>)} />
-                        <span>-</span>
-                        <FormField control={form.control} name="month" render={({ field }) => (<FormItem className="w-20"><FormControl><Input placeholder="MM" maxLength={2} {...field} /></FormControl></FormItem>)} />
-                        <span>-</span>
-                        <FormField control={form.control} name="day" render={({ field }) => (<FormItem className="w-20"><FormControl><Input placeholder="DD" maxLength={2} {...field} /></FormControl></FormItem>)} />
-                    </div>
-                     <FormMessage>
-                        {form.formState.errors.year?.message || form.formState.errors.month?.message || form.formState.errors.day?.message}
-                    </FormMessage>
-                </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>새 강사 등록</DialogTitle>
+          <DialogDescription>아래 폼을 작성하여 새로운 강사를 시스템에 등록합니다.</DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>이름</FormLabel>
+                    <FormControl><Input placeholder="홍길동" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>이메일</FormLabel>
+                    <FormControl><Input type="email" placeholder="instructor@example.com" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="space-y-2">
+                  <FormLabel>연락처</FormLabel>
+                  <div className="flex items-center gap-2">
+                      <FormField control={form.control} name="phone1" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input maxLength={3} {...field} /></FormControl></FormItem>)} />
+                      <span>-</span>
+                      <FormField control={form.control} name="phone2" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input maxLength={4} {...field} /></FormControl></FormItem>)} />
+                      <span>-</span>
+                      <FormField control={form.control} name="phone3" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input maxLength={4} {...field} /></FormControl></FormItem>)} />
+                  </div>
+                  <FormMessage>
+                      {form.formState.errors.phone1?.message || form.formState.errors.phone2?.message || form.formState.errors.phone3?.message}
+                  </FormMessage>
               </div>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? '등록 중...' : '강사 등록'}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+               <div className="space-y-2">
+                  <FormLabel>생년월일</FormLabel>
+                  <div className="flex items-center gap-2">
+                      <FormField control={form.control} name="year" render={({ field }) => (<FormItem className="flex-1"><FormControl><Input placeholder="YYYY" maxLength={4} {...field} /></FormControl></FormItem>)} />
+                      <span>-</span>
+                      <FormField control={form.control} name="month" render={({ field }) => (<FormItem className="w-20"><FormControl><Input placeholder="MM" maxLength={2} {...field} /></FormControl></FormItem>)} />
+                      <span>-</span>
+                      <FormField control={form.control} name="day" render={({ field }) => (<FormItem className="w-20"><FormControl><Input placeholder="DD" maxLength={2} {...field} /></FormControl></FormItem>)} />
+                  </div>
+                   <FormMessage>
+                      {form.formState.errors.year?.message || form.formState.errors.month?.message || form.formState.errors.day?.message}
+                  </FormMessage>
+              </div>
+            </div>
+             <DialogFooter className="pt-4">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>취소</Button>
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? '등록 중...' : '강사 등록'}
+                </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
+export default function InstructorManager() {
+  const firestore = useFirestore();
+  const [isRegisterDialogOpen, setRegisterDialogOpen] = useState(false);
+  
+  const instructorsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'instructors'), orderBy('createdAt', 'desc')) : null), [firestore]);
+  const { data: instructors, isLoading } = useCollection<Instructor>(instructorsQuery);
+
+  return (
+    <>
       <Card>
-        <CardHeader>
-          <CardTitle>등록된 강사 목록</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>등록된 강사 목록</CardTitle>
+            <CardDescription>시스템에 등록된 전체 강사 목록입니다.</CardDescription>
+          </div>
+          <Button onClick={() => setRegisterDialogOpen(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            강사 등록
+          </Button>
         </CardHeader>
         <CardContent>
           <Table>
@@ -204,6 +231,11 @@ export default function InstructorManager() {
           </Table>
         </CardContent>
       </Card>
-    </div>
+      
+      <InstructorRegistrationDialog 
+        open={isRegisterDialogOpen}
+        onOpenChange={setRegisterDialogOpen}
+      />
+    </>
   );
 }

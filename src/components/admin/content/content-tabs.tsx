@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import HierarchyManager from "@/components/admin/content/hierarchy-manager";
-import PricingManager from "@/app/admin/content/pricing-manager";
+import PricingManager from "@/components/admin/content/pricing-manager";
 import VideoManager from "@/app/admin/content/video-manager";
 import InstructorManager from "@/components/admin/content/instructor-manager";
 import { Skeleton } from '@/components/ui/skeleton';
@@ -48,5 +47,3 @@ export default function ContentTabs() {
     </Tabs>
   );
 }
-
-    
