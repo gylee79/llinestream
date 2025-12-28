@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import PaymentDialog from '@/components/shared/payment-dialog';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where } from 'firebase/firestore';
-import type { Course, Episode, Classification, Instructor } from '@/lib/types';
+import type { Course, Episode, Classification, Instructor, Field } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useState, useEffect } from 'react';
@@ -41,10 +41,16 @@ export default function CourseDetailPage() {
   );
   const { data: classification, isLoading: classificationLoading } = useDoc<Classification>(classificationRef);
 
+  const fieldRef = useMemoFirebase(() =>
+    firestore && classification?.fieldId ? doc(firestore, 'fields', classification.fieldId) : null,
+    [firestore, classification?.fieldId]
+  );
+  const { data: field, isLoading: fieldLoading } = useDoc<Field>(fieldRef);
+
   const instructorsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'instructors') : null), [firestore]);
   const { data: instructors, isLoading: instructorsLoading } = useCollection<Instructor>(instructorsQuery);
 
-  const isLoading = courseLoading || episodesLoading || classificationLoading || instructorsLoading;
+  const isLoading = courseLoading || episodesLoading || classificationLoading || instructorsLoading || fieldLoading;
   
   // Check user subscription
   const hasSubscription = !!(user && classification && user.activeSubscriptions?.[classification.id]);
@@ -128,7 +134,12 @@ export default function CourseDetailPage() {
           </>
         )}
         
-        <h2 className="font-headline text-2xl font-bold mt-12 mb-4">에피소드 목록</h2>
+        {isLoading ? <Skeleton className="h-8 w-1/2 mt-12 mb-4" /> : field && classification && course && (
+            <h2 className="font-headline text-2xl font-bold mt-12 mb-4">
+                {`${field.name} > ${classification.name} > ${course.name}`}
+            </h2>
+        )}
+
         <Card>
           <CardContent className="p-0">
             {episodesLoading ? (
@@ -139,7 +150,7 @@ export default function CourseDetailPage() {
               </div>
             ) : (
             <ul className="divide-y">
-              {episodes?.map((episode, index) => {
+              {episodes?.map((episode) => {
                 const isPlayable = episode.isFree || hasSubscription;
                 const instructor = getInstructor(episode.instructorId);
                 const isSelected = selectedEpisode?.id === episode.id && isPlayerDialogOpen;
@@ -165,12 +176,9 @@ export default function CourseDetailPage() {
                          </Badge>
                       </div>
                       <div className="flex-grow px-4">
-                        <div className="flex items-center gap-2">
+                         <div className="flex items-center gap-2">
                            {isSelected && <CheckCircle2 className="w-5 h-5 text-primary" />}
-                           {classification && course && (
-                            <p className="text-muted-foreground text-xs font-mono">{`${classification.name} > ${course.name}`}</p>
-                           )}
-                        </div>
+                         </div>
                         <p className="font-medium leading-tight mt-1">{episode.title}</p>
                          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
                             {instructor && (
