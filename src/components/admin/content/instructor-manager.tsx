@@ -133,15 +133,16 @@ function InstructorRegistrationDialog({ open, onOpenChange }: { open: boolean, o
                   </FormItem>
                 )}
               />
-              <FormItem>
+              <FormItem className="md:col-span-2">
                 <FormLabel>연락처</FormLabel>
-                <div className="flex items-center gap-2">
+                <div className="flex items-start gap-2">
                   <FormField
                     control={form.control}
                     name="phone1"
                     render={({ field }) => (
                       <FormItem className="flex-1">
                         <FormControl><Input maxLength={3} {...field} /></FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -152,6 +153,7 @@ function InstructorRegistrationDialog({ open, onOpenChange }: { open: boolean, o
                     render={({ field }) => (
                       <FormItem className="flex-1">
                         <FormControl><Input maxLength={4} {...field} /></FormControl>
+                         <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -162,19 +164,15 @@ function InstructorRegistrationDialog({ open, onOpenChange }: { open: boolean, o
                     render={({ field }) => (
                       <FormItem className="flex-1">
                         <FormControl><Input maxLength={4} {...field} /></FormControl>
+                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
-                <FormMessage>
-                  {form.formState.errors.phone1?.message ||
-                    form.formState.errors.phone2?.message ||
-                    form.formState.errors.phone3?.message}
-                </FormMessage>
               </FormItem>
-              <FormItem>
+              <FormItem className="md:col-span-2">
                 <FormLabel>생년월일</FormLabel>
-                <div className="flex items-center gap-2">
+                <div className="flex items-start gap-2">
                   <FormField
                     control={form.control}
                     name="year"
@@ -183,6 +181,7 @@ function InstructorRegistrationDialog({ open, onOpenChange }: { open: boolean, o
                         <FormControl>
                           <Input placeholder="YYYY" maxLength={4} {...field} />
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -195,11 +194,12 @@ function InstructorRegistrationDialog({ open, onOpenChange }: { open: boolean, o
                         <FormControl>
                           <Input placeholder="MM" maxLength={2} {...field} />
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
                   <span>-</span>
-                  <FormField
+                   <FormField
                     control={form.control}
                     name="day"
                     render={({ field }) => (
@@ -207,15 +207,11 @@ function InstructorRegistrationDialog({ open, onOpenChange }: { open: boolean, o
                         <FormControl>
                           <Input placeholder="DD" maxLength={2} {...field} />
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
-                <FormMessage>
-                  {form.formState.errors.year?.message ||
-                    form.formState.errors.month?.message ||
-                    form.formState.errors.day?.message}
-                </FormMessage>
               </FormItem>
             </div>
              <DialogFooter className="pt-4">
