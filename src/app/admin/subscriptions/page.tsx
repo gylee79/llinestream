@@ -78,16 +78,17 @@ export default function AdminSubscriptionsPage() {
               <TableRow>
                 <TableHead>사용자</TableHead>
                 <TableHead>이용권(분류)</TableHead>
+                <TableHead>지급토큰</TableHead>
                 <TableHead>결제일</TableHead>
                 <TableHead>만료일</TableHead>
-                <TableHead>상태</TableHead>
+                <TableHead>상태(남은토큰)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 ))
               ) : subscriptions && subscriptions.length > 0 ? (
@@ -96,6 +97,7 @@ export default function AdminSubscriptionsPage() {
                       <TableRow key={sub.id}>
                         <TableCell className="font-medium">{getUserName(sub.userId)}</TableCell>
                         <TableCell>{getClassificationName(sub.classificationId)}</TableCell>
+                        <TableCell>N/A</TableCell>
                         <TableCell>{toDisplayDate(sub.purchasedAt)}</TableCell>
                         <TableCell>{toDisplayDate(sub.expiresAt)}</TableCell>
                         <TableCell>{sub.expiresAt && getSubscriptionStatus(toJSDate(sub.expiresAt))}</TableCell>
@@ -104,7 +106,7 @@ export default function AdminSubscriptionsPage() {
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center h-24">
+                  <TableCell colSpan={6} className="text-center h-24">
                     구독 내역이 없습니다.
                   </TableCell>
                 </TableRow>
