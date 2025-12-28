@@ -185,7 +185,7 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
                     <SelectTrigger className="w-[180px]"><SelectValue placeholder="분류 선택" /></SelectTrigger>
                     <SelectContent>{classifications?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                 </Select>
-                <Input type="number" placeholder="일수" className="w-24" value={bonusDays} onChange={e => setBonusDays(e.target.value)} />
+                <Input type="number" placeholder="일수(토큰)" className="w-24" value={bonusDays} onChange={e => setBonusDays(e.target.value)} />
                 <Button onClick={handleAddBonusDays}>추가</Button>
             </div>
           </TabsContent>
