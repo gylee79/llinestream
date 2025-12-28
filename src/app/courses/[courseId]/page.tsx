@@ -75,38 +75,8 @@ export default function CourseDetailPage() {
     return instructors.find(i => i.id === instructorId);
   }
 
-  const CourseHero = () => {
-    if (isLoading || !course) {
-      return <Skeleton className="aspect-video w-full" />;
-    }
-    
-    return (
-      <div className="relative aspect-video w-full bg-black">
-        {course.thumbnailUrl ? (
-            <Image
-                src={course.thumbnailUrl}
-                alt={course.name}
-                fill
-                sizes="100vw"
-                className="object-cover opacity-50"
-            />
-        ) : null}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-4">
-          <div className="text-center">
-            {/* Content removed as per user request */}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div>
-      <div className="bg-black">
-        <div className="container mx-auto max-w-5xl">
-          <CourseHero />
-        </div>
-      </div>
       <div className="container mx-auto max-w-5xl py-8">
         {isLoading || !course || !classification ? (
           <div className="space-y-4">
