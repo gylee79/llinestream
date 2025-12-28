@@ -55,7 +55,10 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     const adminApp = initializeAdminApp();
     const db = admin.firestore(adminApp);
     const storage = admin.storage(adminApp);
-    const bucketName = storage.bucket().name;
+    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+     if (!bucketName) {
+      throw new Error("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not set.");
+    }
     
     const docRef = db.collection(itemType).doc(itemId);
 

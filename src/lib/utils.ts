@@ -52,21 +52,22 @@ export function extractPathFromUrl(url: string | undefined): string | undefined 
     if (!url) return undefined;
     try {
         const urlObject = new URL(url);
-        // Pathname for storage.googleapis.com is /<bucket_name>/<path_to_file>
         // Pathname for firebasestorage.googleapis.com is /v0/b/<bucket_name>/o/<path_to_file>?...
-        if (urlObject.hostname === 'storage.googleapis.com') {
-            const pathSegments = urlObject.pathname.split('/');
-            // Remove the initial empty segment and the bucket name segment
-            if (pathSegments.length > 2) {
-                return decodeURIComponent(pathSegments.slice(2).join('/'));
-            }
-        } else if (urlObject.hostname === 'firebasestorage.googleapis.com') {
+        if (urlObject.hostname === 'firebasestorage.googleapis.com') {
              const pathSegments = urlObject.pathname.split('/');
              // Find the 'o' segment, the path is what comes after it
              const oIndex = pathSegments.indexOf('o');
              if (oIndex !== -1 && oIndex + 1 < pathSegments.length) {
                 return decodeURIComponent(pathSegments.slice(oIndex + 1).join('/'));
              }
+        }
+        // Deprecated but handle for old data
+        if (urlObject.hostname === 'storage.googleapis.com') {
+            const pathSegments = urlObject.pathname.split('/');
+            // Remove the initial empty segment and the bucket name segment
+            if (pathSegments.length > 2) {
+                return decodeURIComponent(pathSegments.slice(2).join('/'));
+            }
         }
     } catch (e) {
         console.warn(`Could not parse URL to extract path: ${url}`, e);
