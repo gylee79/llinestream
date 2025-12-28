@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -48,7 +47,6 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
     const firestore = useFirestore();
     const { toast } = useToast();
     
-    // Use a local state for the user to allow for immediate updates
     const [user, setUser] = useState(initialUser);
 
     const [name, setName] = useState(user.name);
@@ -57,7 +55,6 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
     const [bonusDays, setBonusDays] = useState('');
     const [bonusCourseId, setBonusCourseId] = useState('');
     
-    // Effect to sync local state when the initialUser prop changes
     useEffect(() => {
         setUser(initialUser);
         setName(initialUser.name);
@@ -85,7 +82,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
       }
     };
     
-    const handleAddBonusDays = async () => {
+    const handleBonusDaysChange = async (daysToAdd: number) => {
         if (!firestore || !bonusCourseId || !bonusDays) {
             toast({ variant: 'destructive', title: '입력 오류', description: '상세분류와 일수를 모두 입력해주세요.' });
             return;
@@ -97,16 +94,29 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
             return;
         }
 
+        const currentSub = user.activeSubscriptions?.[bonusCourseId];
+        const currentExpiry = currentSub?.expiresAt ? (currentSub.expiresAt as FirebaseTimestamp).toDate() : null;
+        const currentPurchase = currentSub?.purchasedAt ? (currentSub.purchasedAt as FirebaseTimestamp).toDate() : null;
+
+        if (daysToAdd < 0 && !currentExpiry) {
+            toast({ variant: 'destructive', title: '오류', description: '구독 기간이 없는 사용자의 기간을 차감할 수 없습니다.' });
+            return;
+        }
+
         try {
             const batch = writeBatch(firestore);
             const userRef = doc(firestore, 'users', user.id);
             const now = new Date();
             
-            const currentSub = user.activeSubscriptions?.[bonusCourseId];
-            const currentExpiry = currentSub?.expiresAt ? (currentSub.expiresAt as FirebaseTimestamp).toDate() : null;
-            
             const startDate = currentExpiry && currentExpiry > now ? currentExpiry : now;
-            const newExpiryDate = add(startDate, { days });
+            let newExpiryDate = add(startDate, { days: days * daysToAdd });
+            
+            // Ensure expiry doesn't go before purchase date when reducing
+            if (daysToAdd < 0 && currentPurchase && newExpiryDate < currentPurchase) {
+                 toast({ variant: 'destructive', title: '차감 오류', description: `만료일이 구독 시작일(${toDisplayDate(currentPurchase)})보다 빨라질 수 없습니다.` });
+                 return;
+            }
+
             const newExpiryTimestamp = FirebaseTimestamp.fromDate(newExpiryDate);
 
             const newActiveSub = {
@@ -119,22 +129,24 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
             });
             
             const bonusSubscriptionRef = doc(collection(firestore, 'users', user.id, 'subscriptions'));
+            const transactionType = daysToAdd > 0 ? 'BONUS' : 'DEDUCTION';
+            const transactionName = daysToAdd > 0 ? `보너스 ${days}일` : `기간 차감 ${days}일`;
+
             const bonusSubscriptionData: Omit<Subscription, 'id'> = {
                 userId: user.id,
                 courseId: bonusCourseId,
                 purchasedAt: serverTimestamp() as Timestamp,
                 expiresAt: newExpiryTimestamp as Timestamp,
                 amount: 0,
-                orderName: `보너스 ${days}일`,
-                paymentId: `bonus-${bonusSubscriptionRef.id}`,
-                status: 'BONUS',
+                orderName: transactionName,
+                paymentId: `${transactionType.toLowerCase()}-${bonusSubscriptionRef.id}`,
+                status: transactionType,
                 method: 'INTERNAL'
             };
             batch.set(bonusSubscriptionRef, bonusSubscriptionData);
             
             await batch.commit();
 
-            // Optimistically update local state for immediate UI feedback
             setUser(currentUser => ({
                 ...currentUser,
                 activeSubscriptions: {
@@ -147,13 +159,12 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
             }));
 
 
-            toast({ title: '성공', description: `${days}일의 보너스 기간이 추가되었습니다.` });
+            toast({ title: '성공', description: `${days}일의 기간이 성공적으로 ${daysToAdd > 0 ? '추가' : '차감'}되었습니다.` });
             setBonusDays('');
-            setBonusCourseId('');
-
+            // Keep bonusCourseId selected for potential further actions
         } catch (error) {
              console.error("Failed to add bonus days:", error);
-             toast({ variant: 'destructive', title: '오류', description: '보너스 기간 추가에 실패했습니다.' });
+             toast({ variant: 'destructive', title: '오류', description: '보너스 기간 변경에 실패했습니다.' });
         }
     };
 
@@ -204,14 +215,15 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                     ))}
                 </TableBody>
             </Table>
-            <h4 className="font-semibold mt-6 mb-2">보너스 이용 기간 추가</h4>
+            <h4 className="font-semibold mt-6 mb-2">보너스 이용 기간 관리</h4>
             <div className="flex gap-2 items-center">
                 <Select value={bonusCourseId} onValueChange={setBonusCourseId}>
                     <SelectTrigger className="w-[180px]"><SelectValue placeholder="상세분류 선택" /></SelectTrigger>
                     <SelectContent>{courses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                 </Select>
                 <Input type="number" placeholder="일수(토큰)" className="w-24" value={bonusDays} onChange={e => setBonusDays(e.target.value)} />
-                <Button onClick={handleAddBonusDays}>추가</Button>
+                <Button onClick={() => handleBonusDaysChange(1)}>추가</Button>
+                <Button variant="destructive" onClick={() => handleBonusDaysChange(-1)}>차감</Button>
             </div>
           </TabsContent>
           <TabsContent value="history" className="mt-4">
