@@ -35,6 +35,7 @@ import { collection, query, where, doc, updateDoc, addDoc, serverTimestamp, writ
 import { useToast } from '@/hooks/use-toast';
 import { add } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { toDisplayDate } from '@/lib/date-helpers';
 
 interface UserDetailsDialogProps {
   user: User;
@@ -195,7 +196,7 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
                 <TableBody>
                     {subscriptions?.map((sub) => (
                         <TableRow key={sub.id}>
-                            <TableCell>{(sub.purchasedAt as FirebaseTimestamp).toDate().toLocaleDateString('ko-KR')}</TableCell>
+                            <TableCell>{toDisplayDate(sub.purchasedAt)}</TableCell>
                             <TableCell><Badge variant={sub.status === 'PAID' ? 'default' : 'secondary'}>{sub.status}</Badge></TableCell>
                             <TableCell>{sub.orderName}</TableCell>
                             <TableCell>{sub.amount.toLocaleString('ko-KR')}원</TableCell>
