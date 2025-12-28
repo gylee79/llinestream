@@ -9,6 +9,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,11 +40,12 @@ import {
   } from '@/components/ui/select';
 import type { User, Course, Subscription, Timestamp } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
-import { collection, query, where, doc, updateDoc, addDoc, serverTimestamp, writeBatch, Timestamp as FirebaseTimestamp } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, writeBatch, Timestamp as FirebaseTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { add } from 'date-fns';
+import { add, isBefore } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { toDisplayDate } from '@/lib/date-helpers';
+import { toDisplayDate, toJSDate } from '@/lib/date-helpers';
+import { Minus, Plus } from 'lucide-react';
 
 interface UserDetailsDialogProps {
   user: User;
@@ -48,19 +59,22 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
     const { toast } = useToast();
     
     const [user, setUser] = useState(initialUser);
-
-    const [name, setName] = useState(user.name);
-    const [phone, setPhone] = useState(user.phone);
-    const [dob, setDob] = useState(user.dob);
-    const [bonusDays, setBonusDays] = useState('');
-    const [bonusCourseId, setBonusCourseId] = useState('');
+    const [name, setName] = useState(initialUser.name);
+    const [phone, setPhone] = useState(initialUser.phone);
+    const [dob, setDob] = useState(initialUser.dob);
     
+    const [bonusDays, setBonusDays] = useState<number>(0);
+    const [bonusCourseId, setBonusCourseId] = useState('');
+    const [alertState, setAlertState] = useState<{ isOpen: boolean, onConfirm: () => void }>({ isOpen: false, onConfirm: () => {} });
+
     useEffect(() => {
         setUser(initialUser);
         setName(initialUser.name);
         setPhone(initialUser.phone);
         setDob(initialUser.dob);
-    }, [initialUser]);
+        setBonusDays(0);
+        setBonusCourseId('');
+    }, [initialUser, open]);
 
 
     const subscriptionsQuery = useMemoFirebase(() => (
@@ -82,23 +96,17 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
       }
     };
     
-    const handleBonusDaysChange = async (daysToAdd: number) => {
-        if (!firestore || !bonusCourseId || !bonusDays) {
-            toast({ variant: 'destructive', title: '입력 오류', description: '상세분류와 일수를 모두 입력해주세요.' });
-            return;
-        }
-
-        const days = parseInt(bonusDays, 10);
-        if (isNaN(days) || days <= 0) {
-            toast({ variant: 'destructive', title: '입력 오류', description: '유효한 일수를 입력해주세요.' });
+    const handleApplyBonusDays = async (finalExpiryDate?: Date) => {
+        if (!firestore || !bonusCourseId || bonusDays === 0) {
+            toast({ variant: 'destructive', title: '입력 오류', description: '상세분류를 선택하고 변경할 일수(토큰)를 입력해주세요.' });
             return;
         }
 
         const currentSub = user.activeSubscriptions?.[bonusCourseId];
-        const currentExpiry = currentSub?.expiresAt ? (currentSub.expiresAt as FirebaseTimestamp).toDate() : null;
-        const currentPurchase = currentSub?.purchasedAt ? (currentSub.purchasedAt as FirebaseTimestamp).toDate() : null;
+        const currentExpiry = currentSub?.expiresAt ? toJSDate(currentSub.expiresAt) : null;
+        const currentPurchase = currentSub?.purchasedAt ? toJSDate(currentSub.purchasedAt) : null;
 
-        if (daysToAdd < 0 && !currentExpiry) {
+        if (bonusDays < 0 && !currentExpiry) {
             toast({ variant: 'destructive', title: '오류', description: '구독 기간이 없는 사용자의 기간을 차감할 수 없습니다.' });
             return;
         }
@@ -107,21 +115,36 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
             const batch = writeBatch(firestore);
             const userRef = doc(firestore, 'users', user.id);
             const now = new Date();
-            
-            const startDate = currentExpiry && currentExpiry > now ? currentExpiry : now;
-            let newExpiryDate = add(startDate, { days: days * daysToAdd });
-            
-            // Ensure expiry doesn't go before purchase date when reducing
-            if (daysToAdd < 0 && currentPurchase && newExpiryDate < currentPurchase) {
-                 toast({ variant: 'destructive', title: '차감 오류', description: `만료일이 구독 시작일(${toDisplayDate(currentPurchase)})보다 빨라질 수 없습니다.` });
-                 return;
+            let newExpiryDate: Date;
+
+            if (finalExpiryDate) {
+              newExpiryDate = finalExpiryDate;
+            } else {
+              const startDate = currentExpiry && isBefore(now, currentExpiry) ? currentExpiry : now;
+              newExpiryDate = add(startDate, { days: bonusDays });
             }
 
-            const newExpiryTimestamp = FirebaseTimestamp.fromDate(newExpiryDate);
+            // If the calculated expiry is in the past, show confirmation dialog
+            if (isBefore(newExpiryDate, now) && !finalExpiryDate) {
+                setAlertState({
+                    isOpen: true,
+                    onConfirm: () => {
+                        handleApplyBonusDays(now); // Re-run with today's date
+                        setAlertState({ isOpen: false, onConfirm: () => {} });
+                    }
+                });
+                return;
+            }
 
+            if (currentPurchase && isBefore(newExpiryDate, currentPurchase)) {
+                toast({ variant: 'destructive', title: '차감 오류', description: `만료일이 구독 시작일(${toDisplayDate(currentPurchase)})보다 빨라질 수 없습니다.` });
+                return;
+            }
+            
+            const newExpiryTimestamp = FirebaseTimestamp.fromDate(newExpiryDate);
             const newActiveSub = {
                 expiresAt: newExpiryTimestamp,
-                purchasedAt: currentSub?.purchasedAt || serverTimestamp()
+                purchasedAt: currentSub?.purchasedAt || FirebaseTimestamp.now()
             };
             
             batch.update(userRef, {
@@ -129,13 +152,13 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
             });
             
             const bonusSubscriptionRef = doc(collection(firestore, 'users', user.id, 'subscriptions'));
-            const transactionType = daysToAdd > 0 ? 'BONUS' : 'DEDUCTION';
-            const transactionName = daysToAdd > 0 ? `보너스 ${days}일` : `기간 차감 ${days}일`;
+            const transactionType = bonusDays > 0 ? 'BONUS' : 'DEDUCTION';
+            const transactionName = `${bonusDays > 0 ? '보너스' : '기간 차감'} ${Math.abs(bonusDays)}일`;
 
             const bonusSubscriptionData: Omit<Subscription, 'id'> = {
                 userId: user.id,
                 courseId: bonusCourseId,
-                purchasedAt: serverTimestamp() as Timestamp,
+                purchasedAt: FirebaseTimestamp.now() as Timestamp,
                 expiresAt: newExpiryTimestamp as Timestamp,
                 amount: 0,
                 orderName: transactionName,
@@ -158,17 +181,25 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                 }
             }));
 
-
-            toast({ title: '성공', description: `${days}일의 기간이 성공적으로 ${daysToAdd > 0 ? '추가' : '차감'}되었습니다.` });
-            setBonusDays('');
-            // Keep bonusCourseId selected for potential further actions
+            toast({ title: '성공', description: `${Math.abs(bonusDays)}일의 기간이 성공적으로 ${bonusDays > 0 ? '추가' : '차감'}되었습니다.` });
+            setBonusDays(0);
         } catch (error) {
-             console.error("Failed to add bonus days:", error);
-             toast({ variant: 'destructive', title: '오류', description: '보너스 기간 변경에 실패했습니다.' });
+             console.error("Failed to apply bonus days:", error);
+             toast({ variant: 'destructive', title: '오류', description: '보너스 기간 적용에 실패했습니다.' });
         }
     };
 
+    const handleBonusDaysInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setBonusDays(value === '' ? 0 : parseInt(value, 10));
+    };
+
+    const adjustBonusDays = (amount: number) => {
+        setBonusDays(prev => prev + amount);
+    };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
@@ -221,9 +252,18 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                     <SelectTrigger className="w-[180px]"><SelectValue placeholder="상세분류 선택" /></SelectTrigger>
                     <SelectContent>{courses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                 </Select>
-                <Input type="number" placeholder="일수(토큰)" className="w-24" value={bonusDays} onChange={e => setBonusDays(e.target.value)} />
-                <Button onClick={() => handleBonusDaysChange(1)}>추가</Button>
-                <Button variant="destructive" onClick={() => handleBonusDaysChange(-1)}>차감</Button>
+                <div className="flex items-center">
+                  <Button variant="outline" size="icon" className="h-10 w-10" onClick={() => adjustBonusDays(-1)}><Minus className="h-4 w-4" /></Button>
+                  <Input 
+                    type="number" 
+                    placeholder="일수(토큰)" 
+                    className="w-24 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                    value={bonusDays} 
+                    onChange={handleBonusDaysInputChange} 
+                  />
+                  <Button variant="outline" size="icon" className="h-10 w-10" onClick={() => adjustBonusDays(1)}><Plus className="h-4 w-4" /></Button>
+                </div>
+                <Button onClick={() => handleApplyBonusDays()}>기간 적용</Button>
             </div>
           </TabsContent>
           <TabsContent value="history" className="mt-4">
@@ -244,5 +284,21 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
         </Tabs>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={alertState.isOpen} onOpenChange={(open) => !open && setAlertState({ isOpen: false, onConfirm: () => {} })}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>만료일 경고</AlertDialogTitle>
+          <AlertDialogDescription>
+            만료일이 오늘보다 이전입니다. 오늘 날짜로 만료일을 적용할까요?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => setAlertState({ isOpen: false, onConfirm: () => {} })}>아니요</AlertDialogCancel>
+          <AlertDialogAction onClick={alertState.onConfirm}>예</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
