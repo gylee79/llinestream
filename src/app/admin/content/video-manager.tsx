@@ -42,6 +42,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { sanitize } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import VideoPlayerDialog from '@/components/shared/video-player-dialog';
 
 
 export default function VideoManager() {
@@ -65,7 +67,10 @@ export default function VideoManager() {
 
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [isThumbnailDialogOpen, setThumbnailDialogOpen] = useState(false);
+  const [isPlayerDialogOpen, setPlayerDialogOpen] = useState(false);
+  
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
+  const [selectedInstructor, setSelectedInstructor] = useState<Instructor | null>(null);
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [episodeToDelete, setEpisodeToDelete] = useState<Episode | null>(null);
@@ -79,6 +84,12 @@ export default function VideoManager() {
     setSelectedEpisode(episode);
     setThumbnailDialogOpen(true);
   };
+  
+  const handlePlayVideo = (episode: Episode) => {
+    setSelectedEpisode(episode);
+    setSelectedInstructor(instructors?.find(i => i.id === episode.instructorId) || null);
+    setPlayerDialogOpen(true);
+  }
 
   const getFullCoursePath = (courseId: string): string => {
     if (!courses || !classifications || !fields) return '? > ? > ?';
@@ -159,92 +170,99 @@ export default function VideoManager() {
           </Button>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[80px]">썸네일</TableHead>
-                <TableHead>제목</TableHead>
-                <TableHead>소속 상세분류</TableHead>
-                <TableHead>재생 시간(초)</TableHead>
-                <TableHead>강사</TableHead>
-                <TableHead>무료 여부</TableHead>
-                <TableHead className="text-right">관리</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                        <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
-                    </TableRow>
-                ))
-              ) : (
-                episodes?.map((episode) => (
-                  <TableRow key={episode.id}>
-                    <TableCell>
-                        <div className="relative aspect-video w-20 rounded-md overflow-hidden bg-muted border">
-                            {episode.thumbnailUrl ? (
-                                <Image
-                                    src={episode.thumbnailUrl}
-                                    alt={episode.title}
-                                    fill
-                                    sizes="80px"
-                                    className="object-cover"
-                                />
-                            ) : (
-                                <div className="flex items-center justify-center h-full w-full">
-                                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                            )}
+          <TooltipProvider>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[80px]">썸네일</TableHead>
+                  <TableHead>제목</TableHead>
+                  <TableHead>소속 상세분류</TableHead>
+                  <TableHead>재생 시간(초)</TableHead>
+                  <TableHead>강사</TableHead>
+                  <TableHead>무료 여부</TableHead>
+                  <TableHead className="text-right">관리</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                          <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
+                      </TableRow>
+                  ))
+                ) : (
+                  episodes?.map((episode) => (
+                    <TableRow key={episode.id}>
+                      <TableCell>
+                          <div className="relative aspect-video w-20 rounded-md overflow-hidden bg-muted border">
+                              {episode.thumbnailUrl ? (
+                                  <Image
+                                      src={episode.thumbnailUrl}
+                                      alt={episode.title}
+                                      fill
+                                      sizes="80px"
+                                      className="object-cover"
+                                  />
+                              ) : (
+                                  <div className="flex items-center justify-center h-full w-full">
+                                      <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                                  </div>
+                              )}
+                          </div>
+                      </TableCell>
+                      <TableCell className="font-medium">{episode.title}</TableCell>
+                      <TableCell>{getFullCoursePath(episode.courseId)}</TableCell>
+                      <TableCell>{episode.duration}</TableCell>
+                      <TableCell>{getInstructorName(episode.instructorId)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={episode.isFree}
+                            onCheckedChange={() => toggleFreeStatus(episode)}
+                            aria-label="Toggle free status"
+                          />
+                          <Tooltip>
+                            <TooltipTrigger>
+                                <Badge variant={episode.isFree ? "secondary" : "outline"}>
+                                    {episode.isFree ? '무료' : '유료'}
+                                </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                {episode.isFree ? <p>무료영상은 구독과 관계없이 누구나 시청가능합니다.</p> : <p>유료영상은 해당 분류의 이용권 구독자만 시청가능합니다.</p>}
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
-                    </TableCell>
-                    <TableCell className="font-medium">{episode.title}</TableCell>
-                    <TableCell>{getFullCoursePath(episode.courseId)}</TableCell>
-                    <TableCell>{episode.duration}</TableCell>
-                    <TableCell>{getInstructorName(episode.instructorId)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={episode.isFree}
-                          onCheckedChange={() => toggleFreeStatus(episode)}
-                          aria-label="Toggle free status"
-                        />
-                        <Badge variant={episode.isFree ? "secondary" : "outline"}>
-                          {episode.isFree ? '무료' : '유료'}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                       <Button variant="outline" size="sm" asChild>
-                         <Link href={episode.videoUrl} target="_blank" rel="noopener noreferrer" >
+                      </TableCell>
+                      <TableCell className="text-right space-x-2">
+                         <Button variant="outline" size="sm" onClick={() => handlePlayVideo(episode)}>
                             시청
-                         </Link>
-                       </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">메뉴 열기</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleOpenUploadDialog(episode)}>
-                            정보 수정
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleOpenThumbnailDialog(episode)}>
-                            썸네일 수정
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => requestDeleteEpisode(episode)}>
-                            삭제
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                         </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">메뉴 열기</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleOpenUploadDialog(episode)}>
+                              정보 수정
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenThumbnailDialog(episode)}>
+                              썸네일 수정
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => requestDeleteEpisode(episode)}>
+                              삭제
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TooltipProvider>
         </CardContent>
       </Card>
       
@@ -265,6 +283,15 @@ export default function VideoManager() {
               item={selectedEpisode}
               itemType="episodes"
           />
+      )}
+
+      {isPlayerDialogOpen && selectedEpisode && (
+        <VideoPlayerDialog 
+            isOpen={isPlayerDialogOpen}
+            onOpenChange={setPlayerDialogOpen}
+            episode={selectedEpisode}
+            instructor={selectedInstructor}
+        />
       )}
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
