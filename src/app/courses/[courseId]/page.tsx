@@ -172,17 +172,18 @@ export default function CourseDetailPage() {
                            )}
                         </div>
                         <p className="font-medium leading-tight mt-1">{episode.title}</p>
-                         {instructor && (
-                            <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                                <Avatar className="h-5 w-5">
-                                    <AvatarFallback>{instructor.name.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <span>{instructor.name}</span>
-                            </div>
-                        )}
-                        <p className="text-sm text-muted-foreground mt-2">
-                          {formatDuration(episode.duration)}
-                        </p>
+                         <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                            {instructor && (
+                                <>
+                                    <Avatar className="h-5 w-5">
+                                        <AvatarFallback>{instructor.name.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <span>{instructor.name}</span>
+                                    <span className="mx-1">·</span>
+                                </>
+                            )}
+                            <span>{formatDuration(episode.duration)}</span>
+                         </div>
                       </div>
                       <div className="flex flex-col items-center justify-center gap-2 ml-auto pl-2">
                         {!isPlayable ? (
@@ -219,3 +220,4 @@ export default function CourseDetailPage() {
     </div>
   );
 }
+
