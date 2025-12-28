@@ -41,16 +41,10 @@ export default function CourseDetailPage() {
   );
   const { data: classification, isLoading: classificationLoading } = useDoc<Classification>(classificationRef);
 
-  const fieldRef = useMemoFirebase(() =>
-    firestore && classification?.fieldId ? doc(firestore, 'fields', classification.fieldId) : null,
-    [firestore, classification?.fieldId]
-  );
-  const { data: field, isLoading: fieldLoading } = useDoc<Field>(fieldRef);
-
   const instructorsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'instructors') : null), [firestore]);
   const { data: instructors, isLoading: instructorsLoading } = useCollection<Instructor>(instructorsQuery);
 
-  const isLoading = courseLoading || episodesLoading || classificationLoading || instructorsLoading || fieldLoading;
+  const isLoading = courseLoading || episodesLoading || classificationLoading || instructorsLoading;
   
   // Check user subscription
   const hasSubscription = !!(user && classification && user.activeSubscriptions?.[classification.id]);
@@ -134,9 +128,9 @@ export default function CourseDetailPage() {
           </>
         )}
         
-        {isLoading ? <Skeleton className="h-8 w-1/2 mt-12 mb-4" /> : field && classification && course && (
+        {isLoading ? <Skeleton className="h-8 w-1/2 mt-12 mb-4" /> : classification && course && (
             <h2 className="font-headline text-2xl font-bold mt-12 mb-4">
-                {`${field.name} > ${classification.name} > ${course.name}`}
+                {`${classification.name} > ${course.name}`}
             </h2>
         )}
 
