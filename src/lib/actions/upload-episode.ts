@@ -144,6 +144,12 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         const db = admin.firestore(adminApp);
         const storage = admin.storage(adminApp);
         const episodeRef = db.collection('episodes').doc(episodeId);
+        
+        const currentDoc = await episodeRef.get();
+        if (!currentDoc.exists) {
+            return { success: false, message: '업데이트할 에피소드를 찾을 수 없습니다.' };
+        }
+        const currentData = currentDoc.data() as Episode;
 
         // --- File Deletion Logic ---
         const oldFilePath = extractPathFromUrl(oldVideoUrl);
@@ -185,9 +191,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             dataToUpdate.customThumbnailPath = newCustomThumbnailData.filePath ?? '';
         }
 
-        const currentDoc = await episodeRef.get();
-        const currentData = currentDoc.data() as Episode | undefined;
-
+        // Recalculate the final thumbnailUrl based on all updates
         const finalCustomUrl = dataToUpdate.customThumbnailUrl ?? currentData?.customThumbnailUrl;
         const finalDefaultUrl = dataToUpdate.defaultThumbnailUrl ?? currentData?.defaultThumbnailUrl;
         dataToUpdate.thumbnailUrl = finalCustomUrl || finalDefaultUrl || '';
