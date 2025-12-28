@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -9,16 +10,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,7 +56,6 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
     
     const [bonusDays, setBonusDays] = useState<number>(0);
     const [bonusCourseId, setBonusCourseId] = useState('');
-    const [alertState, setAlertState] = useState<{ isOpen: boolean, onConfirm: () => void }>({ isOpen: false, onConfirm: () => {} });
 
     useEffect(() => {
         setUser(initialUser);
@@ -96,7 +86,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
       }
     };
     
-    const handleApplyBonusDays = async (finalExpiryDate?: Date) => {
+    const handleApplyBonusDays = async () => {
         if (!firestore || !bonusCourseId || bonusDays === 0) {
             toast({ variant: 'destructive', title: '입력 오류', description: '상세분류를 선택하고 변경할 일수(토큰)를 입력해주세요.' });
             return;
@@ -116,24 +106,16 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
             const userRef = doc(firestore, 'users', user.id);
             const now = new Date();
             let newExpiryDate: Date;
+            
+            const startDate = currentExpiry && isBefore(now, currentExpiry) ? currentExpiry : now;
+            newExpiryDate = add(startDate, { days: bonusDays });
 
-            if (finalExpiryDate) {
-              newExpiryDate = finalExpiryDate;
-            } else {
-              const startDate = currentExpiry && isBefore(now, currentExpiry) ? currentExpiry : now;
-              newExpiryDate = add(startDate, { days: bonusDays });
-            }
-
-            // If the calculated expiry is in the past, show confirmation dialog
-            if (isBefore(newExpiryDate, now) && !finalExpiryDate) {
-                setAlertState({
-                    isOpen: true,
-                    onConfirm: () => {
-                        handleApplyBonusDays(now); // Re-run with today's date
-                        setAlertState({ isOpen: false, onConfirm: () => {} });
-                    }
-                });
-                return;
+            if (isBefore(newExpiryDate, now)) {
+              newExpiryDate = now;
+              toast({
+                title: "만료일 조정",
+                description: "계산된 만료일이 과거이므로 만료일을 오늘로 설정했습니다.",
+              });
             }
 
             if (currentPurchase && isBefore(newExpiryDate, currentPurchase)) {
@@ -199,7 +181,6 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
     };
 
   return (
-    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
@@ -263,7 +244,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                   />
                   <Button variant="outline" size="icon" className="h-10 w-10" onClick={() => adjustBonusDays(1)}><Plus className="h-4 w-4" /></Button>
                 </div>
-                <Button onClick={() => handleApplyBonusDays()}>기간 적용</Button>
+                <Button onClick={handleApplyBonusDays}>기간 적용</Button>
             </div>
           </TabsContent>
           <TabsContent value="history" className="mt-4">
@@ -284,21 +265,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
         </Tabs>
       </DialogContent>
     </Dialog>
-
-    <AlertDialog open={alertState.isOpen} onOpenChange={(open) => !open && setAlertState({ isOpen: false, onConfirm: () => {} })}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>만료일 경고</AlertDialogTitle>
-          <AlertDialogDescription>
-            만료일이 오늘보다 이전입니다. 오늘 날짜로 만료일을 적용할까요?
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => setAlertState({ isOpen: false, onConfirm: () => {} })}>아니요</AlertDialogCancel>
-          <AlertDialogAction onClick={alertState.onConfirm}>예</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-    </>
   );
 }
+
+    
