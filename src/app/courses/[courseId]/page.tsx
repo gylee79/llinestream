@@ -190,12 +190,12 @@ export default function CourseDetailPage() {
                           <Lock className="w-5 h-5 text-muted-foreground" />
                         ) : (
                           <>
-                             <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handlePlayClick(episode)}>
-                                <Play className="w-6 h-6" />
-                             </Button>
                              <Button variant="outline" size="sm">
                                 <MessageSquare className="w-4 h-4 mr-2"/>
                                 채팅
+                             </Button>
+                             <Button variant="ghost" size="icon" className="h-12 w-12 text-primary" onClick={() => handlePlayClick(episode)}>
+                                <Play className="w-8 h-8" />
                              </Button>
                           </>
                         )}
