@@ -123,9 +123,6 @@ export default function CourseDetailPage() {
                                 <ImageIcon className="w-8 h-8 text-muted-foreground" />
                             </div>
                         )}
-                         <Badge variant={episode.isFree ? "secondary" : "destructive"} className="absolute top-2 left-2">
-                            {episode.isFree ? '무료' : '구독 필요'}
-                         </Badge>
                       </div>
                       <div className="flex-grow px-4">
                          <div className="flex items-center gap-2">
