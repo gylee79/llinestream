@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -45,7 +44,13 @@ export default function AdminUsersPage() {
       .map(id => courses.find(c => c.id === id)?.name)
       .filter(Boolean); // Filter out undefined names
 
-    return subNames.join(', ');
+    if (subNames.length === 0) return '없음';
+    
+    return (
+      <div className="flex flex-wrap gap-1">
+        {subNames.map(name => <Badge key={name} variant="secondary">{name}</Badge>)}
+      </div>
+    );
   };
 
   const getFinalExpiry = (user: User) => {

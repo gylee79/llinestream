@@ -164,7 +164,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
             if (wasExpiryAdjusted) {
                 toast({
                     title: '만료일 조정 및 적용 완료',
-                    description: '계산된 만료일이 과거이므로 만료일을 오늘로 설정했습니다.',
+                    description: '오늘보다 과거를 만료일로 설정 할수 없습니다. 대안으로 만료일을 오늘로 설정했습니다.',
                 });
             } else {
                  toast({ title: '성공', description: `${Math.abs(bonusDays)}일의 기간이 성공적으로 ${bonusDays > 0 ? '추가' : '차감'}되었습니다.` });
