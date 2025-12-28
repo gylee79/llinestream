@@ -24,24 +24,22 @@ export function sanitize<T>(data: T): T {
 }
 
 /**
- * Constructs the public URL for a file in a Google Cloud Storage bucket.
- * This version corrects the bucket name if it contains '.firebasestorage.app'.
- * @param bucketName The name of your Firebase Storage bucket (e.g., 'your-project-id.appspot.com').
+ * Constructs the public URL for a file in a Firebase Storage bucket using the recommended firebasestorage.googleapis.com format.
+ * This format works reliably for public files.
+ * @param bucketName The full name of your Firebase Storage bucket (e.g., 'your-project-id.appspot.com').
  * @param filePath The full path to the file within the bucket (e.g., 'images/profile.jpg').
  * @returns The full public URL to access the file.
  */
 export function getPublicUrl(bucketName: string, filePath: string): string {
-    if (!bucketName) {
-      console.error("getPublicUrl: bucketName is missing.");
+    if (!bucketName || !filePath) {
+      console.error("getPublicUrl: bucketName or filePath is missing.");
       return '';
     }
-    // The bucket name for GCS URLs should be the project ID, not the full storage domain.
-    const correctBucketName = bucketName.replace('.appspot.com', '').replace('.firebasestorage.app', '');
+    // Encode the file path to handle special characters like spaces or symbols
+    const encodedFilePath = encodeURIComponent(filePath);
     
-    // Do not encode the full file path, as it may contain directory slashes which should not be encoded.
-    // Individual segments of a path should be encoded if they contain special characters,
-    // but Firebase SDKs handle this during upload. The stored path is usually safe.
-    return `https://storage.googleapis.com/${correctBucketName}/${filePath}`;
+    // Use the standard Firebase Storage URL format
+    return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedFilePath}?alt=media`;
 }
 
 
