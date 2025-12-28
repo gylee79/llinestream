@@ -47,7 +47,7 @@ export default function CourseDetailPage() {
 
   const isLoading = courseLoading || episodesLoading || classificationLoading || instructorsLoading;
   
-  const hasSubscription = !!(user && classification && user.activeSubscriptions?.[classification.id]);
+  const hasSubscription = !!(user && course && user.activeSubscriptions?.[course.id]);
 
   const handlePlayClick = (episode: Episode) => {
     const isPlayable = episode.isFree || hasSubscription;
@@ -147,8 +147,8 @@ export default function CourseDetailPage() {
                             <MessageSquare className="w-4 h-4 mr-2"/>
                             채팅
                          </Button>
-                        <Badge variant={episode.isFree ? 'default' : 'destructive'} className="whitespace-nowrap">
-                            {episode.isFree ? '무료' : '유료'}
+                        <Badge variant={isPlayable || episode.isFree ? "default" : "destructive"} className="whitespace-nowrap">
+                            {episode.isFree ? '무료' : hasSubscription ? '시청 가능' : '구독 필요'}
                         </Badge>
                          <Button variant="ghost" size="icon" className="h-12 w-12 text-primary" onClick={() => handlePlayClick(episode)}>
                             <Play className="w-8 h-8" />
@@ -173,13 +173,14 @@ export default function CourseDetailPage() {
         />
       )}
 
-      {selectedEpisode && !selectedEpisode.isFree && classification && (
+      {selectedEpisode && !selectedEpisode.isFree && course && (
          <PaymentDialog
             open={isPaymentDialogOpen}
             onOpenChange={setPaymentDialogOpen}
-            classification={classification}
+            item={course}
+            itemType="course"
             selectedDuration="day30"
-            selectedPrice={classification.prices.day30}
+            selectedPrice={course.prices.day30}
             selectedLabel="30일 이용권"
         >
             {/* The trigger is now handled programmatically, so no child needed here */}

@@ -3,7 +3,7 @@
 import PricingCard from '@/components/pricing/pricing-card';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, where } from 'firebase/firestore';
-import type { Classification } from '@/lib/types';
+import type { Course } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCart } from '@/context/cart-context';
 import { formatPrice } from '@/lib/utils';
@@ -70,19 +70,19 @@ function CartSummary() {
 
 export default function PricingPage() {
   const firestore = useFirestore();
-  const classificationsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'classifications'), where('prices.day30', '>', 0)) : null,
+  const coursesQuery = useMemoFirebase(() => 
+    firestore ? query(collection(firestore, 'courses'), where('prices.day30', '>', 0)) : null,
     [firestore]
   );
-  const { data: subscribableClassifications, isLoading } = useCollection<Classification>(classificationsQuery);
+  const { data: subscribableCourses, isLoading } = useCollection<Course>(coursesQuery);
 
   return (
     <>
       <div className="container mx-auto py-12 pb-48"> {/* Add padding-bottom to avoid overlap with summary */}
         <header className="mb-12 text-center">
-          <h1 className="font-headline text-4xl font-bold tracking-tight">구독 안내</h1>
+          <h1 className="font-headline text-4xl font-bold tracking-tight">수강권 구매</h1>
           <p className="mt-2 text-lg text-muted-foreground">
-            관심 있는 분야를 구독하고 모든 콘텐츠를 무제한으로 즐겨보세요.
+            관심 있는 강좌를 구매하고 모든 에피소드를 무제한으로 즐겨보세요.
           </p>
         </header>
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
@@ -93,8 +93,8 @@ export default function PricingPage() {
               <Skeleton className="h-96 w-full" />
             </>
           ) : (
-            subscribableClassifications?.map((classification) => (
-              <PricingCard key={classification.id} classification={classification} />
+            subscribableCourses?.map((course) => (
+              <PricingCard key={course.id} item={course} itemType="course" />
             ))
           )}
         </div>

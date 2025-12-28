@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useTransition } from 'react';
@@ -195,7 +196,6 @@ export default function HierarchyManager() {
                         fieldId: selectedField,
                         name: itemData.name,
                         description: `${itemData.name}에 대한 설명입니다.`,
-                        prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
                         thumbnailUrl: '',
                     });
                 } else if (type === '상세분류' && selectedClassification) {
@@ -203,6 +203,7 @@ export default function HierarchyManager() {
                         classificationId: selectedClassification,
                         name: itemData.name,
                         description: `${itemData.name}에 대한 상세 설명입니다.`,
+                        prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
                         thumbnailUrl: '',
                     });
                 }

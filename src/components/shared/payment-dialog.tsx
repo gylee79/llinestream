@@ -13,7 +13,7 @@ import {
   DialogClose
 } from "@/components/ui/dialog"
 import { Button } from "../ui/button"
-import type { Classification } from "@/lib/types"
+import type { Course } from "@/lib/types"
 import type { PortOnePaymentRequest, PortOnePaymentResponse } from "@/lib/portone";
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/firebase/hooks"
@@ -27,8 +27,9 @@ declare global {
 
 interface PaymentDialogProps {
     children: React.ReactNode;
-    classification: Classification;
-    selectedDuration: keyof Classification['prices'];
+    item: Course;
+    itemType: 'course';
+    selectedDuration: keyof Course['prices'];
     selectedPrice: number;
     selectedLabel: string;
     open?: boolean;
@@ -37,7 +38,8 @@ interface PaymentDialogProps {
 
 export default function PaymentDialog({ 
     children, 
-    classification,
+    item,
+    itemType,
     selectedDuration,
     selectedPrice,
     selectedLabel,
@@ -86,7 +88,7 @@ export default function PaymentDialog({
             storeId,
             channelKey,
             paymentId,
-            orderName: `${classification.name} ${selectedLabel}`,
+            orderName: `${item.name} ${selectedLabel}`,
             totalAmount: selectedPrice,
             currency: 'KRW',
             payMethod: 'CARD',
@@ -133,9 +135,9 @@ export default function PaymentDialog({
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle className="font-headline">이용권 구매</DialogTitle>
+                        <DialogTitle className="font-headline">수강권 구매</DialogTitle>
                         <DialogDescription>
-                            이 콘텐츠를 시청하려면 {classification.name} 이용권이 필요합니다.
+                            이 콘텐츠를 시청하려면 {item.name} 수강권이 필요합니다.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
@@ -162,9 +164,9 @@ export default function PaymentDialog({
         </DialogTrigger>
         <DialogContent>
             <DialogHeader>
-            <DialogTitle className="font-headline">{classification.name} 구독</DialogTitle>
+            <DialogTitle className="font-headline">{item.name} 수강권 구매</DialogTitle>
             <DialogDescription>
-                {`결제를 진행하여 '${classification.name}' 카테고리의 모든 콘텐츠를 무제한으로 이용하세요.`}
+                {`결제를 진행하여 '${item.name}' 강좌의 모든 에피소드를 무제한으로 이용하세요.`}
             </DialogDescription>
             </DialogHeader>
             <div className="py-4">

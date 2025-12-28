@@ -15,7 +15,7 @@ export interface User {
   dob: string; // Date of Birth YYYY-MM-DD
   role: 'user' | 'admin';
   activeSubscriptions: {
-    [classificationId: string]: {
+    [courseId: string]: {
       expiresAt: Timestamp;
       purchasedAt: Timestamp;
     };
@@ -35,12 +35,6 @@ export interface Classification {
   fieldId: string;
   name: string;
   description: string;
-  prices: {
-    day1: number;
-    day30: number;
-    day60: number;
-    day90: number;
-  };
   thumbnailUrl: string;
   thumbnailPath?: string;
 }
@@ -50,6 +44,12 @@ export interface Course {
   classificationId: string;
   name: string;
   description: string;
+  prices: {
+    day1: number;
+    day30: number;
+    day60: number;
+    day90: number;
+  };
   thumbnailUrl: string;
   thumbnailPath?: string;
 }
@@ -94,7 +94,7 @@ export interface Policy {
 export interface Subscription {
     id: string; // This will be the document ID from Firestore (same as paymentId)
     userId: string;
-    classificationId: string;
+    courseId: string;
     purchasedAt: Timestamp;
     expiresAt: Timestamp;
     // For record-keeping

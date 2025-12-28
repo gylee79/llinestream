@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { config } from 'dotenv';
 config();
@@ -82,25 +83,25 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
         
         const orderItems = orderName.split(' 외 ')[0]; 
         const nameParts = orderItems.split(' ');
-        const classificationName = nameParts.slice(0, -2).join(' ');
+        const courseName = nameParts.slice(0, -2).join(' ');
         const durationLabel = nameParts.slice(-2).join(' ');
-        console.log(`[DEBUG] 3d. Parsed classificationName: ${classificationName}, durationLabel: ${durationLabel}`);
+        console.log(`[DEBUG] 3d. Parsed courseName: ${courseName}, durationLabel: ${durationLabel}`);
 
         const durationMap: { [key: string]: number } = { "1일 이용권": 1, "30일 이용권": 30, "60일 이용권": 60, "90일 이용권": 90 };
         const durationDays = durationMap[durationLabel] || 30;
 
-        const q = firestore.collection('classifications').where("name", "==", classificationName).limit(1);
-        const classificationsSnapshot = await q.get();
+        const q = firestore.collection('courses').where("name", "==", courseName).limit(1);
+        const coursesSnapshot = await q.get();
 
-        if (classificationsSnapshot.empty) {
-            console.error(`[DEBUG] 3e. [PROCESS_FAILED] Classification not found in DB: ${classificationName}. Cancelling payment.`);
-            await cancelPayment(paymentData.id, `상품(${classificationName})을 찾을 수 없음`);
-            return { success: false, message: `주문명에 해당하는 상품(${classificationName})을 찾을 수 없습니다.` };
+        if (coursesSnapshot.empty) {
+            console.error(`[DEBUG] 3e. [PROCESS_FAILED] Course not found in DB: ${courseName}. Cancelling payment.`);
+            await cancelPayment(paymentData.id, `상품(${courseName})을 찾을 수 없음`);
+            return { success: false, message: `주문명에 해당하는 상품(${courseName})을 찾을 수 없습니다.` };
         }
         
-        const targetClassificationDoc = classificationsSnapshot.docs[0];
-        const targetClassificationId = targetClassificationDoc.id;
-        console.log(`[DEBUG] 3e. Found classification in DB: ${targetClassificationId}`);
+        const targetCourseDoc = coursesSnapshot.docs[0];
+        const targetCourseId = targetCourseDoc.id;
+        console.log(`[DEBUG] 3e. Found course in DB: ${targetCourseId}`);
         
         const userRef = firestore.doc(`users/${userId}`);
         const subscriptionRef = userRef.collection('subscriptions').doc(paymentData.id);
@@ -123,7 +124,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
 
             const newSubscriptionData = {
                 userId: userId,
-                classificationId: targetClassificationId,
+                courseId: targetCourseId,
                 purchasedAt,
                 expiresAt,
                 amount: paymentData.amount.total,
@@ -141,7 +142,7 @@ async function verifyAndProcessPayment(paymentId: string): Promise<{ success: bo
             transaction.update(userRef, {
                 activeSubscriptions: {
                   ...existingSubscriptions,
-                  [targetClassificationId]: {
+                  [targetCourseId]: {
                     expiresAt: expiresAt,
                     purchasedAt: purchasedAt
                   }

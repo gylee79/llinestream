@@ -13,68 +13,66 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import type { Classification } from '@/lib/types';
+import type { Course } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, updateDoc } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
+import { collection, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export default function PricingManager() {
+export default function CoursePricingManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
-  const { data: classifications, isLoading } = useCollection<Classification>(classificationsQuery);
+  const coursesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'courses'), orderBy('name')) : null), [firestore]);
+  const { data: courses, isLoading } = useCollection<Course>(coursesQuery);
 
-  // We need a local state to handle input changes before saving to Firestore
-  const [localClassifications, setLocalClassifications] = useState<Classification[] | null>(null);
+  const [localCourses, setLocalCourses] = useState<Course[] | null>(null);
 
   useEffect(() => {
-    if (classifications) {
-      setLocalClassifications(classifications);
+    if (courses) {
+      setLocalCourses(courses);
     }
-  }, [classifications]);
+  }, [courses]);
 
 
-  const handlePriceChange = (classId: string, duration: keyof Classification['prices'], value: string) => {
+  const handlePriceChange = (courseId: string, duration: keyof Course['prices'], value: string) => {
     const price = Number(value);
-    if (isNaN(price) || !localClassifications) return;
+    if (isNaN(price) || !localCourses) return;
     
-    setLocalClassifications(prev => 
+    setLocalCourses(prev => 
       prev!.map(c => 
-        c.id === classId 
+        c.id === courseId 
           ? { ...c, prices: { ...c.prices, [duration]: price } }
           : c
       )
     );
   };
   
-  const handleSave = async (classId: string) => {
-    if (!firestore || !localClassifications) return;
-    const classification = localClassifications.find(c => c.id === classId);
-    if (!classification) return;
+  const handleSave = async (courseId: string) => {
+    if (!firestore || !localCourses) return;
+    const course = localCourses.find(c => c.id === courseId);
+    if (!course) return;
 
-    const docRef = doc(firestore, 'classifications', classId);
-    // We only update the prices field
-    await updateDoc(docRef, { prices: classification.prices });
+    const docRef = doc(firestore, 'courses', courseId);
+    await updateDoc(docRef, { prices: course.prices });
 
     toast({
       title: '저장 완료',
-      description: `${classification.name}의 가격 정보가 업데이트되었습니다.`,
+      description: `${course.name}의 가격 정보가 업데이트되었습니다.`,
     });
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>분류 및 가격 관리</CardTitle>
-        <p className="text-sm text-muted-foreground">각 &apos;큰분류&apos;별 이용권 가격을 설정합니다.</p>
+        <CardTitle>상세분류 및 가격 관리</CardTitle>
+        <p className="text-sm text-muted-foreground">각 '상세분류(Course)'별 이용권 가격을 설정합니다.</p>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>큰분류 이름</TableHead>
+              <TableHead>상세분류 이름</TableHead>
               <TableHead>1일 이용권 (원)</TableHead>
               <TableHead>30일 이용권 (원)</TableHead>
               <TableHead>60일 이용권 (원)</TableHead>
@@ -83,14 +81,14 @@ export default function PricingManager() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading || !localClassifications ? (
+            {isLoading || !localCourses ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center">
                   <Skeleton className="h-8 w-full" />
                 </TableCell>
               </TableRow>
             ) : (
-              localClassifications.map((item) => (
+              localCourses.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell>
