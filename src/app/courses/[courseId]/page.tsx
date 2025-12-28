@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import PaymentDialog from '@/components/shared/payment-dialog';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where } from 'firebase/firestore';
-import type { Course, Episode, Classification, Instructor, Field } from '@/lib/types';
+import type { Course, Episode, Classification, Instructor } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useState, useEffect } from 'react';
@@ -116,23 +116,21 @@ export default function CourseDetailPage() {
         </div>
       </div>
       <div className="container mx-auto max-w-5xl py-8">
-        {isLoading || !course ? (
+        {isLoading || !course || !classification ? (
           <div className="space-y-4">
             <Skeleton className="h-10 w-3/4" />
             <Skeleton className="h-6 w-full" />
           </div>
         ) : (
           <>
-            <h1 className="font-headline text-3xl font-bold">{course.name}</h1>
+            <h1 className="font-headline text-3xl font-bold">{`${classification.name} > ${course.name}`}</h1>
             <p className="text-muted-foreground mt-2">{course.description}</p>
           </>
         )}
         
-        {isLoading ? <Skeleton className="h-8 w-1/2 mt-12 mb-4" /> : classification && course && (
-            <h2 className="font-headline text-2xl font-bold mt-12 mb-4">
-                {`${classification.name} > ${course.name}`}
-            </h2>
-        )}
+        <h2 className="font-headline text-2xl font-bold mt-12 mb-4">
+            에피소드 목록
+        </h2>
 
         <Card>
           <CardContent className="p-0">
