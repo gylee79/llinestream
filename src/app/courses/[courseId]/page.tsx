@@ -1,15 +1,17 @@
 'use client';
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
-import { Lock, Play } from 'lucide-react';
+import { Lock, Play, MessageSquare, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import PaymentDialog from '@/components/shared/payment-dialog';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where } from 'firebase/firestore';
-import type { Course, Episode, Classification } from '@/lib/types';
+import type { Course, Episode, Classification, Instructor } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
 
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
@@ -31,7 +33,10 @@ export default function CourseDetailPage() {
   );
   const { data: classification, isLoading: classificationLoading } = useDoc<Classification>(classificationRef);
 
-  const isLoading = courseLoading || episodesLoading || classificationLoading;
+  const instructorsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'instructors') : null), [firestore]);
+  const { data: instructors, isLoading: instructorsLoading } = useCollection<Instructor>(instructorsQuery);
+
+  const isLoading = courseLoading || episodesLoading || classificationLoading || instructorsLoading;
 
   if (!isLoading && !course) {
     notFound();
@@ -47,6 +52,11 @@ export default function CourseDetailPage() {
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
+
+  const getInstructor = (instructorId?: string): Instructor | undefined => {
+    if (!instructorId || !instructors) return undefined;
+    return instructors.find(i => i.id === instructorId);
+  }
 
   const PlayerOverlay = () => {
     if (isLoading || !course) {
@@ -118,38 +128,61 @@ export default function CourseDetailPage() {
           <CardContent className="p-0">
             {episodesLoading ? (
               <div className="p-4 space-y-2">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
               </div>
             ) : (
             <ul className="divide-y">
               {episodes?.map((episode, index) => {
                 const isPlayable = episode.isFree || hasSubscription;
+                const instructor = getInstructor(episode.instructorId);
+
                 return (
-                  <li key={episode.id}>
+                  <li key={episode.id} className="p-4">
                     <button
                       className={cn(
-                        "w-full flex items-center p-4 text-left transition-colors group",
-                        isPlayable ? "hover:bg-muted/50 cursor-pointer" : "opacity-60 cursor-not-allowed"
+                        "w-full flex items-start text-left transition-colors group",
+                        isPlayable ? "hover:bg-muted/50 cursor-pointer rounded-lg" : "opacity-60 cursor-not-allowed"
                       )}
                       disabled={!isPlayable}
                       aria-label={isPlayable ? `Play ${episode.title}`: `Locked: ${episode.title}`}
                     >
-                      <div className="flex items-center justify-center w-10 text-muted-foreground font-mono text-lg">
-                        {index + 1}
+                      <div className="relative aspect-video w-32 md:w-40 rounded-md overflow-hidden bg-muted border flex-shrink-0">
+                        {episode.thumbnailUrl ? (
+                           <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="(max-width: 768px) 33vw, 20vw" className="object-cover" />
+                        ) : (
+                            <div className="flex items-center justify-center h-full">
+                                <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                            </div>
+                        )}
                       </div>
-                      <div className="flex-grow">
-                        <p className="font-medium">{episode.title}</p>
-                        <p className="text-sm text-muted-foreground mt-1">
+                      <div className="flex-grow px-4">
+                        <p className="text-muted-foreground text-sm font-mono">{`EP ${index + 1}`}</p>
+                        <p className="font-medium leading-tight mt-1">{episode.title}</p>
+                         {instructor && (
+                            <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                                <Avatar className="h-5 w-5">
+                                    <AvatarFallback>{instructor.name.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <span>{instructor.name}</span>
+                            </div>
+                        )}
+                        <p className="text-sm text-muted-foreground mt-2">
                           {formatDuration(episode.duration)}
                         </p>
                       </div>
-                      <div className="w-12 flex items-center justify-center">
+                      <div className="flex flex-col items-center justify-center gap-2 ml-auto pl-2">
                         {!isPlayable ? (
                           <Lock className="w-5 h-5 text-muted-foreground" />
                         ) : (
-                          <Play className="w-6 h-6 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <>
+                            <Play className="w-6 h-6 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                             <Button variant="outline" size="sm" className="mt-2">
+                                <MessageSquare className="w-4 h-4 mr-2"/>
+                                채팅
+                             </Button>
+                          </>
                         )}
                       </div>
                     </button>
