@@ -39,7 +39,8 @@ export interface Classification {
     day1: number;
     day30: number;
     day60: number;
-y;
+    day90: number;
+  };
   thumbnailUrl: string;
   thumbnailPath?: string;
 }

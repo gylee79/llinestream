@@ -38,8 +38,8 @@ function HeroImageManager() {
     const heroImagesRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
     const { data: heroImageData, isLoading } = useDoc<HeroImageSettings>(heroImagesRef);
 
-    const [settings, setSettings] = useState<Partial<HeroImageSettings>>({ home: {}, about: {}, second: {} });
-    const [files, setFiles] = useState<{ home?: File, about?: File, second?: File, homeMobile?: File, aboutMobile?: File, secondMobile?: File }>({});
+    const [settings, setSettings] = useState<Partial<HeroImageSettings>>({ home: {}, about: {} });
+    const [files, setFiles] = useState<{ home?: File, about?: File, homeMobile?: File, aboutMobile?: File }>({});
     const [isSaving, setIsSaving] = useState(false);
     
     const originalUrls = useRef<any>({});
@@ -49,22 +49,19 @@ function HeroImageManager() {
             const initialSettings = {
                 home: heroImageData.home || {},
                 about: heroImageData.about || {},
-                second: heroImageData.second || {},
             };
             setSettings(initialSettings);
             originalUrls.current = {
                 home: heroImageData.home?.url,
                 about: heroImageData.about?.url,
-                second: heroImageData.second?.url,
                 homeMobile: heroImageData.home?.urlMobile,
                 aboutMobile: heroImageData.about?.urlMobile,
-                secondMobile: heroImageData.second?.urlMobile,
             };
         }
     }, [heroImageData]);
     
-    type FileType = 'home' | 'about' | 'second' | 'homeMobile' | 'aboutMobile' | 'secondMobile';
-    type PageType = 'home' | 'about' | 'second';
+    type FileType = 'home' | 'about' | 'homeMobile' | 'aboutMobile';
+    type PageType = 'home' | 'about';
 
     const handleFileChange = (type: FileType, file: File | null) => {
         if (file) {
@@ -122,7 +119,6 @@ function HeroImageManager() {
                 if (file) {
                     const page = key.replace('Mobile', '') as PageType;
                     const device = key.endsWith('Mobile') ? 'mobile' : 'pc';
-                    const filePath = `settings/hero-${page}-${device}/${Date.now()}-${file.name}`;
                     
                     const base64Image = await new Promise<string>((resolve, reject) => {
                         const reader = new FileReader();
@@ -201,7 +197,7 @@ function HeroImageManager() {
     }
 
     const renderManagerFor = (type: PageType) => {
-        const title = type === 'home' ? '메인 히어로' : type === 'about' ? '아카데미 소개 히어로' : '두 번째 히어로';
+        const title = type === 'home' ? '메인 히어로' : '아카데미 소개 히어로';
         const pcImageUrl = settings[type]?.url;
         const mobileImageUrl = settings[type]?.urlMobile;
       
@@ -265,7 +261,6 @@ function HeroImageManager() {
         <CardContent className="space-y-6">
             {renderManagerFor('home')}
             {renderManagerFor('about')}
-            {renderManagerFor('second')}
             <Button onClick={handleSave} disabled={isSaving}>{isSaving ? '저장 중...' : '히어로 정보 저장'}</Button>
         </CardContent>
     );
@@ -517,5 +512,3 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
-
-    
