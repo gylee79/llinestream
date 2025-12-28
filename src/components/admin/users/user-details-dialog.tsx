@@ -106,16 +106,14 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
             const userRef = doc(firestore, 'users', user.id);
             const now = new Date();
             let newExpiryDate: Date;
+            let wasExpiryAdjusted = false;
             
             const startDate = currentExpiry && isBefore(now, currentExpiry) ? currentExpiry : now;
             newExpiryDate = add(startDate, { days: bonusDays });
 
             if (isBefore(newExpiryDate, now)) {
               newExpiryDate = now;
-              toast({
-                title: "만료일 조정",
-                description: "계산된 만료일이 과거이므로 만료일을 오늘로 설정했습니다.",
-              });
+              wasExpiryAdjusted = true;
             }
 
             if (currentPurchase && isBefore(newExpiryDate, currentPurchase)) {
@@ -163,7 +161,14 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                 }
             }));
 
-            toast({ title: '성공', description: `${Math.abs(bonusDays)}일의 기간이 성공적으로 ${bonusDays > 0 ? '추가' : '차감'}되었습니다.` });
+            if (wasExpiryAdjusted) {
+                toast({
+                    title: '만료일 조정 및 적용 완료',
+                    description: '계산된 만료일이 과거이므로 만료일을 오늘로 설정했습니다.',
+                });
+            } else {
+                 toast({ title: '성공', description: `${Math.abs(bonusDays)}일의 기간이 성공적으로 ${bonusDays > 0 ? '추가' : '차감'}되었습니다.` });
+            }
             setBonusDays(0);
         } catch (error) {
              console.error("Failed to apply bonus days:", error);
@@ -267,5 +272,3 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
     </Dialog>
   );
 }
-
-    
