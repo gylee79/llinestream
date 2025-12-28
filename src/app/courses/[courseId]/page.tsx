@@ -168,7 +168,7 @@ export default function CourseDetailPage() {
                         <div className="flex items-center gap-2">
                            {isSelected && <CheckCircle2 className="w-5 h-5 text-primary" />}
                            {classification && course && (
-                            <p className="text-muted-foreground text-sm font-mono">{`${classification.name} > ${course.name}`}</p>
+                            <p className="text-muted-foreground text-xs font-mono">{`${classification.name} > ${course.name}`}</p>
                            )}
                         </div>
                         <p className="font-medium leading-tight mt-1">{episode.title}</p>
@@ -178,7 +178,7 @@ export default function CourseDetailPage() {
                                     <Avatar className="h-5 w-5">
                                         <AvatarFallback>{instructor.name.charAt(0)}</AvatarFallback>
                                     </Avatar>
-                                    <span>{instructor.name}</span>
+                                    <span>강사: {instructor.name}</span>
                                     <span className="mx-1">·</span>
                                 </>
                             )}
