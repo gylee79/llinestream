@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -28,7 +29,7 @@ import {
     SelectTrigger,
     SelectValue,
   } from '@/components/ui/select';
-import type { User, Classification, Subscription, Timestamp } from '@/lib/types';
+import type { User, Course, Subscription, Timestamp } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, where, doc, updateDoc, addDoc, serverTimestamp, writeBatch, Timestamp as FirebaseTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -40,9 +41,10 @@ interface UserDetailsDialogProps {
   user: User;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  courses: Course[];
 }
 
-export function UserDetailsDialog({ user: initialUser, open, onOpenChange }: UserDetailsDialogProps) {
+export function UserDetailsDialog({ user: initialUser, open, onOpenChange, courses }: UserDetailsDialogProps) {
     const firestore = useFirestore();
     const { toast } = useToast();
     
@@ -53,7 +55,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange }: Use
     const [phone, setPhone] = useState(user.phone);
     const [dob, setDob] = useState(user.dob);
     const [bonusDays, setBonusDays] = useState('');
-    const [bonusClassification, setBonusClassification] = useState('');
+    const [bonusCourseId, setBonusCourseId] = useState('');
     
     // Effect to sync local state when the initialUser prop changes
     useEffect(() => {
@@ -64,15 +66,12 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange }: Use
     }, [initialUser]);
 
 
-    const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
-    const { data: classifications } = useCollection<Classification>(classificationsQuery);
-
     const subscriptionsQuery = useMemoFirebase(() => (
       firestore ? query(collection(firestore, 'users', user.id, 'subscriptions'), where('userId', '==', user.id)) : null
     ), [firestore, user.id]);
     const { data: subscriptions } = useCollection<Subscription>(subscriptionsQuery);
 
-    const getClassificationName = (id: string) => classifications?.find(c => c.id === id)?.name || '알 수 없음';
+    const getCourseName = (id: string) => courses?.find(c => c.id === id)?.name || '알 수 없음';
     
     const handleSaveUserInfo = async () => {
       if (!firestore) return;
@@ -87,8 +86,8 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange }: Use
     };
     
     const handleAddBonusDays = async () => {
-        if (!firestore || !bonusClassification || !bonusDays) {
-            toast({ variant: 'destructive', title: '입력 오류', description: '분류와 일수를 모두 입력해주세요.' });
+        if (!firestore || !bonusCourseId || !bonusDays) {
+            toast({ variant: 'destructive', title: '입력 오류', description: '상세분류와 일수를 모두 입력해주세요.' });
             return;
         }
 
@@ -103,7 +102,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange }: Use
             const userRef = doc(firestore, 'users', user.id);
             const now = new Date();
             
-            const currentSub = user.activeSubscriptions?.[bonusClassification];
+            const currentSub = user.activeSubscriptions?.[bonusCourseId];
             const currentExpiry = currentSub?.expiresAt ? (currentSub.expiresAt as FirebaseTimestamp).toDate() : null;
             
             const startDate = currentExpiry && currentExpiry > now ? currentExpiry : now;
@@ -116,13 +115,13 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange }: Use
             };
             
             batch.update(userRef, {
-                [`activeSubscriptions.${bonusClassification}`]: newActiveSub
+                [`activeSubscriptions.${bonusCourseId}`]: newActiveSub
             });
             
             const bonusSubscriptionRef = doc(collection(firestore, 'users', user.id, 'subscriptions'));
             const bonusSubscriptionData: Omit<Subscription, 'id'> = {
                 userId: user.id,
-                classificationId: bonusClassification,
+                courseId: bonusCourseId,
                 purchasedAt: serverTimestamp() as Timestamp,
                 expiresAt: newExpiryTimestamp as Timestamp,
                 amount: 0,
@@ -140,8 +139,8 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange }: Use
                 ...currentUser,
                 activeSubscriptions: {
                     ...currentUser.activeSubscriptions,
-                    [bonusClassification]: {
-                        ...currentUser.activeSubscriptions[bonusClassification],
+                    [bonusCourseId]: {
+                        ...currentUser.activeSubscriptions?.[bonusCourseId],
                         expiresAt: newExpiryTimestamp,
                     }
                 }
@@ -150,7 +149,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange }: Use
 
             toast({ title: '성공', description: `${days}일의 보너스 기간이 추가되었습니다.` });
             setBonusDays('');
-            setBonusClassification('');
+            setBonusCourseId('');
 
         } catch (error) {
              console.error("Failed to add bonus days:", error);
@@ -195,21 +194,21 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange }: Use
           <TabsContent value="subscriptions" className="mt-4">
             <h4 className="font-semibold mb-2">활성 이용권 현황</h4>
             <Table>
-                <TableHeader><TableRow><TableHead>분류</TableHead><TableHead>만료일</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>상세분류</TableHead><TableHead>만료일</TableHead></TableRow></TableHeader>
                 <TableBody>
                     {user.activeSubscriptions && Object.entries(user.activeSubscriptions).map(([id, sub]) => (
                         <TableRow key={id}>
-                            <TableCell>{getClassificationName(id)}</TableCell>
-                            <TableCell>{(sub.expiresAt as FirebaseTimestamp).toDate().toLocaleDateString('ko-KR')}</TableCell>
+                            <TableCell>{getCourseName(id)}</TableCell>
+                            <TableCell>{toDisplayDate(sub.expiresAt)}</TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
             </Table>
             <h4 className="font-semibold mt-6 mb-2">보너스 이용 기간 추가</h4>
             <div className="flex gap-2 items-center">
-                <Select value={bonusClassification} onValueChange={setBonusClassification}>
-                    <SelectTrigger className="w-[180px]"><SelectValue placeholder="분류 선택" /></SelectTrigger>
-                    <SelectContent>{classifications?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                <Select value={bonusCourseId} onValueChange={setBonusCourseId}>
+                    <SelectTrigger className="w-[180px]"><SelectValue placeholder="상세분류 선택" /></SelectTrigger>
+                    <SelectContent>{courses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                 </Select>
                 <Input type="number" placeholder="일수(토큰)" className="w-24" value={bonusDays} onChange={e => setBonusDays(e.target.value)} />
                 <Button onClick={handleAddBonusDays}>추가</Button>

@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
-import type { User, Classification } from '@/lib/types';
+import type { User, Course } from '@/lib/types';
 import { UserDetailsDialog } from '@/components/admin/users/user-details-dialog';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection } from 'firebase/firestore';
@@ -27,22 +27,22 @@ export default function AdminUsersPage() {
   const usersQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
   const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
 
-  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
-  const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
+  const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
+  const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   const getActiveSubscriptions = (user: User) => {
-    if (classificationsLoading) return '로딩 중...';
-    if (!user.activeSubscriptions || !classifications) return '없음';
+    if (coursesLoading) return '로딩 중...';
+    if (!user.activeSubscriptions || !courses) return '없음';
 
     const activeSubIds = Object.keys(user.activeSubscriptions);
     if (activeSubIds.length === 0) return '없음';
     
     const subNames = activeSubIds
-      .map(id => classifications.find(c => c.id === id)?.name)
+      .map(id => courses.find(c => c.id === id)?.name)
       .filter(Boolean); // Filter out undefined names
 
     return subNames.join(', ');
@@ -66,7 +66,7 @@ export default function AdminUsersPage() {
     user.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
-  const isLoading = usersLoading || classificationsLoading;
+  const isLoading = usersLoading || coursesLoading;
 
   return (
     <>
@@ -136,8 +136,13 @@ export default function AdminUsersPage() {
           </CardContent>
         </Card>
       </div>
-      {selectedUser && (
-        <UserDetailsDialog user={selectedUser} open={isDialogOpen} onOpenChange={setDialogOpen} />
+      {selectedUser && courses && (
+        <UserDetailsDialog 
+            user={selectedUser} 
+            open={isDialogOpen} 
+            onOpenChange={setDialogOpen}
+            courses={courses}
+        />
       )}
     </>
   );
