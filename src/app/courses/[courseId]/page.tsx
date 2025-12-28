@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
+import VideoPlayerDialog from '@/components/shared/video-player-dialog';
 
 
 export default function CourseDetailPage() {
@@ -21,6 +22,7 @@ export default function CourseDetailPage() {
   const { user } = useUser();
   
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
+  const [isPlayerDialogOpen, setPlayerDialogOpen] = useState(false);
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', params.courseId) : null), [firestore, params.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
@@ -45,13 +47,10 @@ export default function CourseDetailPage() {
   // Check user subscription
   const hasSubscription = !!(user && classification && user.activeSubscriptions?.[classification.id]);
 
-  useEffect(() => {
-      if (episodes && episodes.length > 0 && !selectedEpisode) {
-          const firstPlayable = episodes.find(ep => ep.isFree || hasSubscription);
-          setSelectedEpisode(firstPlayable || null);
-      }
-  }, [episodes, hasSubscription, selectedEpisode]);
-
+  const handlePlayClick = (episode: Episode) => {
+    setSelectedEpisode(episode);
+    setPlayerDialogOpen(true);
+  }
 
   if (!isLoading && !course) {
     notFound();
@@ -68,26 +67,11 @@ export default function CourseDetailPage() {
     return instructors.find(i => i.id === instructorId);
   }
 
-  const PlayerContent = () => {
+  const CourseHero = () => {
     if (isLoading || !course) {
       return <Skeleton className="aspect-video w-full" />;
     }
-
-    const episodeToPlay = selectedEpisode;
-    const canPlaySelected = episodeToPlay && (episodeToPlay.isFree || hasSubscription);
-
-    if (canPlaySelected) {
-       return (
-            <div className="relative aspect-video w-full bg-black">
-                <video key={episodeToPlay.id} controls autoPlay className="w-full h-full" poster={episodeToPlay.thumbnailUrl}>
-                    <source src={episodeToPlay.videoUrl} type="video/mp4" />
-                    브라우저가 비디오 태그를 지원하지 않습니다.
-                </video>
-            </div>
-       )
-    }
     
-    // Default overlay for locked content or no selection
     return (
       <div className="relative aspect-video w-full bg-black">
         {course.thumbnailUrl ? (
@@ -96,23 +80,24 @@ export default function CourseDetailPage() {
                 alt={course.name}
                 fill
                 sizes="100vw"
-                className="object-cover"
+                className="object-cover opacity-50"
             />
         ) : null}
-        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white p-4">
-          <div className="text-center bg-black/70 p-8 rounded-lg">
-            <Lock className="w-12 h-12 mx-auto mb-4"/>
-            <h2 className="text-2xl font-bold">이용권이 필요한 콘텐츠입니다.</h2>
-            <p className="mt-2 mb-6 text-white/80">이 콘텐츠를 시청하려면 이용권을 구매해주세요.</p>
-            {classification && classification.prices.day30 > 0 && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-4">
+          <div className="text-center">
+            <h1 className="font-headline text-4xl font-bold">{course.name}</h1>
+            {!hasSubscription && classification && classification.prices.day30 > 0 && (
+              <div className="mt-6">
+                <p className="mb-4 text-white/80">이 강좌의 모든 에피소드를 보려면 이용권이 필요합니다.</p>
                 <PaymentDialog 
                     classification={classification}
                     selectedDuration="day30"
                     selectedPrice={classification.prices.day30}
                     selectedLabel="30일 이용권"
                 >
-                    <Button size="lg">이용권 구매하러 가기</Button>
+                    <Button size="lg">이용권 구매하기</Button>
                 </PaymentDialog>
+              </div>
             )}
           </div>
         </div>
@@ -124,7 +109,7 @@ export default function CourseDetailPage() {
     <div>
       <div className="bg-black">
         <div className="container mx-auto max-w-5xl">
-          <PlayerContent />
+          <CourseHero />
         </div>
       </div>
       <div className="container mx-auto max-w-5xl py-8">
@@ -154,7 +139,7 @@ export default function CourseDetailPage() {
               {episodes?.map((episode, index) => {
                 const isPlayable = episode.isFree || hasSubscription;
                 const instructor = getInstructor(episode.instructorId);
-                const isSelected = selectedEpisode?.id === episode.id;
+                const isSelected = selectedEpisode?.id === episode.id && isPlayerDialogOpen;
 
                 return (
                   <li key={episode.id} className={cn("p-4 transition-colors", isSelected && "bg-muted")}>
@@ -199,7 +184,7 @@ export default function CourseDetailPage() {
                           <Lock className="w-5 h-5 text-muted-foreground" />
                         ) : (
                           <>
-                             <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setSelectedEpisode(episode)}>
+                             <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handlePlayClick(episode)}>
                                 <Play className="w-6 h-6" />
                              </Button>
                              <Button variant="outline" size="sm" className="mt-2">
@@ -218,6 +203,13 @@ export default function CourseDetailPage() {
           </CardContent>
         </Card>
       </div>
+      {selectedEpisode && (
+        <VideoPlayerDialog 
+            isOpen={isPlayerDialogOpen}
+            onOpenChange={setPlayerDialogOpen}
+            episode={selectedEpisode}
+        />
+      )}
     </div>
   );
 }

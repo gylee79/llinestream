@@ -1,0 +1,57 @@
+'use client';
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import type { Episode } from '@/lib/types';
+import { useEffect } from 'react';
+
+interface VideoPlayerDialogProps {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  episode: Episode;
+}
+
+export default function VideoPlayerDialog({ isOpen, onOpenChange, episode }: VideoPlayerDialogProps) {
+
+  // This key forces remounting of the video element when the episode changes
+  const videoKey = episode.id; 
+  
+  useEffect(() => {
+    // When the dialog closes, pause the video by removing the src
+    // This is a simple way to stop playback and background loading
+    return () => {
+      const videoElement = document.getElementById(`video-${videoKey}`) as HTMLVideoElement;
+      if (videoElement) {
+        videoElement.pause();
+        videoElement.src = '';
+      }
+    };
+  }, [isOpen, videoKey]);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl p-0 border-0">
+        <div className="aspect-video w-full bg-black">
+          <video
+            id={`video-${videoKey}`}
+            key={videoKey}
+            controls
+            autoPlay
+            className="w-full h-full"
+            poster={episode.thumbnailUrl}
+          >
+            <source src={episode.videoUrl} type="video/mp4" />
+            브라우저가 비디오 태그를 지원하지 않습니다.
+          </video>
+        </div>
+        <DialogHeader className="p-6 pt-2">
+          <DialogTitle>{episode.title}</DialogTitle>
+        </DialogHeader>
+      </DialogContent>
+    </Dialog>
+  );
+}
