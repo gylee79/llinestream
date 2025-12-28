@@ -23,8 +23,8 @@ import { doc } from 'firebase/firestore';
 
 const adminNavLinks = [
   { href: '/admin/dashboard', label: '대시보드', icon: LayoutDashboard },
-  { href: '/admin/users', label: '고객 관리', icon: Users },
   { href: '/admin/content', label: '콘텐츠 관리', icon: FolderKanban },
+  { href: '/admin/users', label: '고객 관리', icon: Users },
   { href: '/admin/subscriptions', label: '구독/결제 관리', icon: CreditCard },
   { href: '/admin/revenue', label: '매출 관리', icon: BarChart3 },
   { href: '/admin/settings', label: '설정', icon: Cog },
