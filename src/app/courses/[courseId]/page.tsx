@@ -1,3 +1,4 @@
+
 'use client';
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
@@ -166,7 +167,9 @@ export default function CourseDetailPage() {
                       <div className="flex-grow px-4">
                         <div className="flex items-center gap-2">
                            {isSelected && <CheckCircle2 className="w-5 h-5 text-primary" />}
-                           <p className="text-muted-foreground text-sm font-mono">{`EP ${index + 1}`}</p>
+                           {classification && course && (
+                            <p className="text-muted-foreground text-sm font-mono">{`${classification.name} > ${course.name}`}</p>
+                           )}
                         </div>
                         <p className="font-medium leading-tight mt-1">{episode.title}</p>
                          {instructor && (
