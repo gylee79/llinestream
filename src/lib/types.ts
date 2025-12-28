@@ -129,6 +129,7 @@ export interface HeroContent {
 export interface HeroImageSettings {
   home: HeroContent;
   about: HeroContent;
+  second: HeroContent;
 }
 
 export interface Instructor {
@@ -139,3 +140,5 @@ export interface Instructor {
   dob: string; // YYYY-MM-DD
   createdAt: Timestamp;
 }
+
+    

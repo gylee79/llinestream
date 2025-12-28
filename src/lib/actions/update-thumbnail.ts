@@ -7,7 +7,7 @@ config();
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
-import type { Field, Classification, Course, Episode } from '@/lib/types';
+import type { Field, Classification, Course, Episode, HeroContent } from '@/lib/types';
 import { Storage } from 'firebase-admin/storage';
 import { getPublicUrl, extractPathFromUrl } from '@/lib/utils';
 
@@ -17,8 +17,10 @@ type UpdateResult = {
 };
 
 type UpdateThumbnailPayload = {
-    itemType: 'fields' | 'classifications' | 'courses' | 'episodes';
+    itemType: 'fields' | 'classifications' | 'courses' | 'episodes' | 'settings';
     itemId: string;
+    subCollection?: string; // For nested data like hero images
+    field?: string; // for nested data like hero images
     base64Image: string | null; // Allow null for deletion
     imageContentType?: string;
     imageName?: string;
@@ -45,7 +47,7 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
 };
 
 export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<UpdateResult> {
-  const { itemType, itemId, base64Image, imageContentType, imageName } = payload;
+  const { itemType, itemId, base64Image, imageContentType, imageName, subCollection, field } = payload;
 
   if (!itemType || !itemId) {
     return { success: false, message: '필수 항목(itemType, itemId)이 누락되었습니다.' };
@@ -69,52 +71,57 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     if (!currentDoc.exists) {
         return { success: false, message: '문서를 찾을 수 없습니다.' };
     }
-    const currentData = currentDoc.data() as Field | Classification | Course | Episode;
+    const currentData = currentDoc.data() as any;
 
-    // Determine which thumbnail path to use (custom or default)
-    const oldThumbnailPath = itemType === 'episodes'
-        ? ((currentData as Episode).customThumbnailPath || extractPathFromUrl((currentData as Episode).customThumbnailUrl))
-        : (currentData.thumbnailPath || extractPathFromUrl(currentData.thumbnailUrl));
+    let oldThumbnailPath: string | undefined;
 
+    if (itemType === 'settings' && subCollection && field) {
+        oldThumbnailPath = extractPathFromUrl(currentData?.[subCollection]?.[field]);
+    } else if (itemType === 'episodes') {
+        oldThumbnailPath = (currentData as Episode).customThumbnailPath || extractPathFromUrl((currentData as Episode).customThumbnailUrl);
+    } else {
+        oldThumbnailPath = (currentData as Field | Classification | Course).thumbnailPath || extractPathFromUrl((currentData as Field | Classification | Course).thumbnailUrl);
+    }
 
-    // If a new image is provided, upload it.
     if (base64Image && imageContentType && imageName) {
         if (oldThumbnailPath) {
-            console.log(`[UPDATE] Deleting old thumbnail file: ${oldThumbnailPath}`);
             await deleteStorageFileByPath(storage, oldThumbnailPath);
         }
         
-        newThumbnailPath = `${itemType}/${itemId}/thumbnails/${Date.now()}-${imageName}`;
+        const pathPrefix = (itemType === 'settings' && subCollection && field) 
+            ? `settings/hero-${subCollection}-${field.includes('Mobile') ? 'mobile' : 'pc'}`
+            : `${itemType}/${itemId}/thumbnails`;
+            
+        newThumbnailPath = `${pathPrefix}/${Date.now()}-${imageName}`;
         
         const base64EncodedImageString = base64Image.replace(/^data:image\/\w+;base64,/, '');
         const fileBuffer = Buffer.from(base64EncodedImageString, 'base64');
         
         const file = storage.bucket().file(newThumbnailPath);
-        await file.save(fileBuffer, {
-          metadata: { contentType: imageContentType },
-        });
-
+        await file.save(fileBuffer, { metadata: { contentType: imageContentType } });
         downloadUrl = getPublicUrl(bucketName, newThumbnailPath);
 
-    } else if (base64Image === null) { // Explicit deletion request for custom thumbnail
+    } else if (base64Image === null) {
         if (oldThumbnailPath) {
             await deleteStorageFileByPath(storage, oldThumbnailPath);
         }
-        downloadUrl = ''; // Set to empty string for deletion
+        downloadUrl = '';
         newThumbnailPath = '';
     } else {
-        // No new image and not a deletion request, so do nothing.
         return { success: true, message: '새로운 썸네일이 제공되지 않아 스킵합니다.' };
     }
 
     let dataToUpdate: { [key: string]: any };
 
-    if (itemType === 'episodes') {
+    if (itemType === 'settings' && subCollection && field) {
+        dataToUpdate = {
+            [`${subCollection}.${field}`]: downloadUrl
+        }
+    } else if (itemType === 'episodes') {
         const episodeData = currentData as Episode;
         dataToUpdate = {
             customThumbnailUrl: downloadUrl,
             customThumbnailPath: newThumbnailPath,
-            // If we are deleting a custom thumbnail, the main thumbnailUrl should revert to the default.
             thumbnailUrl: downloadUrl || episodeData.defaultThumbnailUrl
         }
     } else {
@@ -127,6 +134,7 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     await docRef.update(dataToUpdate);
 
     revalidatePath('/admin/content', 'page');
+    revalidatePath('/admin/settings', 'page');
 
     return { success: true, message: `썸네일이 성공적으로 ${downloadUrl ? '업데이트' : '삭제'}되었습니다.` };
 
@@ -136,3 +144,5 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     return { success: false, message: `작업 실패: ${errorMessage}` };
   }
 }
+
+    

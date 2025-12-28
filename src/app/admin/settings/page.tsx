@@ -11,49 +11,67 @@ import { Switch } from "@/components/ui/switch";
 import type { Policy, FooterSettings, HeroImageSettings } from '@/lib/types';
 import { useCollection, useDoc, useFirestore, useUser, errorEmitter, useStorage, useMemoFirebase } from '@/firebase';
 import { collection, doc, updateDoc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytesResumable } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useRef } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
 import { getPublicUrl } from "@/lib/utils";
+import { updateThumbnail } from '@/lib/actions/update-thumbnail';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
 
 
 function HeroImageManager() {
     const firestore = useFirestore();
-    const storage = useStorage();
-    const { user } = useUser();
     const { toast } = useToast();
     const heroImagesRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
     const { data: heroImageData, isLoading } = useDoc<HeroImageSettings>(heroImagesRef);
 
-    const [settings, setSettings] = useState<Partial<HeroImageSettings>>({ home: {}, about: {} });
-    const [files, setFiles] = useState<{ home?: File, about?: File, homeMobile?: File, aboutMobile?: File }>({});
+    const [settings, setSettings] = useState<Partial<HeroImageSettings>>({ home: {}, about: {}, second: {} });
+    const [files, setFiles] = useState<{ home?: File, about?: File, second?: File, homeMobile?: File, aboutMobile?: File, secondMobile?: File }>({});
     const [isSaving, setIsSaving] = useState(false);
     
-    const originalUrls = useRef<{ home?: string, about?: string, homeMobile?: string, aboutMobile?: string }>({});
+    const originalUrls = useRef<any>({});
 
     useEffect(() => {
         if (heroImageData) {
-            setSettings(heroImageData);
+            const initialSettings = {
+                home: heroImageData.home || {},
+                about: heroImageData.about || {},
+                second: heroImageData.second || {},
+            };
+            setSettings(initialSettings);
             originalUrls.current = {
                 home: heroImageData.home?.url,
                 about: heroImageData.about?.url,
+                second: heroImageData.second?.url,
                 homeMobile: heroImageData.home?.urlMobile,
                 aboutMobile: heroImageData.about?.urlMobile,
+                secondMobile: heroImageData.second?.urlMobile,
             };
         }
     }, [heroImageData]);
     
-    type FileType = 'home' | 'about' | 'homeMobile' | 'aboutMobile';
+    type FileType = 'home' | 'about' | 'second' | 'homeMobile' | 'aboutMobile' | 'secondMobile';
+    type PageType = 'home' | 'about' | 'second';
 
     const handleFileChange = (type: FileType, file: File | null) => {
         if (file) {
             setFiles(prev => ({ ...prev, [type]: file }));
             const reader = new FileReader();
             reader.onloadend = () => {
-                const page = type.startsWith('home') ? 'home' : 'about';
+                const page = type.replace('Mobile', '') as PageType;
                 const device = type.endsWith('Mobile') ? 'urlMobile' : 'url';
                 setSettings(prev => ({
                     ...prev,
@@ -71,17 +89,16 @@ function HeroImageManager() {
             return newFiles;
         });
 
-        const page = type.startsWith('home') ? 'home' : 'about';
+        const page = type.replace('Mobile', '') as PageType;
         const deviceUrlProp = type.endsWith('Mobile') ? 'urlMobile' : 'url';
-        const originalUrlProp = (type.endsWith('Mobile') ? `${page}Mobile` : page) as keyof typeof originalUrls.current;
-
+        
         setSettings(prev => ({
             ...prev,
-            [page]: { ...(prev[page] || {}), [deviceUrlProp]: originalUrls.current[originalUrlProp] }
+            [page]: { ...(prev[page] || {}), [deviceUrlProp]: originalUrls.current[type] }
         }));
     };
     
-    const handleTextChange = (type: 'home' | 'about', field: 'title' | 'description', value: string) => {
+    const handleTextChange = (type: PageType, field: 'title' | 'description', value: string) => {
       setSettings(prev => ({
         ...prev,
         [type]: { ...(prev[type] || {}), [field]: value }
@@ -89,7 +106,7 @@ function HeroImageManager() {
     };
 
     const handleSave = async () => {
-        if (!firestore || !storage || !user) return;
+        if (!firestore) return;
         setIsSaving(true);
         
         let updatedSettings: Partial<HeroImageSettings> = JSON.parse(JSON.stringify(settings));
@@ -97,39 +114,39 @@ function HeroImageManager() {
         try {
             const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
             if (!bucketName) {
-                throw new Error('Firebase Storage bucket name is not configured in environment variables.');
+                throw new Error('Firebase Storage bucket name is not configured.');
             }
 
             for (const key of Object.keys(files) as Array<FileType>) {
                 const file = files[key];
                 if (file) {
-                    const page = key.startsWith('home') ? 'home' : 'about';
+                    const page = key.replace('Mobile', '') as PageType;
                     const device = key.endsWith('Mobile') ? 'mobile' : 'pc';
-                    const filePath = `settings/hero-${page}-${device}/${file.name}`;
-                    const storageRef = ref(storage, filePath);
-                    const uploadTask = uploadBytesResumable(storageRef, file);
+                    const filePath = `settings/hero-${page}-${device}/${Date.now()}-${file.name}`;
                     
-                    await new Promise<void>((resolve, reject) => {
-                        uploadTask.on('state_changed',
-                            () => {}, // progress
-                            (error) => reject(error),
-                            () => resolve()
-                        );
+                    const base64Image = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.onerror = error => reject(error);
+                        reader.readAsDataURL(file);
+                    });
+
+                    const result = await updateThumbnail({
+                        itemType: 'settings',
+                        itemId: 'heroImages',
+                        subCollection: page,
+                        field: device === 'pc' ? 'url' : 'urlMobile',
+                        base64Image,
+                        imageContentType: file.type,
+                        imageName: file.name,
                     });
                     
-                    const downloadUrl = getPublicUrl(bucketName, filePath);
-                    if (!downloadUrl) {
-                        throw new Error(`Failed to generate public URL for ${filePath}`);
-                    }
-
-                    if (!updatedSettings[page]) updatedSettings[page] = {};
-                    const urlProp = device === 'pc' ? 'url' : 'urlMobile';
-                    (updatedSettings[page]! as any)[urlProp] = downloadUrl;
+                    if(!result.success) throw new Error(result.message);
                 }
             }
             
-            const docRef = doc(firestore, 'settings', 'heroImages');
-            await setDoc(docRef, updatedSettings, { merge: true });
+            // Text fields are updated separately
+            await setDoc(doc(firestore, 'settings', 'heroImages'), updatedSettings, { merge: true });
             
             toast({
                 title: '저장 완료',
@@ -149,25 +166,55 @@ function HeroImageManager() {
         }
     };
     
+    const handleDeleteImage = async (page: PageType, device: 'pc' | 'mobile') => {
+        setIsSaving(true);
+        try {
+            const result = await updateThumbnail({
+                itemType: 'settings',
+                itemId: 'heroImages',
+                subCollection: page,
+                field: device === 'pc' ? 'url' : 'urlMobile',
+                base64Image: null, // Indicates deletion
+            });
+
+            if (result.success) {
+                toast({ title: '삭제 완료', description: '히어로 이미지가 삭제되었습니다.'});
+                // Manually update local state to reflect deletion
+                const urlProp = device === 'pc' ? 'url' : 'urlMobile';
+                setSettings(prev => ({
+                    ...prev,
+                    [page]: { ...(prev[page] || {}), [urlProp]: undefined }
+                }));
+            } else {
+                throw new Error(result.message);
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.";
+            toast({ variant: 'destructive', title: '삭제 실패', description: message });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     if (isLoading) {
         return <CardContent className="space-y-6">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-60 w-full" />)}</CardContent>;
     }
 
-    const renderManagerFor = (type: 'home' | 'about') => {
+    const renderManagerFor = (type: PageType) => {
+        const title = type === 'home' ? '메인 히어로' : type === 'about' ? '아카데미 소개 히어로' : '두 번째 히어로';
         const pcImageUrl = settings[type]?.url;
         const mobileImageUrl = settings[type]?.urlMobile;
       
         return (
-          <div className="space-y-6 rounded-lg border p-4">
-              <h4 className="font-semibold text-lg">{type === 'home' ? '홈페이지' : '아카데미 소개'} 히어로</h4>
+          <div key={type} className="space-y-6 rounded-lg border p-4">
+              <h4 className="font-semibold text-lg">{title}</h4>
               
-              {/* Text Content */}
               <div className="space-y-2">
                   <Label>제목</Label>
                   <Input 
                       value={settings[type]?.title || ''}
                       onChange={e => handleTextChange(type, 'title', e.target.value)}
-                      placeholder={`${type === 'home' ? '온라인 동영상 강의' : '뷰티 비즈니스...'}`}
+                      placeholder={`${type} 페이지의 제목`}
                   />
               </div>
               <div className="space-y-2">
@@ -175,15 +222,17 @@ function HeroImageManager() {
                   <Textarea 
                       value={settings[type]?.description || ''}
                       onChange={e => handleTextChange(type, 'description', e.target.value)}
-                      placeholder={`${type === 'home' ? '온라인에서 고품질 강의를 만나보세요' : '엘라인이 뷰티 전문가의 기준을...'}`}
+                      placeholder={`${type} 페이지의 설명`}
                   />
               </div>
     
               <Separator />
     
-              {/* PC Image */}
               <div className="space-y-2">
-                  <Label>PC 배경 이미지</Label>
+                  <div className="flex justify-between items-center">
+                    <Label>PC 배경 이미지</Label>
+                    {pcImageUrl && <ImageDeleteButton onConfirm={() => handleDeleteImage(type, 'pc')} />}
+                  </div>
                   {pcImageUrl && <Image src={pcImageUrl} alt={`${type} hero preview`} width={500} height={200} className="rounded-md object-cover"/>}
                   <div className="flex items-center gap-2">
                     <Input type="file" onChange={e => handleFileChange(type, e.target.files?.[0] || null)} accept="image/*" className="flex-1" />
@@ -191,21 +240,23 @@ function HeroImageManager() {
                       <Button variant="outline" size="sm" onClick={() => handleCancelFileChange(type)}>취소</Button>
                     )}
                   </div>
-                </div>
+              </div>
               
               <Separator />
               
-              {/* Mobile Image */}
               <div className="space-y-2">
-                  <Label>모바일 배경 이미지</Label>
+                   <div className="flex justify-between items-center">
+                    <Label>모바일 배경 이미지</Label>
+                    {mobileImageUrl && <ImageDeleteButton onConfirm={() => handleDeleteImage(type, 'mobile')} />}
+                  </div>
                   {mobileImageUrl && <Image src={mobileImageUrl} alt={`${type} mobile hero preview`} width={500} height={200} className="rounded-md object-cover"/>}
                   <div className="flex items-center gap-2">
-                    <Input type="file" onChange={e => handleFileChange(`${type}Mobile`, e.target.files?.[0] || null)} accept="image/*" className="flex-1" />
+                    <Input type="file" onChange={e => handleFileChange(`${type}Mobile` as FileType, e.target.files?.[0] || null)} accept="image/*" className="flex-1" />
                     {files[`${type}Mobile` as FileType] && (
                       <Button variant="outline" size="sm" onClick={() => handleCancelFileChange(`${type}Mobile` as FileType)}>취소</Button>
                     )}
                   </div>
-                </div>
+              </div>
           </div>
       );
     }
@@ -214,10 +265,39 @@ function HeroImageManager() {
         <CardContent className="space-y-6">
             {renderManagerFor('home')}
             {renderManagerFor('about')}
+            {renderManagerFor('second')}
             <Button onClick={handleSave} disabled={isSaving}>{isSaving ? '저장 중...' : '히어로 정보 저장'}</Button>
         </CardContent>
     );
 }
+
+function ImageDeleteButton({ onConfirm }: { onConfirm: () => void }) {
+    return (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="sm">
+              <Trash2 className="mr-2 h-4 w-4" />
+              삭제
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>이미지를 삭제하시겠습니까?</AlertDialogTitle>
+              <AlertDialogDescription>
+                이 작업은 되돌릴 수 없습니다. 이미지가 서버에서 영구적으로 삭제됩니다.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>취소</AlertDialogCancel>
+              <AlertDialogAction onClick={onConfirm} className="bg-destructive hover:bg-destructive/90">
+                삭제
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+    );
+}
+
 
 function FooterSettingsManager() {
   const firestore = useFirestore();
@@ -437,3 +517,5 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
+
+    
