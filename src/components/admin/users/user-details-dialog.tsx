@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -43,15 +42,28 @@ interface UserDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialogProps) {
+export function UserDetailsDialog({ user: initialUser, open, onOpenChange }: UserDetailsDialogProps) {
     const firestore = useFirestore();
     const { toast } = useToast();
+    
+    // Use a local state for the user to allow for immediate updates
+    const [user, setUser] = useState(initialUser);
+
     const [name, setName] = useState(user.name);
     const [phone, setPhone] = useState(user.phone);
     const [dob, setDob] = useState(user.dob);
     const [bonusDays, setBonusDays] = useState('');
     const [bonusClassification, setBonusClassification] = useState('');
     
+    // Effect to sync local state when the initialUser prop changes
+    useEffect(() => {
+        setUser(initialUser);
+        setName(initialUser.name);
+        setPhone(initialUser.phone);
+        setDob(initialUser.dob);
+    }, [initialUser]);
+
+
     const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
     const { data: classifications } = useCollection<Classification>(classificationsQuery);
 
@@ -96,9 +108,10 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
             
             const startDate = currentExpiry && currentExpiry > now ? currentExpiry : now;
             const newExpiryDate = add(startDate, { days });
+            const newExpiryTimestamp = FirebaseTimestamp.fromDate(newExpiryDate);
 
             const newActiveSub = {
-                expiresAt: FirebaseTimestamp.fromDate(newExpiryDate),
+                expiresAt: newExpiryTimestamp,
                 purchasedAt: currentSub?.purchasedAt || serverTimestamp()
             };
             
@@ -106,13 +119,12 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
                 [`activeSubscriptions.${bonusClassification}`]: newActiveSub
             });
             
-            // Add a record in the subscriptions subcollection for history
             const bonusSubscriptionRef = doc(collection(firestore, 'users', user.id, 'subscriptions'));
             const bonusSubscriptionData: Omit<Subscription, 'id'> = {
                 userId: user.id,
                 classificationId: bonusClassification,
                 purchasedAt: serverTimestamp() as Timestamp,
-                expiresAt: FirebaseTimestamp.fromDate(newExpiryDate) as Timestamp,
+                expiresAt: newExpiryTimestamp as Timestamp,
                 amount: 0,
                 orderName: `보너스 ${days}일`,
                 paymentId: `bonus-${bonusSubscriptionRef.id}`,
@@ -122,6 +134,19 @@ export function UserDetailsDialog({ user, open, onOpenChange }: UserDetailsDialo
             batch.set(bonusSubscriptionRef, bonusSubscriptionData);
             
             await batch.commit();
+
+            // Optimistically update local state for immediate UI feedback
+            setUser(currentUser => ({
+                ...currentUser,
+                activeSubscriptions: {
+                    ...currentUser.activeSubscriptions,
+                    [bonusClassification]: {
+                        ...currentUser.activeSubscriptions[bonusClassification],
+                        expiresAt: newExpiryTimestamp,
+                    }
+                }
+            }));
+
 
             toast({ title: '성공', description: `${days}일의 보너스 기간이 추가되었습니다.` });
             setBonusDays('');
