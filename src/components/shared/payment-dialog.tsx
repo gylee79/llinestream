@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useState, useEffect } from "react"
@@ -163,7 +164,7 @@ export default function PaymentDialog({
             <DialogHeader>
             <DialogTitle className="font-headline">{classification.name} 구독</DialogTitle>
             <DialogDescription>
-                {'결제를 진행하여 \'}{classification.name}{'\' 카테고리의 모든 콘텐츠를 무제한으로 이용하세요.'}
+                {`결제를 진행하여 '${classification.name}' 카테고리의 모든 콘텐츠를 무제한으로 이용하세요.`}
             </DialogDescription>
             </DialogHeader>
             <div className="py-4">
