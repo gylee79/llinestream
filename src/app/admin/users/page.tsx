@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -13,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
-import type { User } from '@/lib/types';
+import type { User, Classification } from '@/lib/types';
 import { UserDetailsDialog } from '@/components/admin/users/user-details-dialog';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection } from 'firebase/firestore';
@@ -24,17 +25,27 @@ import { toDisplayDate, toJSDate } from '@/lib/date-helpers';
 export default function AdminUsersPage() {
   const firestore = useFirestore();
   const usersQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
-  const { data: users, isLoading } = useCollection<User>(usersQuery);
+  const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
+
+  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
+  const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   const getActiveSubscriptions = (user: User) => {
-    if (!user.activeSubscriptions) return '없음';
-    const subCount = Object.keys(user.activeSubscriptions).length;
-    if (subCount === 0) return '없음';
-    return `${subCount}개 활성`;
+    if (classificationsLoading) return '로딩 중...';
+    if (!user.activeSubscriptions || !classifications) return '없음';
+
+    const activeSubIds = Object.keys(user.activeSubscriptions);
+    if (activeSubIds.length === 0) return '없음';
+    
+    const subNames = activeSubIds
+      .map(id => classifications.find(c => c.id === id)?.name)
+      .filter(Boolean); // Filter out undefined names
+
+    return subNames.join(', ');
   };
 
   const getFinalExpiry = (user: User) => {
@@ -54,6 +65,8 @@ export default function AdminUsersPage() {
     user.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     user.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  
+  const isLoading = usersLoading || classificationsLoading;
 
   return (
     <>
