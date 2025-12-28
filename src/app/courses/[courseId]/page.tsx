@@ -22,6 +22,7 @@ export default function CourseDetailPage() {
   const { user } = useUser();
   
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
+  const [selectedInstructor, setSelectedInstructor] = useState<Instructor | null>(null);
   const [isPlayerDialogOpen, setPlayerDialogOpen] = useState(false);
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', params.courseId) : null), [firestore, params.courseId]);
@@ -49,6 +50,7 @@ export default function CourseDetailPage() {
 
   const handlePlayClick = (episode: Episode) => {
     setSelectedEpisode(episode);
+    setSelectedInstructor(getInstructor(episode.instructorId) || null);
     setPlayerDialogOpen(true);
   }
 
@@ -208,6 +210,7 @@ export default function CourseDetailPage() {
             isOpen={isPlayerDialogOpen}
             onOpenChange={setPlayerDialogOpen}
             episode={selectedEpisode}
+            instructor={selectedInstructor}
         />
       )}
     </div>
