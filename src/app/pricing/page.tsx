@@ -3,7 +3,7 @@
 import PricingCard from '@/components/pricing/pricing-card';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, where } from 'firebase/firestore';
-import type { Course } from '@/lib/types';
+import type { Course, Classification } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCart } from '@/context/cart-context';
 import { formatPrice } from '@/lib/utils';
@@ -70,11 +70,20 @@ function CartSummary() {
 
 export default function PricingPage() {
   const firestore = useFirestore();
+
   const coursesQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'courses'), where('prices.day30', '>', 0)) : null,
+    firestore ? collection(firestore, 'courses') : null,
     [firestore]
   );
-  const { data: subscribableCourses, isLoading } = useCollection<Course>(coursesQuery);
+  const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
+  
+  const classificationsQuery = useMemoFirebase(() => 
+    firestore ? query(collection(firestore, 'classifications'), where('prices.day30', '>', 0)) : null,
+    [firestore]
+  );
+  const { data: subscribableClassifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
+
+  const isLoading = coursesLoading || classificationsLoading;
 
   return (
     <>
@@ -93,9 +102,18 @@ export default function PricingPage() {
               <Skeleton className="h-96 w-full" />
             </>
           ) : (
-            subscribableCourses?.map((course) => (
-              <PricingCard key={course.id} item={course} itemType="course" />
-            ))
+            subscribableClassifications?.map((classification) => {
+              const representativeCourse = courses?.find(c => c.classificationId === classification.id);
+              if (!representativeCourse) return null;
+              return (
+                <PricingCard 
+                  key={classification.id} 
+                  item={representativeCourse}
+                  classification={classification}
+                  itemType="course" 
+                />
+              )
+            })
           )}
         </div>
       </div>

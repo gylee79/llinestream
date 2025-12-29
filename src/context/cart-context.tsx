@@ -2,16 +2,16 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import type { Course } from '@/lib/types';
+import type { Classification } from '@/lib/types';
 
 export interface CartItem {
   id: string; // Composite ID: `${itemId}-${duration}`
   itemId: string;
-  itemType: 'course'; // Future-proof for other item types
+  itemType: 'classification'; // Future-proof for other item types
   name: string;
   price: number;
   quantity: number;
-  duration: keyof Course['prices'];
+  duration: keyof Classification['prices'];
   durationLabel: string;
   thumbnailUrl: string;
 }

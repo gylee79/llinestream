@@ -15,7 +15,7 @@ export interface User {
   dob: string; // Date of Birth YYYY-MM-DD
   role: 'user' | 'admin';
   activeSubscriptions: {
-    [courseId: string]: {
+    [classificationId: string]: {
       expiresAt: Timestamp;
       purchasedAt: Timestamp;
     };
@@ -95,7 +95,6 @@ export interface Subscription {
     id: string; // This will be the document ID from Firestore (same as paymentId)
     userId: string;
     classificationId: string;
-    courseId: string;
     purchasedAt: Timestamp;
     expiresAt: Timestamp;
     // For record-keeping

@@ -19,34 +19,41 @@ import { formatPrice } from '@/lib/utils';
 import { ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type ItemWithPrice = Course; // Or union type if needed e.g. Course | Classification
-
 interface PricingCardProps {
-  item: ItemWithPrice;
+  item: Course;
+  classification: Classification;
   itemType: 'course';
 }
 
-export default function PricingCard({ item, itemType }: PricingCardProps) {
-  const [selectedDuration, setSelectedDuration] = useState<keyof ItemWithPrice['prices']>('day30');
+export default function PricingCard({ item, classification, itemType }: PricingCardProps) {
+  const [selectedDuration, setSelectedDuration] = useState<keyof Classification['prices']>('day30');
   const { addToCart, items } = useCart();
   
+  if (!classification.prices) {
+    return null; // Don't render card if there are no prices
+  }
+
   const plans = [
-    { duration: 'day1', label: '1일 이용권', price: item.prices.day1 },
-    { duration: 'day30', label: '30일 이용권', price: item.prices.day30 },
-    { duration: 'day60', label: '60일 이용권', price: item.prices.day60 },
-    { duration: 'day90', label: '90일 이용권', price: item.prices.day90 },
+    { duration: 'day1', label: '1일 이용권', price: classification.prices.day1 },
+    { duration: 'day30', label: '30일 이용권', price: classification.prices.day30 },
+    { duration: 'day60', label: '60일 이용권', price: classification.prices.day60 },
+    { duration: 'day90', label: '90일 이용권', price: classification.prices.day90 },
   ].filter(plan => plan.price > 0);
 
-  const selectedPrice = item.prices[selectedDuration] || 0;
+  if (plans.length === 0) {
+    return null; // Don't render card if there are no valid plans
+  }
+
+  const selectedPrice = classification.prices[selectedDuration] || 0;
   
-  const durationLabels: { [key in keyof ItemWithPrice['prices']]: string } = {
+  const durationLabels: { [key in keyof Classification['prices']]: string } = {
     day1: '1일',
     day30: '30일',
     day60: '60일',
     day90: '90일',
   };
   const selectedLabelForDisplay = durationLabels[selectedDuration];
-  const currentCartItemId = `${item.id}-${selectedDuration}`;
+  const currentCartItemId = `${classification.id}-${selectedDuration}`;
   const isInCart = items.some(cartItem => cartItem.id === currentCartItemId);
 
   const handleAddToCart = () => {
@@ -56,13 +63,13 @@ export default function PricingCard({ item, itemType }: PricingCardProps) {
     }
 
     const itemToAdd: CartItem = {
-      id: `${item.id}-${selectedDuration}`,
-      itemId: item.id,
-      itemType: itemType,
-      name: item.name,
+      id: `${classification.id}-${selectedDuration}`,
+      itemId: classification.id,
+      itemType: 'classification',
+      name: classification.name,
       price: selectedPlan.price,
-      quantity: 1, // Quantity is always 1 for subscriptions
-      duration: selectedDuration,
+      quantity: 1, 
+      duration: selectedDuration as keyof Classification['prices'],
       durationLabel: selectedPlan.label,
       thumbnailUrl: item.thumbnailUrl || `https://picsum.photos/seed/${item.id}/100/100`
     };
@@ -73,8 +80,8 @@ export default function PricingCard({ item, itemType }: PricingCardProps) {
   return (
     <Card className="flex flex-col">
       <CardHeader>
-        <CardTitle className="font-headline text-2xl">{item.name}</CardTitle>
-        <CardDescription>{item.description}</CardDescription>
+        <CardTitle className="font-headline text-2xl">{classification.name}</CardTitle>
+        <CardDescription>{classification.description}</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow">
         <div className="text-4xl font-bold">
@@ -84,21 +91,21 @@ export default function PricingCard({ item, itemType }: PricingCardProps) {
         <RadioGroup 
           defaultValue="day30" 
           className="mt-6 space-y-3"
-          onValueChange={(value) => setSelectedDuration(value as keyof ItemWithPrice['prices'])}
+          onValueChange={(value) => setSelectedDuration(value as keyof Classification['prices'])}
         >
           {plans.map((plan) => {
-             const cartItemId = `${item.id}-${plan.duration}`;
+             const cartItemId = `${classification.id}-${plan.duration}`;
              const isCurrentInCart = items.some(item => item.id === cartItemId);
             return (
               <Label 
                 key={plan.duration} 
-                htmlFor={`${item.id}-${plan.duration}`} 
+                htmlFor={`${classification.id}-${plan.duration}`} 
                 className={cn(
                     "flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer",
                     isCurrentInCart && "border-primary/50 bg-muted/50 cursor-not-allowed opacity-70"
                 )}
               >
-                <RadioGroupItem value={plan.duration} id={`${item.id}-${plan.duration}`} className="sr-only" disabled={isCurrentInCart} />
+                <RadioGroupItem value={plan.duration} id={`${classification.id}-${plan.duration}`} className="sr-only" disabled={isCurrentInCart} />
                 <span>{plan.label}</span>
                 <span className="font-bold text-foreground">{formatPrice(plan.price)}</span>
               </Label>

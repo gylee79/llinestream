@@ -13,7 +13,7 @@ import {
   DialogClose
 } from "@/components/ui/dialog"
 import { Button } from "../ui/button"
-import type { Course } from "@/lib/types"
+import type { Classification } from "@/lib/types"
 import type { PortOnePaymentRequest, PortOnePaymentResponse } from "@/lib/portone";
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/firebase/hooks"
@@ -27,9 +27,9 @@ declare global {
 
 interface PaymentDialogProps {
     children: React.ReactNode;
-    item: Course;
-    itemType: 'course';
-    selectedDuration: keyof Course['prices'];
+    item: Classification;
+    itemType: 'classification';
+    selectedDuration: keyof Classification['prices'];
     selectedPrice: number;
     selectedLabel: string;
     open?: boolean;

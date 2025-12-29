@@ -1,4 +1,3 @@
-
 'use client';
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
@@ -47,7 +46,7 @@ export default function CourseDetailPage() {
 
   const isLoading = courseLoading || episodesLoading || classificationLoading || instructorsLoading;
   
-  const hasSubscription = !!(user && course && user.activeSubscriptions?.[course.id]);
+  const hasSubscription = !!(user && classification && user.activeSubscriptions?.[classification.id]);
 
   const handlePlayClick = (episode: Episode) => {
     const isPlayable = episode.isFree || hasSubscription;
@@ -173,14 +172,14 @@ export default function CourseDetailPage() {
         />
       )}
 
-      {selectedEpisode && !selectedEpisode.isFree && course && (
+      {selectedEpisode && !selectedEpisode.isFree && classification && (
          <PaymentDialog
             open={isPaymentDialogOpen}
             onOpenChange={setPaymentDialogOpen}
-            item={course}
-            itemType="course"
+            item={classification}
+            itemType="classification"
             selectedDuration="day30"
-            selectedPrice={course.prices.day30}
+            selectedPrice={classification.prices.day30}
             selectedLabel="30일 이용권"
         >
             {/* The trigger is now handled programmatically, so no child needed here */}
