@@ -36,6 +36,11 @@ const ReviewItem = ({ comment }: { comment: EpisodeComment }) => {
     )
 }
 
+interface CourseReviewSectionProps {
+  comments: EpisodeComment[];
+  user: User;
+}
+
 export default function CourseReviewSection({ comments, user }: CourseReviewSectionProps) {
   const [isCommentDialogOpen, setCommentDialogOpen] = useState(false);
 
@@ -68,46 +73,50 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
           <h2 className="font-headline text-2xl font-bold">리뷰 ({totalReviews})</h2>
           <Button variant="outline" onClick={() => setCommentDialogOpen(true)}>모든 리뷰 보기</Button>
         </div>
-        <div className="flex flex-col md:flex-row gap-8 md:items-stretch">
-          {/* Left Side: Rating Summary */}
-          <div className="md:w-[320px] flex-shrink-0 flex flex-col items-start justify-start bg-muted/50 p-6 rounded-lg">
-              <span className="text-3xl font-bold">{averageRating.toFixed(1)}</span>
-              <div className="flex items-center my-1">
-                  {[1,2,3,4,5].map(star => (
-                      <Star key={star} className={cn("w-5 h-5", star <= averageRating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30')} />
-                  ))}
-              </div>
-              <span className="text-xs text-muted-foreground">{totalReviews}개 리뷰</span>
-              <div className="w-full mt-2 space-y-1">
-                  {ratingDistribution.map((percentage, index) => (
-                      <div key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span className="w-2">{5-index}</span>
-                          <div className="w-full bg-background rounded-full h-1.5">
-                              <div className="bg-yellow-400 h-1.5 rounded-full" style={{ width: `${percentage}%` }}></div>
-                          </div>
-                          <span className="w-6 text-right">{ratingCounts[index]}</span>
-                      </div>
-                  ))}
-              </div>
-          </div>
+        
+        <Carousel opts={{ align: 'start', loop: false }} className="w-full h-full">
+            <CarouselContent className="h-full -ml-4">
+                {/* Rating Summary Item */}
+                <CarouselItem className="md:basis-1/2 lg:basis-1/3 pl-4">
+                    <div className="p-1 h-full">
+                        <Card className="h-full">
+                            <CardContent className="p-4 flex flex-col h-full items-start justify-center">
+                                <span className="text-3xl font-bold">{averageRating.toFixed(1)}</span>
+                                <div className="flex items-center my-1">
+                                    {[1,2,3,4,5].map(star => (
+                                        <Star key={star} className={cn("w-5 h-5", star <= averageRating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30')} />
+                                    ))}
+                                </div>
+                                <span className="text-xs text-muted-foreground">{totalReviews}개 리뷰</span>
+                                <div className="w-full mt-2 space-y-1">
+                                    {ratingDistribution.map((percentage, index) => (
+                                        <div key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
+                                            <span className="w-2">{5-index}</span>
+                                            <div className="w-full bg-background rounded-full h-1.5">
+                                                <div className="bg-yellow-400 h-1.5 rounded-full" style={{ width: `${percentage}%` }}></div>
+                                            </div>
+                                            <span className="w-6 text-right">{ratingCounts[index]}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </CarouselItem>
+                
+                {/* Review Items */}
+                {comments.map(comment => (
+                    <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/3 pl-4">
+                        <div className="p-1 h-full">
+                            <ReviewItem comment={comment} />
+                        </div>
+                    </CarouselItem>
+                ))}
+            </CarouselContent>
+            <CarouselPrevious className="hidden sm:flex" />
+            <CarouselNext className="hidden sm:flex" />
+        </Carousel>
 
-          {/* Right Side: Review Carousel */}
-          <div className="flex-1 min-w-0">
-             <Carousel opts={{ align: 'start', loop: false }} className="w-full h-full">
-                <CarouselContent className="h-full">
-                    {comments.map(comment => (
-                        <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/3">
-                            <div className="p-1 h-full">
-                                <ReviewItem comment={comment} />
-                            </div>
-                        </CarouselItem>
-                    ))}
-                </CarouselContent>
-                <CarouselPrevious className="hidden sm:flex" />
-                <CarouselNext className="hidden sm:flex" />
-            </Carousel>
-          </div>
-        </div>
       </div>
       <EpisodeCommentDialog
         isOpen={isCommentDialogOpen}
