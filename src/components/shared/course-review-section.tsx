@@ -4,7 +4,6 @@ import type { EpisodeComment } from '@/lib/types';
 import { Star, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { toDisplayDate } from '@/lib/date-helpers';
 import { Card, CardContent } from '../ui/card';
 
@@ -65,9 +64,9 @@ export default function CourseReviewSection({ comments }: CourseReviewSectionPro
   return (
     <div className="mt-12">
       <h2 className="font-headline text-2xl font-bold mb-4">리뷰 ({totalReviews})</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
         {/* Left Side: Rating Summary */}
-        <div className="md:col-span-1 flex flex-col items-start justify-start bg-muted/50 p-6 rounded-lg">
+        <div className="md:col-span-2 flex flex-col items-start justify-start bg-muted/50 p-6 rounded-lg">
             <span className="text-4xl font-bold">{averageRating.toFixed(1)}</span>
             <div className="flex items-center my-1">
                 {[1,2,3,4,5].map(star => (
@@ -89,7 +88,7 @@ export default function CourseReviewSection({ comments }: CourseReviewSectionPro
         </div>
 
         {/* Right Side: Review List */}
-        <div className="md:col-span-2">
+        <div className="md:col-span-3">
             {displayedComments.map(comment => (
                 <ReviewItem key={comment.id} comment={comment} />
             ))}
