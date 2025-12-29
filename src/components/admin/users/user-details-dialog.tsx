@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -196,7 +197,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
         </Badge>
       );
     };
-
+    
     const getPaymentMethod = (sub: Subscription) => {
       if (sub.status === 'BONUS' || sub.status === 'DEDUCTION') {
         return '서비스 지급';
@@ -282,8 +283,8 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                     <TableHeader>
                         <TableRow>
                             <TableHead className="p-2 text-xs">날짜</TableHead>
-                            <TableHead className="p-2 text-xs">상세분류</TableHead>
-                            <TableHead className="p-2 text-xs">결제수단</TableHead>
+                            <TableHead className="p-2 text-xs">카테고리</TableHead>
+                            <TableHead className="p-2 text-xs">결제 수단</TableHead>
                             <TableHead className="p-2 text-xs">내역</TableHead>
                             <TableHead className="p-2 text-xs text-right">금액</TableHead>
                         </TableRow>

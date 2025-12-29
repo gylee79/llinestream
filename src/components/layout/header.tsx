@@ -50,7 +50,7 @@ import BillingDialog from '@/components/profile/billing-dialog';
 
 
 const navLinks = [
-  { href: '/', label: 'Home', icon: Home },
+  { href: '/', label: '홈', icon: Home },
   { href: '/about', label: '엘라인아카데미소개', icon: Info },
   { href: '/contents', label: '영상 콘텐츠', icon: Clapperboard },
   { href: '/pricing', label: '가격 안내', icon: CreditCard },
@@ -187,23 +187,23 @@ export default function Header() {
                   <DropdownMenuGroup>
                     <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
                       <UserIcon className="mr-2 h-4 w-4" />
-                      <span>Profile</span>
+                      <span>프로필</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setBillingOpen(true)}>
                       <CreditCard className="mr-2 h-4 w-4" />
-                      <span>Billing</span>
+                      <span>결제 정보</span>
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
+                    <span>로그아웃</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
               <Button asChild>
-                <Link href="/login">Login</Link>
+                <Link href="/login">로그인</Link>
               </Button>
             )}
           </div>
