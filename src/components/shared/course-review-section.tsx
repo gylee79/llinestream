@@ -70,7 +70,7 @@ export default function CourseReviewSection({ comments }: CourseReviewSectionPro
       <h2 className="font-headline text-2xl font-bold mb-4">리뷰 ({totalReviews})</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Left Side: Rating Summary */}
-        <div className="md:col-span-1 flex flex-col items-center justify-center bg-muted/50 p-6 rounded-lg">
+        <div className="md:col-span-1 flex flex-col items-start justify-start bg-muted/50 p-6 rounded-lg">
             <span className="text-4xl font-bold">{averageRating.toFixed(1)}</span>
             <div className="flex items-center my-1">
                 {[1,2,3,4,5].map(star => (
