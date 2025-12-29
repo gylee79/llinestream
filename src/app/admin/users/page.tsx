@@ -55,7 +55,7 @@ export default function AdminUsersPage() {
     return (
       <div className="flex flex-wrap gap-1">
         {subDetails.map((sub, index) => (
-          <Badge key={index} variant="secondary">
+          sub && <Badge key={index} variant="secondary">
             {sub.name} ({sub.expiresAt})
           </Badge>
         ))}

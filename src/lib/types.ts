@@ -37,6 +37,12 @@ export interface Classification {
   description: string;
   thumbnailUrl: string;
   thumbnailPath?: string;
+  prices: {
+    day1: number;
+    day30: number;
+    day60: number;
+    day90: number;
+  };
 }
 
 export interface Course {
@@ -44,12 +50,6 @@ export interface Course {
   classificationId: string;
   name: string;
   description: string;
-  prices: {
-    day1: number;
-    day30: number;
-    day60: number;
-    day90: number;
-  };
   thumbnailUrl: string;
   thumbnailPath?: string;
 }
@@ -94,6 +94,7 @@ export interface Policy {
 export interface Subscription {
     id: string; // This will be the document ID from Firestore (same as paymentId)
     userId: string;
+    classificationId: string;
     courseId: string;
     purchasedAt: Timestamp;
     expiresAt: Timestamp;

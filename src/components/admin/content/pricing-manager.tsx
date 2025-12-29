@@ -96,7 +96,7 @@ export default function PricingManager() {
                   <TableCell>
                     <Input
                       type="number"
-                      value={item.prices.day1}
+                      value={item.prices?.day1 ?? 0}
                       onChange={(e) => handlePriceChange(item.id, 'day1', e.target.value)}
                       className="w-24"
                     />
@@ -104,7 +104,7 @@ export default function PricingManager() {
                   <TableCell>
                     <Input
                       type="number"
-                      value={item.prices.day30}
+                      value={item.prices?.day30 ?? 0}
                       onChange={(e) => handlePriceChange(item.id, 'day30', e.target.value)}
                       className="w-24"
                     />
@@ -112,7 +112,7 @@ export default function PricingManager() {
                   <TableCell>
                     <Input
                       type="number"
-                      value={item.prices.day60}
+                      value={item.prices?.day60 ?? 0}
                       onChange={(e) => handlePriceChange(item.id, 'day60', e.target.value)}
                       className="w-24"
                     />
@@ -120,7 +120,7 @@ export default function PricingManager() {
                   <TableCell>
                     <Input
                       type="number"
-                      value={item.prices.day90}
+                      value={item.prices?.day90 ?? 0}
                       onChange={(e) => handlePriceChange(item.id, 'day90', e.target.value)}
                       className="w-24"
                     />
