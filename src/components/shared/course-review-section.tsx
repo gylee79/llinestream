@@ -76,14 +76,14 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
         <div className="flex flex-col md:flex-row gap-8">
           {/* Left Side: Rating Summary */}
           <div className="md:w-[320px] flex-shrink-0 flex flex-col items-start justify-start bg-muted/50 p-6 rounded-lg">
-              <span className="text-4xl font-bold">{averageRating.toFixed(1)}</span>
+              <span className="text-3xl font-bold">{averageRating.toFixed(1)}</span>
               <div className="flex items-center my-1">
                   {[1,2,3,4,5].map(star => (
                       <Star key={star} className={cn("w-5 h-5", star <= averageRating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30')} />
                   ))}
               </div>
-              <span className="text-sm text-muted-foreground">{totalReviews}개 리뷰</span>
-              <div className="w-full mt-4 space-y-1">
+              <span className="text-xs text-muted-foreground">{totalReviews}개 리뷰</span>
+              <div className="w-full mt-2 space-y-1">
                   {ratingDistribution.map((percentage, index) => (
                       <div key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span className="w-2">{5-index}</span>
