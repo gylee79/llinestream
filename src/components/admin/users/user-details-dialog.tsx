@@ -221,17 +221,19 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
           </TabsContent>
           <TabsContent value="subscriptions" className="mt-4">
             <h4 className="font-semibold mb-2">활성 이용권 현황</h4>
-            <Table>
-                <TableHeader><TableRow><TableHead className="p-2 text-xs">상세분류</TableHead><TableHead className="p-2 text-xs">만료일</TableHead></TableRow></TableHeader>
-                <TableBody>
-                    {user.activeSubscriptions && Object.entries(user.activeSubscriptions).map(([id, sub]) => (
-                        <TableRow key={id}>
-                            <TableCell className="p-2 text-xs">{getCourseName(id)}</TableCell>
-                            <TableCell className="p-2 text-xs">{toDisplayDate(sub.expiresAt)}</TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+            <ScrollArea className="h-40 w-full rounded-md border">
+              <Table>
+                  <TableHeader><TableRow><TableHead className="p-2 text-xs">상세분류</TableHead><TableHead className="p-2 text-xs">만료일</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                      {user.activeSubscriptions && Object.entries(user.activeSubscriptions).map(([id, sub]) => (
+                          <TableRow key={id}>
+                              <TableCell className="p-2 text-xs">{getCourseName(id)}</TableCell>
+                              <TableCell className="p-2 text-xs">{toDisplayDate(sub.expiresAt)}</TableCell>
+                          </TableRow>
+                      ))}
+                  </TableBody>
+              </Table>
+            </ScrollArea>
             <h4 className="font-semibold mt-6 mb-2">보너스 이용 기간 관리</h4>
             <div className="flex gap-2 items-center">
                 <Select value={bonusCourseId} onValueChange={setBonusCourseId}>
