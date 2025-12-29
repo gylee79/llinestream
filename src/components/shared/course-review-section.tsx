@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo } from 'react';
 import type { EpisodeComment, User } from '@/lib/types';
@@ -108,9 +107,9 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
         </div>
         
         {hasReviews ? (
-           <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
+           <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-stretch">
              {/* Rating Summary */}
-             <div className="md:col-span-1">
+             <div className="md:col-span-1 h-full">
                 <Card className="h-full">
                     <CardContent className="p-4 flex flex-col h-full items-center justify-center text-center">
                         <span className="text-3xl font-bold">{averageRating.toFixed(1)}</span>
@@ -129,8 +128,8 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
                 <Carousel opts={{ align: 'start', loop: false }} className="w-full">
                     <CarouselContent className="-ml-4">
                         {comments.map(comment => (
-                            <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/4 pl-4 h-full">
-                                <div className="p-1 h-full">
+                            <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/4 pl-4 flex">
+                                <div className="p-1 h-full w-full">
                                     <ReviewItem comment={comment} />
                                 </div>
                             </CarouselItem>
