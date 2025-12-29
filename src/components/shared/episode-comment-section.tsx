@@ -107,16 +107,16 @@ export default function EpisodeCommentSection({
             <MessageSquare className="inline-block w-5 h-5 mr-2" />
             모든 댓글 ({comments?.length || 0})
         </h3>
-        <div className="flex-grow border rounded-md p-4 bg-muted/50 overflow-x-auto">
+        <ScrollArea className="flex-grow border rounded-md p-4 bg-muted/50 h-96">
             {isLoading && <p>댓글을 불러오는 중...</p>}
             {!isLoading && comments?.length === 0 && (
             <p className="text-center text-muted-foreground py-8">
                 아직 댓글이 없습니다.
             </p>
             )}
-            <div className="flex gap-4">
+            <div className="flex flex-col gap-4">
             {comments?.map((comment) => (
-                <Card key={comment.id} className="w-80 flex-shrink-0">
+                <Card key={comment.id}>
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
                       <Avatar className="h-8 w-8">
@@ -157,7 +157,7 @@ export default function EpisodeCommentSection({
                 </Card>
             ))}
             </div>
-        </div>
+        </ScrollArea>
         </div>
 
         {/* Comment Form */}
