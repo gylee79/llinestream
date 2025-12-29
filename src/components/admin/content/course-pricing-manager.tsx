@@ -66,7 +66,7 @@ export default function CoursePricingManager() {
     <Card>
       <CardHeader>
         <CardTitle>상세분류 및 가격 관리</CardTitle>
-        <p className="text-sm text-muted-foreground">각 '상세분류(Course)'별 이용권 가격을 설정합니다.</p>
+        <p className="text-sm text-muted-foreground">각 &apos;상세분류(Course)&apos;별 이용권 가격을 설정합니다.</p>
       </CardHeader>
       <CardContent>
         <Table>
