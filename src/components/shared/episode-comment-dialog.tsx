@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -44,15 +43,61 @@ const commentSchema = z.object({
 interface EpisodeCommentDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  episode: Episode;
+  episode?: Episode;
+  comments?: EpisodeComment[];
   user: User;
+  mode?: 'comment' | 'view';
 }
+
+const CommentList = ({ comments }: { comments: EpisodeComment[] | null | undefined }) => (
+    <div className="space-y-4">
+        {comments?.map((comment) => (
+          <div key={comment.id} className="flex items-start gap-3">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback>
+                {comment.userName.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm">
+                  {comment.userName}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {toDisplayDate(comment.createdAt)}
+                </span>
+              </div>
+              {comment.rating && comment.rating > 0 && (
+                <div className="flex items-center mt-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={cn(
+                        'w-3 h-3',
+                        star <= comment.rating!
+                          ? 'text-yellow-400 fill-yellow-400'
+                          : 'text-muted-foreground'
+                      )}
+                    />
+                  ))}
+                </div>
+              )}
+              <p className="text-sm mt-1 whitespace-pre-wrap">
+                {comment.content}
+              </p>
+            </div>
+          </div>
+        ))}
+    </div>
+)
 
 export default function EpisodeCommentDialog({
   isOpen,
   onOpenChange,
   episode,
+  comments: propComments,
   user,
+  mode = 'comment',
 }: EpisodeCommentDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -60,16 +105,17 @@ export default function EpisodeCommentDialog({
 
   const commentsQuery = useMemoFirebase(
     () =>
-      firestore
+      firestore && episode && mode === 'comment'
         ? query(
             collection(firestore, 'episodes', episode.id, 'comments'),
             orderBy('createdAt', 'desc')
           )
         : null,
-    [firestore, episode.id]
+    [firestore, episode, mode]
   );
-  const { data: comments, isLoading } =
-    useCollection<EpisodeComment>(commentsQuery);
+  const { data: dbComments, isLoading } = useCollection<EpisodeComment>(commentsQuery);
+
+  const comments = mode === 'view' ? propComments : dbComments;
 
   const {
     register,
@@ -89,7 +135,7 @@ export default function EpisodeCommentDialog({
   const ratingValue = watch('rating');
 
   const onSubmit = async (data: z.infer<typeof commentSchema>) => {
-    if (!firestore) return;
+    if (!firestore || !episode) return;
     try {
       await addDoc(collection(firestore, 'episodes', episode.id, 'comments'), {
         episodeId: episode.id,
@@ -111,16 +157,20 @@ export default function EpisodeCommentDialog({
       });
     }
   };
+  
+  const dialogTitle = mode === 'view' ? '전체 리뷰' : '리뷰 및 질문';
+  const dialogDescription = mode === 'view' ? '모든 리뷰를 확인합니다.' : episode?.title;
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>리뷰 및 질문</DialogTitle>
-          <DialogDescription>{episode.title}</DialogDescription>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh]">
+        <div className={cn("max-h-[60vh]", mode === 'comment' && "grid grid-cols-1 md:grid-cols-2 gap-6")}>
           {/* Comment List */}
           <div className="flex flex-col">
             <h3 className="text-lg font-semibold mb-2">
@@ -134,102 +184,66 @@ export default function EpisodeCommentDialog({
                   아직 댓글이 없습니다.
                 </p>
               )}
-              <div className="space-y-4">
-                {comments?.map((comment) => (
-                  <div key={comment.id} className="flex items-start gap-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback>
-                        {comment.userName.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm">
-                          {comment.userName}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {toDisplayDate(comment.createdAt)}
-                        </span>
-                      </div>
-                      {comment.rating && comment.rating > 0 && (
-                        <div className="flex items-center mt-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={cn(
-                                'w-3 h-3',
-                                star <= comment.rating!
-                                  ? 'text-yellow-400 fill-yellow-400'
-                                  : 'text-muted-foreground'
-                              )}
-                            />
-                          ))}
-                        </div>
-                      )}
-                      <p className="text-sm mt-1 whitespace-pre-wrap">
-                        {comment.content}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <CommentList comments={comments} />
             </ScrollArea>
           </div>
 
-          {/* Comment Form */}
-          <div className="flex flex-col">
-            <h3 className="text-lg font-semibold mb-2">댓글 작성하기</h3>
-            <form
-              onSubmit={handleSubmit(onSubmit)}
-              className="flex-grow flex flex-col space-y-4 border rounded-md p-4"
-            >
-              <div className="space-y-1">
-                <label className="text-sm font-medium">별점 (선택)</label>
-                <Controller
-                  name="rating"
-                  control={control}
-                  render={({ field }) => (
-                    <div className="flex items-center">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={cn(
-                            'w-6 h-6 cursor-pointer',
-                            star <= (hoverRating || ratingValue || 0)
-                              ? 'text-yellow-400 fill-yellow-400'
-                              : 'text-muted-foreground'
-                          )}
-                          onMouseEnter={() => setHoverRating(star)}
-                          onMouseLeave={() => setHoverRating(0)}
-                          onClick={() => field.onChange(star === ratingValue ? 0 : star)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                />
-              </div>
+          {/* Comment Form - shown only in 'comment' mode */}
+          {mode === 'comment' && (
+            <div className="flex flex-col">
+              <h3 className="text-lg font-semibold mb-2">댓글 작성하기</h3>
+              <form
+                onSubmit={handleSubmit(onSubmit)}
+                className="flex-grow flex flex-col space-y-4 border rounded-md p-4"
+              >
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">별점 (선택)</label>
+                  <Controller
+                    name="rating"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="flex items-center">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={cn(
+                              'w-6 h-6 cursor-pointer',
+                              star <= (hoverRating || ratingValue || 0)
+                                ? 'text-yellow-400 fill-yellow-400'
+                                : 'text-muted-foreground'
+                            )}
+                            onMouseEnter={() => setHoverRating(star)}
+                            onMouseLeave={() => setHoverRating(0)}
+                            onClick={() => field.onChange(star === ratingValue ? 0 : star)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  />
+                </div>
 
-              <div className="flex-grow flex flex-col">
-                <label htmlFor="content" className="text-sm font-medium">내용</label>
-                <Textarea
-                  id="content"
-                  {...register('content')}
-                  placeholder="리뷰, 질문, 응원의 메시지를 남겨주세요."
-                  className="flex-grow resize-none"
-                />
-                {errors.content && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors.content.message}
-                  </p>
-                )}
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? '등록 중...' : '댓글 등록'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </div>
+                <div className="flex-grow flex flex-col">
+                  <label htmlFor="content" className="text-sm font-medium">내용</label>
+                  <Textarea
+                    id="content"
+                    {...register('content')}
+                    placeholder="리뷰, 질문, 응원의 메시지를 남겨주세요."
+                    className="flex-grow resize-none"
+                  />
+                  {errors.content && (
+                    <p className="text-xs text-destructive mt-1">
+                      {errors.content.message}
+                    </p>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? '등록 중...' : '댓글 등록'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
