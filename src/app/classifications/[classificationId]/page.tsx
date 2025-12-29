@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useParams, notFound } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { doc, collection, query, where } from 'firebase/firestore';
-import type { Classification, Course } from '@/lib/types';
+import type { Classification, Course, Field, Instructor } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import CourseCard from '@/components/shared/course-card';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,13 @@ export default function ClassificationDetailPage() {
   );
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
 
-  const isLoading = classificationLoading || coursesLoading;
+  const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
+  const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
+  
+  const instructorsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'instructors') : null), [firestore]);
+  const { data: instructors, isLoading: instructorsLoading } = useCollection<Instructor>(instructorsQuery);
+
+  const isLoading = classificationLoading || coursesLoading || fieldsLoading || instructorsLoading;
 
   if (!isLoading && !classification) {
     notFound();
@@ -52,6 +58,8 @@ export default function ClassificationDetailPage() {
 
   if (!classification) return null;
 
+  const field = fields?.find(f => f.id === classification.fieldId);
+
   return (
     <div className="container mx-auto py-12">
       <header className="mb-12 text-center">
@@ -63,10 +71,19 @@ export default function ClassificationDetailPage() {
 
       <h2 className="text-2xl font-bold font-headline mb-6">관련 강좌 목록</h2>
       {courses && courses.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {courses.map((course) => (
-            <CourseCard key={course.id} course={course} />
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-10">
+          {courses.map((course, index) => {
+             const instructor = instructors?.find(i => i.id === course.instructorId);
+             return (
+                <CourseCard 
+                    key={course.id} 
+                    course={course} 
+                    instructor={instructor}
+                    field={field}
+                    rank={index + 1}
+                />
+            )
+          })}
         </div>
       ) : (
         <div className="text-center py-16 border rounded-lg bg-muted/50">

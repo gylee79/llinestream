@@ -48,10 +48,16 @@ export interface Classification {
 export interface Course {
   id: string; // This will be the document ID from Firestore, added on the client
   classificationId: string;
+  instructorId?: string;
   name: string;
   description: string;
   thumbnailUrl: string;
   thumbnailPath?: string;
+  // New fields for richer display
+  level?: '입문' | '초급' | '중급' | '고급';
+  tags?: string[];
+  rating?: number;
+  reviewCount?: number;
 }
 
 export interface Episode {
@@ -115,7 +121,6 @@ export interface FooterSettings {
   address: string;
   supportPhone: string;
   supportHours: string;
-
   kakaoTalkUrl?: string;
 }
 
