@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -37,6 +36,7 @@ import { add, isBefore } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { toDisplayDate, toJSDate } from '@/lib/date-helpers';
 import { Minus, Plus } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface UserDetailsDialogProps {
   user: User;
@@ -253,19 +253,32 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
             </div>
           </TabsContent>
           <TabsContent value="history" className="mt-4">
-          <Table>
-                <TableHeader><TableRow><TableHead>날짜</TableHead><TableHead>종류</TableHead><TableHead>내역</TableHead><TableHead>금액</TableHead></TableRow></TableHeader>
-                <TableBody>
-                    {subscriptions?.map((sub) => (
-                        <TableRow key={sub.id}>
-                            <TableCell>{toDisplayDate(sub.purchasedAt)}</TableCell>
-                            <TableCell><Badge variant={sub.status === 'PAID' ? 'default' : 'secondary'}>{sub.status}</Badge></TableCell>
-                            <TableCell>{sub.orderName}</TableCell>
-                            <TableCell>{sub.amount.toLocaleString('ko-KR')}원</TableCell>
+            <ScrollArea className="h-60 w-full rounded-md border">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="p-2 text-xs">날짜</TableHead>
+                            <TableHead className="p-2 text-xs">종류</TableHead>
+                            <TableHead className="p-2 text-xs">내역</TableHead>
+                            <TableHead className="p-2 text-xs">금액</TableHead>
                         </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+                    </TableHeader>
+                    <TableBody>
+                        {subscriptions?.map((sub) => (
+                            <TableRow key={sub.id}>
+                                <TableCell className="p-2 text-xs">{toDisplayDate(sub.purchasedAt)}</TableCell>
+                                <TableCell className="p-2 text-xs">
+                                    <Badge variant={sub.status === 'PAID' ? 'default' : 'secondary'} className="text-xs">
+                                        {sub.status}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell className="p-2 text-xs">{sub.orderName}</TableCell>
+                                <TableCell className="p-2 text-xs">{sub.amount.toLocaleString('ko-KR')}원</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </ScrollArea>
           </TabsContent>
         </Tabs>
       </DialogContent>
