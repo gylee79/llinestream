@@ -55,7 +55,6 @@ export default function ContinueWatching() {
     }, [historyItems, allEpisodes]);
     
     const isLoading = historyLoading || episodesLoading;
-    const finalItems = (watchedEpisodes && watchedEpisodes.length > 0) ? watchedEpisodes : mockEpisodes;
 
     if (isLoading) {
         return (
@@ -71,11 +70,15 @@ export default function ContinueWatching() {
         );
     }
     
-    if (finalItems.length === 0) {
+    const hasRealHistory = watchedEpisodes && watchedEpisodes.length > 0;
+    const itemsToShow = hasRealHistory ? watchedEpisodes : mockEpisodes;
+    const title = hasRealHistory ? "최근 시청 영상" : "추천 영상";
+    
+    if (itemsToShow.length === 0) {
         return null;
     }
 
     return (
-        <ContentCarousel title="최근 시청 영상" items={finalItems} itemType="episode" />
+        <ContentCarousel title={title} items={itemsToShow} itemType="episode" />
     );
 }
