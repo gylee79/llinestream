@@ -137,7 +137,7 @@ export default function CourseDetailPage() {
             </div>
         </div>
 
-      <div className="container mx-auto max-w-5xl py-8">
+      <div className="container mx-auto max-w-5xl pb-8">
         
         {user && <CourseReviewSection comments={comments} user={user} />}
         
