@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -33,7 +32,7 @@ import type { User, Course, Subscription, Timestamp } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, where, doc, updateDoc, writeBatch, Timestamp as FirebaseTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { add, isBefore } from 'date-fns';
+import { add, isBefore, isAfter } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { toDisplayDate, toJSDate } from '@/lib/date-helpers';
 import { Minus, Plus } from 'lucide-react';
@@ -186,6 +185,28 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
         setBonusDays(prev => prev + amount);
     };
 
+    const getSubscriptionStatusBadge = (sub: Subscription) => {
+      const isExpired = isAfter(new Date(), toJSDate(sub.expiresAt));
+      if (sub.status !== 'PAID') {
+          return <Badge variant="secondary" className="text-xs">{sub.status}</Badge>
+      }
+      return (
+        <Badge variant={isExpired ? 'outline' : 'default'} className="text-xs">
+          {isExpired ? '만료됨' : '구독중'}
+        </Badge>
+      );
+    };
+
+    const getPaymentMethod = (sub: Subscription) => {
+      if (sub.status === 'BONUS' || sub.status === 'DEDUCTION') {
+        return '서비스 지급';
+      }
+      if (sub.amount > 0) {
+        return sub.method === 'CARD' ? '카드 결제' : sub.method;
+      }
+      return 'N/A';
+    }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
@@ -261,10 +282,10 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                     <TableHeader>
                         <TableRow>
                             <TableHead className="p-2 text-xs">날짜</TableHead>
-                            <TableHead className="p-2 text-xs">종류</TableHead>
+                            <TableHead className="p-2 text-xs">상태</TableHead>
                             <TableHead className="p-2 text-xs">결제수단</TableHead>
                             <TableHead className="p-2 text-xs">내역</TableHead>
-                            <TableHead className="p-2 text-xs">금액</TableHead>
+                            <TableHead className="p-2 text-xs text-right">금액</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -272,13 +293,11 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                             <TableRow key={sub.id}>
                                 <TableCell className="p-2 text-xs">{toDisplayDate(sub.purchasedAt)}</TableCell>
                                 <TableCell className="p-2 text-xs">
-                                    <Badge variant={sub.status === 'PAID' ? 'default' : 'secondary'} className="text-xs">
-                                        {sub.status}
-                                    </Badge>
+                                  {getSubscriptionStatusBadge(sub)}
                                 </TableCell>
-                                <TableCell className="p-2 text-xs">{sub.method}</TableCell>
+                                <TableCell className="p-2 text-xs">{getPaymentMethod(sub)}</TableCell>
                                 <TableCell className="p-2 text-xs">{sub.orderName}</TableCell>
-                                <TableCell className="p-2 text-xs">{sub.amount.toLocaleString('ko-KR')}원</TableCell>
+                                <TableCell className="p-2 text-xs text-right">{sub.amount.toLocaleString('ko-KR')}원</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

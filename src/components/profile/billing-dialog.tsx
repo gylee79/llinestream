@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -20,11 +19,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import type { User, Subscription, Course } from '@/lib/types';
 import { collection, query, where, orderBy } from 'firebase/firestore';
-import { toDisplayDate } from '@/lib/date-helpers';
+import { toDisplayDate, toJSDate } from '@/lib/date-helpers';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
 import { formatPrice } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
+import { isAfter } from 'date-fns';
 
 interface BillingDialogProps {
   user: User;
@@ -50,6 +50,29 @@ export default function BillingDialog({ user, open, onOpenChange }: BillingDialo
   const getCourseName = (courseId: string) => courses?.find((c) => c.id === courseId)?.name || '알 수 없음';
   
   const isLoading = coursesLoading || subsLoading;
+
+  const getSubscriptionStatusBadge = (sub: Subscription) => {
+    const isExpired = isAfter(new Date(), toJSDate(sub.expiresAt));
+    if (sub.status !== 'PAID') {
+        return <Badge variant="secondary" className="text-xs">{sub.status}</Badge>
+    }
+    return (
+      <Badge variant={isExpired ? 'outline' : 'default'} className="text-xs">
+        {isExpired ? '만료됨' : '구독중'}
+      </Badge>
+    );
+  };
+  
+  const getPaymentMethod = (sub: Subscription) => {
+    if (sub.status === 'BONUS' || sub.status === 'DEDUCTION') {
+      return '서비스 지급';
+    }
+    if (sub.amount > 0) {
+      // In a real scenario, you might have more details in sub.method
+      return sub.method === 'CARD' ? '카드 결제' : sub.method;
+    }
+    return 'N/A';
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -115,11 +138,9 @@ export default function BillingDialog({ user, open, onOpenChange }: BillingDialo
                                 <TableRow key={sub.id}>
                                     <TableCell className="p-2 text-sm">{toDisplayDate(sub.purchasedAt)}</TableCell>
                                     <TableCell className="p-2 text-sm">
-                                        <Badge variant={sub.status === 'PAID' ? 'default' : 'secondary'} className="text-xs">
-                                            {sub.status}
-                                        </Badge>
+                                        {getSubscriptionStatusBadge(sub)}
                                     </TableCell>
-                                    <TableCell className="p-2 text-sm">{sub.method}</TableCell>
+                                    <TableCell className="p-2 text-sm">{getPaymentMethod(sub)}</TableCell>
                                     <TableCell className="p-2 text-sm">{sub.orderName}</TableCell>
                                     <TableCell className="p-2 text-sm text-right">{formatPrice(sub.amount)}</TableCell>
                                 </TableRow>
