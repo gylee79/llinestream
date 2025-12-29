@@ -113,7 +113,7 @@ export default function CourseDetailPage() {
                         <Carousel setApi={setApi} className="w-full" opts={{align: 'start'}}>
                             <CarouselContent>
                                 {introImages.map((url, index) => (
-                                    <CarouselItem key={index} className="md:basis-4/5">
+                                    <CarouselItem key={index}>
                                         <div className="relative aspect-video">
                                             <Image src={url} alt={`${course.name} 소개 이미지 ${index + 1}`} fill sizes="60vw" className="object-contain rounded-lg" />
                                         </div>
