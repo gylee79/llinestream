@@ -1,13 +1,23 @@
+
 'use client';
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where, getDocs } from 'firebase/firestore';
-import type { Course, Episode, Classification, Instructor, EpisodeComment } from '@/lib/types';
+import type { Course, Episode, Classification, Instructor, EpisodeComment, CarouselApi } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import EpisodeListItem from '@/components/shared/episode-list-item';
 import CourseReviewSection from '@/components/shared/course-review-section';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '@/components/ui/carousel';
+import { useDotButton } from '@/components/ui/dot-button';
+
 
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
@@ -16,6 +26,10 @@ export default function CourseDetailPage() {
 
   const [comments, setComments] = useState<EpisodeComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
+  const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
+  
+  const { selectedIndex, scrollSnaps, onDotButtonClick } = useDotButton(carouselApi);
+
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', params.courseId) : null), [firestore, params.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
@@ -83,10 +97,8 @@ export default function CourseDetailPage() {
   if (!course) {
     notFound();
   }
-
-  const heroImageUrl = course.introImageUrls && course.introImageUrls.length > 0
-    ? course.introImageUrls[0]
-    : course.thumbnailUrl;
+  
+  const allImageUrls = [...(course.introImageUrls || []), course.thumbnailUrl].filter(Boolean);
 
   return (
     <div>
@@ -94,10 +106,25 @@ export default function CourseDetailPage() {
           <h1 className="font-headline text-3xl font-bold">{course.name}</h1>
           <p className="text-muted-foreground mt-2">{course.description}</p>
         
-        {heroImageUrl && (
-            <div className="relative aspect-video w-full rounded-lg overflow-hidden border mt-8">
-                <Image src={heroImageUrl} alt={`${course.name} 소개 이미지`} fill sizes="(max-width: 1024px) 100vw, 1024px" className="object-cover" />
+        {allImageUrls.length > 0 && (
+          <Carousel setApi={setCarouselApi} className="w-full max-w-3xl mx-auto mt-8">
+            <CarouselContent>
+              {allImageUrls.map((url, index) => (
+                <CarouselItem key={index}>
+                   <div className="relative aspect-video">
+                      <Image src={url} alt={`${course.name} 소개 이미지 ${index + 1}`} fill sizes="(max-width: 1024px) 100vw, 1024px" className="object-cover rounded-lg" />
+                   </div>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            <CarouselPrevious />
+            <CarouselNext />
+             <div className="flex justify-center gap-2 mt-4">
+                {scrollSnaps.map((_, index) => (
+                    <button key={index} onClick={() => onDotButtonClick(index)} className={`h-2 w-2 rounded-full ${index === selectedIndex ? 'bg-primary' : 'bg-muted'}`}/>
+                ))}
             </div>
+          </Carousel>
         )}
 
         <CourseReviewSection comments={comments} />

@@ -168,3 +168,13 @@ export interface EpisodeComment {
   rating?: number; // 1-5, optional
   createdAt: Timestamp;
 }
+
+export type CarouselApi = {
+  on: (event: string, callback: () => void) => void;
+  off: (event: string, callback: () => void) => void;
+  scrollPrev: () => void;
+  scrollNext: () => void;
+  scrollTo: (index: number) => void;
+  selectedScrollSnap: () => number;
+  scrollSnapList: () => number[];
+};

@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import type { EpisodeComment } from '@/lib/types';
@@ -6,45 +7,37 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { toDisplayDate } from '@/lib/date-helpers';
+import { Card, CardContent } from '../ui/card';
 
 interface CourseReviewSectionProps {
   comments: EpisodeComment[];
 }
 
 const ReviewItem = ({ comment }: { comment: EpisodeComment }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    
-    // Show only first 2 lines initially
-    const canTruncate = comment.content.split('\n').length > 2 || comment.content.length > 100;
-    const displayText = isExpanded ? comment.content : comment.content.split('\n').slice(0, 2).join('\n').substring(0, 100) + (canTruncate ? '...' : '');
-
     return (
-        <div className="py-4 border-b">
-            <div className="flex items-start gap-3">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback>{comment.userName.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm">{comment.userName}</span>
-                        <span className="text-xs text-muted-foreground">{toDisplayDate(comment.createdAt)}</span>
-                    </div>
-                    {comment.rating && comment.rating > 0 && (
-                        <div className="flex items-center mt-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star key={star} className={cn('w-3 h-3', star <= comment.rating! ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground')} />
-                          ))}
+        <Card className="flex-shrink-0 w-full">
+            <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback>{comment.userName.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm">{comment.userName}</span>
+                            <span className="text-xs text-muted-foreground">{toDisplayDate(comment.createdAt)}</span>
                         </div>
-                    )}
-                    <p className="text-sm mt-2 whitespace-pre-wrap">{displayText}</p>
-                    {canTruncate && (
-                         <Button variant="ghost" size="sm" onClick={() => setIsExpanded(!isExpanded)} className="h-auto p-1 text-muted-foreground">
-                            {isExpanded ? '접기' : '더보기'}
-                         </Button>
-                    )}
+                        {comment.rating && comment.rating > 0 && (
+                            <div className="flex items-center mt-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star key={star} className={cn('w-3 h-3', star <= comment.rating! ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground')} />
+                              ))}
+                            </div>
+                        )}
+                        <p className="text-sm mt-2 whitespace-pre-wrap line-clamp-3">{comment.content}</p>
+                    </div>
                 </div>
-            </div>
-        </div>
+            </CardContent>
+        </Card>
     )
 }
 
@@ -68,7 +61,7 @@ export default function CourseReviewSection({ comments }: CourseReviewSectionPro
     return { averageRating, totalReviews, ratingDistribution: distribution.map(d => (d/totalReviews)*100) };
   }, [comments]);
   
-  const displayedComments = showAll ? comments : comments.slice(0, 3);
+  const displayedComments = showAll ? comments : comments.slice(0, 4);
 
   if (comments.length === 0) {
       return null; // Don't render section if there are no comments
@@ -95,13 +88,13 @@ export default function CourseReviewSection({ comments }: CourseReviewSectionPro
         <p className="text-muted-foreground text-sm">{totalReviews}개 리뷰</p>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {displayedComments.map(comment => (
             <ReviewItem key={comment.id} comment={comment} />
         ))}
       </div>
       
-      {comments.length > 3 && (
+      {comments.length > 4 && (
         <div className="mt-6 text-center">
             <Button variant="outline" onClick={() => setShowAll(!showAll)}>
                 {showAll ? (
