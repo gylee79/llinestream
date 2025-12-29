@@ -75,7 +75,7 @@ service cloud.firestore {
     match /episodes/{episodeId}/comments/{commentId} {
       // Anyone can read comments
       allow get, list: if true;
-      // Only signed-in users can create comments
+      // Only signed-in users can create comments for themselves
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       // Only the owner of the comment or an admin can update/delete
       allow update, delete: if (isOwner(resource.data.userId) || isAdmin());
