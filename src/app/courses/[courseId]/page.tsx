@@ -100,34 +100,42 @@ export default function CourseDetailPage() {
 
   return (
     <div>
-        <div className="w-full bg-muted py-8">
-            <Carousel setApi={setApi} className="w-full max-w-2xl mx-auto">
-                <CarouselContent>
-                    {introImages.map((url, index) => (
-                        <CarouselItem key={index}>
-                            <div className="relative aspect-video">
-                                <Image src={url} alt={`${course.name} 소개 이미지 ${index + 1}`} fill sizes="100vw" className="object-contain" />
-                            </div>
-                        </CarouselItem>
-                    ))}
-                </CarouselContent>
-                <CarouselPrevious className="left-[-50px]" />
-                <CarouselNext className="right-[-50px]" />
-                 <div className="absolute bottom-[-30px] w-full flex justify-center items-center gap-2">
-                    {scrollSnaps.map((_, index) => (
-                        <DotButton
-                            key={index}
-                            selected={index === selectedIndex}
-                            onClick={() => onDotButtonClick(index)}
-                        />
-                    ))}
+        <div className="w-full bg-muted">
+            <div className="container mx-auto flex items-center gap-8 py-8">
+                {/* Left side: Title and Description */}
+                <div className="w-2/5">
+                    <h1 className="font-headline text-3xl font-bold">{course.name}</h1>
+                    <p className="text-muted-foreground mt-4">{course.description}</p>
                 </div>
-            </Carousel>
+                {/* Right side: Image Carousel */}
+                <div className="w-3/5">
+                    <Carousel setApi={setApi} className="w-full">
+                        <CarouselContent>
+                            {introImages.map((url, index) => (
+                                <CarouselItem key={index}>
+                                    <div className="relative aspect-video">
+                                        <Image src={url} alt={`${course.name} 소개 이미지 ${index + 1}`} fill sizes="60vw" className="object-contain rounded-lg" />
+                                    </div>
+                                </CarouselItem>
+                            ))}
+                        </CarouselContent>
+                        <CarouselPrevious className="left-[-50px]" />
+                        <CarouselNext className="right-[-50px]" />
+                        <div className="absolute bottom-[-30px] w-full flex justify-center items-center gap-2">
+                            {scrollSnaps.map((_, index) => (
+                                <DotButton
+                                    key={index}
+                                    selected={index === selectedIndex}
+                                    onClick={() => onDotButtonClick(index)}
+                                />
+                            ))}
+                        </div>
+                    </Carousel>
+                </div>
+            </div>
         </div>
 
-      <div className="container mx-auto max-w-5xl py-8 mt-8">
-        <h1 className="font-headline text-3xl font-bold">{course.name}</h1>
-        <p className="text-muted-foreground mt-2">{course.description}</p>
+      <div className="container mx-auto max-w-5xl py-8">
         
         {user && <CourseReviewSection comments={comments} user={user} />}
         
