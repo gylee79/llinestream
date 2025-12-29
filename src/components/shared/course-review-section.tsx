@@ -1,7 +1,7 @@
 'use client';
 import { useState, useMemo } from 'react';
 import type { EpisodeComment, User } from '@/lib/types';
-import { Star, MessageSquare } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toDisplayDate } from '@/lib/date-helpers';
@@ -14,11 +14,6 @@ import {
   CarouselPrevious,
 } from '@/components/ui/carousel';
 import EpisodeCommentDialog from './episode-comment-dialog';
-
-interface CourseReviewSectionProps {
-  comments: EpisodeComment[];
-  user: User;
-}
 
 const ReviewItem = ({ comment }: { comment: EpisodeComment }) => {
     return (
@@ -73,7 +68,7 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
           <h2 className="font-headline text-2xl font-bold">리뷰 ({totalReviews})</h2>
           <Button variant="outline" onClick={() => setCommentDialogOpen(true)}>모든 리뷰 보기</Button>
         </div>
-        <div className="flex flex-col md:flex-row gap-8">
+        <div className="flex flex-col md:flex-row gap-8 md:items-stretch">
           {/* Left Side: Rating Summary */}
           <div className="md:w-[320px] flex-shrink-0 flex flex-col items-start justify-start bg-muted/50 p-6 rounded-lg">
               <span className="text-3xl font-bold">{averageRating.toFixed(1)}</span>
@@ -98,8 +93,8 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
 
           {/* Right Side: Review Carousel */}
           <div className="flex-1 min-w-0">
-             <Carousel opts={{ align: 'start', loop: false }} className="w-full">
-                <CarouselContent>
+             <Carousel opts={{ align: 'start', loop: false }} className="w-full h-full">
+                <CarouselContent className="h-full">
                     {comments.map(comment => (
                         <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/3">
                             <div className="p-1 h-full">
