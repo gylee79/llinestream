@@ -3,11 +3,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import {
   CreditCard,
   Home,
   LogOut,
-  Settings,
   User as UserIcon,
   Clapperboard,
   Menu,
@@ -45,6 +45,9 @@ import { useCart } from '@/context/cart-context';
 import { Badge } from '../ui/badge';
 import type { FooterSettings } from '@/lib/types';
 import { doc } from 'firebase/firestore';
+import ProfileDialog from '@/components/profile/profile-dialog';
+import BillingDialog from '@/components/profile/billing-dialog';
+
 
 const navLinks = [
   { href: '/', label: 'Home', icon: Home },
@@ -63,6 +66,9 @@ export default function Header() {
   const { openCart, items } = useCart();
   const isLoggedIn = !!authUser;
   const isAdmin = user?.role === 'admin';
+
+  const [isProfileOpen, setProfileOpen] = useState(false);
+  const [isBillingOpen, setBillingOpen] = useState(false);
 
   const footerRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
   const { data: settings } = useDoc<FooterSettings>(footerRef);
@@ -90,121 +96,121 @@ export default function Header() {
   )
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 max-w-screen-2xl items-center">
-        {/* Mobile Menu */}
-        <div className="md:hidden">
-           <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-6 w-6" />
-                <span className="sr-only">Toggle Navigation</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm">
-                <SheetHeader className="border-b pb-4">
-                    <Link href="/" className="self-start">
-                        <LlineStreamLogo appName={appName} />
-                    </Link>
-                    <SheetTitle className="sr-only">메뉴</SheetTitle>
-                    <SheetDescription className="sr-only">메인 네비게이션 메뉴</SheetDescription>
-                </SheetHeader>
-                <nav className="grid gap-4 py-6 text-lg font-medium">
-                    {navLinks.map((link) => (
-                    <SheetClose asChild key={link.href}>
-                        <NavLink {...link} isMobile />
-                    </SheetClose>
-                    ))}
-                    {isAdmin && (
-                    <SheetClose asChild>
-                        <NavLink {...adminLink} isMobile />
-                    </SheetClose>
-                    )}
-                </nav>
-            </SheetContent>
-          </Sheet>
-        </div>
-        
-        {/* Desktop Logo and Navigation */}
-        <div className="flex flex-1 items-center justify-start">
-            <Link href="/" className="ml-4 md:ml-0 mr-6 flex items-center space-x-2">
-            <LlineStreamLogo appName={appName} />
-            </Link>
-            <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
-            {navLinks.map((link) => (
-                <NavLink key={link.href} {...link} />
-            ))}
-            {isAdmin && <NavLink {...adminLink} />}
-            </nav>
-        </div>
-
-
-        <div className="flex items-center justify-end space-x-2">
-           <Button variant="ghost" size="icon" className="relative" onClick={openCart}>
-                <ShoppingCart className="h-5 w-5" />
-                {items.length > 0 && (
-                    <Badge variant="destructive" className="absolute -right-2 -top-2 h-5 w-5 justify-center rounded-full p-0">
-                        {items.length}
-                    </Badge>
-                )}
-                <span className="sr-only">장바구니 열기</span>
-            </Button>
-
-          {isUserLoading ? (
-            <Avatar className="h-8 w-8">
-              <AvatarFallback>?</AvatarFallback>
-            </Avatar>
-          ) : isLoggedIn && user && authUser ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage
-                      src={authUser.photoURL || `https://avatar.vercel.sh/${user.id}.png`}
-                      alt={user.name || user.email || ''}
-                    />
-                    <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
-                  </Avatar>
+    <>
+      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 max-w-screen-2xl items-center">
+          {/* Mobile Menu */}
+          <div className="md:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-6 w-6" />
+                  <span className="sr-only">Toggle Navigation</span>
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user.name || 'Unnamed User'}</p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {user.email}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem>
-                    <UserIcon className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm">
+                  <SheetHeader className="border-b pb-4">
+                      <Link href="/" className="self-start">
+                          <LlineStreamLogo appName={appName} />
+                      </Link>
+                      <SheetTitle className="sr-only">메뉴</SheetTitle>
+                      <SheetDescription className="sr-only">메인 네비게이션 메뉴</SheetDescription>
+                  </SheetHeader>
+                  <nav className="grid gap-4 py-6 text-lg font-medium">
+                      {navLinks.map((link) => (
+                      <SheetClose asChild key={link.href}>
+                          <NavLink {...link} isMobile />
+                      </SheetClose>
+                      ))}
+                      {isAdmin && (
+                      <SheetClose asChild>
+                          <NavLink {...adminLink} isMobile />
+                      </SheetClose>
+                      )}
+                  </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
+          
+          {/* Desktop Logo and Navigation */}
+          <div className="flex flex-1 items-center justify-start">
+              <Link href="/" className="ml-4 md:ml-0 mr-6 flex items-center space-x-2">
+              <LlineStreamLogo appName={appName} />
+              </Link>
+              <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
+              {navLinks.map((link) => (
+                  <NavLink key={link.href} {...link} />
+              ))}
+              {isAdmin && <NavLink {...adminLink} />}
+              </nav>
+          </div>
+
+
+          <div className="flex items-center justify-end space-x-2">
+            <Button variant="ghost" size="icon" className="relative" onClick={openCart}>
+                  <ShoppingCart className="h-5 w-5" />
+                  {items.length > 0 && (
+                      <Badge variant="destructive" className="absolute -right-2 -top-2 h-5 w-5 justify-center rounded-full p-0">
+                          {items.length}
+                      </Badge>
+                  )}
+                  <span className="sr-only">장바구니 열기</span>
+              </Button>
+
+            {isUserLoading ? (
+              <Avatar className="h-8 w-8">
+                <AvatarFallback>?</AvatarFallback>
+              </Avatar>
+            ) : isLoggedIn && user && authUser ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage
+                        src={authUser.photoURL || `https://avatar.vercel.sh/${user.id}.png`}
+                        alt={user.name || user.email || ''}
+                      />
+                      <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{user.name || 'Unnamed User'}</p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {user.email}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setBillingOpen(true)}>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      <span>Billing</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    <span>Billing</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Button asChild>
-              <Link href="/login">Login</Link>
-            </Button>
-          )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button asChild>
+                <Link href="/login">Login</Link>
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+      {user && <ProfileDialog open={isProfileOpen} onOpenChange={setProfileOpen} user={user} />}
+      {user && <BillingDialog open={isBillingOpen} onOpenChange={setBillingOpen} user={user} />}
+    </>
   );
 }
