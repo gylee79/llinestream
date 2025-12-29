@@ -28,17 +28,19 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { sanitize } from '@/lib/utils';
+import CourseEditDialog from './course-edit-dialog';
 
 
 type Item = (Field | Classification | Course) & { type: 'field' | 'classification' | 'course' };
 
-const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }: {
+const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail, onOpenCourseDialog }: {
   item: Item;
   onSelect: () => void;
   selected: boolean;
   onEdit: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
   onEditThumbnail: (e: React.MouseEvent) => void;
+  onOpenCourseDialog?: (e: React.MouseEvent) => void;
 }) => (
     <div 
         className={cn(
@@ -69,11 +71,9 @@ const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }
         <div className="flex items-center opacity-0 group-hover/menu-item:opacity-100 transition-opacity">
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit}><Pencil className="h-4 w-4" /></Button>
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEditThumbnail}><ImageIcon className="h-4 w-4" /></Button>
-            {item.type === 'course' && (
-                <Button asChild size="icon" variant="ghost" className="h-7 w-7">
-                    <Link href={`/admin/courses/${item.id}`} onClick={(e) => e.stopPropagation()} target="_blank">
-                        <ExternalLink className="h-4 w-4" />
-                    </Link>
+            {item.type === 'course' && onOpenCourseDialog && (
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onOpenCourseDialog}>
+                    <ExternalLink className="h-4 w-4" />
                 </Button>
             )}
             <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>
@@ -126,6 +126,7 @@ export default function HierarchyManager() {
   const [nameDialog, setNameDialog] = useState<NameDialogState>({ isOpen: false, item: null, type: '분야' });
   const [thumbnailDialog, setThumbnailDialog] = useState<ThumbnailDialogState>({ isOpen: false, item: null, type: 'fields' });
   const [deleteAlert, setDeleteAlert] = useState<DeleteAlertState>({ isOpen: false, item: null, collectionName: null });
+  const [courseEditDialog, setCourseEditDialog] = useState<{isOpen: boolean, course: Course | null}>({ isOpen: false, course: null });
 
 
   const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
@@ -176,9 +177,15 @@ export default function HierarchyManager() {
     setThumbnailDialog({ isOpen: true, item, type });
   }
 
+  const openCourseEditDialog = (e: React.MouseEvent, course: Course) => {
+    e.stopPropagation();
+    setCourseEditDialog({ isOpen: true, course });
+  };
+
   const closeDialogs = () => {
       setNameDialog({ isOpen: false, item: null, type: '분야' });
       setThumbnailDialog({ isOpen: false, item: null, type: 'fields' });
+      setCourseEditDialog({isOpen: false, course: null});
   };
   
   const closeDeleteAlert = () => {
@@ -353,6 +360,7 @@ export default function HierarchyManager() {
                        onEdit={(e) => { e.stopPropagation(); openNameDialog('상세분류', item); }}
                        onDelete={(e) => handleDeleteRequest(e, 'courses', {...item, type: 'course'})}
                        onEditThumbnail={(e) => { e.stopPropagation(); openThumbnailDialog('courses', item); }}
+                       onOpenCourseDialog={(e) => openCourseEditDialog(e, item)}
                     />
                 ))
                 }
@@ -378,6 +386,15 @@ export default function HierarchyManager() {
             onClose={closeDialogs}
             item={thumbnailDialog.item}
             itemType={thumbnailDialog.type}
+        />
+      )}
+
+      {courseEditDialog.isOpen && courseEditDialog.course && (
+        <CourseEditDialog
+          key={courseEditDialog.course.id}
+          open={courseEditDialog.isOpen}
+          onOpenChange={(open) => setCourseEditDialog({ isOpen: open, course: open ? courseEditDialog.course : null })}
+          course={courseEditDialog.course}
         />
       )}
 
