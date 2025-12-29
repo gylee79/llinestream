@@ -124,7 +124,7 @@ export default function BillingDialog({ user, open, onOpenChange }: BillingDialo
                     <TableHeader>
                         <TableRow>
                             <TableHead className="p-2 text-xs">결제일</TableHead>
-                            <TableHead className="p-2 text-xs">상태</TableHead>
+                            <TableHead className="p-2 text-xs">카테고리</TableHead>
                             <TableHead className="p-2 text-xs">결제 수단</TableHead>
                             <TableHead className="p-2 text-xs">내역</TableHead>
                             <TableHead className="p-2 text-xs text-right">금액</TableHead>
@@ -137,9 +137,7 @@ export default function BillingDialog({ user, open, onOpenChange }: BillingDialo
                             subscriptions.map((sub) => (
                                 <TableRow key={sub.id}>
                                     <TableCell className="p-2 text-sm">{toDisplayDate(sub.purchasedAt)}</TableCell>
-                                    <TableCell className="p-2 text-sm">
-                                        {getSubscriptionStatusBadge(sub)}
-                                    </TableCell>
+                                    <TableCell className="p-2 text-sm">{getCourseName(sub.courseId)}</TableCell>
                                     <TableCell className="p-2 text-sm">{getPaymentMethod(sub)}</TableCell>
                                     <TableCell className="p-2 text-sm">{sub.orderName}</TableCell>
                                     <TableCell className="p-2 text-sm text-right">{formatPrice(sub.amount)}</TableCell>

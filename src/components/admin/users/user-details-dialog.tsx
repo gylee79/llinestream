@@ -282,7 +282,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                     <TableHeader>
                         <TableRow>
                             <TableHead className="p-2 text-xs">날짜</TableHead>
-                            <TableHead className="p-2 text-xs">상태</TableHead>
+                            <TableHead className="p-2 text-xs">상세분류</TableHead>
                             <TableHead className="p-2 text-xs">결제수단</TableHead>
                             <TableHead className="p-2 text-xs">내역</TableHead>
                             <TableHead className="p-2 text-xs text-right">금액</TableHead>
@@ -292,9 +292,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                         {subscriptions?.map((sub) => (
                             <TableRow key={sub.id}>
                                 <TableCell className="p-2 text-xs">{toDisplayDate(sub.purchasedAt)}</TableCell>
-                                <TableCell className="p-2 text-xs">
-                                  {getSubscriptionStatusBadge(sub)}
-                                </TableCell>
+                                <TableCell className="p-2 text-xs">{getCourseName(sub.courseId)}</TableCell>
                                 <TableCell className="p-2 text-xs">{getPaymentMethod(sub)}</TableCell>
                                 <TableCell className="p-2 text-xs">{sub.orderName}</TableCell>
                                 <TableCell className="p-2 text-xs text-right">{sub.amount.toLocaleString('ko-KR')}원</TableCell>
