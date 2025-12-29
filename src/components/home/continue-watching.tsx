@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo } from 'react';
@@ -40,15 +39,23 @@ export default function ContinueWatching() {
 
     const watchedEpisodes = useMemo(() => {
         if (!historyItems || !allEpisodes) return [];
-        // Get unique episode IDs from history, preserving order
-        const uniqueEpisodeIds = [...new Set(historyItems.map(item => item.id))];
-        // Map episode IDs to actual episode objects
-        return uniqueEpisodeIds.map(episodeId => allEpisodes.find(e => e.id === episodeId)).filter(Boolean) as Episode[];
+
+        const episodeMap = new Map(allEpisodes.map(e => [e.id, e]));
+        
+        const filteredHistory = historyItems.filter(item => {
+            const episode = episodeMap.get(item.id);
+            if (!episode) return false;
+            const watchedSeconds = item.progress * episode.duration;
+            return watchedSeconds >= 5;
+        });
+        
+        const uniqueEpisodeIds = [...new Set(filteredHistory.map(item => item.id))];
+        
+        return uniqueEpisodeIds.map(episodeId => episodeMap.get(episodeId)).filter(Boolean) as Episode[];
     }, [historyItems, allEpisodes]);
     
     const isLoading = historyLoading || episodesLoading;
     const finalItems = (watchedEpisodes && watchedEpisodes.length > 0) ? watchedEpisodes : mockEpisodes;
-
 
     if (isLoading) {
         return (
@@ -72,5 +79,3 @@ export default function ContinueWatching() {
         <ContentCarousel title="최근 시청 영상" items={finalItems} itemType="episode" />
     );
 }
-
-    
