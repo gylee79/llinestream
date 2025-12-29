@@ -164,7 +164,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
             if (wasExpiryAdjusted) {
                 toast({
                     title: '만료일 조정 및 적용 완료',
-                    description: '오늘보다 과거를 만료일로 설정 할수 없습니다. 대안으로 만료일을 오늘로 설정했습니다.',
+                    description: '오늘보다 과거를 만료일로 설정 할 수 없어 만료일을 오늘로 설정했습니다.',
                 });
             } else {
                  toast({ title: '성공', description: `${Math.abs(bonusDays)}일의 기간이 성공적으로 ${bonusDays > 0 ? '추가' : '차감'}되었습니다.` });
@@ -222,12 +222,12 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
           <TabsContent value="subscriptions" className="mt-4">
             <h4 className="font-semibold mb-2">활성 이용권 현황</h4>
             <Table>
-                <TableHeader><TableRow><TableHead>상세분류</TableHead><TableHead>만료일</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead className="p-2 text-xs">상세분류</TableHead><TableHead className="p-2 text-xs">만료일</TableHead></TableRow></TableHeader>
                 <TableBody>
                     {user.activeSubscriptions && Object.entries(user.activeSubscriptions).map(([id, sub]) => (
                         <TableRow key={id}>
-                            <TableCell>{getCourseName(id)}</TableCell>
-                            <TableCell>{toDisplayDate(sub.expiresAt)}</TableCell>
+                            <TableCell className="p-2 text-xs">{getCourseName(id)}</TableCell>
+                            <TableCell className="p-2 text-xs">{toDisplayDate(sub.expiresAt)}</TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
