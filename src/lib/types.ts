@@ -150,3 +150,14 @@ export interface UserAuditLog {
   oldValue: string;
   newValue: string;
 }
+
+export interface EpisodeComment {
+  id: string;
+  episodeId: string;
+  userId: string;
+  userName: string;
+  userRole: 'user' | 'admin';
+  content: string;
+  rating?: number; // 1-5, optional
+  createdAt: Timestamp;
+}

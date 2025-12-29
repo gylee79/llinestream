@@ -8,12 +8,23 @@ import { cn } from '@/lib/utils';
 import PaymentDialog from '@/components/shared/payment-dialog';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where } from 'firebase/firestore';
-import type { Course, Episode, Classification, Instructor } from '@/lib/types';
+import type { Course, Episode, Classification, Instructor, EpisodeComment } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import VideoPlayerDialog from '@/components/shared/video-player-dialog';
+import EpisodeCommentDialog from '@/components/shared/episode-comment-dialog';
+
+function EpisodeComments({ episodeId }: { episodeId: string }) {
+  const firestore = useFirestore();
+  const commentsQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'episodes', episodeId, 'comments')) : null),
+    [firestore, episodeId]
+  );
+  const { data: comments } = useCollection<EpisodeComment>(commentsQuery);
+  return <>{comments?.length || 0}</>;
+}
 
 
 export default function CourseDetailPage() {
@@ -25,6 +36,7 @@ export default function CourseDetailPage() {
   const [selectedInstructor, setSelectedInstructor] = useState<Instructor | null>(null);
   const [isPlayerDialogOpen, setPlayerDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [isCommentDialogOpen, setCommentDialogOpen] = useState(false);
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', params.courseId) : null), [firestore, params.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
@@ -58,6 +70,11 @@ export default function CourseDetailPage() {
     } else {
       setPaymentDialogOpen(true);
     }
+  }
+
+  const handleCommentClick = (episode: Episode) => {
+    setSelectedEpisode(episode);
+    setCommentDialogOpen(true);
   }
 
   if (!isLoading && !course) {
@@ -141,10 +158,10 @@ export default function CourseDetailPage() {
                             <span>{formatDuration(episode.duration)}</span>
                          </div>
                       </div>
-                      <div className="flex flex-row items-center justify-center gap-2 ml-auto pl-2">
-                         <Button variant="outline" size="sm">
+                      <div className="flex flex-col md:flex-row items-center justify-end gap-2 ml-auto pl-2">
+                         <Button variant="outline" size="sm" onClick={() => handleCommentClick(episode)}>
                             <MessageSquare className="w-4 h-4 mr-2"/>
-                            채팅
+                            리뷰/질문 (<EpisodeComments episodeId={episode.id} />)
                          </Button>
                         <Badge variant={isPlayable || episode.isFree ? "default" : "destructive"} className="whitespace-nowrap">
                             {episode.isFree ? '무료' : hasSubscription ? '시청 가능' : '구독 필요'}
@@ -169,6 +186,15 @@ export default function CourseDetailPage() {
             onOpenChange={setPlayerDialogOpen}
             episode={selectedEpisode}
             instructor={selectedInstructor}
+        />
+      )}
+
+      {selectedEpisode && user && (
+        <EpisodeCommentDialog
+          isOpen={isCommentDialogOpen}
+          onOpenChange={setCommentDialogOpen}
+          episode={selectedEpisode}
+          user={user}
         />
       )}
 

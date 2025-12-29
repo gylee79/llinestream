@@ -72,6 +72,15 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    match /episodes/{episodeId}/comments/{commentId} {
+      // Anyone can read comments
+      allow get, list: if true;
+      // Only signed-in users can create comments
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // Only the owner of the comment or an admin can update/delete
+      allow update, delete: if (isOwner(resource.data.userId) || isAdmin());
+    }
+
     match /instructors/{instructorId} {
         allow read: if isSignedIn();
         allow write: if isAdmin();
