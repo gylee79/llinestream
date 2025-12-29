@@ -57,7 +57,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
         <>
             <Card className="overflow-hidden">
                 <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
-                    <div className="relative aspect-video w-full sm:w-20 flex-shrink-0 bg-muted rounded-md overflow-hidden">
+                    <div className="relative aspect-square w-full sm:w-20 flex-shrink-0 bg-muted rounded-md overflow-hidden">
                         <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="(max-width: 640px) 100vw, 80px" className="object-cover" />
                         <div className="absolute bottom-1 right-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
                             {formatDuration(episode.duration)}
