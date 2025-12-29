@@ -100,41 +100,38 @@ export default function CourseDetailPage() {
 
   return (
     <div>
+        <div className="container mx-auto max-w-5xl py-8">
+            <h1 className="font-headline text-3xl font-bold">{course.name}</h1>
+            <p className="text-muted-foreground mt-4">{course.description}</p>
+        </div>
+
         <div className="w-full bg-muted">
             <div className="container py-8">
-                <div className="flex flex-col md:flex-row items-center gap-8">
-                    {/* Left side: Title and Description */}
-                    <div className="w-full md:w-2/5">
-                        <h1 className="font-headline text-3xl font-bold">{course.name}</h1>
-                        <p className="text-muted-foreground mt-4">{course.description}</p>
-                    </div>
-                    {/* Right side: Image Carousel */}
-                    <div className="w-full md:w-3/5">
-                        <Carousel setApi={setApi} className="w-full" opts={{align: 'start'}}>
-                            <CarouselContent>
-                                {introImages.map((url, index) => (
-                                    <CarouselItem key={index}>
-                                        <div className="relative aspect-video">
-                                            <Image src={url} alt={`${course.name} 소개 이미지 ${index + 1}`} fill sizes="60vw" className="object-contain rounded-lg" />
-                                        </div>
-                                    </CarouselItem>
+                <div className="mx-auto max-w-4xl">
+                    <Carousel setApi={setApi} className="w-full" opts={{align: 'start'}}>
+                        <CarouselContent>
+                            {introImages.map((url, index) => (
+                                <CarouselItem key={index}>
+                                    <div className="relative aspect-video">
+                                        <Image src={url} alt={`${course.name} 소개 이미지 ${index + 1}`} fill sizes="60vw" className="object-contain rounded-lg" />
+                                    </div>
+                                </CarouselItem>
+                            ))}
+                        </CarouselContent>
+                         <div className="relative mt-4 flex justify-center items-center gap-4">
+                            <CarouselPrevious className="static translate-y-0" />
+                            <div className="flex items-center gap-2">
+                                {scrollSnaps.map((_, index) => (
+                                    <DotButton
+                                        key={index}
+                                        selected={index === selectedIndex}
+                                        onClick={() => onDotButtonClick(index)}
+                                    />
                                 ))}
-                            </CarouselContent>
-                             <div className="relative mt-4 flex justify-center items-center gap-4">
-                                <CarouselPrevious className="static translate-y-0" />
-                                <div className="flex items-center gap-2">
-                                    {scrollSnaps.map((_, index) => (
-                                        <DotButton
-                                            key={index}
-                                            selected={index === selectedIndex}
-                                            onClick={() => onDotButtonClick(index)}
-                                        />
-                                    ))}
-                                </div>
-                                <CarouselNext className="static translate-y-0" />
                             </div>
-                        </Carousel>
-                    </div>
+                            <CarouselNext className="static translate-y-0" />
+                        </div>
+                    </Carousel>
                 </div>
             </div>
         </div>
