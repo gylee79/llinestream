@@ -16,9 +16,6 @@ const ReviewItem = ({ comment }: { comment: EpisodeComment }) => {
     return (
         <div className="py-4 border-b">
             <div className="flex items-start gap-3">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback>{comment.userName.charAt(0)}</AvatarFallback>
-                </Avatar>
                 <div className="flex-1">
                     <div className="flex items-center gap-2">
                         <span className="font-semibold text-sm">{comment.userName}</span>
