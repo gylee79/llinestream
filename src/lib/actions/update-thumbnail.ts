@@ -78,9 +78,9 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     let oldImagePath: string | undefined;
 
     // Determine the old path to delete
-    if (fieldToUpdate) { // For specific fields like introImageUrl or hero images
+    if (fieldToUpdate && pathFieldToUpdate) {
         const oldUrl = subCollection ? currentData?.[subCollection]?.[fieldToUpdate] : currentData?.[fieldToUpdate];
-        oldImagePath = extractPathFromUrl(oldUrl);
+        oldImagePath = currentData?.[pathFieldToUpdate] || extractPathFromUrl(oldUrl);
     } else { // Default thumbnail logic
         oldImagePath = (currentData as Field | Classification | Course).thumbnailPath || extractPathFromUrl((currentData as Field | Classification | Course).thumbnailUrl);
     }
@@ -141,6 +141,7 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     await docRef.update(dataToUpdate);
 
     revalidatePath('/admin/content', 'layout');
+    revalidatePath(`/admin/courses/${itemId}`, 'page');
     revalidatePath('/admin/settings', 'page');
     revalidatePath(`/courses/${itemId}`, 'page');
 

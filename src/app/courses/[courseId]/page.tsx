@@ -112,9 +112,13 @@ export default function CourseDetailPage() {
           <>
             <h1 className="font-headline text-3xl font-bold">{`${classification.name} > ${course.name}`}</h1>
             <p className="text-muted-foreground mt-2">{course.description}</p>
-            {course.introImageUrl && (
-              <div className="mt-8 relative aspect-video w-full rounded-lg overflow-hidden border">
-                  <Image src={course.introImageUrl} alt={`${course.name} 소개`} fill sizes="(max-width: 1024px) 100vw, 1024px" className="object-cover" />
+            {course.introImageUrls && course.introImageUrls.length > 0 && (
+              <div className="mt-8 space-y-4">
+                  {course.introImageUrls.map((url, index) => (
+                      <div key={index} className="relative aspect-video w-full rounded-lg overflow-hidden border">
+                          <Image src={url} alt={`${course.name} 소개 이미지 ${index + 1}`} fill sizes="(max-width: 1024px) 100vw, 1024px" className="object-cover" />
+                      </div>
+                  ))}
               </div>
             )}
           </>
@@ -227,7 +231,7 @@ export default function CourseDetailPage() {
             onOpenChange={setPaymentDialogOpen}
             item={classification}
             itemType="classification"
-            selectedDuration="day30"
+            selectedDuration={"day30"}
             selectedPrice={classification.prices.day30}
             selectedLabel="30일 이용권"
         >

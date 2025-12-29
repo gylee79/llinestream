@@ -53,8 +53,8 @@ export interface Course {
   description: string;
   thumbnailUrl: string;
   thumbnailPath?: string;
-  introImageUrl?: string;
-  introImagePath?: string;
+  introImageUrls?: string[];
+  introImagePaths?: string[];
   // New fields for richer display
   level?: '입문' | '초급' | '중급' | '고급';
   tags?: string[];
