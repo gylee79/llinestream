@@ -183,10 +183,15 @@ export default function HierarchyManager() {
         try {
             const { type, item: existingItem } = nameDialog;
             const collectionName = type === '분야' ? 'fields' : type === '큰분류' ? 'classifications' : 'courses';
+            let dataToSave: { [key: string]: any } = { name: itemData.name };
+
+            if (type === '큰분류' || type === '상세분류') {
+                dataToSave.description = itemData.description || `${itemData.name}에 대한 설명입니다.`;
+            }
 
             if (existingItem?.id) { // Edit mode
-                await updateDoc(doc(firestore, collectionName, existingItem.id), { name: itemData.name });
-                toast({ title: '수정 성공', description: `'${itemData.name}'으로 이름이 수정되었습니다.` });
+                await updateDoc(doc(firestore, collectionName, existingItem.id), dataToSave);
+                toast({ title: '수정 성공', description: `'${itemData.name}'의 정보가 수정되었습니다.` });
             } else { // Add mode
                  const docRef = doc(firestore, collectionName, uuidv4());
                 if (type === '분야') {
@@ -195,14 +200,14 @@ export default function HierarchyManager() {
                     await setDoc(docRef, {
                         fieldId: selectedField,
                         name: itemData.name,
-                        description: `${itemData.name}에 대한 설명입니다.`,
+                        description: itemData.description || `${itemData.name}에 대한 설명입니다.`,
                         thumbnailUrl: '',
                     });
                 } else if (type === '상세분류' && selectedClassification) {
                     await setDoc(docRef, {
                         classificationId: selectedClassification,
                         name: itemData.name,
-                        description: `${itemData.name}에 대한 상세 설명입니다.`,
+                        description: itemData.description || `${itemData.name}에 대한 상세 설명입니다.`,
                         prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
                         thumbnailUrl: '',
                     });
