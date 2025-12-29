@@ -5,7 +5,7 @@ import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toDisplayDate } from '@/lib/date-helpers';
-import { Card, CardContent } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import {
   Carousel,
   CarouselContent,
@@ -14,6 +14,13 @@ import {
   CarouselPrevious,
 } from '@/components/ui/carousel';
 import EpisodeCommentDialog from './episode-comment-dialog';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartStyle,
+} from '@/components/ui/chart';
+import { BarChart, Bar } from 'recharts';
 
 const ReviewItem = ({ comment }: { comment: EpisodeComment }) => {
     return (
@@ -62,60 +69,70 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
     return { averageRating, totalReviews, ratingDistribution: distribution, ratingCounts: counts };
   }, [comments]);
   
-  if (comments.length === 0) {
-      return null;
-  }
+  const chartData = ratingDistribution.map((percentage, index) => ({
+    star: 5 - index,
+    count: ratingCounts[index],
+  }));
+
+  const chartConfig = {
+    count: {
+      label: 'Count',
+      color: 'hsl(var(--primary))',
+    },
+  };
+
+  const hasReviews = comments.length > 0;
 
   return (
     <>
       <div className="mt-12">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-headline text-2xl font-bold">리뷰 ({totalReviews})</h2>
-          <Button variant="outline" onClick={() => setCommentDialogOpen(true)}>모든 리뷰 보기</Button>
+          {hasReviews && (
+             <Button variant="outline" onClick={() => setCommentDialogOpen(true)}>모든 리뷰 보기</Button>
+          )}
         </div>
         
-        <Carousel opts={{ align: 'start', loop: false }} className="w-full h-full">
-            <CarouselContent className="h-full -ml-4">
-                {/* Rating Summary Item */}
-                <CarouselItem className="md:basis-1/2 lg:basis-1/3 pl-4">
-                    <div className="p-1 h-full">
-                        <Card className="h-full">
-                            <CardContent className="p-4 flex flex-col h-full items-start justify-center">
-                                <span className="text-3xl font-bold">{averageRating.toFixed(1)}</span>
-                                <div className="flex items-center my-1">
-                                    {[1,2,3,4,5].map(star => (
-                                        <Star key={star} className={cn("w-5 h-5", star <= averageRating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30')} />
-                                    ))}
-                                </div>
-                                <span className="text-xs text-muted-foreground">{totalReviews}개 리뷰</span>
-                                <div className="w-full mt-2 space-y-1">
-                                    {ratingDistribution.map((percentage, index) => (
-                                        <div key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
-                                            <span className="w-2">{5-index}</span>
-                                            <div className="w-full bg-background rounded-full h-1.5">
-                                                <div className="bg-yellow-400 h-1.5 rounded-full" style={{ width: `${percentage}%` }}></div>
-                                            </div>
-                                            <span className="w-6 text-right">{ratingCounts[index]}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </CarouselItem>
-                
-                {/* Review Items */}
-                {comments.map(comment => (
-                    <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/3 pl-4">
-                        <div className="p-1 h-full">
-                            <ReviewItem comment={comment} />
+        {hasReviews ? (
+           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
+             {/* Rating Summary */}
+             <div className="md:col-span-1">
+                <Card className="h-full">
+                    <CardContent className="p-4 flex flex-col h-full items-center justify-center text-center">
+                        <span className="text-3xl font-bold">{averageRating.toFixed(1)}</span>
+                        <div className="flex items-center my-1">
+                            {[1,2,3,4,5].map(star => (
+                                <Star key={star} className={cn("w-4 h-4", star <= averageRating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30')} />
+                            ))}
                         </div>
-                    </CarouselItem>
-                ))}
-            </CarouselContent>
-            <CarouselPrevious className="hidden sm:flex" />
-            <CarouselNext className="hidden sm:flex" />
-        </Carousel>
+                        <span className="text-xs text-muted-foreground">{totalReviews}개 리뷰</span>
+                    </CardContent>
+                </Card>
+             </div>
+
+            {/* Reviews Carousel */}
+            <div className="md:col-span-4">
+                <Carousel opts={{ align: 'start', loop: false }} className="w-full">
+                    <CarouselContent className="-ml-4">
+                        {comments.map(comment => (
+                            <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/4 pl-4">
+                                <div className="p-1 h-full">
+                                    <ReviewItem comment={comment} />
+                                </div>
+                            </CarouselItem>
+                        ))}
+                    </CarouselContent>
+                    <CarouselPrevious className="hidden sm:flex" />
+                    <CarouselNext className="hidden sm:flex" />
+                </Carousel>
+            </div>
+          </div>
+        ) : (
+             <div className="text-center py-16 border rounded-lg bg-muted/50">
+                <p className="text-muted-foreground">아직 작성된 리뷰가 없습니다.</p>
+                <p className="text-sm text-muted-foreground mt-2">첫 리뷰를 작성해보세요!</p>
+            </div>
+        )}
 
       </div>
       <EpisodeCommentDialog
