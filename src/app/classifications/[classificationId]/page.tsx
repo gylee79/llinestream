@@ -59,13 +59,6 @@ export default function ClassificationDetailPage() {
         <p className="mt-4 text-lg text-muted-foreground max-w-3xl mx-auto">
           {classification.description}
         </p>
-        {classification.prices.day30 > 0 && (
-            <Button asChild className="mt-6">
-                <Link href="/pricing">
-                    이용권 구매하기
-                </Link>
-            </Button>
-        )}
       </header>
 
       <h2 className="text-2xl font-bold font-headline mb-6">관련 강좌 목록</h2>
