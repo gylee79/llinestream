@@ -139,3 +139,14 @@ export interface Instructor {
   dob: string; // YYYY-MM-DD
   createdAt: Timestamp;
 }
+
+export interface UserAuditLog {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  changedAt: Timestamp;
+  fieldName: 'name' | 'phone' | 'dob';
+  oldValue: string;
+  newValue: string;
+}

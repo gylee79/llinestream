@@ -26,9 +26,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import type { User } from '@/lib/types';
-import { useFirestore } from '@/firebase/hooks';
-import { doc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { updateUserProfileAndLog } from '@/lib/actions/user-actions';
 
 const profileFormSchema = z.object({
   name: z.string().min(2, { message: '이름은 2자 이상이어야 합니다.' }),
@@ -45,7 +44,6 @@ interface ProfileDialogProps {
 }
 
 export default function ProfileDialog({ user, open, onOpenChange }: ProfileDialogProps) {
-  const firestore = useFirestore();
   const { toast } = useToast();
 
   const form = useForm<ProfileFormValues>({
@@ -65,23 +63,29 @@ export default function ProfileDialog({ user, open, onOpenChange }: ProfileDialo
             dob: user.dob || '',
         })
     }
-  }, [user, form]);
+  }, [user, form, open]);
 
   const onSubmit: SubmitHandler<ProfileFormValues> = async (data) => {
-    if (!firestore) return;
-
     try {
-      const userRef = doc(firestore, 'users', user.id);
-      await updateDoc(userRef, {
-        name: data.name,
-        phone: data.phone,
-        dob: data.dob,
+      const result = await updateUserProfileAndLog({
+        userId: user.id,
+        currentData: {
+          name: user.name,
+          phone: user.phone,
+          dob: user.dob,
+        },
+        newData: data,
       });
-      toast({
-        title: '성공',
-        description: '프로필 정보가 성공적으로 업데이트되었습니다.',
-      });
-      onOpenChange(false);
+
+      if (result.success) {
+        toast({
+          title: '성공',
+          description: result.message,
+        });
+        onOpenChange(false);
+      } else {
+        throw new Error(result.message);
+      }
     } catch (error: any) {
       console.error('Error updating profile:', error);
       toast({

@@ -1,10 +1,90 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // 개발 중에는 모든 읽기/쓰기/삭제를 허용합니다.
-      // 주의: 프로덕션 배포 전에는 반드시 보안 규칙을 강화해야 합니다.
-      allow read, write: if true;
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+    
+    function isOwnerOrAdmin(userId) {
+      return isOwner(userId) || isAdmin();
+    }
+    
+    function isExistingDoc() {
+      return resource != null;
+    }
+    
+    function isExistingOwnerOrAdmin(userId) {
+      return isOwnerOrAdmin(userId) && isExistingDoc();
+    }
+    
+    match /roles_admin/{userId} {
+      allow get, list, create, update, delete: if isAdmin();
+    }
+    
+    match /users/{userId} {
+      allow get: if isOwnerOrAdmin(userId);
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isOwnerOrAdmin(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwnerOrAdmin(userId);
+    }
+    
+    match /users/{userId}/subscriptions/{subscriptionId} {
+      allow get, list: if isOwnerOrAdmin(userId);
+      allow create: if isOwnerOrAdmin(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwnerOrAdmin(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwnerOrAdmin(userId);
+    }
+
+    match /user_audit_logs/{logId} {
+      allow read, list: if isAdmin();
+      allow create: if isSignedIn(); // Log creation is allowed for any signed-in user (when they update their own profile)
+      allow update, delete: if false; // Logs should be immutable
+    }
+    
+    match /fields/{fieldId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+    
+    match /classifications/{classificationId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+    
+    match /courses/{courseId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+    
+    match /episodes/{episodeId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /instructors/{instructorId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+    }
+    
+    match /policies/{policyId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow get, list: if true;
+      allow create, update, delete: if isAdmin();
     }
   }
 }
