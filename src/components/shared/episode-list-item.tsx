@@ -57,8 +57,8 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
         <>
             <Card className="overflow-hidden">
                 <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
-                    <div className="relative aspect-video w-full sm:w-48 flex-shrink-0 bg-muted rounded-md overflow-hidden">
-                        <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="(max-width: 640px) 100vw, 192px" className="object-cover" />
+                    <div className="relative aspect-video w-full sm:w-20 flex-shrink-0 bg-muted rounded-md overflow-hidden">
+                        <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="(max-width: 640px) 100vw, 80px" className="object-cover" />
                         <div className="absolute bottom-1 right-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
                             {formatDuration(episode.duration)}
                         </div>
@@ -76,22 +76,6 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                         </div>
                         <h3 className="text-lg font-bold mt-1">{episode.title}</h3>
                         {instructor && <p className="text-sm text-muted-foreground mt-1">강사: {instructor.name}</p>}
-                        
-                        {representativeComment && (
-                             <div className="text-sm mt-3 border-t pt-3">
-                                <div className="flex gap-2 items-center">
-                                    <Avatar className="h-5 w-5">
-                                        <AvatarFallback>{representativeComment.userName.charAt(0)}</AvatarFallback>
-                                    </Avatar>
-                                    <p className={cn("truncate", !isReviewExpanded && "line-clamp-1")}>
-                                        {representativeComment.content}
-                                    </p>
-                                </div>
-                                <Button variant="link" size="sm" className="h-auto p-0 text-muted-foreground" onClick={() => setReviewExpanded(!isReviewExpanded)}>
-                                    {isReviewExpanded ? '접기' : '펼침'}
-                                </Button>
-                             </div>
-                        )}
                     </div>
                     <div className="flex-shrink-0 flex sm:flex-col items-center justify-start gap-2">
                         <Button className="w-full" onClick={handlePlayClick}>
