@@ -51,6 +51,12 @@ service cloud.firestore {
       allow create: if isSignedIn(); // Log creation is allowed for any signed-in user (when they update their own profile)
       allow update, delete: if false; // Logs should be immutable
     }
+
+    match /episode_view_logs/{logId} {
+      allow read, list: if isAdmin();
+      allow create: if isSignedIn(); // Server action writes on behalf of user
+      allow update, delete: if false; // Immutable logs
+    }
     
     match /fields/{fieldId} {
       allow get, list: if true;
