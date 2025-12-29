@@ -16,6 +16,14 @@ import { Badge } from '@/components/ui/badge';
 import VideoPlayerDialog from '@/components/shared/video-player-dialog';
 import EpisodeCommentDialog from '@/components/shared/episode-comment-dialog';
 import EpisodeCommentSection from '@/components/shared/episode-comment-section';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+  type CarouselApi,
+} from "@/components/ui/carousel";
 
 function EpisodeComments({ episodeId }: { episodeId: string }) {
   const firestore = useFirestore();
@@ -38,6 +46,7 @@ export default function CourseDetailPage() {
   const [isPlayerDialogOpen, setPlayerDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [isCommentDialogOpen, setCommentDialogOpen] = useState(false);
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>()
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', params.courseId) : null), [firestore, params.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
@@ -62,10 +71,26 @@ export default function CourseDetailPage() {
   const hasSubscription = !!(user && classification && user.activeSubscriptions?.[classification.id]);
 
   useEffect(() => {
-    if (!selectedEpisode && episodes && episodes.length > 0) {
+    if (!episodes || episodes.length === 0) return;
+    if (!selectedEpisode) {
       setSelectedEpisode(episodes[0]);
     }
-  }, [episodes, selectedEpisode]);
+    
+    if (!carouselApi) return;
+
+    const handleSelect = () => {
+        const selectedIndex = carouselApi.selectedScrollSnap();
+        if (episodes[selectedIndex]) {
+            setSelectedEpisode(episodes[selectedIndex]);
+        }
+    }
+    carouselApi.on("select", handleSelect)
+    return () => {
+      carouselApi.off("select", handleSelect)
+    }
+
+  }, [episodes, selectedEpisode, carouselApi]);
+
 
   const handlePlayClick = (episode: Episode) => {
     const isPlayable = episode.isFree || hasSubscription;
@@ -127,79 +152,84 @@ export default function CourseDetailPage() {
         <h2 className="font-headline text-2xl font-bold mt-12 mb-4">
             에피소드 목록
         </h2>
+        
+        {episodesLoading ? (
+            <Card>
+                <CardContent className="p-4 space-y-2">
+                    <Skeleton className="h-48 w-full" />
+                </CardContent>
+            </Card>
+        ) : episodes && episodes.length > 0 ? (
+          <Carousel setApi={setCarouselApi} className="w-full">
+            <CarouselContent>
+              {episodes.map((episode) => {
+                  const isPlayable = episode.isFree || hasSubscription;
+                  const instructor = getInstructor(episode.instructorId);
 
-        <Card>
-          <CardContent className="p-0">
-            {episodesLoading ? (
-              <div className="p-4 space-y-2">
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-              </div>
-            ) : (
-            <ul className="divide-y">
-              {episodes?.map((episode) => {
-                const isPlayable = episode.isFree || hasSubscription;
-                const instructor = getInstructor(episode.instructorId);
-                const isSelected = selectedEpisode?.id === episode.id;
-
-                return (
-                  <li key={episode.id} className={cn("p-4 transition-colors", isSelected && "bg-muted")}>
-                    <div
-                      className="w-full flex items-start text-left group"
-                    >
-                      <div className="relative aspect-video w-24 md:w-28 rounded-md overflow-hidden bg-muted border flex-shrink-0">
-                        {episode.thumbnailUrl ? (
-                           <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="(max-width: 768px) 33vw, 20vw" className="object-cover" />
-                        ) : (
-                            <div className="flex items-center justify-center h-full">
-                                <ImageIcon className="w-8 h-8 text-muted-foreground" />
-                            </div>
-                        )}
-                      </div>
-                      <div className="flex-grow px-4">
-                         <div className="flex items-center gap-2">
-                           {isSelected && isPlayerDialogOpen && <CheckCircle2 className="w-5 h-5 text-primary" />}
-                         </div>
-                        <p className="font-medium leading-tight mt-1">{episode.title}</p>
-                         <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                            {instructor && (
-                                <>
-                                    <Avatar className="h-5 w-5">
-                                        <AvatarFallback>{instructor.name.charAt(0)}</AvatarFallback>
-                                    </Avatar>
-                                    <span>강사: {instructor.name}</span>
-                                    <span className="mx-1">·</span>
-                                </>
-                            )}
-                            <span>{formatDuration(episode.duration)}</span>
-                         </div>
-                      </div>
-                      <div className="flex flex-col md:flex-row items-center justify-end gap-2 ml-auto pl-2">
-                         <Button variant="outline" size="sm" onClick={() => handleCommentClick(episode)}>
-                            <MessageSquare className="w-4 h-4 mr-2"/>
-                            리뷰/질문 (<EpisodeComments episodeId={episode.id} />)
-                         </Button>
-                        <Badge variant={isPlayable || episode.isFree ? "default" : "destructive"} className="whitespace-nowrap">
-                            {episode.isFree ? '무료' : hasSubscription ? '시청 가능' : '구독 필요'}
-                        </Badge>
-                         <Button variant="ghost" size="icon" className="h-12 w-12 text-primary" onClick={() => handlePlayClick(episode)}>
-                            <Play className="w-8 h-8" />
-                         </Button>
-                      </div>
-                    </div>
-                  </li>
-                );
+                  return (
+                    <CarouselItem key={episode.id}>
+                      <Card className="overflow-hidden">
+                        <CardContent className="p-0 flex flex-col md:flex-row">
+                          <div className="relative aspect-video w-full md:w-1/2 flex-shrink-0 bg-muted border-r">
+                              {episode.thumbnailUrl ? (
+                                <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" />
+                              ) : (
+                                  <div className="flex items-center justify-center h-full">
+                                      <ImageIcon className="w-12 h-12 text-muted-foreground" />
+                                  </div>
+                              )}
+                          </div>
+                          <div className="flex-grow p-6 flex flex-col justify-between">
+                              <div>
+                                  <Badge variant={isPlayable || episode.isFree ? "default" : "destructive"} className="whitespace-nowrap mb-2">
+                                      {episode.isFree ? '무료' : hasSubscription ? '시청 가능' : '구독 필요'}
+                                  </Badge>
+                                  <h3 className="text-xl font-bold font-headline">{episode.title}</h3>
+                                  <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                                    {instructor && (
+                                        <>
+                                            <Avatar className="h-5 w-5">
+                                                <AvatarFallback>{instructor.name.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                            <span>강사: {instructor.name}</span>
+                                            <span className="mx-1">·</span>
+                                        </>
+                                    )}
+                                    <span>{formatDuration(episode.duration)}</span>
+                                  </div>
+                              </div>
+                              <div className="flex items-center gap-2 mt-4">
+                                  <Button className="flex-1" onClick={() => handlePlayClick(episode)}>
+                                      <Play className="w-4 h-4 mr-2"/>
+                                      시청하기
+                                  </Button>
+                                  <Button variant="outline" onClick={() => handleCommentClick(episode)}>
+                                      <MessageSquare className="w-4 h-4 mr-2"/>
+                                      리뷰/질문 (<EpisodeComments episodeId={episode.id} />)
+                                  </Button>
+                              </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </CarouselItem>
+                  );
               })}
-            </ul>
-            )}
-          </CardContent>
-        </Card>
+            </CarouselContent>
+            <CarouselPrevious className="left-[-50px] h-10 w-10" />
+            <CarouselNext className="right-[-50px] h-10 w-10" />
+          </Carousel>
+        ) : (
+            <Card>
+                <CardContent className="p-10 text-center text-muted-foreground">
+                    등록된 에피소드가 없습니다.
+                </CardContent>
+            </Card>
+        )}
 
         {selectedEpisode && user && (
             <div className="mt-12">
                  <h2 className="font-headline text-2xl font-bold mb-4">
-                    리뷰 및 질문
+                    리뷰 및 질문: {selectedEpisode.title}
                 </h2>
                 <EpisodeCommentSection episode={selectedEpisode} user={user} />
             </div>
