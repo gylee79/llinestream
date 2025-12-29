@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useTransition } from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Plus, Pencil, Trash2, ImageIcon, ImageUp } from 'lucide-react';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, where, doc, setDoc, updateDoc } from 'firebase/firestore';
@@ -27,17 +27,19 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { sanitize } from '@/lib/utils';
+import ImageUploaderDialog from './image-uploader-dialog';
 
 
 type Item = (Field | Classification | Course) & { type: 'field' | 'classification' | 'course' };
 
-const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }: {
+const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail, onEditIntroImage }: {
   item: Item;
   onSelect: () => void;
   selected: boolean;
   onEdit: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
   onEditThumbnail: (e: React.MouseEvent) => void;
+  onEditIntroImage?: (e: React.MouseEvent) => void;
 }) => (
     <div 
         className={cn(
@@ -68,6 +70,9 @@ const ItemRow = ({ item, onSelect, selected, onEdit, onDelete, onEditThumbnail }
         <div className="flex items-center opacity-0 group-hover/menu-item:opacity-100 transition-opacity">
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit}><Pencil className="h-4 w-4" /></Button>
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEditThumbnail}><ImageIcon className="h-4 w-4" /></Button>
+            {onEditIntroImage && (
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEditIntroImage}><ImageUp className="h-4 w-4" /></Button>
+            )}
             <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>
         </div>
     </div>
@@ -101,6 +106,10 @@ type ThumbnailDialogState = {
     item: Field | Classification | Course | null;
     type: 'fields' | 'classifications' | 'courses';
 }
+type ImageUploaderState = {
+    isOpen: boolean;
+    item: Course | null;
+}
 type DeleteAlertState = {
     isOpen: boolean;
     item: Item | null;
@@ -117,6 +126,7 @@ export default function HierarchyManager() {
 
   const [nameDialog, setNameDialog] = useState<NameDialogState>({ isOpen: false, item: null, type: '분야' });
   const [thumbnailDialog, setThumbnailDialog] = useState<ThumbnailDialogState>({ isOpen: false, item: null, type: 'fields' });
+  const [introImageDialog, setIntroImageDialog] = useState<ImageUploaderState>({ isOpen: false, item: null });
   const [deleteAlert, setDeleteAlert] = useState<DeleteAlertState>({ isOpen: false, item: null, collectionName: null });
 
 
@@ -168,9 +178,14 @@ export default function HierarchyManager() {
     setThumbnailDialog({ isOpen: true, item, type });
   }
 
+  const openIntroImageDialog = (item: Course) => {
+    setIntroImageDialog({ isOpen: true, item });
+  }
+
   const closeDialogs = () => {
       setNameDialog({ isOpen: false, item: null, type: '분야' });
       setThumbnailDialog({ isOpen: false, item: null, type: 'fields' });
+      setIntroImageDialog({ isOpen: false, item: null });
   };
   
   const closeDeleteAlert = () => {
@@ -208,7 +223,6 @@ export default function HierarchyManager() {
                         classificationId: selectedClassification,
                         name: itemData.name,
                         description: itemData.description || `${itemData.name}에 대한 상세 설명입니다.`,
-                        prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
                         thumbnailUrl: '',
                     });
                 }
@@ -344,6 +358,7 @@ export default function HierarchyManager() {
                        onEdit={(e) => { e.stopPropagation(); openNameDialog('상세분류', item); }}
                        onDelete={(e) => handleDeleteRequest(e, 'courses', {...item, type: 'course'})}
                        onEditThumbnail={(e) => { e.stopPropagation(); openThumbnailDialog('courses', item); }}
+                       onEditIntroImage={(e) => { e.stopPropagation(); openIntroImageDialog(item); }}
                     />
                 ))
                 }
@@ -371,6 +386,19 @@ export default function HierarchyManager() {
             itemType={thumbnailDialog.type}
         />
       )}
+      
+      {introImageDialog.isOpen && introImageDialog.item && (
+        <ImageUploaderDialog
+          isOpen={introImageDialog.isOpen}
+          onClose={closeDialogs}
+          item={introImageDialog.item}
+          itemType="courses"
+          fieldToUpdate="introImageUrl"
+          pathFieldToUpdate="introImagePath"
+          dialogTitle="강좌 소개 이미지 수정"
+        />
+      )}
+
 
       <AlertDialog open={deleteAlert.isOpen} onOpenChange={(open) => !open && closeDeleteAlert()}>
         <AlertDialogContent>

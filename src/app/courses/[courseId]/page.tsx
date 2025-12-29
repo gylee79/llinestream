@@ -15,6 +15,7 @@ import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import VideoPlayerDialog from '@/components/shared/video-player-dialog';
 import EpisodeCommentDialog from '@/components/shared/episode-comment-dialog';
+import EpisodeCommentSection from '@/components/shared/episode-comment-section';
 
 function EpisodeComments({ episodeId }: { episodeId: string }) {
   const firestore = useFirestore();
@@ -60,6 +61,12 @@ export default function CourseDetailPage() {
   
   const hasSubscription = !!(user && classification && user.activeSubscriptions?.[classification.id]);
 
+  useEffect(() => {
+    if (!selectedEpisode && episodes && episodes.length > 0) {
+      setSelectedEpisode(episodes[0]);
+    }
+  }, [episodes, selectedEpisode]);
+
   const handlePlayClick = (episode: Episode) => {
     const isPlayable = episode.isFree || hasSubscription;
     setSelectedEpisode(episode);
@@ -99,11 +106,17 @@ export default function CourseDetailPage() {
           <div className="space-y-4">
             <Skeleton className="h-10 w-3/4" />
             <Skeleton className="h-6 w-full" />
+            <Skeleton className="aspect-video w-full" />
           </div>
         ) : (
           <>
             <h1 className="font-headline text-3xl font-bold">{`${classification.name} > ${course.name}`}</h1>
             <p className="text-muted-foreground mt-2">{course.description}</p>
+            {course.introImageUrl && (
+              <div className="mt-8 relative aspect-video w-full rounded-lg overflow-hidden border">
+                  <Image src={course.introImageUrl} alt={`${course.name} 소개`} fill sizes="(max-width: 1024px) 100vw, 1024px" className="object-cover" />
+              </div>
+            )}
           </>
         )}
         
@@ -124,7 +137,7 @@ export default function CourseDetailPage() {
               {episodes?.map((episode) => {
                 const isPlayable = episode.isFree || hasSubscription;
                 const instructor = getInstructor(episode.instructorId);
-                const isSelected = selectedEpisode?.id === episode.id && isPlayerDialogOpen;
+                const isSelected = selectedEpisode?.id === episode.id;
 
                 return (
                   <li key={episode.id} className={cn("p-4 transition-colors", isSelected && "bg-muted")}>
@@ -142,7 +155,7 @@ export default function CourseDetailPage() {
                       </div>
                       <div className="flex-grow px-4">
                          <div className="flex items-center gap-2">
-                           {isSelected && <CheckCircle2 className="w-5 h-5 text-primary" />}
+                           {isSelected && isPlayerDialogOpen && <CheckCircle2 className="w-5 h-5 text-primary" />}
                          </div>
                         <p className="font-medium leading-tight mt-1">{episode.title}</p>
                          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
@@ -178,6 +191,16 @@ export default function CourseDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {selectedEpisode && user && (
+            <div className="mt-12">
+                 <h2 className="font-headline text-2xl font-bold mb-4">
+                    리뷰 및 질문
+                </h2>
+                <EpisodeCommentSection episode={selectedEpisode} user={user} />
+            </div>
+        )}
+
       </div>
       
       {selectedEpisode && (
