@@ -13,7 +13,6 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel';
-import EpisodeCommentDialog from './episode-comment-dialog';
 import {
   ChartContainer,
   ChartTooltip,
@@ -21,6 +20,7 @@ import {
   ChartStyle,
 } from '@/components/ui/chart';
 import { BarChart, Bar } from 'recharts';
+import { ScrollArea } from '../ui/scroll-area';
 
 const ReviewItem = ({ comment }: { comment: EpisodeComment }) => {
     const [isExpanded, setIsExpanded] = useState(false);
@@ -62,7 +62,6 @@ interface CourseReviewSectionProps {
 }
 
 export default function CourseReviewSection({ comments, user }: CourseReviewSectionProps) {
-  const [isCommentDialogOpen, setCommentDialogOpen] = useState(false);
 
   const { averageRating, totalReviews, ratingDistribution, ratingCounts } = useMemo(() => {
     const ratedComments = comments.filter(c => c.rating && c.rating > 0);
@@ -101,9 +100,6 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
       <div className="mt-3">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-headline text-2xl font-bold">리뷰 ({totalReviews})</h2>
-          {hasReviews && (
-             <Button variant="outline" onClick={() => setCommentDialogOpen(true)}>모든 리뷰 보기</Button>
-          )}
         </div>
         
         {hasReviews ? (
@@ -125,14 +121,12 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
 
             {/* Reviews Carousel */}
             <div className="md:col-span-4">
-                <Carousel opts={{ align: 'start', loop: false }} className="w-full">
+                 <Carousel opts={{ align: 'start', loop: false }} className="w-full">
                     <CarouselContent className="-ml-4">
-                        {comments.map(comment => (
-                            <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/4 pl-4 flex">
-                                <div className="p-1 h-full w-full">
-                                    <ReviewItem comment={comment} />
-                                </div>
-                            </CarouselItem>
+                        {comments.map((comment) => (
+                          <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/3 pl-4">
+                                <ReviewItem comment={comment} />
+                          </CarouselItem>
                         ))}
                     </CarouselContent>
                     <CarouselPrevious className="hidden sm:flex" />
@@ -148,13 +142,6 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
         )}
 
       </div>
-      <EpisodeCommentDialog
-        isOpen={isCommentDialogOpen}
-        onOpenChange={setCommentDialogOpen}
-        comments={comments}
-        user={user}
-        mode="view"
-      />
     </>
   );
 }

@@ -16,6 +16,8 @@ import {
   CarouselPrevious,
 } from '@/components/ui/carousel';
 import { DotButton, useDotButton } from '@/components/ui/dot-button';
+import { Button } from '@/components/ui/button';
+import EpisodeCommentDialog from '@/components/shared/episode-comment-dialog';
 
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
@@ -27,7 +29,7 @@ export default function CourseDetailPage() {
   
   const [api, setApi] = useState<CarouselApi | undefined>();
   const { selectedIndex, scrollSnaps, onDotButtonClick } = useDotButton(api);
-
+  const [isAllReviewsOpen, setAllReviewsOpen] = useState(false);
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', params.courseId) : null), [firestore, params.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
@@ -140,6 +142,14 @@ export default function CourseDetailPage() {
       <div className="container mx-auto max-w-5xl pb-8">
         
         {user && <CourseReviewSection comments={comments} user={user} />}
+
+        {user && comments && comments.length > 0 && (
+          <div className="mt-4 flex justify-center">
+            <Button variant="outline" onClick={() => setAllReviewsOpen(true)}>
+              전체 리뷰 보기
+            </Button>
+          </div>
+        )}
         
         <h2 className="font-headline text-2xl font-bold mt-12 mb-4">
             에피소드 목록
@@ -167,6 +177,16 @@ export default function CourseDetailPage() {
             )}
         </div>
       </div>
+      
+      {user && (
+        <EpisodeCommentDialog
+            isOpen={isAllReviewsOpen}
+            onOpenChange={setAllReviewsOpen}
+            comments={comments}
+            user={user}
+            mode="view"
+        />
+      )}
     </div>
   );
 }
