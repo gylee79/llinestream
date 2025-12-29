@@ -34,6 +34,7 @@ import { toDisplayDate } from '@/lib/date-helpers';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Separator } from '../ui/separator';
+import { Card, CardContent } from '../ui/card';
 
 const commentSchema = z.object({
   content: z.string().min(1, '내용을 입력해주세요.').max(1000, '1000자 이내로 작성해주세요.'),
@@ -50,43 +51,47 @@ interface EpisodeCommentDialogProps {
 }
 
 const CommentList = ({ comments }: { comments: EpisodeComment[] | null | undefined }) => (
-    <div className="space-y-4">
+    <div className="flex gap-4">
         {comments?.map((comment) => (
-          <div key={comment.id} className="flex items-start gap-3">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback>
-                {comment.userName.charAt(0)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm">
-                  {comment.userName}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {toDisplayDate(comment.createdAt)}
-                </span>
-              </div>
-              {comment.rating && comment.rating > 0 && (
-                <div className="flex items-center mt-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      className={cn(
-                        'w-3 h-3',
-                        star <= comment.rating!
-                          ? 'text-yellow-400 fill-yellow-400'
-                          : 'text-muted-foreground'
-                      )}
-                    />
-                  ))}
+          <Card key={comment.id} className="w-80 flex-shrink-0">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback>
+                    {comment.userName.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">
+                      {comment.userName}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {toDisplayDate(comment.createdAt)}
+                    </span>
+                  </div>
+                  {comment.rating && comment.rating > 0 && (
+                    <div className="flex items-center mt-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={cn(
+                            'w-3 h-3',
+                            star <= comment.rating!
+                              ? 'text-yellow-400 fill-yellow-400'
+                              : 'text-muted-foreground'
+                          )}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-sm mt-1 whitespace-pre-wrap break-words">
+                    {comment.content}
+                  </p>
                 </div>
-              )}
-              <p className="text-sm mt-1 whitespace-pre-wrap">
-                {comment.content}
-              </p>
-            </div>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         ))}
     </div>
 )
@@ -177,7 +182,7 @@ export default function EpisodeCommentDialog({
               <MessageSquare className="inline-block w-5 h-5 mr-2" />
               모든 댓글 ({comments?.length || 0})
             </h3>
-            <ScrollArea className="flex-grow border rounded-md p-4 bg-muted/50">
+            <div className="flex-grow border rounded-md p-4 bg-muted/50 overflow-x-auto">
               {isLoading && <p>댓글을 불러오는 중...</p>}
               {!isLoading && comments?.length === 0 && (
                 <p className="text-center text-muted-foreground py-8">
@@ -185,7 +190,7 @@ export default function EpisodeCommentDialog({
                 </p>
               )}
               <CommentList comments={comments} />
-            </ScrollArea>
+            </div>
           </div>
 
           {/* Comment Form - shown only in 'comment' mode */}
