@@ -98,7 +98,7 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
 
   return (
     <>
-      <div className="mt-0">
+      <div className="mt-3">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-headline text-2xl font-bold">리뷰 ({totalReviews})</h2>
           {hasReviews && (
