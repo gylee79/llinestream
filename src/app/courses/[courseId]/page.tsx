@@ -101,7 +101,7 @@ export default function CourseDetailPage() {
   return (
     <div>
         <div className="w-full bg-muted py-8">
-            <Carousel setApi={setApi} className="w-full max-w-4xl mx-auto">
+            <Carousel setApi={setApi} className="w-full max-w-2xl mx-auto">
                 <CarouselContent>
                     {introImages.map((url, index) => (
                         <CarouselItem key={index}>
