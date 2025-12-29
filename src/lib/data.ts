@@ -92,16 +92,16 @@ export const episodes: (Omit<Episode, 'id'| 'courseId' | 'createdAt'> & { create
 ];
 
 export const subscriptions: (Omit<Subscription, 'id' | 'purchasedAt' | 'expiresAt'> & { purchasedAt: Date, expiresAt: Date })[] = [
-    { userId: 'user-02', classificationId: 'class-01', courseId: 'course-01', purchasedAt: new Date('2024-05-01'), expiresAt: new Date('2024-05-31'), amount: 9900, orderName: '코딩 30일 이용권', paymentId: 'pmt-mock-001', status: 'PAID', method: 'CARD' },
-    { userId: 'user-03', classificationId: 'class-02', courseId: 'course-02', purchasedAt: new Date('2024-05-10'), expiresAt: new Date('2024-06-10'), amount: 12900, orderName: '액션 30일 이용권', paymentId: 'pmt-mock-002', status: 'PAID', method: 'CARD' },
-    { userId: 'user-02', classificationId: 'class-03', courseId: 'course-03', purchasedAt: new Date('2024-05-15'), expiresAt: new Date('2024-08-15'), amount: 14000, orderName: '홈트레이닝 60일 이용권', paymentId: 'pmt-mock-003', status: 'PAID', method: 'CARD' },
-    { userId: 'user-04', classificationId: 'class-01', courseId: 'course-04', purchasedAt: new Date('2024-05-20'), expiresAt: new Date('2024-06-20'), amount: 9900, orderName: '코딩 30일 이용권', paymentId: 'pmt-mock-004', status: 'PAID', method: 'CARD' },
-    { userId: 'user-05', classificationId: 'class-05', courseId: 'course-05', purchasedAt: new Date('2024-05-25'), expiresAt: new Date('2024-06-25'), amount: 8900, orderName: '외국어 30일 이용권', paymentId: 'pmt-mock-005', status: 'PAID', method: 'CARD' },
-    { userId: 'user-06', classificationId: 'class-06', courseId: 'course-06', purchasedAt: new Date('2024-06-01'), expiresAt: new Date('2024-07-01'), amount: 6900, orderName: '요리 30일 이용권', paymentId: 'pmt-mock-006', status: 'PAID', method: 'CARD' },
-    { userId: 'admin-user-01', classificationId: 'class-01', courseId: 'course-01', purchasedAt: new Date('2024-01-01'), expiresAt: new Date('2099-12-31'), amount: 0, orderName: '코딩 영구 이용권', paymentId: 'pmt-mock-admin-001', status: 'PAID', method: 'INTERNAL' },
-    { userId: 'admin-user-01', classificationId: 'class-02', courseId: 'course-02', purchasedAt: new Date('2024-01-01'), expiresAt: new Date('2099-12-31'), amount: 0, orderName: '액션 영구 이용권', paymentId: 'pmt-mock-admin-002', status: 'PAID', method: 'INTERNAL' },
-    { userId: 'user-07', classificationId: 'class-01', courseId: 'course-07', purchasedAt: new Date('2024-06-05'), expiresAt: new Date('2024-07-05'), amount: 9900, orderName: '코딩 30일 이용권', paymentId: 'pmt-mock-007', status: 'PAID', method: 'CARD' },
-    { userId: 'user-08', classificationId: 'class-03', courseId: 'course-08', purchasedAt: new Date('2024-06-10'), expiresAt: new Date('2024-09-10'), amount: 14000, orderName: '홈트레이닝 60일 이용권', paymentId: 'pmt-mock-008', status: 'PAID', method: 'CARD' },
+    { userId: 'user1@example.com', classificationId: 'classification-1', purchasedAt: new Date('2024-05-01'), expiresAt: new Date('2024-05-31'), amount: 9900, orderName: '코딩 30일 이용권', paymentId: 'pmt-mock-001', status: 'PAID', method: 'CARD' },
+    { userId: 'user2@example.com', classificationId: 'classification-2', purchasedAt: new Date('2024-05-10'), expiresAt: new Date('2024-06-10'), amount: 12900, orderName: '액션 30일 이용권', paymentId: 'pmt-mock-002', status: 'PAID', method: 'CARD' },
+    { userId: 'user1@example.com', classificationId: 'classification-3', purchasedAt: new Date('2024-05-15'), expiresAt: new Date('2024-08-15'), amount: 14000, orderName: '홈트레이닝 60일 이용권', paymentId: 'pmt-mock-003', status: 'PAID', method: 'CARD' },
+    { userId: 'user3@example.com', classificationId: 'classification-1', purchasedAt: new Date('2024-05-20'), expiresAt: new Date('2024-06-20'), amount: 9900, orderName: '코딩 30일 이용권', paymentId: 'pmt-mock-004', status: 'PAID', method: 'CARD' },
+    { userId: 'user4@example.com', classificationId: 'classification-5', purchasedAt: new Date('2024-05-25'), expiresAt: new Date('2024-06-25'), amount: 8900, orderName: '외국어 30일 이용권', paymentId: 'pmt-mock-005', status: 'PAID', method: 'CARD' },
+    { userId: 'user5@example.com', classificationId: 'classification-6', purchasedAt: new Date('2024-06-01'), expiresAt: new Date('2024-07-01'), amount: 6900, orderName: '요리 30일 이용권', paymentId: 'pmt-mock-006', status: 'PAID', method: 'CARD' },
+    { userId: 'admin@llinestream.com', classificationId: 'classification-1', purchasedAt: new Date('2024-01-01'), expiresAt: new Date('2099-12-31'), amount: 0, orderName: '코딩 영구 이용권', paymentId: 'pmt-mock-admin-001', status: 'PAID', method: 'INTERNAL' },
+    { userId: 'admin@llinestream.com', classificationId: 'classification-2', purchasedAt: new Date('2024-01-01'), expiresAt: new Date('2099-12-31'), amount: 0, orderName: '액션 영구 이용권', paymentId: 'pmt-mock-admin-002', status: 'PAID', method: 'INTERNAL' },
+    { userId: 'user6@example.com', classificationId: 'classification-1', purchasedAt: new Date('2024-06-05'), expiresAt: new Date('2024-07-05'), amount: 9900, orderName: '코딩 30일 이용권', paymentId: 'pmt-mock-007', status: 'PAID', method: 'CARD' },
+    { userId: 'user7@example.com', classificationId: 'classification-3', purchasedAt: new Date('2024-06-10'), expiresAt: new Date('2024-09-10'), amount: 14000, orderName: '홈트레이닝 60일 이용권', paymentId: 'pmt-mock-008', status: 'PAID', method: 'CARD' },
 ];
 
 // This data will be used by the data-uploader script.
