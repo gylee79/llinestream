@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -68,4 +67,3 @@ export const DotButton = React.forwardRef<HTMLButtonElement, DotButtonProps>((pr
 })
 
 DotButton.displayName = "DotButton"
-
