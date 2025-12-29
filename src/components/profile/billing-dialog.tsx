@@ -102,13 +102,14 @@ export default function BillingDialog({ user, open, onOpenChange }: BillingDialo
                         <TableRow>
                             <TableHead className="p-2 text-xs">결제일</TableHead>
                             <TableHead className="p-2 text-xs">상태</TableHead>
+                            <TableHead className="p-2 text-xs">결제 수단</TableHead>
                             <TableHead className="p-2 text-xs">내역</TableHead>
                             <TableHead className="p-2 text-xs text-right">금액</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
-                           <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full"/></TableCell></TableRow>
+                           <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full"/></TableCell></TableRow>
                         ) : subscriptions && subscriptions.length > 0 ? (
                             subscriptions.map((sub) => (
                                 <TableRow key={sub.id}>
@@ -118,13 +119,14 @@ export default function BillingDialog({ user, open, onOpenChange }: BillingDialo
                                             {sub.status}
                                         </Badge>
                                     </TableCell>
+                                    <TableCell className="p-2 text-sm">{sub.method}</TableCell>
                                     <TableCell className="p-2 text-sm">{sub.orderName}</TableCell>
                                     <TableCell className="p-2 text-sm text-right">{formatPrice(sub.amount)}</TableCell>
                                 </TableRow>
                             ))
                         ) : (
                              <TableRow>
-                                <TableCell colSpan={4} className="h-24 text-center">결제 내역이 없습니다.</TableCell>
+                                <TableCell colSpan={5} className="h-24 text-center">결제 내역이 없습니다.</TableCell>
                              </TableRow>
                         )}
                     </TableBody>
@@ -136,4 +138,3 @@ export default function BillingDialog({ user, open, onOpenChange }: BillingDialo
     </Dialog>
   );
 }
-

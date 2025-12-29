@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -261,6 +262,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                         <TableRow>
                             <TableHead className="p-2 text-xs">날짜</TableHead>
                             <TableHead className="p-2 text-xs">종류</TableHead>
+                            <TableHead className="p-2 text-xs">결제수단</TableHead>
                             <TableHead className="p-2 text-xs">내역</TableHead>
                             <TableHead className="p-2 text-xs">금액</TableHead>
                         </TableRow>
@@ -274,6 +276,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                                         {sub.status}
                                     </Badge>
                                 </TableCell>
+                                <TableCell className="p-2 text-xs">{sub.method}</TableCell>
                                 <TableCell className="p-2 text-xs">{sub.orderName}</TableCell>
                                 <TableCell className="p-2 text-xs">{sub.amount.toLocaleString('ko-KR')}원</TableCell>
                             </TableRow>
