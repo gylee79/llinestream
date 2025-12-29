@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Menu,
   Users,
+  History,
 } from 'lucide-react';
 import { LlineStreamLogo } from '@/components/icons';
 import { cn } from '@/lib/utils';
@@ -27,6 +28,7 @@ const adminNavLinks = [
   { href: '/admin/users', label: '고객 관리', icon: Users },
   { href: '/admin/subscriptions', label: '구독/결제 관리', icon: CreditCard },
   { href: '/admin/revenue', label: '매출 관리', icon: BarChart3 },
+  { href: '/admin/view-history', label: '시청 기록', icon: History },
   { href: '/admin/settings', label: '설정', icon: Cog },
 ];
 

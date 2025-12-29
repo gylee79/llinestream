@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -293,6 +294,25 @@
         }
       },
       "required": ["id", "name", "email", "phone", "dob", "createdAt"]
+    },
+    "EpisodeViewLog": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "Episode View Log",
+        "type": "object",
+        "description": "Logs an instance of a user viewing an episode.",
+        "properties": {
+            "id": { "type": "string" },
+            "userId": { "type": "string" },
+            "userName": { "type": "string" },
+            "userEmail": { "type": "string", "format": "email" },
+            "episodeId": { "type": "string" },
+            "episodeTitle": { "type": "string" },
+            "courseId": { "type": "string" },
+            "startedAt": { "type": "string", "format": "date-time" },
+            "endedAt": { "type": "string", "format": "date-time" },
+            "duration": { "type": "number", "description": "Watched duration in seconds." }
+        },
+        "required": ["userId", "episodeId", "startedAt", "endedAt", "duration"]
     }
   },
   "auth": {
@@ -450,10 +470,19 @@
             }
           ]
         }
+      },
+      {
+        "path": "/episode_view_logs/{logId}",
+        "definition": {
+          "entityName": "EpisodeViewLog",
+          "schema": { "$ref": "#/backend/entities/EpisodeViewLog" },
+          "description": "Logs user episode viewing activity. Writable by server action, readable only by admins.",
+          "params": [
+            { "name": "logId", "description": "The unique identifier of the log entry." }
+          ]
+        }
       }
     ],
-    "reasoning": "The Firestore data structure is designed to support LlineStream's video streaming and subscription model, focusing on secure and efficient data access. It incorporates key strategies like Authorization Independence through denormalization, Structural Segregation for homogeneous security postures, and Access Modeling using path-based ownership and membership maps.\n\n**Authorization Independence (Denormalization):** The structure avoids `get()` calls in security rules by denormalizing authorization data. For instance, the `Classification` entity's `id` is copied into the `Subscription` to allow rules on `subscriptions` collection to operate without reading the `classifications` document. This ensures atomic operations and simplifies security rules.\n\n**Structural Segregation (Homogeneous Security Posture):** Each collection is designed to contain documents with the same security requirements. User-specific data is segregated under `/users/{userId}` paths, while global content like `fields`, `classifications`, `courses`, `episodes` and `policies` reside in root-level collections.\n\n**Access Modeling:**\n*   **Path-Based Ownership:** User-owned data such as subscriptions is located under `/users/{userId}/subscriptions/{subscriptionId}`, providing clear ownership and simplifying security rules.\n*   **Membership Maps:** While not explicitly used in this design, the structure allows for future collaborative features. If collaborative playlists were added, the `members` map would be implemented to manage access, ensuring authorization independence by denormalizing the map into each relevant document.\n*   **DBAC via Existence:** Admin roles are managed through the existence of documents in dedicated collections like `/roles_admin/{userId}`. This allows verifying admin status without reading user documents.\n\n**QAPs (Rules are not Filters):**\n*   Secure `list` operations are ensured by the structural segregation. Listing courses or episodes doesn't require filtering based on user roles, as the data is organized to allow direct access based on path-based authorization rules, or roles based on the existence of special role documents.\n\nThis structure allows for simple and robust security rules, ensuring data integrity and application scalability."
+    "reasoning": "The Firestore data structure is designed to support LlineStream's video streaming and subscription model, focusing on secure and efficient data access. It incorporates key strategies like Authorization Independence through denormalization, Structural Segregation for homogeneous security postures, and Access Modeling using path-based ownership and membership maps.\n\n**Authorization Independence (Denormalization):** The structure avoids `get()` calls in security rules by denormalizing authorization data. For instance, the `Classification` entity's `id` is copied into the `Subscription` to allow rules on `subscriptions` collection to operate without reading the `classifications` document. This ensures atomic operations and simplifies security rules.\n\n**Structural Segregation (Homogeneous Security Posture):** Each collection is designed to contain documents with the same security requirements. User-specific data is segregated under `/users/{userId}` paths, while global content like `fields`, `classifications`, `courses`, `episodes` and `policies` reside in root-level collections.\n\n**Access Modeling:**\n*   **Path-Based Ownership:** User-owned data such as subscriptions is located under `/users/{userId}/subscriptions/{subscriptionId}`, providing clear ownership and simplifying security rules.\n*   **Membership Maps:** While not explicitly used in this design, the structure allows for future collaborative features. If collaborative playlists were added, the `members` map would be implemented to manage access, ensuring authorization independence by denormalizing the map into each relevant document.\n*   **DBAC via Existence:** Admin roles are managed through the existence of documents in dedicated collections like `/roles_admin/{userId}`. This allows verifying admin status without reading user documents.\n\n**QAPs (Rules are not Filters):**\n*   Secure `list` operations are ensured by the structural segregation. Listing courses or episodes doesn't require filtering based on user roles, as the data is organized to allow direct access based on path-based authorization rules, or roles based on the existence of special role documents."
   }
 }
-
-    

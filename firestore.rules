@@ -1,3 +1,4 @@
+
 /**
  * Core Philosophy: This ruleset enforces a hybrid security model tailored for a subscription-based video streaming service.
  * It combines three primary access control patterns:
@@ -122,6 +123,28 @@ service cloud.firestore {
       allow update: if isExistingOwnerOrAdmin(userId) && request.resource.data.userId == resource.data.userId;
       allow delete: if isExistingOwnerOrAdmin(userId);
     }
+
+    /**
+     * @description User profile change history. Writable by any signed-in user (for their own changes via server action).
+     *              Readable only by admins.
+     * @path /user_audit_logs/{logId}
+     */
+    match /user_audit_logs/{logId} {
+        allow read, list: if isAdmin();
+        allow create: if isSignedIn(); // Logged by server action on behalf of user
+        allow update, delete: if false; // Immutable logs
+    }
+    
+    /**
+     * @description User's episode view logs. Writable by server action. Readable only by admins.
+     * @path /episode_view_logs/{logId}
+     */
+    match /episode_view_logs/{logId} {
+      allow read, list: if isAdmin();
+      allow create: if isSignedIn(); // Server action writes on behalf of user
+      allow update, delete: if false; // Immutable logs
+    }
+
     
     // ----------------------------------------------------------------
     // Public Content Collections (Admin-Managed)
@@ -183,9 +206,7 @@ service cloud.firestore {
      * @description Stores instructor profiles. Read-only for signed in users, writable by admins.
      * @path /instructors/{instructorId}
      * @allow (read) Authenticated users can view instructor profiles.
-     * @allow (write) Admins can manage instructor profiles.
-     * @deny (any) Unauthenticated users cannot access instructor data.
-     * @principle Balances public visibility of instructors with secure data management.
+     * @allow (write) if isAdmin();
      */
     match /instructors/{instructorId} {
         allow read: if isSignedIn();

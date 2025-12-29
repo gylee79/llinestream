@@ -92,6 +92,20 @@ export interface ViewHistoryItem {
   progress: number; // 0 to 1
 }
 
+export interface EpisodeViewLog {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  episodeId: string;
+  episodeTitle: string;
+  courseId: string;
+  startedAt: Timestamp;
+  endedAt: Timestamp;
+  duration: number; // Watched duration in seconds
+}
+
+
 export interface Policy {
   id: string; // This will be the document ID from Firestore, added on the client
   slug: 'terms' | 'privacy' | 'refund';
