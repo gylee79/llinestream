@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import type { EpisodeComment, User } from '@/lib/types';
@@ -23,6 +24,10 @@ import {
 import { BarChart, Bar } from 'recharts';
 
 const ReviewItem = ({ comment }: { comment: EpisodeComment }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    const toggleExpanded = () => setIsExpanded(!isExpanded);
+    
     return (
         <Card className="h-full">
           <CardContent className="p-4 flex flex-col h-full">
@@ -37,7 +42,16 @@ const ReviewItem = ({ comment }: { comment: EpisodeComment }) => {
                   ))}
                 </div>
             )}
-            <p className="text-sm mt-2 flex-grow line-clamp-3">{comment.content}</p>
+            <p 
+              className={cn(
+                "text-sm mt-2 flex-grow",
+                !isExpanded && "line-clamp-3",
+                "cursor-pointer"
+              )}
+              onClick={toggleExpanded}
+            >
+                {comment.content}
+            </p>
           </CardContent>
         </Card>
     )
@@ -94,7 +108,7 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
         </div>
         
         {hasReviews ? (
-           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
+           <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
              {/* Rating Summary */}
              <div className="md:col-span-1">
                 <Card className="h-full">
@@ -115,7 +129,7 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
                 <Carousel opts={{ align: 'start', loop: false }} className="w-full">
                     <CarouselContent className="-ml-4">
                         {comments.map(comment => (
-                            <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/4 pl-4">
+                            <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/4 pl-4 h-full">
                                 <div className="p-1 h-full">
                                     <ReviewItem comment={comment} />
                                 </div>
