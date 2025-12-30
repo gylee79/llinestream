@@ -204,7 +204,7 @@ export default function EpisodeCommentDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl h-[90vh] md:h-auto flex flex-col">
+      <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{dialogTitle} {mode === 'view' && `(${comments?.length || 0})`}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
