@@ -56,7 +56,9 @@ export default function BillingDialog({ user, open, onOpenChange }: BillingDialo
   const isLoading = coursesLoading || subsLoading || classificationsLoading;
 
   const getSubscriptionStatusBadge = (sub: Subscription) => {
-    const isExpired = isAfter(new Date(), toJSDate(sub.expiresAt));
+    const expires = toJSDate(sub.expiresAt);
+    if (!expires) return <Badge variant="secondary">처리중</Badge>;
+    const isExpired = isAfter(new Date(), expires);
     if (sub.status !== 'PAID') {
         return <Badge variant="secondary" className="text-xs">{sub.status}</Badge>
     }

@@ -19,6 +19,9 @@ export function toJSDate(timestamp: Timestamp | null | undefined): Date | null {
     return timestamp;
   }
   // If it's a FieldValue (like a serverTimestamp placeholder), we can't convert it yet.
+  if (timestamp instanceof FieldValue) {
+    return null;
+  }
   return null;
 }
 
@@ -28,11 +31,11 @@ export function toJSDate(timestamp: Timestamp | null | undefined): Date | null {
  * @param timestamp The Timestamp or Date to convert.
  * @returns A formatted date string (e.g., 'YYYY. MM. DD.'), or an empty string.
  */
-export function toDisplayDate(timestamp: Timestamp | null | undefined): string {
+export function toDisplayDate(timestamp: Timestamp | Date | null | undefined): string {
     if (!timestamp) {
         return '';
     }
-    const date = toJSDate(timestamp);
+    const date = toJSDate(timestamp as Timestamp);
     if (!date) {
         return '처리중...'; // Or some other placeholder for server-generated timestamps
     }

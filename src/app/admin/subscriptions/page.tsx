@@ -93,6 +93,7 @@ export default function AdminSubscriptionsPage() {
                 ))
               ) : subscriptions && subscriptions.length > 0 ? (
                 subscriptions.map((sub) => {
+                    const expiresDate = toJSDate(sub.expiresAt);
                     return (
                       <TableRow key={sub.id}>
                         <TableCell className="font-medium">{getUserName(sub.userId)}</TableCell>
@@ -100,7 +101,7 @@ export default function AdminSubscriptionsPage() {
                         <TableCell>N/A</TableCell>
                         <TableCell>{toDisplayDate(sub.purchasedAt)}</TableCell>
                         <TableCell>{toDisplayDate(sub.expiresAt)}</TableCell>
-                        <TableCell>{sub.expiresAt && getSubscriptionStatus(toJSDate(sub.expiresAt))}</TableCell>
+                        <TableCell>{expiresDate && getSubscriptionStatus(expiresDate)}</TableCell>
                       </TableRow>
                     )
                 })
