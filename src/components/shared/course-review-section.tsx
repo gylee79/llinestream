@@ -22,7 +22,7 @@ import {
 import { BarChart, Bar } from 'recharts';
 import { ScrollArea } from '../ui/scroll-area';
 
-const ReviewItem = ({ comment }: { comment: EpisodeComment }) => {
+const ReviewItem = ({ comment, isMobile = false }: { comment: EpisodeComment, isMobile?: boolean }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
     const toggleExpanded = () => setIsExpanded(!isExpanded);
@@ -44,10 +44,10 @@ const ReviewItem = ({ comment }: { comment: EpisodeComment }) => {
             <p 
               className={cn(
                 "text-sm mt-2 flex-grow",
-                !isExpanded && "line-clamp-3",
-                "cursor-pointer"
+                isMobile && !isExpanded && "line-clamp-3",
+                isMobile && "cursor-pointer"
               )}
-              onClick={toggleExpanded}
+              onClick={isMobile ? toggleExpanded : undefined}
             >
                 {comment.content}
             </p>
@@ -81,19 +81,8 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
     return { averageRating, totalReviews, ratingDistribution: distribution, ratingCounts: counts };
   }, [comments]);
   
-  const chartData = ratingDistribution.map((percentage, index) => ({
-    star: 5 - index,
-    count: ratingCounts[index],
-  }));
-
-  const chartConfig = {
-    count: {
-      label: 'Count',
-      color: 'hsl(var(--primary))',
-    },
-  };
-
   const hasReviews = comments.length > 0;
+  const recentTwoReviews = useMemo(() => comments.slice(0, 2), [comments]);
 
   return (
     <>
@@ -103,7 +92,9 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
         </div>
         
         {hasReviews ? (
-           <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-stretch">
+          <>
+            {/* PC Layout: Carousel */}
+            <div className="hidden md:grid grid-cols-1 md:grid-cols-5 gap-8 items-stretch">
              {/* Rating Summary */}
              <div className="md:col-span-1 h-full">
                 <Card className="h-full">
@@ -134,6 +125,26 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
                 </Carousel>
             </div>
           </div>
+          {/* Mobile Layout: Grid */}
+          <div className="grid md:hidden grid-cols-3 gap-2">
+            <Card className="h-full">
+              <CardContent className="p-2 flex flex-col h-full items-center justify-center text-center">
+                <span className="text-3xl font-bold">{averageRating.toFixed(1)}</span>
+                <div className="flex items-center my-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star key={star} className={cn("w-3 h-3", star <= averageRating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30')} />
+                  ))}
+                </div>
+                <span className="text-xs text-muted-foreground">{totalReviews}개 리뷰</span>
+              </CardContent>
+            </Card>
+            {recentTwoReviews.map(comment => (
+              <div key={comment.id} className="col-span-1">
+                <ReviewItem comment={comment} isMobile={true} />
+              </div>
+            ))}
+          </div>
+          </>
         ) : (
              <div className="text-center py-16 border rounded-lg bg-muted/50">
                 <p className="text-muted-foreground">아직 작성된 리뷰가 없습니다.</p>
