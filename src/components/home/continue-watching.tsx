@@ -49,25 +49,26 @@ export default function ContinueWatching() {
         return null;
     }
 
-    return (
-        <section>
-          <h2 className="mb-4 font-headline text-2xl font-semibold tracking-tight">
-            최근 시청 영상
-          </h2>
-          {isLoading ? (
-             <div className="flex space-x-4">
+    if (isLoading) {
+        return (
+            <div className="flex space-x-4">
                 <Skeleton className="h-64 w-1/4" />
                 <Skeleton className="h-64 w-1/4" />
                 <Skeleton className="h-64 w-1/4" />
                 <Skeleton className="h-64 w-1/4" />
-              </div>
-          ) : watchedEpisodes.length > 0 ? (
-            <ContentCarousel title="최근 시청 영상" items={watchedEpisodes} itemType="episode" />
-          ) : (
-            <div className="flex items-center justify-center h-40 rounded-lg border-2 border-dashed bg-muted/50">
-              <p className="text-muted-foreground">비디오 시청을 시작하시면 편하게 최신 영상을 보실수 있게 도와드립니다.</p>
             </div>
-          )}
-        </section>
+        );
+    }
+
+    if (watchedEpisodes.length === 0) {
+        return (
+            <div className="flex items-center justify-center h-40 rounded-lg border-2 border-dashed bg-muted/50">
+                <p className="text-muted-foreground">비디오 시청을 시작하시면 편하게 최신 영상을 보실수 있게 도와드립니다.</p>
+            </div>
+        );
+    }
+
+    return (
+        <ContentCarousel title="최근 시청 영상" items={watchedEpisodes} itemType="episode" />
     );
 }

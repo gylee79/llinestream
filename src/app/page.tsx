@@ -1,4 +1,3 @@
-
 'use client';
 import Hero from '@/components/home/hero';
 import { useCollection, useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
@@ -49,7 +48,14 @@ export default function Home() {
           imageUrlMobile={heroImagesData?.home?.urlMobile}
         />
       <div className="container mx-auto space-y-16 py-12">
-        {user && <ContinueWatching />}
+        {user && (
+          <section>
+            <h2 className="mb-4 font-headline text-2xl font-semibold tracking-tight">
+              최근 시청 영상
+            </h2>
+            <ContinueWatching />
+          </section>
+        )}
         {fields?.map((field) => {
           const classificationsInField = classifications?.filter(
             (c) => c.fieldId === field.id
