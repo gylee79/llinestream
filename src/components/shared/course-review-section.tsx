@@ -1,7 +1,7 @@
 
 'use client';
 import { useState, useMemo } from 'react';
-import type { EpisodeComment, User } from '@/lib/types';
+import type { EpisodeComment, User, Episode } from '@/lib/types';
 import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -14,16 +14,9 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel';
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartStyle,
-} from '@/components/ui/chart';
-import { BarChart, Bar } from 'recharts';
 import { ScrollArea } from '../ui/scroll-area';
 
-const ReviewItem = ({ comment, isMobile = false }: { comment: EpisodeComment, isMobile?: boolean }) => {
+const ReviewItem = ({ comment, episodeTitle, isMobile = false }: { comment: EpisodeComment, episodeTitle?: string, isMobile?: boolean }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
     const toggleExpanded = () => setIsExpanded(!isExpanded);
@@ -31,7 +24,8 @@ const ReviewItem = ({ comment, isMobile = false }: { comment: EpisodeComment, is
     return (
         <Card className="h-full">
           <CardContent className="p-2 flex flex-col h-full">
-            <div className="flex flex-col">
+            <p className="text-primary font-semibold text-xs truncate" title={episodeTitle}>{episodeTitle}</p>
+            <div className="flex flex-col mt-1">
                 <span className="font-semibold text-xs">{comment.userName}</span>
                 <span className="text-[10px] text-muted-foreground">{toDisplayDate(comment.createdAt)}</span>
             </div>
@@ -45,7 +39,7 @@ const ReviewItem = ({ comment, isMobile = false }: { comment: EpisodeComment, is
             <p 
               className={cn(
                 "text-xs mt-1 flex-grow",
-                isMobile && !isExpanded && "line-clamp-3",
+                !isExpanded && "line-clamp-3",
                 isMobile && "cursor-pointer"
               )}
               onClick={isMobile ? toggleExpanded : undefined}
@@ -60,30 +54,26 @@ const ReviewItem = ({ comment, isMobile = false }: { comment: EpisodeComment, is
 interface CourseReviewSectionProps {
   comments: EpisodeComment[];
   user: User;
+  episodes: Episode[];
 }
 
-export default function CourseReviewSection({ comments, user }: CourseReviewSectionProps) {
+export default function CourseReviewSection({ comments, user, episodes }: CourseReviewSectionProps) {
 
-  const { averageRating, totalReviews, ratingDistribution, ratingCounts } = useMemo(() => {
+  const { averageRating, totalReviews } = useMemo(() => {
     const ratedComments = comments.filter(c => c.rating && c.rating > 0);
     const totalReviewsWithRating = ratedComments.length;
     if (totalReviewsWithRating === 0) {
-      return { averageRating: 0, totalReviews: comments.length, ratingDistribution: [0, 0, 0, 0, 0], ratingCounts: [0,0,0,0,0] };
+      return { averageRating: 0, totalReviews: comments.length };
     }
     const totalRating = ratedComments.reduce((sum, c) => sum + c.rating!, 0);
     const averageRating = totalRating / totalReviewsWithRating;
     
-    const counts = [0,0,0,0,0];
-    ratedComments.forEach(c => {
-        if(c.rating) counts[5-c.rating] += 1;
-    })
-    const distribution = counts.map(d => (totalReviewsWithRating > 0 ? (d / totalReviewsWithRating) * 100 : 0));
-
-    return { averageRating, totalReviews: comments.length, ratingDistribution: distribution, ratingCounts: counts };
+    return { averageRating, totalReviews: comments.length };
   }, [comments]);
   
   const hasReviews = comments.length > 0;
   const recentThreeReviews = useMemo(() => comments.slice(0, 3), [comments]);
+  const episodeMap = useMemo(() => new Map(episodes.map(e => [e.id, e.title])), [episodes]);
 
   return (
     <>
@@ -117,7 +107,10 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
                     <CarouselContent className="-ml-4">
                         {comments.map((comment) => (
                           <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/3 pl-4">
-                                <ReviewItem comment={comment} />
+                                <ReviewItem 
+                                  comment={comment} 
+                                  episodeTitle={episodeMap.get(comment.episodeId)} 
+                                />
                           </CarouselItem>
                         ))}
                     </CarouselContent>
@@ -141,7 +134,11 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
             </Card>
             {recentThreeReviews.map(comment => (
               <div key={comment.id} className="col-span-1">
-                <ReviewItem comment={comment} isMobile={true} />
+                <ReviewItem 
+                  comment={comment} 
+                  episodeTitle={episodeMap.get(comment.episodeId)}
+                  isMobile={true} 
+                />
               </div>
             ))}
           </div>

@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, getDocs, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import { doc, collection, query, where, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import type { Course, Episode, Classification, Instructor, EpisodeComment, CarouselApi } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect, useMemo } from 'react';
@@ -162,7 +162,7 @@ export default function CourseDetailPage() {
 
       <div className="container mx-auto max-w-5xl pb-8">
         
-        {user && <CourseReviewSection comments={comments} user={user} />}
+        {user && <CourseReviewSection comments={comments} user={user} episodes={episodes || []} />}
 
         {user && comments && comments.length > 0 && (
           <div className="mt-4 flex justify-center">
@@ -206,6 +206,7 @@ export default function CourseDetailPage() {
             comments={comments}
             user={user}
             mode="view"
+            episodes={episodes || []}
         />
       )}
     </div>

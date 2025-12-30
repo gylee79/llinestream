@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import * as z from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -49,9 +49,12 @@ interface EpisodeCommentDialogProps {
   comments?: EpisodeComment[];
   user: User;
   mode?: 'comment' | 'view';
+  episodes?: Episode[];
 }
 
-const CommentList = ({ comments }: { comments: EpisodeComment[] | null | undefined }) => (
+const CommentList = ({ comments, episodes }: { comments: EpisodeComment[] | null | undefined, episodes?: Episode[] }) => {
+  const episodeMap = useMemo(() => new Map(episodes?.map(e => [e.id, e.title])), [episodes]);
+  return (
     <div className="flex flex-col gap-4">
         {comments?.map((comment) => (
           <Card key={comment.id}>
@@ -63,7 +66,12 @@ const CommentList = ({ comments }: { comments: EpisodeComment[] | null | undefin
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
+                  {episodes && (
+                    <p className="text-primary font-semibold text-xs" title={episodeMap.get(comment.episodeId)}>
+                      {episodeMap.get(comment.episodeId)}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2 mt-1">
                     <span className="font-semibold text-sm">
                       {comment.userName}
                     </span>
@@ -95,7 +103,8 @@ const CommentList = ({ comments }: { comments: EpisodeComment[] | null | undefin
           </Card>
         ))}
     </div>
-)
+  )
+}
 
 export default function EpisodeCommentDialog({
   isOpen,
@@ -104,6 +113,7 @@ export default function EpisodeCommentDialog({
   comments: propComments,
   user,
   mode = 'comment',
+  episodes = [],
 }: EpisodeCommentDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -195,7 +205,7 @@ export default function EpisodeCommentDialog({
                   아직 댓글이 없습니다.
                 </p>
               )}
-              <CommentList comments={comments} />
+              <CommentList comments={comments} episodes={mode === 'view' ? episodes : (episode ? [episode] : [])} />
             </ScrollArea>
           </div>
 
@@ -225,7 +235,7 @@ export default function EpisodeCommentDialog({
                             )}
                             onMouseEnter={() => setHoverRating(star)}
                             onMouseLeave={() => setHoverRating(0)}
-                            onClick={() => field.onChange(star)}
+                            onClick={() => field.onChange(star === ratingValue ? 0 : star)}
                           />
                         ))}
                       </div>
