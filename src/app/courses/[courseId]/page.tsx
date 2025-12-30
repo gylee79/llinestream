@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import type { Course, Episode, Classification, Instructor, EpisodeComment, CarouselApi } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect, useMemo } from 'react';
@@ -51,36 +51,50 @@ export default function CourseDetailPage() {
   const { data: instructors, isLoading: instructorsLoading } = useCollection<Instructor>(instructorsQuery);
 
   useEffect(() => {
-    const fetchComments = async () => {
-      if (!firestore || !episodes || episodes.length === 0) {
-        setComments([]);
-        setCommentsLoading(false);
-        return;
-      };
-      setCommentsLoading(true);
-      try {
-        const allComments: EpisodeComment[] = [];
-        for (const episode of episodes) {
-          const commentsQuery = query(collection(firestore, 'episodes', episode.id, 'comments'));
-          const commentsSnapshot = await getDocs(commentsQuery);
-          commentsSnapshot.forEach(doc => {
-            allComments.push({ id: doc.id, ...doc.data() } as EpisodeComment);
-          });
-        }
-        allComments.sort((a, b) => {
-            const dateA = a.createdAt ? (a.createdAt as any).toDate() : new Date(0);
-            const dateB = b.createdAt ? (b.createdAt as any).toDate() : new Date(0);
-            return dateB.getTime() - dateA.getTime();
+    if (!firestore || !episodes || episodes.length === 0) {
+      setComments([]);
+      setCommentsLoading(false);
+      return;
+    }
+
+    setCommentsLoading(true);
+    const unsubscribers: Unsubscribe[] = [];
+    const episodeCommentMap = new Map<string, EpisodeComment[]>();
+
+    episodes.forEach(episode => {
+      const commentsQuery = query(collection(firestore, 'episodes', episode.id, 'comments'));
+      const unsubscribe = onSnapshot(commentsQuery, (querySnapshot) => {
+        const episodeComments: EpisodeComment[] = [];
+        querySnapshot.forEach(doc => {
+          episodeComments.push({ id: doc.id, ...doc.data() } as EpisodeComment);
         });
+        episodeCommentMap.set(episode.id, episodeComments);
+
+        // Combine all comments from the map
+        const allComments = Array.from(episodeCommentMap.values()).flat();
+        
+        // Sort all comments by creation date
+        allComments.sort((a, b) => {
+          const dateA = a.createdAt ? (a.createdAt as any).toDate() : new Date(0);
+          const dateB = b.createdAt ? (b.createdAt as any).toDate() : new Date(0);
+          return dateB.getTime() - dateA.getTime();
+        });
+        
         setComments(allComments);
-      } catch (error) {
-        console.error("Error fetching comments for course:", error);
-      } finally {
         setCommentsLoading(false);
-      }
+      }, (error) => {
+        console.error(`Error fetching comments for episode ${episode.id}:`, error);
+        setCommentsLoading(false);
+      });
+      unsubscribers.push(unsubscribe);
+    });
+
+    // Cleanup function to unsubscribe from all listeners when the component unmounts or dependencies change
+    return () => {
+      unsubscribers.forEach(unsub => unsub());
     };
-    fetchComments();
   }, [firestore, episodes]);
+
 
   const isLoading = courseLoading || episodesLoading || classificationLoading || instructorsLoading || commentsLoading;
   
