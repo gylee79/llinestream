@@ -53,7 +53,8 @@ service cloud.firestore {
     }
 
     match /episode_view_logs/{logId} {
-      allow read, list: if isAdmin();
+      allow get: if isOwner(resource.data.userId) || isAdmin();
+      allow list: if isAdmin() || (request.query.where.size() == 1 && request.query.where[0].field == 'userId' && request.query.where[0].value == request.auth.uid);
       allow create: if isSignedIn(); // Server action writes on behalf of user
       allow update, delete: if false; // Immutable logs
     }
