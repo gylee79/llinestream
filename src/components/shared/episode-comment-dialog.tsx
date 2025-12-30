@@ -198,22 +198,29 @@ export default function EpisodeCommentDialog({
     }
   };
   
-  const dialogTitle = mode === 'view' ? `전체 리뷰` : '리뷰 및 질문';
+  const dialogTitle = mode === 'view' 
+    ? `전체 리뷰`
+    : `리뷰 및 질문`;
+    
+  const mobileDialogTitle = mode === 'view' ? dialogTitle : episode?.title;
+  const pcDialogTitle = mode === 'view' ? dialogTitle : '리뷰 및 질문';
+
   const dialogDescription = mode === 'view' ? `모든 리뷰를 확인합니다.` : episode?.title;
 
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-2xl md:h-auto h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>{dialogTitle} {mode === 'view' && `(${comments?.length || 0})`}</DialogTitle>
-          <DialogDescription>{dialogDescription}</DialogDescription>
+          <DialogTitle className="md:hidden truncate">{mobileDialogTitle}</DialogTitle>
+          <DialogTitle className="hidden md:block">{pcDialogTitle} {mode === 'view' && `(${comments?.length || 0})`}</DialogTitle>
+          <DialogDescription className="hidden md:block">{dialogDescription}</DialogDescription>
         </DialogHeader>
 
         <div className={cn("grid min-h-0 flex-grow", mode === 'comment' ? "grid-cols-1 md:grid-cols-2 gap-6" : "grid-cols-1")}>
           {/* Comment List */}
           <div className="flex flex-col min-h-0">
-            <h3 className="text-lg font-semibold mb-2 flex-shrink-0">
+            <h3 className="text-lg font-semibold mb-2 flex-shrink-0 md:flex hidden">
               <MessageSquare className="inline-block w-5 h-5 mr-2" />
               모든 댓글 ({comments?.length || 0})
             </h3>
