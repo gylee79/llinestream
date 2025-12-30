@@ -1,4 +1,3 @@
-
 'use client';
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
@@ -19,6 +18,7 @@ import {
 import { DotButton, useDotButton } from '@/components/ui/dot-button';
 import { Button } from '@/components/ui/button';
 import EpisodeCommentDialog from '@/components/shared/episode-comment-dialog';
+import CourseImagesDialog from '@/components/shared/course-images-dialog';
 
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
@@ -31,6 +31,7 @@ export default function CourseDetailPage() {
   const [api, setApi] = useState<CarouselApi | undefined>();
   const { selectedIndex, scrollSnaps, onDotButtonClick } = useDotButton(api);
   const [isAllReviewsOpen, setAllReviewsOpen] = useState(false);
+  const [isImagesDialogOpen, setImagesDialogOpen] = useState(false);
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', params.courseId) : null), [firestore, params.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
@@ -134,43 +135,48 @@ export default function CourseDetailPage() {
   const introImages = course.introImageUrls && course.introImageUrls.length > 0 ? course.introImageUrls : [course.thumbnailUrl];
 
   return (
-    <div>
-        <div className="w-full bg-muted">
-            <div className="container mx-auto max-w-5xl py-12">
-                <div className="flex flex-col md:flex-row items-start gap-8 md:gap-12">
-                    <div className="w-full md:w-1/2">
-                        <h1 className="font-headline text-3xl font-bold">{course.name}</h1>
-                        <p className="text-muted-foreground mt-4">{course.description}</p>
-                    </div>
-                    <div className="w-full md:w-1/2">
-                        <Carousel setApi={setApi} className="w-full">
-                            <CarouselContent>
-                                {introImages.map((url, index) => (
-                                    <CarouselItem key={index}>
-                                        <div className="relative aspect-video">
-                                            <Image src={url} alt={`${course.name} 소개 이미지 ${index + 1}`} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover rounded-lg" />
-                                        </div>
-                                    </CarouselItem>
-                                ))}
-                            </CarouselContent>
-                             <div className="relative mt-4 flex justify-center items-center gap-4">
-                                <CarouselPrevious className="static translate-y-0" />
-                                <div className="flex items-center gap-2">
-                                    {scrollSnaps.map((_, index) => (
-                                        <DotButton
-                                            key={index}
-                                            selected={index === selectedIndex}
-                                            onClick={() => onDotButtonClick(index)}
-                                        />
-                                    ))}
-                                </div>
-                                <CarouselNext className="static translate-y-0" />
-                            </div>
-                        </Carousel>
-                    </div>
-                </div>
+    <>
+      <div className="w-full bg-muted">
+        <div className="container mx-auto max-w-5xl py-12">
+          <div className="flex flex-col md:flex-row items-start gap-8 md:gap-12">
+            <div className="w-full md:w-1/2">
+              <h1 className="font-headline text-3xl font-bold">{course.name}</h1>
+              <p className="text-muted-foreground mt-4">{course.description}</p>
             </div>
+            <div className="w-full md:w-1/2">
+              <Carousel setApi={setApi} className="w-full">
+                <CarouselContent>
+                  {introImages.map((url, index) => (
+                    <CarouselItem key={index}>
+                      <div className="relative aspect-video">
+                        <Image src={url} alt={`${course.name} 소개 이미지 ${index + 1}`} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover rounded-lg" />
+                      </div>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                <div className="relative mt-4 flex justify-center items-center gap-4">
+                  <CarouselPrevious className="static translate-y-0" />
+                  <div className="flex items-center gap-2">
+                    {scrollSnaps.map((_, index) => (
+                      <DotButton
+                        key={index}
+                        selected={index === selectedIndex}
+                        onClick={() => onDotButtonClick(index)}
+                      />
+                    ))}
+                  </div>
+                  <CarouselNext className="static translate-y-0" />
+                </div>
+              </Carousel>
+              <div className="mt-4 text-center">
+                <Button variant="outline" onClick={() => setImagesDialogOpen(true)}>
+                  상세페이지 전체보기
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
 
       <div className="container mx-auto max-w-5xl pb-8">
         
@@ -214,6 +220,13 @@ export default function CourseDetailPage() {
             episodes={episodes || []}
         />
       )}
-    </div>
+      
+      <CourseImagesDialog 
+        isOpen={isImagesDialogOpen}
+        onOpenChange={setImagesDialogOpen}
+        images={introImages}
+        courseName={course.name}
+      />
+    </>
   );
 }
