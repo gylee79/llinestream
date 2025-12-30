@@ -11,13 +11,12 @@ import CourseCard from '@/components/shared/course-card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
-export default function ClassificationDetailPage() {
-  const params = useParams<{ classificationId: string }>();
+function ClassificationDetailClient({ classificationId }: { classificationId: string }) {
   const firestore = useFirestore();
 
   const classificationRef = useMemoFirebase(
-    () => (firestore ? doc(firestore, 'classifications', params.classificationId) : null),
-    [firestore, params.classificationId]
+    () => (firestore ? doc(firestore, 'classifications', classificationId) : null),
+    [firestore, classificationId]
   );
   const { data: classification, isLoading: classificationLoading } = useDoc<Classification>(classificationRef);
 
@@ -92,4 +91,13 @@ export default function ClassificationDetailPage() {
       )}
     </div>
   );
+}
+
+
+export default function ClassificationDetailPage() {
+  const params = useParams<{ classificationId: string }>();
+  if (!params.classificationId) {
+    return notFound();
+  }
+  return <ClassificationDetailClient classificationId={params.classificationId} />;
 }

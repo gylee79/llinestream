@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,6 +8,8 @@ import {
 } from '@/components/ui/dialog';
 import Image from 'next/image';
 import { ScrollArea } from '../ui/scroll-area';
+// 줌 기능을 위한 라이브러리
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 
 interface CourseImagesDialogProps {
   isOpen: boolean;
@@ -18,18 +19,6 @@ interface CourseImagesDialogProps {
 }
 
 export default function CourseImagesDialog({ isOpen, onOpenChange, images, courseName }: CourseImagesDialogProps) {
-
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.touchAction = 'none';
-    } else {
-      document.body.style.touchAction = '';
-    }
-
-    return () => {
-      document.body.style.touchAction = '';
-    };
-  }, [isOpen]);
 
   if (!images || images.length === 0) {
     return null;
@@ -41,21 +30,33 @@ export default function CourseImagesDialog({ isOpen, onOpenChange, images, cours
         <DialogHeader className="p-4 border-b flex-shrink-0">
           <DialogTitle>{courseName} 상세 정보</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="flex-grow min-h-0">
-            <div className="p-4 md:p-6" style={{ touchAction: 'pan-y pan-x' }}>
-                {images.map((url, index) => (
-                    <div key={index} className="relative w-full h-auto mb-4">
-                        <Image 
-                            src={url} 
-                            alt={`상세 정보 이미지 ${index + 1}`} 
-                            width={1200}
-                            height={1200}
-                            sizes="100vw"
-                            className="w-full h-auto object-contain rounded-md"
-                        />
-                    </div>
-                ))}
-            </div>
+        
+        {/* 배경색을 살짝 어둡게 해서 이미지 영역 구분 */}
+        <ScrollArea className="flex-grow min-h-0 bg-black/5">
+          <div className="p-4 md:p-6">
+            {images.map((url, index) => (
+              <div key={index} className="relative w-full h-auto mb-8 bg-white rounded-md shadow-sm overflow-hidden border">
+                {/* 이미지 확대/축소 기능 적용 (최대 4배) */}
+                <TransformWrapper
+                  initialScale={1}
+                  minScale={1}
+                  maxScale={4}
+                >
+                  <TransformComponent wrapperStyle={{ width: "100%", height: "auto" }}>
+                    <Image 
+                      src={url} 
+                      alt={`상세 정보 이미지 ${index + 1}`} 
+                      width={1200}
+                      height={1200}
+                      className="w-full h-auto object-contain"
+                      sizes="(max-width: 768px) 100vw, 800px"
+                      priority={index === 0}
+                    />
+                  </TransformComponent>
+                </TransformWrapper>
+              </div>
+            ))}
+          </div>
         </ScrollArea>
       </DialogContent>
     </Dialog>
