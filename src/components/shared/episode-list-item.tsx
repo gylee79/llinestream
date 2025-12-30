@@ -93,8 +93,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                                     onClick={() => user && setCommentOpen(true)}
                                     disabled={!user}
                                 >
-                                    리뷰
-                                    <Pencil className="ml-1 h-3 w-3" />
+                                    리뷰<Pencil className="h-2.5 w-2.5" />
                                 </Button>
                             </div>
                             <div className="relative aspect-video w-full bg-muted rounded-md overflow-hidden">
