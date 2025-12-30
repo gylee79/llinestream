@@ -29,7 +29,7 @@ export default function CourseImagesDialog({ isOpen, onOpenChange, images, cours
           <DialogTitle>{courseName} 상세 정보</DialogTitle>
         </DialogHeader>
         <ScrollArea className="flex-grow min-h-0">
-            <div className="p-4 md:p-6">
+            <div className="p-4 md:p-6" style={{ touchAction: 'pan-y' }}>
                 {images.map((url, index) => (
                     <div key={index} className="relative w-full h-auto mb-4">
                         <Image 
