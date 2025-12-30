@@ -13,7 +13,7 @@ import EpisodeCard from './episode-card';
 import type { Course, Episode } from '@/lib/types';
 
 interface ContentCarouselProps {
-  title: string;
+  title?: string;
   items: (Course | Episode)[];
   itemType: 'course' | 'episode';
 }
@@ -25,9 +25,11 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
   
   return (
     <section>
-      <h2 className="mb-4 font-headline text-2xl font-semibold tracking-tight">
-        {title}
-      </h2>
+      {title && (
+          <h2 className="mb-4 font-headline text-2xl font-semibold tracking-tight">
+            {title}
+          </h2>
+      )}
       <Carousel
         opts={{
           align: 'start',
