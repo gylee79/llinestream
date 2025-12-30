@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect } from 'react';
@@ -21,24 +20,14 @@ interface CourseImagesDialogProps {
 export default function CourseImagesDialog({ isOpen, onOpenChange, images, courseName }: CourseImagesDialogProps) {
 
   useEffect(() => {
-    const viewport = document.querySelector("meta[name=viewport]");
-    if (!viewport) return;
-    
-    const originalContent = viewport.getAttribute("content");
-
     if (isOpen) {
-      // Allow scaling when dialog is open
-      viewport.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes");
+      document.body.style.touchAction = 'none';
     } else {
-      // Revert to original or default when dialog is closed
-      viewport.setAttribute("content", originalContent || "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no");
+      document.body.style.touchAction = '';
     }
 
-    // Cleanup function to restore original content on component unmount
     return () => {
-      if (originalContent) {
-        viewport.setAttribute("content", originalContent);
-      }
+      document.body.style.touchAction = '';
     };
   }, [isOpen]);
 
@@ -53,7 +42,7 @@ export default function CourseImagesDialog({ isOpen, onOpenChange, images, cours
           <DialogTitle>{courseName} 상세 정보</DialogTitle>
         </DialogHeader>
         <ScrollArea className="flex-grow min-h-0">
-            <div className="p-4 md:p-6" style={{ touchAction: 'pan-y' }}>
+            <div className="p-4 md:p-6" style={{ touchAction: 'pan-y pan-x' }}>
                 {images.map((url, index) => (
                     <div key={index} className="relative w-full h-auto mb-4">
                         <Image 
