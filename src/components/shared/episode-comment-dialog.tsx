@@ -18,9 +18,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Star, MessageSquare } from 'lucide-react';
 import {
-  useCollection,
   useFirestore,
-  useMemoFirebase,
 } from '@/firebase/hooks';
 import {
   collection,
@@ -35,7 +33,6 @@ import type { Episode, User, EpisodeComment } from '@/lib/types';
 import { toDisplayDate } from '@/lib/date-helpers';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { Separator } from '../ui/separator';
 import { Card, CardContent } from '../ui/card';
 import { useEffect } from 'react';
 
@@ -207,20 +204,20 @@ export default function EpisodeCommentDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl h-[90vh] md:h-auto flex flex-col">
         <DialogHeader>
           <DialogTitle>{dialogTitle} {mode === 'view' && `(${comments?.length || 0})`}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
-        <div className={cn("grid min-h-0 max-h-[60vh] overflow-hidden", mode === 'comment' ? "grid-cols-1 md:grid-cols-2 gap-6" : "grid-cols-1")}>
+        <div className={cn("grid min-h-0", mode === 'comment' ? "grid-cols-1 md:grid-cols-2 gap-6 flex-grow" : "grid-cols-1")}>
           {/* Comment List */}
           <div className="flex flex-col min-h-0">
             <h3 className="text-lg font-semibold mb-2 flex-shrink-0 md:flex hidden">
               <MessageSquare className="inline-block w-5 h-5 mr-2" />
               모든 댓글 ({comments?.length || 0})
             </h3>
-            <ScrollArea className="flex-grow border rounded-md p-4 bg-muted/50 h-48 md:h-96">
+            <ScrollArea className="flex-grow border rounded-md p-4 bg-muted/50 h-48 md:h-auto">
               {isLoading && <p className="hidden md:block">댓글을 불러오는 중...</p>}
               {!isLoading && comments?.length === 0 && (
                 <p className="text-center text-muted-foreground py-8">
