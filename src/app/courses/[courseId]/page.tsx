@@ -162,15 +162,7 @@ export default function CourseDetailPage() {
 
       <div className="container mx-auto max-w-5xl pb-8">
         
-        {user && <CourseReviewSection comments={comments} user={user} episodes={episodes || []} />}
-
-        {user && comments && comments.length > 0 && (
-          <div className="mt-4 flex justify-center">
-            <Button variant="outline" onClick={() => setAllReviewsOpen(true)}>
-              전체 리뷰 보기
-            </Button>
-          </div>
-        )}
+        {user && <CourseReviewSection comments={comments} user={user} episodes={episodes || []} onToggleAllReviews={() => setAllReviewsOpen(true)} />}
         
         <h2 className="font-headline text-2xl font-bold mt-12 mb-4">
             에피소드 목록
