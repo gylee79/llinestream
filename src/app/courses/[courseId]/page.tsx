@@ -1,4 +1,3 @@
-
 'use client';
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
@@ -146,7 +145,7 @@ export default function CourseDetailPage() {
               <p className="text-muted-foreground mt-4">{course.description}</p>
             </div>
             <div className="w-full md:w-1/2">
-              <Carousel setApi={setApi} className="w-full">
+              <Carousel setApi={(api) => setApi(api)} className="w-full">
                 <CarouselContent>
                   {introImages.map((url, index) => (
                     <CarouselItem key={index}>
