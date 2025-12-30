@@ -55,9 +55,6 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
         <>
             <Card className="overflow-hidden">
                 <CardContent className="p-3 flex items-center gap-3">
-                    <div className="relative aspect-video w-24 flex-shrink-0 bg-muted rounded-md overflow-hidden">
-                        <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="96px" className="object-cover" />
-                    </div>
                     <div className="flex-grow space-y-1">
                        <h3 className="text-sm font-bold leading-tight line-clamp-2 sm:text-base">{episode.title}</h3>
                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -83,6 +80,9 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                         >
                             리뷰 작성
                         </Button>
+                    </div>
+                     <div className="relative aspect-video w-24 flex-shrink-0 bg-muted rounded-md overflow-hidden">
+                        <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="96px" className="object-cover" />
                     </div>
                     <div className="flex-shrink-0">
                         <Button className="w-20" size="sm" onClick={handlePlayClick}>
