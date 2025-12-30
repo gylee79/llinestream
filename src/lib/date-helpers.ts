@@ -42,4 +42,27 @@ export function toDisplayDate(timestamp: Timestamp | Date | null | undefined): s
     return date.toLocaleDateString('ko-KR');
 }
 
-    
+/**
+ * Safely converts a custom Timestamp into a localized date and time string for display.
+ * @param timestamp The Timestamp or Date to convert.
+ * @returns A formatted date and time string (e.g., 'YYYY. MM. DD. HH:mm:ss'), or an empty string.
+ */
+export function toDisplayDateTime(timestamp: Timestamp | Date | null | undefined): string {
+    if (!timestamp) {
+        return '';
+    }
+    const date = toJSDate(timestamp as Timestamp);
+    if (!date) {
+        return '처리중...';
+    }
+    // Using options for toLocaleString to get the desired format without manual padding
+    return new Intl.DateTimeFormat('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false, // Use 24-hour format
+    }).format(date).replace(/\. /g, '.').replace(/\.$/, ''); // Tidy up the format
+}

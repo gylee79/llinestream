@@ -14,7 +14,7 @@ import type { EpisodeViewLog } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toDisplayDate } from '@/lib/date-helpers';
+import { toDisplayDateTime } from '@/lib/date-helpers';
 
 export default function AdminViewHistoryPage() {
   const firestore = useFirestore();
@@ -44,6 +44,7 @@ export default function AdminViewHistoryPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>날짜(이벤트 발생일)</TableHead>
                 <TableHead>사용자</TableHead>
                 <TableHead>비디오 제목</TableHead>
                 <TableHead>시청 시작 시간</TableHead>
@@ -55,25 +56,26 @@ export default function AdminViewHistoryPage() {
               {isLoading ? (
                 Array.from({ length: 10 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 ))
               ) : viewLogs && viewLogs.length > 0 ? (
                 viewLogs.map((log) => (
                     <TableRow key={log.id}>
+                        <TableCell>{toDisplayDateTime(log.endedAt)}</TableCell>
                         <TableCell>
                             <div className="font-medium">{log.userName}</div>
                             <div className="text-xs text-muted-foreground">{log.userEmail}</div>
                         </TableCell>
                         <TableCell>{log.episodeTitle}</TableCell>
-                        <TableCell>{toDisplayDate(log.startedAt)}</TableCell>
-                        <TableCell>{toDisplayDate(log.endedAt)}</TableCell>
+                        <TableCell>{toDisplayDateTime(log.startedAt)}</TableCell>
+                        <TableCell>{toDisplayDateTime(log.endedAt)}</TableCell>
                         <TableCell>{log.duration}초</TableCell>
                     </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center h-24">
+                  <TableCell colSpan={6} className="text-center h-24">
                     시청 기록이 없습니다.
                   </TableCell>
                 </TableRow>
