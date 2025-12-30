@@ -22,7 +22,7 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
   return (
     <motion.div 
       className={cn(
-          "relative h-[55vh] min-h-[400px] overflow-hidden md:h-[70vh] md:min-h-[500px]",
+          "relative h-[45vh] min-h-[350px] overflow-hidden md:h-[70vh] md:min-h-[500px]",
           "w-[90%] mx-auto md:w-full md:mx-0"
       )}
       initial={{ scale: 1.1 }}
@@ -67,4 +67,3 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
     </motion.div>
   );
 }
-
