@@ -110,8 +110,8 @@ export default function CourseReviewSection({ comments, user, episodes, onToggle
           <>
             {hasReviews ? (
               <>
-                {/* PC Layout: Carousel */}
-                <div className="hidden md:grid grid-cols-1 md:grid-cols-5 gap-8 items-stretch h-[180px]">
+                {/* PC Layout: Grid */}
+                <div className="hidden md:grid grid-cols-1 md:grid-cols-5 gap-8 items-stretch h-[100px]">
                 {/* Rating Summary */}
                 <div className="md:col-span-1 h-full">
                     <Card className="h-full">
