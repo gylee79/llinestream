@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
-import type { ViewHistoryItem, Course, Episode } from '@/lib/types';
+import type { Episode, ViewHistoryItem } from '@/lib/types';
 import ContentCarousel from '@/components/shared/content-carousel';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -11,14 +11,6 @@ export default function ContinueWatching() {
     const { user } = useUser();
     const firestore = useFirestore();
 
-    const mockEpisodes: Episode[] = [
-        { id: 'ep-001', courseId: 'course-001', title: '1. React 소개 및 환경 설정', duration: 980, isFree: true, videoUrl: '', thumbnailUrl: 'https://picsum.photos/seed/ep-001/600/400', createdAt: new Date() },
-        { id: 'ep-008', courseId: 'course-003', title: 'Week 1: 기본 자세 익히기', duration: 1800, isFree: true, videoUrl: '', thumbnailUrl: 'https://picsum.photos/seed/ep-008/600/400', createdAt: new Date() },
-        { id: 'ep-015', courseId: 'course-007', title: '1. 인사와 소개', duration: 1300, isFree: true, videoUrl: '', thumbnailUrl: 'https://picsum.photos/seed/ep-015/600/400', createdAt: new Date() },
-        { id: 'ep-019', courseId: 'course-009', title: '1. Express.js 시작하기', duration: 1200, isFree: true, videoUrl: '', thumbnailUrl: 'https://picsum.photos/seed/ep-019/600/400', createdAt: new Date() },
-    ];
-    
-    
     const historyQuery = useMemoFirebase(() => {
         if (!user || !firestore) return null;
         return query(
@@ -55,6 +47,7 @@ export default function ContinueWatching() {
     }, [historyItems, allEpisodes]);
     
     const isLoading = historyLoading || episodesLoading;
+    const hasRealHistory = watchedEpisodes && watchedEpisodes.length > 0;
 
     if (isLoading) {
         return (
@@ -70,15 +63,11 @@ export default function ContinueWatching() {
         );
     }
     
-    const hasRealHistory = watchedEpisodes && watchedEpisodes.length > 0;
-    const itemsToShow = hasRealHistory ? watchedEpisodes : mockEpisodes;
-    const title = hasRealHistory ? "최근 시청 영상" : "추천 영상";
-    
-    if (itemsToShow.length === 0) {
+    if (!hasRealHistory) {
         return null;
     }
 
     return (
-        <ContentCarousel title={title} items={itemsToShow} itemType="episode" />
+        <ContentCarousel title="최근 시청 영상" items={watchedEpisodes} itemType="episode" />
     );
 }
