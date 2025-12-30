@@ -61,39 +61,40 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                     <div className="flex-grow">
                         <div className="flex justify-between items-start">
                            <h3 className="text-lg font-bold leading-tight">{episode.title}</h3>
-                           <Badge variant={episode.isFree ? 'default' : 'secondary'} className="flex-shrink-0 ml-2">{episode.isFree ? '무료' : '구독필요'}</Badge>
                         </div>
 
                         <div className="flex justify-between items-center mt-1">
-                            <p className="text-sm text-muted-foreground">{instructor ? `강사: ${instructor.name}` : ''}</p>
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                               <div className="flex items-center gap-1">
-                                    <Clock className="w-3 h-3" />
-                                    <span>{formatDuration(episode.duration)}</span>
-                               </div>
-                               {ratedCommentsCount > 0 && (
-                                    <div className="flex items-center gap-1">
-                                        <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                                        <span className="font-semibold text-foreground">{averageRating.toFixed(1)}</span>
-                                        <span>({ratedCommentsCount})</span>
-                                    </div>
-                               )}
+                             <div className="flex items-center gap-2">
+                                <Badge variant={episode.isFree ? 'default' : 'secondary'} className="flex-shrink-0">{episode.isFree ? '무료' : '구독필요'}</Badge>
+                                <p className="text-sm text-muted-foreground">{instructor ? `강사: ${instructor.name}` : ''}</p>
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                   <div className="flex items-center gap-1">
+                                        <Clock className="w-3 h-3" />
+                                        <span>{formatDuration(episode.duration)}</span>
+                                   </div>
+                                   {ratedCommentsCount > 0 && (
+                                        <div className="flex items-center gap-1">
+                                            <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                            <span className="font-semibold text-foreground">{averageRating.toFixed(1)}</span>
+                                            <span>({ratedCommentsCount})</span>
+                                        </div>
+                                   )}
+                                </div>
+                                <Button
+                                    variant="link"
+                                    className="h-auto p-0 text-xs text-muted-foreground"
+                                    onClick={() => user && setCommentOpen(true)}
+                                    disabled={!user}
+                                >
+                                    리뷰 작성
+                                </Button>
                             </div>
                         </div>
 
-                         <div className="flex justify-end mt-1">
-                            <Button
-                                variant="link"
-                                className="h-auto p-0 text-xs text-muted-foreground"
-                                onClick={() => user && setCommentOpen(true)}
-                                disabled={!user}
-                            >
-                                리뷰 작성
-                            </Button>
-                        </div>
-
                     </div>
-                    <div className="flex-shrink-0 flex items-center justify-start">
+                    <div className="flex-shrink-0 flex items-center justify-start sm:justify-center">
                         <Button className="w-full sm:w-auto" onClick={handlePlayClick}>
                            {isPlayable ? <Play className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
                            시청하기
