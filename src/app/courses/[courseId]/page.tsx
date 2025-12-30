@@ -134,7 +134,6 @@ export default function CourseDetailPage() {
   }
   
   const introImages = course.introImageUrls && course.introImageUrls.length > 0 ? course.introImageUrls : [course.thumbnailUrl];
-  const detailImages = course.detailImageUrls && course.detailImageUrls.length > 0 ? course.detailImageUrls : introImages;
 
 
   return (
@@ -227,7 +226,7 @@ export default function CourseDetailPage() {
       <CourseImagesDialog 
         isOpen={isImagesDialogOpen}
         onOpenChange={setImagesDialogOpen}
-        images={detailImages}
+        images={introImages}
         courseName={course.name}
       />
     </>

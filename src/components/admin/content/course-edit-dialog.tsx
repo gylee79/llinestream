@@ -143,7 +143,6 @@ interface CourseEditDialogProps {
 export default function CourseEditDialog({ open, onOpenChange, course }: CourseEditDialogProps) {
   const { toast } = useToast();
   const [introImages, setIntroImages] = useState<ImageItem[]>([]);
-  const [detailImages, setDetailImages] = useState<ImageItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const form = useForm<CourseFormValues>({
@@ -162,8 +161,6 @@ export default function CourseEditDialog({ open, onOpenChange, course }: CourseE
       });
       const existingIntroImages = (course.introImageUrls || []).map(url => ({ id: uuidv4(), url, isNew: false }));
       setIntroImages(existingIntroImages);
-      const existingDetailImages = (course.detailImageUrls || []).map(url => ({ id: uuidv4(), url, isNew: false }));
-      setDetailImages(existingDetailImages);
     }
   }, [course, form, open]);
 
@@ -175,17 +172,12 @@ export default function CourseEditDialog({ open, onOpenChange, course }: CourseE
         const newIntroFiles = introImages.filter(img => img.isNew && img.file).map(img => img.file!);
         const existingIntroImageUrls = introImages.filter(img => !img.isNew).map(img => img.url);
 
-        const newDetailFiles = detailImages.filter(img => img.isNew && img.file).map(img => img.file!);
-        const existingDetailImageUrls = detailImages.filter(img => !img.isNew).map(img => img.url);
-
         const result = await updateCourse({
             courseId: course.id,
             name: data.name,
             description: data.description,
             existingIntroImageUrls: existingIntroImageUrls,
             newIntroFiles: newIntroFiles,
-            existingDetailImageUrls: existingDetailImageUrls,
-            newDetailFiles: newDetailFiles,
         });
 
       if (result.success) {
@@ -231,18 +223,10 @@ export default function CourseEditDialog({ open, onOpenChange, course }: CourseE
 
                 <ImageManager 
                     title="소개 이미지 관리"
-                    description="강좌 목록, 상단 히어로 영역에 사용될 대표 이미지를 관리합니다."
+                    description="강좌 목록, 상단 히어로 영역, 상세 페이지 전체보기에 사용될 이미지를 관리합니다."
                     images={introImages}
                     setImages={setIntroImages}
                     idPrefix="intro"
-                />
-
-                <ImageManager 
-                    title="상세페이지 이미지 관리"
-                    description="'상세페이지 전체보기' 클릭 시 보여질 상세 설명 이미지를 관리합니다."
-                    images={detailImages}
-                    setImages={setDetailImages}
-                    idPrefix="detail"
                 />
             </form>
         </ScrollArea>

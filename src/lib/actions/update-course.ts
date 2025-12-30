@@ -22,8 +22,6 @@ type UpdateCoursePayload = {
     description: string;
     existingIntroImageUrls: string[];
     newIntroFiles: File[];
-    existingDetailImageUrls: string[];
-    newDetailFiles: File[];
 }
 
 const deleteStorageFileByPath = async (storage: Storage, filePath: string | undefined) => {
@@ -41,7 +39,7 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
 const processImages = async (
     storage: Storage,
     courseId: string,
-    imageType: 'intro' | 'detail',
+    imageType: 'intro',
     existingUrls: string[],
     newFiles: File[],
     currentPaths: string[]
@@ -73,7 +71,7 @@ const processImages = async (
 
 
 export async function updateCourse(payload: UpdateCoursePayload): Promise<UpdateResult> {
-  const { courseId, name, description, existingIntroImageUrls, newIntroFiles, existingDetailImageUrls, newDetailFiles } = payload;
+  const { courseId, name, description, existingIntroImageUrls, newIntroFiles } = payload;
 
   if (!courseId) {
     return { success: false, message: '강좌 ID가 필요합니다.' };
@@ -93,7 +91,6 @@ export async function updateCourse(payload: UpdateCoursePayload): Promise<Update
     const currentCourse = courseDoc.data() as Course;
 
     const introImagesResult = await processImages(storage, courseId, 'intro', existingIntroImageUrls, newIntroFiles, currentCourse.introImagePaths || []);
-    const detailImagesResult = await processImages(storage, courseId, 'detail', existingDetailImageUrls, newDetailFiles, currentCourse.detailImagePaths || []);
     
     // Update Firestore
     await courseRef.update({
@@ -101,8 +98,6 @@ export async function updateCourse(payload: UpdateCoursePayload): Promise<Update
       description,
       introImageUrls: introImagesResult.finalUrls,
       introImagePaths: introImagesResult.finalPaths,
-      detailImageUrls: detailImagesResult.finalUrls,
-      detailImagePaths: detailImagesResult.finalPaths,
     });
 
     revalidatePath(`/admin/courses/${courseId}`);
