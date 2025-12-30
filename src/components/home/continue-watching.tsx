@@ -65,7 +65,7 @@ export default function ContinueWatching() {
             <ContentCarousel items={watchedEpisodes} itemType="episode" />
           ) : (
             <div className="flex items-center justify-center h-40 rounded-lg border-2 border-dashed bg-muted/50">
-              <p className="text-muted-foreground">시청 기록이 없습니다. 비디오를 시청하면 여기에 표시됩니다.</p>
+              <p className="text-muted-foreground">비디오 시청을 시작하시면 편하게 최신 영상을 보실수 있게 도와드립니다.</p>
             </div>
           )}
         </section>
