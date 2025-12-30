@@ -26,7 +26,7 @@ const ReviewItem = ({ comment, episodeTitle, isMobile = false }: { comment: Epis
           <CardContent className="p-2 flex flex-col h-full">
             <p className="text-primary font-semibold text-xs truncate" title={episodeTitle}>{episodeTitle}</p>
             <div className="flex flex-col mt-1">
-                <span className="font-semibold text-[10px]">{comment.userName}</span>
+                <span className="font-semibold text-[10px] truncate">{comment.userName}</span>
                 <span className="text-[9px] text-muted-foreground">{toDisplayDate(comment.createdAt)}</span>
             </div>
             {comment.rating && comment.rating > 0 && (
