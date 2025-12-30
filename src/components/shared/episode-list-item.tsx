@@ -62,13 +62,11 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                                 <h3 className="text-base font-bold leading-tight line-clamp-2">{episode.title}</h3>
                                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{episode.description}</p>
                             </div>
-                            <div className="space-y-1 mt-2">
-                                <p className="text-xs text-muted-foreground">강사: {instructor?.name || 'N/A'}</p>
-                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                    <div className="flex items-center gap-1">
-                                        <Clock className="w-3 h-3" />
-                                        <span>{formatDuration(episode.duration)}</span>
-                                    </div>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
+                                <p>강사: {instructor?.name || 'N/A'}</p>
+                                <div className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    <span>{formatDuration(episode.duration)}</span>
                                 </div>
                             </div>
                         </div>
