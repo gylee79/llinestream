@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo } from 'react';
 import type { EpisodeComment, User, Episode } from '@/lib/types';
@@ -92,8 +91,18 @@ export default function CourseReviewSection({ comments, user, episodes, onToggle
             <span className="md:text-2xl text-xl">리뷰</span>
             <span className="md:text-2xl text-lg"> ({totalReviews})</span>
           </h2>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            {isReviewExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          <Button variant="ghost" className="h-8 px-2 flex items-center text-sm text-muted-foreground">
+            {isReviewExpanded ? (
+              <>
+                <span>접기</span>
+                <ChevronUp className="h-5 w-5 ml-1" />
+              </>
+            ) : (
+              <>
+                <span>전체보기</span>
+                <ChevronDown className="h-5 w-5 ml-1" />
+              </>
+            )}
           </Button>
         </div>
         
