@@ -183,6 +183,6 @@ export interface EpisodeComment {
   createdAt: Timestamp;
 }
 
-export type CarouselApi = UseEmblaCarouselType;
+export type CarouselApi = UseEmblaCarouselType[1];
 
     
