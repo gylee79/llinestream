@@ -75,7 +75,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
 
                         {/* Right Column */}
                         <div className="flex-shrink-0 flex flex-col items-center gap-1.5 w-24">
-                            <div className="w-full flex justify-between items-center h-6">
+                            <div className="w-full flex justify-end items-center h-6 gap-2">
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                     {ratedCommentsCount > 0 ? (
                                         <>
@@ -93,7 +93,9 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                                     onClick={() => user && setCommentOpen(true)}
                                     disabled={!user}
                                 >
-                                    리뷰<Pencil className="h-2.5 w-2.5" />
+                                    <span className="flex items-center">
+                                      리뷰<Pencil className="h-2.5 w-2.5" />
+                                    </span>
                                 </Button>
                             </div>
                             <div className="relative aspect-video w-full bg-muted rounded-md overflow-hidden">
