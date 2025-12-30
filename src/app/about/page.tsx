@@ -138,6 +138,12 @@ export default function AboutPage() {
 
         {/* Differentiation Section */}
         <section className="grid md:grid-cols-2 gap-8 items-center bg-muted rounded-lg p-8 md:p-12">
+            <div>
+                <h2 className="text-3xl font-bold tracking-tight">엘라인은 교육 방식부터 다릅니다.</h2>
+                <p className="mt-4 text-muted-foreground text-lg">
+온라인 영상시청,커뮤니티방,실제 현업의 전문가와 연결을 통해 현장 교육의 기회를 만들어 드립니다.
+                </p>
+            </div>
             <motion.div 
                 className="relative aspect-video rounded-lg overflow-hidden"
                 initial={{ opacity: 0, y: 20 }}
@@ -147,12 +153,6 @@ export default function AboutPage() {
             >
                 <Image src="https://picsum.photos/seed/ai-beauty/800/600" alt="AI 기반 교육" fill sizes="(max-width: 768px) 100vw, 50vw" style={{objectFit: "cover"}} data-ai-hint="futuristic beauty technology"/>
             </motion.div>
-            <div>
-                <h2 className="text-3xl font-bold tracking-tight">엘라인은 교육 방식부터 다릅니다.</h2>
-                <p className="mt-4 text-muted-foreground text-lg">
-온라인 영상시청,커뮤니티방,실제 현업의 전문가와 연결을 통해 현장 교육의 기회를 만들어 드립니다.
-                </p>
-            </div>
         </section>
 
         {/* Ecosystem Hub Section */}
