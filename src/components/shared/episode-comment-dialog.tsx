@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -29,6 +28,8 @@ import {
   orderBy,
   addDoc,
   serverTimestamp,
+  onSnapshot,
+  Unsubscribe,
 } from 'firebase/firestore';
 import type { Episode, User, EpisodeComment } from '@/lib/types';
 import { toDisplayDate } from '@/lib/date-helpers';
@@ -36,6 +37,8 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Separator } from '../ui/separator';
 import { Card, CardContent } from '../ui/card';
+import { useEffect } from 'react';
+
 
 const commentSchema = z.object({
   content: z.string().min(1, '내용을 입력해주세요.').max(1000, '1000자 이내로 작성해주세요.'),
@@ -119,17 +122,36 @@ export default function EpisodeCommentDialog({
   const { toast } = useToast();
   const [hoverRating, setHoverRating] = useState(0);
 
-  const commentsQuery = useMemoFirebase(
-    () =>
-      firestore && episode && mode === 'comment'
-        ? query(
-            collection(firestore, 'episodes', episode.id, 'comments'),
-            orderBy('createdAt', 'desc')
-          )
-        : null,
-    [firestore, episode, mode]
-  );
-  const { data: dbComments, isLoading } = useCollection<EpisodeComment>(commentsQuery);
+  const [dbComments, setDbComments] = useState<EpisodeComment[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!firestore || !episode || mode !== 'comment') {
+      setIsLoading(false);
+      return;
+    }
+    
+    setIsLoading(true);
+    const commentsQuery = query(
+      collection(firestore, 'episodes', episode.id, 'comments'),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(commentsQuery, (snapshot) => {
+      const fetchedComments: EpisodeComment[] = [];
+      snapshot.forEach(doc => {
+        fetchedComments.push({ id: doc.id, ...doc.data() } as EpisodeComment);
+      });
+      setDbComments(fetchedComments);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching comments:", error);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [firestore, episode, mode]);
+
 
   const comments = mode === 'view' ? propComments : dbComments;
 
@@ -179,7 +201,7 @@ export default function EpisodeCommentDialog({
     }
   };
   
-  const dialogTitle = mode === 'view' ? `전체 리뷰 (${comments?.length || 0})` : '리뷰 및 질문';
+  const dialogTitle = mode === 'view' ? `전체 리뷰` : '리뷰 및 질문';
   const dialogDescription = mode === 'view' ? '모든 리뷰를 확인합니다.' : episode?.title;
 
 
@@ -187,7 +209,7 @@ export default function EpisodeCommentDialog({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogTitle>{dialogTitle} {mode === 'view' && `(${comments?.length || 0})`}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
@@ -198,7 +220,7 @@ export default function EpisodeCommentDialog({
               <MessageSquare className="inline-block w-5 h-5 mr-2" />
               모든 댓글 ({comments?.length || 0})
             </h3>
-            <ScrollArea className="flex-grow border rounded-md p-4 bg-muted/50">
+            <ScrollArea className="flex-grow border rounded-md p-4 bg-muted/50 h-48 md:h-96">
               {isLoading && <p className="hidden md:block">댓글을 불러오는 중...</p>}
               {!isLoading && comments?.length === 0 && (
                 <p className="text-center text-muted-foreground py-8">
