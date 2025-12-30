@@ -177,8 +177,8 @@ export default function EpisodeCommentDialog({
 
         <div className={cn("max-h-[60vh]", mode === 'comment' && "grid grid-cols-1 md:grid-cols-2 gap-6")}>
           {/* Comment List */}
-          <div className="flex flex-col">
-            <h3 className="text-lg font-semibold mb-2">
+          <div className="flex flex-col min-h-0 overflow-hidden">
+            <h3 className="text-lg font-semibold mb-2 flex-shrink-0">
               <MessageSquare className="inline-block w-5 h-5 mr-2" />
               모든 댓글 ({comments?.length || 0})
             </h3>
