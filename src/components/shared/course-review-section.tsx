@@ -28,7 +28,7 @@ const ReviewItem = ({ comment, episodeTitle, isMobile = false }: { comment: Epis
                 <span className="font-semibold text-[10px] truncate">{comment.userName}</span>
                 <span className="text-[9px] text-muted-foreground">{toDisplayDate(comment.createdAt)}</span>
             </div>
-            {comment.rating > 0 && (
+            {comment.rating && comment.rating > 0 && (
                 <div className="flex items-center mt-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Star key={star} className={cn('w-3 h-3', star <= comment.rating! ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground')} />
