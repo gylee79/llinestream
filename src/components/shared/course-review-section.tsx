@@ -26,8 +26,8 @@ const ReviewItem = ({ comment, episodeTitle, isMobile = false }: { comment: Epis
           <CardContent className="p-2 flex flex-col h-full">
             <p className="text-primary font-semibold text-xs truncate" title={episodeTitle}>{episodeTitle}</p>
             <div className="flex flex-col mt-1">
-                <span className="font-semibold text-xs">{comment.userName}</span>
-                <span className="text-[10px] text-muted-foreground">{toDisplayDate(comment.createdAt)}</span>
+                <span className="font-semibold text-[10px]">{comment.userName}</span>
+                <span className="text-[9px] text-muted-foreground">{toDisplayDate(comment.createdAt)}</span>
             </div>
             {comment.rating && comment.rating > 0 && (
                 <div className="flex items-center mt-1">
@@ -85,7 +85,10 @@ export default function CourseReviewSection({ comments, user, episodes, onToggle
     <>
       <div className="mt-3">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="font-headline text-2xl font-bold">리뷰 ({totalReviews})</h2>
+          <h2 className="font-headline font-bold text-2xl">
+            <span className="md:text-2xl text-xl">리뷰</span>
+            <span className="md:text-2xl text-lg"> ({totalReviews})</span>
+          </h2>
           <Button variant="ghost" onClick={toggleReviewExpansion}>
             {isReviewExpanded ? '숨기기' : '리뷰 보기'}
             {isReviewExpanded ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
