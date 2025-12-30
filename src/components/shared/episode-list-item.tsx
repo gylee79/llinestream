@@ -60,20 +60,22 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                            <h3 className="text-lg font-bold leading-tight">{episode.title}</h3>
                            <Badge variant={episode.isFree ? 'default' : 'secondary'} className="flex-shrink-0 ml-2">{episode.isFree ? '무료' : '구독필요'}</Badge>
                         </div>
-                        {instructor && <p className="text-sm text-muted-foreground mt-1">강사: {instructor.name}</p>}
 
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
-                           <div className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                <span>{formatDuration(episode.duration)}</span>
-                           </div>
-                           {comments.length > 0 && (
-                                <div className="flex items-center gap-1">
-                                    <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                                    <span className="font-semibold text-foreground">{averageRating.toFixed(1)}</span>
-                                    <span>({comments.length})</span>
-                                </div>
-                           )}
+                        <div className="flex justify-between items-center mt-1">
+                            <p className="text-sm text-muted-foreground">{instructor ? `강사: ${instructor.name}` : ''}</p>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                               <div className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    <span>{formatDuration(episode.duration)}</span>
+                               </div>
+                               {comments.length > 0 && (
+                                    <div className="flex items-center gap-1">
+                                        <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                        <span className="font-semibold text-foreground">{averageRating.toFixed(1)}</span>
+                                        <span>({comments.length})</span>
+                                    </div>
+                               )}
+                            </div>
                         </div>
 
                     </div>
