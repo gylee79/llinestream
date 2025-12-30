@@ -44,9 +44,10 @@ export default function AdminViewHistoryPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>시청 완료 시간</TableHead>
                 <TableHead>사용자</TableHead>
                 <TableHead>비디오 제목</TableHead>
+                <TableHead>시청 시작 시간</TableHead>
+                <TableHead>시청 종료 시간</TableHead>
                 <TableHead>총 시청 시간(초)</TableHead>
               </TableRow>
             </TableHeader>
@@ -54,24 +55,25 @@ export default function AdminViewHistoryPage() {
               {isLoading ? (
                 Array.from({ length: 10 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 ))
               ) : viewLogs && viewLogs.length > 0 ? (
                 viewLogs.map((log) => (
                     <TableRow key={log.id}>
-                        <TableCell>{toDisplayDate(log.endedAt)}</TableCell>
                         <TableCell>
                             <div className="font-medium">{log.userName}</div>
                             <div className="text-xs text-muted-foreground">{log.userEmail}</div>
                         </TableCell>
                         <TableCell>{log.episodeTitle}</TableCell>
+                        <TableCell>{toDisplayDate(log.startedAt)}</TableCell>
+                        <TableCell>{toDisplayDate(log.endedAt)}</TableCell>
                         <TableCell>{log.duration}초</TableCell>
                     </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center h-24">
+                  <TableCell colSpan={5} className="text-center h-24">
                     시청 기록이 없습니다.
                   </TableCell>
                 </TableRow>
