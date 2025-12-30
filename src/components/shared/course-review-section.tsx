@@ -29,10 +29,10 @@ const ReviewItem = ({ comment, isMobile = false }: { comment: EpisodeComment, is
     
     return (
         <Card className="h-full">
-          <CardContent className="p-4 flex flex-col h-full">
+          <CardContent className="p-2 flex flex-col h-full">
             <div className="flex flex-col">
-                <span className="font-semibold text-sm">{comment.userName}</span>
-                <span className="text-xs text-muted-foreground">{toDisplayDate(comment.createdAt)}</span>
+                <span className="font-semibold text-xs">{comment.userName}</span>
+                <span className="text-[10px] text-muted-foreground">{toDisplayDate(comment.createdAt)}</span>
             </div>
             {comment.rating && comment.rating > 0 && (
                 <div className="flex items-center mt-1">
@@ -43,7 +43,7 @@ const ReviewItem = ({ comment, isMobile = false }: { comment: EpisodeComment, is
             )}
             <p 
               className={cn(
-                "text-sm mt-2 flex-grow",
+                "text-xs mt-1 flex-grow",
                 isMobile && !isExpanded && "line-clamp-3",
                 isMobile && "cursor-pointer"
               )}
@@ -82,7 +82,7 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
   }, [comments]);
   
   const hasReviews = comments.length > 0;
-  const recentTwoReviews = useMemo(() => comments.slice(0, 2), [comments]);
+  const recentThreeReviews = useMemo(() => comments.slice(0, 3), [comments]);
 
   return (
     <>
@@ -126,19 +126,19 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
             </div>
           </div>
           {/* Mobile Layout: Grid */}
-          <div className="grid md:hidden grid-cols-3 gap-2">
-            <Card className="h-full">
+          <div className="grid md:hidden grid-cols-4 gap-2">
+            <Card className="h-full col-span-1">
               <CardContent className="p-2 flex flex-col h-full items-center justify-center text-center">
-                <span className="text-3xl font-bold">{averageRating.toFixed(1)}</span>
+                <span className="text-2xl font-bold">{averageRating.toFixed(1)}</span>
                 <div className="flex items-center my-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Star key={star} className={cn("w-3 h-3", star <= averageRating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30')} />
                   ))}
                 </div>
-                <span className="text-xs text-muted-foreground">{totalReviews}개 리뷰</span>
+                <span className="text-[10px] text-muted-foreground">{totalReviews}개 리뷰</span>
               </CardContent>
             </Card>
-            {recentTwoReviews.map(comment => (
+            {recentThreeReviews.map(comment => (
               <div key={comment.id} className="col-span-1">
                 <ReviewItem comment={comment} isMobile={true} />
               </div>
