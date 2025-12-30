@@ -85,7 +85,7 @@ export default function CourseReviewSection({ comments, user, episodes, onToggle
     <>
       <div className="mt-3">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="font-headline font-bold text-2xl">
+          <h2 className="font-headline font-bold">
             <span className="md:text-2xl text-xl">리뷰</span>
             <span className="md:text-2xl text-lg"> ({totalReviews})</span>
           </h2>
@@ -168,7 +168,7 @@ export default function CourseReviewSection({ comments, user, episodes, onToggle
             {hasReviews && (
               <div className="mt-4 flex justify-center">
                 <Button variant="outline" onClick={onToggleAllReviews}>
-                  전체 리뷰 보기
+                  전체 리뷰 보기 ({totalReviews})
                 </Button>
               </div>
             )}

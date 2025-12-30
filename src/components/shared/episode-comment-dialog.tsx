@@ -179,7 +179,7 @@ export default function EpisodeCommentDialog({
     }
   };
   
-  const dialogTitle = mode === 'view' ? '전체 리뷰' : '리뷰 및 질문';
+  const dialogTitle = mode === 'view' ? `전체 리뷰 (${comments?.length || 0})` : '리뷰 및 질문';
   const dialogDescription = mode === 'view' ? '모든 리뷰를 확인합니다.' : episode?.title;
 
 
@@ -194,12 +194,12 @@ export default function EpisodeCommentDialog({
         <div className={cn("grid min-h-0 max-h-[60vh] overflow-hidden", mode === 'comment' ? "grid-cols-1 md:grid-cols-2 gap-6" : "grid-cols-1")}>
           {/* Comment List */}
           <div className="flex flex-col min-h-0">
-            <h3 className="text-lg font-semibold mb-2 flex-shrink-0">
+            <h3 className="text-lg font-semibold mb-2 flex-shrink-0 md:flex hidden">
               <MessageSquare className="inline-block w-5 h-5 mr-2" />
               모든 댓글 ({comments?.length || 0})
             </h3>
             <ScrollArea className="flex-grow border rounded-md p-4 bg-muted/50">
-              {isLoading && <p>댓글을 불러오는 중...</p>}
+              {isLoading && <p className="hidden md:block">댓글을 불러오는 중...</p>}
               {!isLoading && comments?.length === 0 && (
                 <p className="text-center text-muted-foreground py-8">
                   아직 댓글이 없습니다.
