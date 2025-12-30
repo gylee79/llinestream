@@ -204,7 +204,10 @@ export default function EpisodeCommentDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
+      <DialogContent 
+        className="sm:max-w-2xl h-[90vh] md:h-auto flex flex-col"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{dialogTitle} {mode === 'view' && `(${comments?.length || 0})`}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
@@ -217,7 +220,7 @@ export default function EpisodeCommentDialog({
               <MessageSquare className="inline-block w-5 h-5 mr-2" />
               모든 댓글 ({comments?.length || 0})
             </h3>
-            <ScrollArea className="flex-grow border rounded-md p-4 bg-muted/50 h-48 md:h-full">
+            <ScrollArea className="flex-grow border rounded-md p-4 bg-muted/50 h-full">
               {isLoading && <p className="hidden md:block">댓글을 불러오는 중...</p>}
               {!isLoading && comments?.length === 0 && (
                 <p className="text-center text-muted-foreground py-8">
@@ -236,8 +239,8 @@ export default function EpisodeCommentDialog({
                 onSubmit={handleSubmit(onSubmit)}
                 className="flex-grow flex flex-col space-y-4 border rounded-md p-4"
               >
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">별점 (선택)</label>
+                <div className="flex flex-col md:flex-row md:items-center md:gap-4 space-y-2 md:space-y-0">
+                  <label className="text-sm font-medium flex-shrink-0">별점 (선택)</label>
                   <Controller
                     name="rating"
                     control={control}
@@ -260,12 +263,13 @@ export default function EpisodeCommentDialog({
                       </div>
                     )}
                   />
-                   {errors.rating && (
-                    <p className="text-xs text-destructive mt-1">
-                      {errors.rating.message}
-                    </p>
-                  )}
                 </div>
+                 {errors.rating && (
+                  <p className="text-xs text-destructive mt-1">
+                    {errors.rating.message}
+                  </p>
+                )}
+                
 
                 <div className="flex-grow flex flex-col">
                   <label htmlFor="content" className="text-sm font-medium">내용</label>
@@ -273,7 +277,7 @@ export default function EpisodeCommentDialog({
                     id="content"
                     {...register('content')}
                     placeholder="리뷰, 질문, 응원의 메시지를 남겨주세요."
-                    className="flex-grow resize-none"
+                    className="flex-grow resize-none mt-1"
                   />
                   {errors.content && (
                     <p className="text-xs text-destructive mt-1">
