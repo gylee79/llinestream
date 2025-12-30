@@ -96,16 +96,12 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                                     </span>
                                 </Button>
                             </div>
-                            <div className="relative aspect-video w-full bg-muted rounded-md overflow-hidden">
+                            <div className="relative aspect-video w-full bg-muted rounded-md overflow-hidden cursor-pointer" onClick={handlePlayClick}>
                                 <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="96px" className="object-cover" />
                                 {!episode.isFree && (
                                     <Badge variant="secondary" className="absolute bottom-1 right-1 h-5 px-1.5 py-0 text-xs">구독필요</Badge>
                                 )}
                             </div>
-                            <Button className="w-full mt-1 h-8 text-sm" onClick={handlePlayClick}>
-                                {isPlayable ? <Play className="mr-1.5 h-4 w-4" /> : <Lock className="mr-1.5 h-4 w-4" />}
-                                시청
-                            </Button>
                         </div>
                     </div>
                 </CardContent>
