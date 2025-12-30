@@ -59,7 +59,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                 <CardContent className="p-3">
                      <div className="flex gap-3">
                         {/* Left Column */}
-                        <div className="flex-grow flex flex-col justify-between min-w-0">
+                        <div className="flex-grow flex flex-col min-w-0">
                             <div className="mt-2 md:mt-0">
                                 <h3 className="text-base font-bold leading-tight line-clamp-2">{episode.title}</h3>
                                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{episode.description}</p>
@@ -101,21 +101,13 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                                     </span>
                                 </Button>
                             </div>
-                            <div className="relative aspect-video w-full bg-muted rounded-md overflow-hidden cursor-pointer border border-black group" onClick={handlePlayClick}>
+                            <div className="relative aspect-video w-full bg-muted rounded-md overflow-hidden cursor-pointer border border-black" onClick={handlePlayClick}>
                                 <Image 
                                     src={episode.thumbnailUrl} 
                                     alt={episode.title} 
                                     fill sizes="96px" 
-                                    className={cn(
-                                        "object-cover transition-all duration-300",
-                                        !hasBeenWatched && "blur-sm brightness-75 group-hover:blur-none group-hover:brightness-100"
-                                    )} 
+                                    className="object-cover"
                                 />
-                                {!hasBeenWatched && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Play className="h-8 w-8 text-white" fill="white" />
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </div>
