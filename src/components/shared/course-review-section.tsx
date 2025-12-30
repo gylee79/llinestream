@@ -64,16 +64,16 @@ export default function CourseReviewSection({ comments, user, episodes, onToggle
     setReviewExpanded(!isReviewExpanded);
   }
 
-  const { averageRating, totalReviews } = useMemo(() => {
+  const { averageRating, totalReviews, reviewsWithRatingCount } = useMemo(() => {
     const ratedComments = comments.filter(c => c.rating && c.rating > 0);
     const totalReviewsWithRating = ratedComments.length;
     if (totalReviewsWithRating === 0) {
-      return { averageRating: 0, totalReviews: comments.length };
+      return { averageRating: 0, totalReviews: comments.length, reviewsWithRatingCount: 0 };
     }
     const totalRating = ratedComments.reduce((sum, c) => sum + c.rating!, 0);
     const averageRating = totalRating / totalReviewsWithRating;
     
-    return { averageRating, totalReviews: comments.length };
+    return { averageRating, totalReviews: comments.length, reviewsWithRatingCount: totalReviewsWithRating };
   }, [comments]);
   
   const hasReviews = comments.length > 0;
@@ -91,7 +91,7 @@ export default function CourseReviewSection({ comments, user, episodes, onToggle
             <span className="md:text-2xl text-xl">리뷰</span>
             <span className="md:text-2xl text-lg"> ({totalReviews})</span>
           </h2>
-          <Button variant="ghost" className="h-8 px-2 flex items-center text-sm text-muted-foreground">
+          <Button variant="ghost" className="h-8 px-2 flex items-center text-sm text-muted-foreground hover:text-muted-foreground/80 focus-visible:ring-0 focus-visible:ring-offset-0">
             {isReviewExpanded ? (
               <>
                 <span>접기</span>
@@ -122,7 +122,7 @@ export default function CourseReviewSection({ comments, user, episodes, onToggle
                                     <Star key={star} className={cn("w-4 h-4", star <= averageRating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30')} />
                                 ))}
                             </div>
-                            <span className="text-xs text-muted-foreground">{comments.filter(c => c.rating).length}개 리뷰</span>
+                            <span className="text-xs text-muted-foreground">{reviewsWithRatingCount}개 리뷰</span>
                         </CardContent>
                     </Card>
                 </div>
@@ -155,7 +155,7 @@ export default function CourseReviewSection({ comments, user, episodes, onToggle
                         <Star key={star} className={cn("w-3 h-3", star <= averageRating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30')} />
                       ))}
                     </div>
-                    <span className="text-[10px] text-muted-foreground">{comments.filter(c => c.rating).length}개 리뷰</span>
+                    <span className="text-[10px] text-muted-foreground">{reviewsWithRatingCount}개 리뷰</span>
                   </CardContent>
                 </Card>
                 {recentThreeReviews.map(comment => (

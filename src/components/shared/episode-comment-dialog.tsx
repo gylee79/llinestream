@@ -39,7 +39,7 @@ import { useEffect } from 'react';
 
 const commentSchema = z.object({
   content: z.string().min(1, '내용을 입력해주세요.').max(1000, '1000자 이내로 작성해주세요.'),
-  rating: z.number().min(0).max(5).optional(),
+  rating: z.number().min(0).max(5).default(0),
 });
 
 interface EpisodeCommentDialogProps {
@@ -178,12 +178,9 @@ export default function EpisodeCommentDialog({
         userName: user.name,
         userRole: user.role,
         content: data.content,
+        rating: data.rating,
         createdAt: serverTimestamp(),
       };
-      
-      if (data.rating && data.rating > 0) {
-        commentData.rating = data.rating;
-      }
       
       await addDoc(collection(firestore, 'episodes', episode.id, 'comments'), commentData);
       toast({ title: '성공', description: '댓글이 등록되었습니다.' });
@@ -199,7 +196,7 @@ export default function EpisodeCommentDialog({
   };
   
   const dialogTitle = mode === 'view' ? `전체 리뷰` : '리뷰 및 질문';
-  const dialogDescription = mode === 'view' ? '모든 리뷰를 확인합니다.' : episode?.title;
+  const dialogDescription = mode === 'view' ? `모든 리뷰를 확인합니다.` : episode?.title;
 
 
   return (

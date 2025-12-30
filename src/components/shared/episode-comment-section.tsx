@@ -30,7 +30,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 const commentSchema = z.object({
   content: z.string().min(1, '내용을 입력해주세요.').max(1000, '1000자 이내로 작성해주세요.'),
-  rating: z.number().min(0).max(5).optional(),
+  rating: z.number().min(0).max(5).default(0),
 });
 
 interface EpisodeCommentSectionProps {
@@ -85,12 +85,9 @@ export default function EpisodeCommentSection({
         userName: user.name,
         userRole: user.role,
         content: data.content,
+        rating: data.rating,
         createdAt: serverTimestamp(),
       };
-      
-      if (data.rating && data.rating > 0) {
-        commentData.rating = data.rating;
-      }
 
       await addDoc(collection(firestore, 'episodes', episode.id, 'comments'), commentData);
       toast({ title: '성공', description: '댓글이 등록되었습니다.' });
@@ -191,7 +188,7 @@ export default function EpisodeCommentSection({
                         )}
                         onMouseEnter={() => setHoverRating(star)}
                         onMouseLeave={() => setHoverRating(0)}
-                        onClick={() => field.onChange(star)}
+                        onClick={() => field.onChange(star === ratingValue ? 0 : star)}
                     />
                     ))}
                 </div>
