@@ -1,3 +1,4 @@
+
 'use client';
 
 import Image from 'next/image';
@@ -82,12 +83,15 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                            {isPlayable ? <Play className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
                            시청하기
                         </Button>
-                        {user && (
-                            <Button variant="outline" className="w-full" onClick={() => setCommentOpen(true)}>
-                                <MessageSquare className="mr-2 h-4 w-4"/>
-                                리뷰
-                            </Button>
-                        )}
+                        <Button 
+                            variant="outline" 
+                            className="w-full" 
+                            onClick={() => user && setCommentOpen(true)}
+                            disabled={!user}
+                        >
+                            <MessageSquare className="mr-2 h-4 w-4"/>
+                            리뷰
+                        </Button>
                     </div>
                 </CardContent>
             </Card>
