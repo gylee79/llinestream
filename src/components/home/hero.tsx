@@ -19,7 +19,7 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
 
   return (
     <motion.div 
-      className="relative h-[70vh] min-h-[500px] w-full overflow-hidden"
+      className="relative h-[55vh] min-h-[400px] w-full overflow-hidden md:h-[70vh] md:min-h-[500px]"
       initial={{ scale: 1.1 }}
       animate={{ scale: 1 }}
       transition={{ duration: 8, ease: "easeOut" }}
