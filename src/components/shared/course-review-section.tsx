@@ -28,7 +28,7 @@ const ReviewItem = ({ comment, episodeTitle, isMobile = false }: { comment: Epis
                 <span className="font-semibold text-[10px] truncate">{comment.userName}</span>
                 <span className="text-[9px] text-muted-foreground">{toDisplayDate(comment.createdAt)}</span>
             </div>
-            {comment.rating && comment.rating > 0 && (
+            {comment.rating > 0 && (
                 <div className="flex items-center mt-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Star key={star} className={cn('w-3 h-3', star <= comment.rating! ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground')} />
@@ -111,7 +111,7 @@ export default function CourseReviewSection({ comments, user, episodes, onToggle
             {hasReviews ? (
               <>
                 {/* PC Layout: Carousel */}
-                <div className="hidden md:grid grid-cols-1 md:grid-cols-5 gap-8 items-stretch">
+                <div className="hidden md:grid grid-cols-1 md:grid-cols-5 gap-8 items-stretch h-[180px]">
                 {/* Rating Summary */}
                 <div className="md:col-span-1 h-full">
                     <Card className="h-full">
@@ -128,11 +128,11 @@ export default function CourseReviewSection({ comments, user, episodes, onToggle
                 </div>
 
                 {/* Reviews Carousel */}
-                <div className="md:col-span-4">
-                    <Carousel opts={{ align: 'start', loop: false }} className="w-full">
-                        <CarouselContent className="-ml-4 h-[180px] overflow-y-auto">
+                <div className="md:col-span-4 h-full overflow-hidden">
+                    <Carousel opts={{ align: 'start', loop: false }} className="w-full h-full">
+                        <CarouselContent className="-ml-4 h-full">
                             {comments.map((comment) => (
-                            <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/3 pl-4">
+                            <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/3 pl-4 h-full">
                                     <ReviewItem 
                                     comment={comment} 
                                     episodeTitle={episodeMap.get(comment.episodeId)} 
