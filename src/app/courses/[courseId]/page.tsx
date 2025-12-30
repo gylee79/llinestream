@@ -28,7 +28,7 @@ export default function CourseDetailPage() {
   const [comments, setComments] = useState<EpisodeComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
   
-  const [api, setApi] = useState<CarouselApi>();
+  const [api, setApi] = useState<CarouselApi | undefined>();
   const { selectedIndex, scrollSnaps, onDotButtonClick } = useDotButton(api);
   const [isAllReviewsOpen, setAllReviewsOpen] = useState(false);
 
@@ -53,6 +53,7 @@ export default function CourseDetailPage() {
   useEffect(() => {
     const fetchComments = async () => {
       if (!firestore || !episodes || episodes.length === 0) {
+        setComments([]);
         setCommentsLoading(false);
         return;
       };
@@ -66,6 +67,11 @@ export default function CourseDetailPage() {
             allComments.push({ id: doc.id, ...doc.data() } as EpisodeComment);
           });
         }
+        allComments.sort((a, b) => {
+            const dateA = a.createdAt ? (a.createdAt as any).toDate() : new Date(0);
+            const dateB = b.createdAt ? (b.createdAt as any).toDate() : new Date(0);
+            return dateB.getTime() - dateA.getTime();
+        });
         setComments(allComments);
       } catch (error) {
         console.error("Error fetching comments for course:", error);

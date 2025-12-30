@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -38,7 +39,7 @@ import { Card, CardContent } from '../ui/card';
 
 const commentSchema = z.object({
   content: z.string().min(1, '내용을 입력해주세요.').max(1000, '1000자 이내로 작성해주세요.'),
-  rating: z.number().min(0).max(5).optional(),
+  rating: z.number().min(1, '별점을 선택해주세요.').max(5),
 });
 
 interface EpisodeCommentDialogProps {
@@ -142,19 +143,16 @@ export default function EpisodeCommentDialog({
   const onSubmit = async (data: z.infer<typeof commentSchema>) => {
     if (!firestore || !episode) return;
     try {
-      const commentData: any = {
+      const commentData = {
         episodeId: episode.id,
         userId: user.id,
         userName: user.name,
         userRole: user.role,
         content: data.content,
+        rating: data.rating,
         createdAt: serverTimestamp(),
       };
-
-      if (data.rating && data.rating > 0) {
-        commentData.rating = data.rating;
-      }
-
+      
       await addDoc(collection(firestore, 'episodes', episode.id, 'comments'), commentData);
       toast({ title: '성공', description: '댓글이 등록되었습니다.' });
       reset();
@@ -180,9 +178,9 @@ export default function EpisodeCommentDialog({
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
-        <div className={cn("max-h-[60vh]", mode === 'comment' && "grid grid-cols-1 md:grid-cols-2 gap-6")}>
+        <div className={cn("max-h-[60vh] grid min-h-0", mode === 'comment' && "grid-cols-1 md:grid-cols-2 gap-6")}>
           {/* Comment List */}
-          <div className="flex flex-col min-h-0 overflow-hidden">
+          <div className="flex flex-col min-h-0">
             <h3 className="text-lg font-semibold mb-2 flex-shrink-0">
               <MessageSquare className="inline-block w-5 h-5 mr-2" />
               모든 댓글 ({comments?.length || 0})
@@ -207,7 +205,7 @@ export default function EpisodeCommentDialog({
                 className="flex-grow flex flex-col space-y-4 border rounded-md p-4"
               >
                 <div className="space-y-1">
-                  <label className="text-sm font-medium">별점 (선택)</label>
+                  <label className="text-sm font-medium">별점</label>
                   <Controller
                     name="rating"
                     control={control}
@@ -224,12 +222,17 @@ export default function EpisodeCommentDialog({
                             )}
                             onMouseEnter={() => setHoverRating(star)}
                             onMouseLeave={() => setHoverRating(0)}
-                            onClick={() => field.onChange(star === ratingValue ? 0 : star)}
+                            onClick={() => field.onChange(star)}
                           />
                         ))}
                       </div>
                     )}
                   />
+                   {errors.rating && (
+                    <p className="text-xs text-destructive mt-1">
+                      {errors.rating.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex-grow flex flex-col">
