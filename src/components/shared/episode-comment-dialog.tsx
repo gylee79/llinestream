@@ -212,7 +212,7 @@ export default function EpisodeCommentDialog({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl md:h-auto h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="md:hidden truncate">{mobileDialogTitle}</DialogTitle>
+          <DialogTitle className="md:hidden truncate">{mobileDialogTitle} {`(${comments?.length || 0})`}</DialogTitle>
           <DialogTitle className="hidden md:block">{pcDialogTitle} {mode === 'view' && `(${comments?.length || 0})`}</DialogTitle>
           <DialogDescription className="hidden md:block">{dialogDescription}</DialogDescription>
         </DialogHeader>
