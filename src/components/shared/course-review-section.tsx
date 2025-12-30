@@ -84,14 +84,16 @@ export default function CourseReviewSection({ comments, user, episodes, onToggle
   return (
     <>
       <div className="mt-3">
-        <div className="flex justify-between items-center mb-4">
+        <div 
+          className="flex justify-between items-center mb-4 cursor-pointer"
+          onClick={toggleReviewExpansion}
+        >
           <h2 className="font-headline font-bold">
             <span className="md:text-2xl text-xl">리뷰</span>
             <span className="md:text-2xl text-lg"> ({totalReviews})</span>
           </h2>
-          <Button variant="ghost" onClick={toggleReviewExpansion}>
-            {isReviewExpanded ? '숨기기' : '리뷰 보기'}
-            {isReviewExpanded ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            {isReviewExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
           </Button>
         </div>
         
