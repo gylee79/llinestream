@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import type { EpisodeComment, User } from '@/lib/types';
@@ -65,20 +66,20 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
 
   const { averageRating, totalReviews, ratingDistribution, ratingCounts } = useMemo(() => {
     const ratedComments = comments.filter(c => c.rating && c.rating > 0);
-    const totalReviews = ratedComments.length;
-    if (totalReviews === 0) {
-      return { averageRating: 0, totalReviews: 0, ratingDistribution: [0, 0, 0, 0, 0], ratingCounts: [0,0,0,0,0] };
+    const totalReviewsWithRating = ratedComments.length;
+    if (totalReviewsWithRating === 0) {
+      return { averageRating: 0, totalReviews: comments.length, ratingDistribution: [0, 0, 0, 0, 0], ratingCounts: [0,0,0,0,0] };
     }
     const totalRating = ratedComments.reduce((sum, c) => sum + c.rating!, 0);
-    const averageRating = totalRating / totalReviews;
+    const averageRating = totalRating / totalReviewsWithRating;
     
     const counts = [0,0,0,0,0];
     ratedComments.forEach(c => {
         if(c.rating) counts[5-c.rating] += 1;
     })
-    const distribution = counts.map(d => (totalReviews > 0 ? (d / totalReviews) * 100 : 0));
+    const distribution = counts.map(d => (totalReviewsWithRating > 0 ? (d / totalReviewsWithRating) * 100 : 0));
 
-    return { averageRating, totalReviews, ratingDistribution: distribution, ratingCounts: counts };
+    return { averageRating, totalReviews: comments.length, ratingDistribution: distribution, ratingCounts: counts };
   }, [comments]);
   
   const hasReviews = comments.length > 0;
@@ -105,7 +106,7 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
                                 <Star key={star} className={cn("w-4 h-4", star <= averageRating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30')} />
                             ))}
                         </div>
-                        <span className="text-xs text-muted-foreground">{totalReviews}개 리뷰</span>
+                        <span className="text-xs text-muted-foreground">{comments.filter(c => c.rating).length}개 리뷰</span>
                     </CardContent>
                 </Card>
              </div>
@@ -135,7 +136,7 @@ export default function CourseReviewSection({ comments, user }: CourseReviewSect
                     <Star key={star} className={cn("w-3 h-3", star <= averageRating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30')} />
                   ))}
                 </div>
-                <span className="text-[10px] text-muted-foreground">{totalReviews}개 리뷰</span>
+                <span className="text-[10px] text-muted-foreground">{comments.filter(c => c.rating).length}개 리뷰</span>
               </CardContent>
             </Card>
             {recentThreeReviews.map(comment => (

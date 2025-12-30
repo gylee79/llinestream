@@ -30,7 +30,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 const commentSchema = z.object({
   content: z.string().min(1, '내용을 입력해주세요.').max(1000, '1000자 이내로 작성해주세요.'),
-  rating: z.number().min(1, '별점을 선택해주세요.').max(5),
+  rating: z.number().min(0).max(5).optional(),
 });
 
 interface EpisodeCommentSectionProps {
@@ -79,15 +79,18 @@ export default function EpisodeCommentSection({
   const onSubmit = async (data: z.infer<typeof commentSchema>) => {
     if (!firestore) return;
     try {
-      const commentData = {
+      const commentData: any = {
         episodeId: episode.id,
         userId: user.id,
         userName: user.name,
         userRole: user.role,
         content: data.content,
-        rating: data.rating,
         createdAt: serverTimestamp(),
       };
+      
+      if (data.rating && data.rating > 0) {
+        commentData.rating = data.rating;
+      }
 
       await addDoc(collection(firestore, 'episodes', episode.id, 'comments'), commentData);
       toast({ title: '성공', description: '댓글이 등록되었습니다.' });
@@ -171,7 +174,7 @@ export default function EpisodeCommentSection({
             className="flex-grow flex flex-col space-y-4 border rounded-md p-4"
         >
             <div className="space-y-1">
-            <label className="text-sm font-medium">별점</label>
+            <label className="text-sm font-medium">별점 (선택)</label>
             <Controller
                 name="rating"
                 control={control}
