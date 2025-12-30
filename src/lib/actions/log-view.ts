@@ -8,7 +8,7 @@ import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import type { EpisodeViewLog } from '../types';
 
-type LogViewPayload = Omit<EpisodeViewLog, 'id' | 'endedAt' | 'duration'> & {
+type LogViewPayload = Omit<EpisodeViewLog, 'id' | 'endedAt' | 'duration' | 'startedAt'> & {
     endedAt: Date,
     startedAt: Date,
 };
@@ -54,3 +54,5 @@ export async function logEpisodeView(payload: LogViewPayload): Promise<{ success
     return { success: false, message: `시청 기록 저장 실패: ${errorMessage}` };
   }
 }
+
+    

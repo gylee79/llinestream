@@ -2,7 +2,7 @@
 'use client';
 
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
-import type { EmblaCarouselType } from 'embla-carousel-react';
+import type { UseEmblaCarouselType } from 'embla-carousel-react';
 
 // This union type can represent a client-side Timestamp or a server-side FieldValue for server timestamps.
 export type Timestamp = FirebaseTimestamp | FieldValue;
@@ -183,4 +183,6 @@ export interface EpisodeComment {
   createdAt: Timestamp;
 }
 
-export type CarouselApi = EmblaCarouselType;
+export type CarouselApi = UseEmblaCarouselType;
+
+    

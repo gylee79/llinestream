@@ -121,7 +121,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
             }
 
             if (currentPurchase && isBefore(newExpiryDate, currentPurchase)) {
-                toast({ variant: 'destructive', title: '차감 오류', description: `만료일이 구독 시작일(${toDisplayDate(currentPurchase)})보다 빨라질 수 없습니다.` });
+                toast({ variant: 'destructive', title: '차감 오류', description: `만료일이 구독 시작일(${toDisplayDate(currentPurchase) || '알수없음'})보다 빨라질 수 없습니다.` });
                 return;
             }
             
@@ -190,7 +190,9 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
     };
 
     const getSubscriptionStatusBadge = (sub: Subscription) => {
-      const isExpired = isAfter(new Date(), toJSDate(sub.expiresAt));
+      const expires = toJSDate(sub.expiresAt);
+      if (!expires) return <Badge variant="secondary">처리중</Badge>;
+      const isExpired = isAfter(new Date(), expires);
       if (sub.status !== 'PAID') {
           return <Badge variant="secondary" className="text-xs">{sub.status}</Badge>
       }
@@ -311,3 +313,5 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
     </Dialog>
   );
 }
+
+    
