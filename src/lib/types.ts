@@ -1,11 +1,11 @@
 
 'use client';
 
-import type { Timestamp as FirebaseTimestamp } from 'firebase/firestore';
+import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
+import type { EmblaCarouselType } from 'embla-carousel-react';
 
-// We use the client-side Timestamp for all client-facing components and types.
-// For server-side operations (like in `complete/route.ts`), we will convert as needed.
-export type Timestamp = FirebaseTimestamp | Date;
+// This union type can represent a client-side Timestamp or a server-side FieldValue for server timestamps.
+export type Timestamp = FirebaseTimestamp | FieldValue;
 
 export interface User {
   id: string; // This will be the document ID from Firestore, added on the client
@@ -183,12 +183,4 @@ export interface EpisodeComment {
   createdAt: Timestamp;
 }
 
-export type CarouselApi = {
-  on: (event: string, callback: () => void) => void;
-  off: (event: string, callback: () => void) => void;
-  scrollPrev: () => void;
-  scrollNext: () => void;
-  scrollTo: (index: number) => void;
-  selectedScrollSnap: () => number;
-  scrollSnapList: () => number[];
-};
+export type CarouselApi = EmblaCarouselType;

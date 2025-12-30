@@ -132,7 +132,7 @@ function HeroImageManager() {
                         itemType: 'settings',
                         itemId: 'heroImages',
                         subCollection: page,
-                        field: device === 'pc' ? 'url' : 'urlMobile',
+                        fieldToUpdate: device === 'pc' ? 'url' : 'urlMobile',
                         base64Image,
                         imageContentType: file.type,
                         imageName: file.name,
@@ -170,7 +170,7 @@ function HeroImageManager() {
                 itemType: 'settings',
                 itemId: 'heroImages',
                 subCollection: page,
-                field: device === 'pc' ? 'url' : 'urlMobile',
+                fieldToUpdate: device === 'pc' ? 'url' : 'urlMobile',
                 base64Image: null, // Indicates deletion
             });
 

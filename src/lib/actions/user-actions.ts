@@ -7,7 +7,7 @@ config();
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
-import type { User, UserAuditLog } from '../types';
+import type { User, UserAuditLog, Timestamp } from '../types';
 
 type UpdateResult = {
   success: boolean;
@@ -61,7 +61,7 @@ export async function updateUserProfileAndLog(payload: UpdateProfilePayload): Pr
                     userId: userId,
                     userName: user.name, // Log with the name at the time of change
                     userEmail: user.email,
-                    changedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    changedAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
                     fieldName: key,
                     oldValue: currentData[key],
                     newValue: newData[key]
