@@ -14,7 +14,7 @@ import type { EpisodeViewLog } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toDisplayDateTime } from '@/lib/date-helpers';
+import { toDisplayDate, toDisplayTime } from '@/lib/date-helpers';
 
 export default function AdminViewHistoryPage() {
   const firestore = useFirestore();
@@ -44,7 +44,7 @@ export default function AdminViewHistoryPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>날짜(이벤트 발생일)</TableHead>
+                <TableHead>날짜</TableHead>
                 <TableHead>사용자</TableHead>
                 <TableHead>비디오 제목</TableHead>
                 <TableHead>시청 시작 시간</TableHead>
@@ -62,14 +62,14 @@ export default function AdminViewHistoryPage() {
               ) : viewLogs && viewLogs.length > 0 ? (
                 viewLogs.map((log) => (
                     <TableRow key={log.id}>
-                        <TableCell>{toDisplayDateTime(log.endedAt)}</TableCell>
+                        <TableCell>{toDisplayDate(log.endedAt)}</TableCell>
                         <TableCell>
                             <div className="font-medium">{log.userName}</div>
                             <div className="text-xs text-muted-foreground">{log.userEmail}</div>
                         </TableCell>
                         <TableCell>{log.episodeTitle}</TableCell>
-                        <TableCell>{toDisplayDateTime(log.startedAt)}</TableCell>
-                        <TableCell>{toDisplayDateTime(log.endedAt)}</TableCell>
+                        <TableCell>{toDisplayTime(log.startedAt)}</TableCell>
+                        <TableCell>{toDisplayTime(log.endedAt)}</TableCell>
                         <TableCell>{log.duration}초</TableCell>
                     </TableRow>
                 ))

@@ -66,3 +66,24 @@ export function toDisplayDateTime(timestamp: Timestamp | Date | null | undefined
         hour12: false, // Use 24-hour format
     }).format(date).replace(/\. /g, '.').replace(/\.$/, ''); // Tidy up the format
 }
+
+/**
+ * Safely converts a custom Timestamp into a localized time string for display.
+ * @param timestamp The Timestamp or Date to convert.
+ * @returns A formatted time string (e.g., 'HH:mm:ss'), or an empty string.
+ */
+export function toDisplayTime(timestamp: Timestamp | Date | null | undefined): string {
+    if (!timestamp) {
+        return '';
+    }
+    const date = toJSDate(timestamp as Timestamp);
+    if (!date) {
+        return '처리중...';
+    }
+    return new Intl.DateTimeFormat('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    }).format(date);
+}
