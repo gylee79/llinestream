@@ -50,8 +50,8 @@ export default function Home() {
       <div className="container mx-auto space-y-16 py-12">
         {user && (
           <section>
-            <h2 className="mb-4 font-headline text-2xl font-semibold tracking-tight">
-              최근 시청 영상
+            <h2 className="mb-6 font-headline text-3xl font-bold tracking-tight">
+              뷰티&건강
             </h2>
             <ContinueWatching />
           </section>
