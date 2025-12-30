@@ -55,6 +55,8 @@ export interface Course {
   thumbnailPath?: string;
   introImageUrls?: string[];
   introImagePaths?: string[];
+  detailImageUrls?: string[];
+  detailImagePaths?: string[];
   // New fields for richer display
   level?: '입문' | '초급' | '중급' | '고급';
   tags?: string[];

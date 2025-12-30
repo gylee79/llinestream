@@ -20,8 +20,10 @@ type UpdateCoursePayload = {
     courseId: string;
     name: string;
     description: string;
-    existingImageUrls: string[];
-    newFiles: File[];
+    existingIntroImageUrls: string[];
+    newIntroFiles: File[];
+    existingDetailImageUrls: string[];
+    newDetailFiles: File[];
 }
 
 const deleteStorageFileByPath = async (storage: Storage, filePath: string | undefined) => {
@@ -36,8 +38,42 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
     }
 };
 
+const processImages = async (
+    storage: Storage,
+    courseId: string,
+    imageType: 'intro' | 'detail',
+    existingUrls: string[],
+    newFiles: File[],
+    currentPaths: string[]
+) => {
+    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
+    const existingPaths = existingUrls.map(url => extractPathFromUrl(url)).filter(Boolean) as string[];
+    const pathsToDelete = currentPaths.filter(path => !existingPaths.includes(path));
+
+    for (const path of pathsToDelete) {
+        await deleteStorageFileByPath(storage, path);
+    }
+
+    const newImageResults = await Promise.all(
+        newFiles.map(async (file) => {
+            const path = `courses/${courseId}/${imageType}/${Date.now()}-${file.name}`;
+            const buffer = Buffer.from(await file.arrayBuffer());
+            const storageFile = storage.bucket().file(path);
+            await storageFile.save(buffer, { metadata: { contentType: file.type } });
+            const downloadUrl = getPublicUrl(bucketName, path);
+            return { url: downloadUrl, path };
+        })
+    );
+
+    const finalUrls = [...existingUrls, ...newImageResults.map(r => r.url)];
+    const finalPaths = [...existingPaths, ...newImageResults.map(r => r.path)];
+    
+    return { finalUrls, finalPaths };
+}
+
+
 export async function updateCourse(payload: UpdateCoursePayload): Promise<UpdateResult> {
-  const { courseId, name, description, existingImageUrls, newFiles } = payload;
+  const { courseId, name, description, existingIntroImageUrls, newIntroFiles, existingDetailImageUrls, newDetailFiles } = payload;
 
   if (!courseId) {
     return { success: false, message: '강좌 ID가 필요합니다.' };
@@ -47,7 +83,6 @@ export async function updateCourse(payload: UpdateCoursePayload): Promise<Update
     const adminApp = initializeAdminApp();
     const db = admin.firestore(adminApp);
     const storage = admin.storage(adminApp);
-    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 
     const courseRef = db.collection('courses').doc(courseId);
     const courseDoc = await courseRef.get();
@@ -57,37 +92,17 @@ export async function updateCourse(payload: UpdateCoursePayload): Promise<Update
     }
     const currentCourse = courseDoc.data() as Course;
 
-    // 1. Delete images that are no longer in the list
-    const currentPaths = currentCourse.introImagePaths || [];
-    const existingPaths = existingImageUrls.map(url => extractPathFromUrl(url)).filter(Boolean) as string[];
-    const pathsToDelete = currentPaths.filter(path => !existingPaths.includes(path));
+    const introImagesResult = await processImages(storage, courseId, 'intro', existingIntroImageUrls, newIntroFiles, currentCourse.introImagePaths || []);
+    const detailImagesResult = await processImages(storage, courseId, 'detail', existingDetailImageUrls, newDetailFiles, currentCourse.detailImagePaths || []);
     
-    for (const path of pathsToDelete) {
-        await deleteStorageFileByPath(storage, path);
-    }
-
-    // 2. Upload new files
-    const newImageResults = await Promise.all(
-        newFiles.map(async (file) => {
-            const path = `courses/${courseId}/intro/${Date.now()}-${file.name}`;
-            const buffer = Buffer.from(await file.arrayBuffer());
-            const storageFile = storage.bucket().file(path);
-            await storageFile.save(buffer, { metadata: { contentType: file.type } });
-            const downloadUrl = getPublicUrl(bucketName, path);
-            return { url: downloadUrl, path };
-        })
-    );
-
-    // 3. Construct the final arrays in the correct order
-    const finalImageUrls = [...existingImageUrls, ...newImageResults.map(r => r.url)];
-    const finalImagePaths = [...existingPaths, ...newImageResults.map(r => r.path)];
-    
-    // 4. Update Firestore
+    // Update Firestore
     await courseRef.update({
       name,
       description,
-      introImageUrls: finalImageUrls,
-      introImagePaths: finalImagePaths,
+      introImageUrls: introImagesResult.finalUrls,
+      introImagePaths: introImagesResult.finalPaths,
+      detailImageUrls: detailImagesResult.finalUrls,
+      detailImagePaths: detailImagesResult.finalPaths,
     });
 
     revalidatePath(`/admin/courses/${courseId}`);

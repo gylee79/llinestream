@@ -54,6 +54,86 @@ interface ImageItem {
   file?: File;
 }
 
+interface ImageManagerProps {
+    title: string;
+    description: string;
+    images: ImageItem[];
+    setImages: React.Dispatch<React.SetStateAction<ImageItem[]>>;
+    idPrefix: string;
+}
+
+const ImageManager = ({ title, description, images, setImages, idPrefix }: ImageManagerProps) => {
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files) {
+          const newFiles = Array.from(event.target.files).map(file => {
+            const localUrl = URL.createObjectURL(file);
+            return { id: uuidv4(), url: localUrl, isNew: true, file };
+          });
+          setImages(prev => [...prev, ...newFiles]);
+        }
+    };
+    
+    const handleRemoveImage = (idToRemove: string) => {
+        const imageToRemove = images.find(img => img.id === idToRemove);
+        if (imageToRemove?.isNew) {
+          URL.revokeObjectURL(imageToRemove.url);
+        }
+        setImages(prev => prev.filter(img => img.id !== idToRemove));
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>{title}</CardTitle>
+                <CardDescription>{description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-4">
+                    <div className="p-4 border-2 border-dashed rounded-lg text-center">
+                        <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <Label htmlFor={`${idPrefix}-image-upload`} className="mt-2 block text-sm font-medium text-primary hover:underline cursor-pointer">
+                            파일 선택
+                        </Label>
+                        <Input id={`${idPrefix}-image-upload`} type="file" multiple onChange={handleFileChange} className="hidden" />
+                        <p className="mt-1 text-xs text-muted-foreground">드래그 앤 드롭 또는 파일 선택으로 여러 이미지를 추가하세요.</p>
+                    </div>
+                    
+                    <Reorder.Group axis="y" values={images} onReorder={setImages} className="space-y-2">
+                        {images.map(image => (
+                            <Reorder.Item key={image.id} value={image} className="bg-muted p-2 rounded-lg flex items-center gap-4 group">
+                                <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
+                                <div className="relative w-40 h-24 rounded-md overflow-hidden">
+                                    <Image src={image.url} alt="업로드 이미지" fill className="object-cover" />
+                                </div>
+                                <div className="flex-1 text-sm text-muted-foreground truncate">
+                                    {image.isNew ? image.file?.name : '기존 이미지'}
+                                </div>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="text-destructive opacity-50 group-hover:opacity-100">
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>이미지를 삭제하시겠습니까?</AlertDialogTitle>
+                                            <AlertDialogDescription>이 작업은 되돌릴 수 없습니다. 이미지가 목록에서 제거됩니다.</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>취소</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleRemoveImage(image.id)} className="bg-destructive hover:bg-destructive/90">삭제</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </Reorder.Item>
+                        ))}
+                    </Reorder.Group>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 interface CourseEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -62,7 +142,8 @@ interface CourseEditDialogProps {
 
 export default function CourseEditDialog({ open, onOpenChange, course }: CourseEditDialogProps) {
   const { toast } = useToast();
-  const [images, setImages] = useState<ImageItem[]>([]);
+  const [introImages, setIntroImages] = useState<ImageItem[]>([]);
+  const [detailImages, setDetailImages] = useState<ImageItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const form = useForm<CourseFormValues>({
@@ -79,44 +160,33 @@ export default function CourseEditDialog({ open, onOpenChange, course }: CourseE
         name: course.name,
         description: course.description,
       });
-      const existingImages = (course.introImageUrls || []).map(url => ({ id: uuidv4(), url, isNew: false }));
-      setImages(existingImages);
+      const existingIntroImages = (course.introImageUrls || []).map(url => ({ id: uuidv4(), url, isNew: false }));
+      setIntroImages(existingIntroImages);
+      const existingDetailImages = (course.detailImageUrls || []).map(url => ({ id: uuidv4(), url, isNew: false }));
+      setDetailImages(existingDetailImages);
     }
   }, [course, form]);
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files) {
-      const newFiles = Array.from(event.target.files).map(file => {
-        const localUrl = URL.createObjectURL(file);
-        return { id: uuidv4(), url: localUrl, isNew: true, file };
-      });
-      setImages(prev => [...prev, ...newFiles]);
-    }
-  };
-  
-  const handleRemoveImage = (idToRemove: string) => {
-    const imageToRemove = images.find(img => img.id === idToRemove);
-    if (imageToRemove?.isNew) {
-      URL.revokeObjectURL(imageToRemove.url);
-    }
-    setImages(prev => prev.filter(img => img.id !== idToRemove));
-  };
 
 
   const onSubmit = async (data: CourseFormValues) => {
     setIsProcessing(true);
 
     try {
-      const newFiles = images.filter(img => img.isNew && img.file).map(img => img.file!);
-      const existingImageUrls = images.filter(img => !img.isNew).map(img => img.url);
+        const newIntroFiles = introImages.filter(img => img.isNew && img.file).map(img => img.file!);
+        const existingIntroImageUrls = introImages.filter(img => !img.isNew).map(img => img.url);
 
-      const result = await updateCourse({
-        courseId: course.id,
-        name: data.name,
-        description: data.description,
-        existingImageUrls: existingImageUrls,
-        newFiles,
-      });
+        const newDetailFiles = detailImages.filter(img => img.isNew && img.file).map(img => img.file!);
+        const existingDetailImageUrls = detailImages.filter(img => !img.isNew).map(img => img.url);
+
+        const result = await updateCourse({
+            courseId: course.id,
+            name: data.name,
+            description: data.description,
+            existingIntroImageUrls: existingIntroImageUrls,
+            newIntroFiles: newIntroFiles,
+            existingDetailImageUrls: existingDetailImageUrls,
+            newDetailFiles: newDetailFiles,
+        });
 
       if (result.success) {
         toast({ title: "성공", description: "강좌 정보가 성공적으로 업데이트되었습니다." });
@@ -137,80 +207,44 @@ export default function CourseEditDialog({ open, onOpenChange, course }: CourseE
       <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>강좌 정보 수정</DialogTitle>
-          <DialogDescription>&apos;{course.name}&apos; 강좌의 기본 정보와 소개 이미지를 관리합니다.</DialogDescription>
+          <DialogDescription>&apos;{course.name}&apos; 강좌의 기본 정보와 이미지를 관리합니다.</DialogDescription>
         </DialogHeader>
-        <ScrollArea className="max-h-[70vh]">
-          <form onSubmit={form.handleSubmit(onSubmit)} className="p-1">
-            <Card>
-              <CardHeader>
-                <CardTitle>기본 정보</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="name">강좌 이름</Label>
-                  <Input id="name" {...form.register('name')} />
-                  {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">강좌 설명</Label>
-                  <Textarea id="description" {...form.register('description')} rows={5} />
-                  {form.formState.errors.description && <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>}
-                </div>
-              </CardContent>
-            </Card>
+        <ScrollArea className="max-h-[70vh] p-1">
+            <div className="space-y-6">
+                <Card>
+                <CardHeader>
+                    <CardTitle>기본 정보</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                    <Label htmlFor="name">강좌 이름</Label>
+                    <Input id="name" {...form.register('name')} />
+                    {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
+                    </div>
+                    <div className="space-y-2">
+                    <Label htmlFor="description">강좌 설명</Label>
+                    <Textarea id="description" {...form.register('description')} rows={5} />
+                    {form.formState.errors.description && <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>}
+                    </div>
+                </CardContent>
+                </Card>
 
-            <Separator className="my-8" />
+                <ImageManager 
+                    title="소개 이미지 관리"
+                    description="강좌 목록, 상단 히어로 영역에 사용될 대표 이미지를 관리합니다."
+                    images={introImages}
+                    setImages={setIntroImages}
+                    idPrefix="intro"
+                />
 
-            <Card>
-              <CardHeader>
-                <CardTitle>소개 이미지 관리</CardTitle>
-                <CardDescription>강좌를 상세히 소개하는 여러 이미지를 추가, 삭제, 재정렬할 수 있습니다.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="p-4 border-2 border-dashed rounded-lg text-center">
-                    <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <Label htmlFor="image-upload-dialog" className="mt-2 block text-sm font-medium text-primary hover:underline cursor-pointer">
-                      파일 선택
-                    </Label>
-                    <Input id="image-upload-dialog" type="file" multiple onChange={handleFileChange} className="hidden" />
-                    <p className="mt-1 text-xs text-muted-foreground">드래그 앤 드롭 또는 파일 선택으로 여러 이미지를 추가하세요.</p>
-                  </div>
-                  
-                  <Reorder.Group axis="y" values={images} onReorder={setImages} className="space-y-2">
-                      {images.map(image => (
-                          <Reorder.Item key={image.id} value={image} className="bg-muted p-2 rounded-lg flex items-center gap-4 group">
-                              <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
-                              <div className="relative w-40 h-24 rounded-md overflow-hidden">
-                                  <Image src={image.url} alt="소개 이미지" fill className="object-cover" />
-                              </div>
-                              <div className="flex-1 text-sm text-muted-foreground truncate">
-                                  {image.isNew ? image.file?.name : '기존 이미지'}
-                              </div>
-                              <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="text-destructive opacity-50 group-hover:opacity-100">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                          <AlertDialogTitle>이미지를 삭제하시겠습니까?</AlertDialogTitle>
-                                          <AlertDialogDescription>이 작업은 되돌릴 수 없습니다. 이미지가 목록에서 제거됩니다.</AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                          <AlertDialogCancel>취소</AlertDialogCancel>
-                                          <AlertDialogAction onClick={() => handleRemoveImage(image.id)} className="bg-destructive hover:bg-destructive/90">삭제</AlertDialogAction>
-                                      </AlertDialogFooter>
-                                  </AlertDialogContent>
-                              </AlertDialog>
-                          </Reorder.Item>
-                      ))}
-                  </Reorder.Group>
-                </div>
-              </CardContent>
-            </Card>
-          </form>
+                <ImageManager 
+                    title="상세페이지 이미지 관리"
+                    description="'상세페이지 전체보기' 클릭 시 보여질 상세 설명 이미지를 관리합니다."
+                    images={detailImages}
+                    setImages={setDetailImages}
+                    idPrefix="detail"
+                />
+            </div>
         </ScrollArea>
         <DialogFooter className="pt-6">
             <DialogClose asChild>

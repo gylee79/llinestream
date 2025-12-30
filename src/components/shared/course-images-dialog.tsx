@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -6,13 +7,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from '@/components/ui/carousel';
 import Image from 'next/image';
 import { ScrollArea } from '../ui/scroll-area';
 
@@ -30,19 +24,19 @@ export default function CourseImagesDialog({ isOpen, onOpenChange, images, cours
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
-        <DialogHeader className="p-4 border-b">
+      <DialogContent className="max-w-[90vw] md:max-w-4xl h-[90vh] flex flex-col p-0">
+        <DialogHeader className="p-4 border-b flex-shrink-0">
           <DialogTitle>{courseName} 상세 정보</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="flex-1">
-            <div className="p-4">
+        <ScrollArea className="flex-grow min-h-0">
+            <div className="p-4 md:p-6">
                 {images.map((url, index) => (
-                    <div key={index} className="relative w-full aspect-auto mb-4">
+                    <div key={index} className="relative w-full h-auto mb-4">
                         <Image 
                             src={url} 
-                            alt={`소개 이미지 ${index + 1}`} 
+                            alt={`상세 정보 이미지 ${index + 1}`} 
                             width={1200}
-                            height={800}
+                            height={1200}
                             sizes="100vw"
                             className="w-full h-auto object-contain rounded-md"
                         />
