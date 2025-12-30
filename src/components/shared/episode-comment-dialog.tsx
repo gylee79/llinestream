@@ -204,10 +204,7 @@ export default function EpisodeCommentDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent 
-        className="sm:max-w-2xl h-[90vh] md:h-auto flex flex-col"
-        onInteractOutside={(e) => e.preventDefault()}
-      >
+      <DialogContent className="sm:max-w-2xl h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{dialogTitle} {mode === 'view' && `(${comments?.length || 0})`}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
@@ -216,12 +213,12 @@ export default function EpisodeCommentDialog({
         <div className={cn("grid min-h-0 flex-grow", mode === 'comment' ? "grid-cols-1 md:grid-cols-2 gap-6" : "grid-cols-1")}>
           {/* Comment List */}
           <div className="flex flex-col min-h-0">
-            <h3 className="text-lg font-semibold mb-2 flex-shrink-0 md:flex hidden">
+            <h3 className="text-lg font-semibold mb-2 flex-shrink-0">
               <MessageSquare className="inline-block w-5 h-5 mr-2" />
               모든 댓글 ({comments?.length || 0})
             </h3>
-            <ScrollArea className="flex-grow border rounded-md p-4 bg-muted/50 h-full">
-              {isLoading && <p className="hidden md:block">댓글을 불러오는 중...</p>}
+            <ScrollArea className="flex-grow border rounded-md p-4 bg-muted/50">
+              {isLoading && <p>댓글을 불러오는 중...</p>}
               {!isLoading && comments?.length === 0 && (
                 <p className="text-center text-muted-foreground py-8">
                   아직 댓글이 없습니다.
