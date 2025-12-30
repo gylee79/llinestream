@@ -210,14 +210,14 @@ export default function EpisodeCommentDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl md:h-auto h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-2xl h-[90vh] md:h-auto flex flex-col">
         <DialogHeader>
           <DialogTitle className="md:hidden truncate">{mobileDialogTitle} {`(${comments?.length || 0})`}</DialogTitle>
           <DialogTitle className="hidden md:block">{pcDialogTitle} {mode === 'view' && `(${comments?.length || 0})`}</DialogTitle>
           <DialogDescription className="hidden md:block">{dialogDescription}</DialogDescription>
         </DialogHeader>
 
-        <div className={cn("grid min-h-0 flex-grow", mode === 'comment' ? "grid-cols-1 md:grid-cols-2 gap-6" : "grid-cols-1")}>
+        <div className={cn("grid flex-grow min-h-0", mode === 'comment' ? "grid-cols-1 md:grid-cols-2 gap-6" : "grid-cols-1")}>
           {/* Comment List */}
           <div className="flex flex-col min-h-0">
             <h3 className="text-lg font-semibold mb-2 flex-shrink-0 md:flex hidden">
