@@ -3,7 +3,7 @@
 
 import Image from 'next/image';
 import { useState, useMemo } from 'react';
-import { Lock, Play, Star, Clock } from 'lucide-react';
+import { Lock, Play, Star, Clock, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -94,6 +94,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                                     disabled={!user}
                                 >
                                     리뷰
+                                    <Pencil className="ml-1 h-3 w-3" />
                                 </Button>
                             </div>
                             <div className="relative aspect-video w-full bg-muted rounded-md overflow-hidden">
