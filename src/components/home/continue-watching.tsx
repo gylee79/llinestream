@@ -2,23 +2,25 @@
 
 import { useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase/hooks';
-import { collection, query, orderBy, limit, where } from 'firebase/firestore';
+import { collection, query, limit, where } from 'firebase/firestore';
 import type { Episode, EpisodeViewLog } from '@/lib/types';
 import ContentCarousel from '@/components/shared/content-carousel';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toJSDate } from '@/lib/date-helpers';
 
 export default function ContinueWatching() {
     const { user } = useUser();
     const firestore = useFirestore();
 
-    // Changed to query the correct 'episode_view_logs' collection for the current user.
+    // Fetch logs for the current user. NOTE: We sort on the client to avoid complex security rules.
     const historyQuery = useMemoFirebase(() => {
         if (!user || !firestore) return null;
         return query(
             collection(firestore, 'episode_view_logs'),
             where('userId', '==', user.id),
-            orderBy('endedAt', 'desc'),
-            limit(10)
+            // orderBy is removed to comply with security rules.
+            // We will sort manually on the client.
+            limit(30) // Fetch more items to sort from, as we can't rely on DB ordering.
         );
     }, [user, firestore]);
 
@@ -39,10 +41,13 @@ export default function ContinueWatching() {
         // Filter logs where watched duration is 5 seconds or more.
         const filteredLogs = viewLogs.filter(log => log.duration >= 5);
 
-        // Get unique episode IDs from the filtered logs, maintaining order (most recent first)
-        const uniqueEpisodeIds = [...new Set(filteredLogs.map(log => log.episodeId))];
+        // Sort on the client side by endedAt date, descending.
+        const sortedLogs = filteredLogs.sort((a, b) => toJSDate(b.endedAt).getTime() - toJSDate(a.endedAt).getTime());
+
+        // Get unique episode IDs from the sorted logs, maintaining order (most recent first)
+        const uniqueEpisodeIds = [...new Set(sortedLogs.map(log => log.episodeId))];
         
-        return uniqueEpisodeIds.map(episodeId => episodeMap.get(episodeId)).filter(Boolean) as Episode[];
+        return uniqueEpisodeIds.slice(0, 10).map(episodeId => episodeMap.get(episodeId)).filter(Boolean) as Episode[];
     }, [viewLogs, allEpisodes]);
     
     const isLoading = historyLoading || episodesLoading;
