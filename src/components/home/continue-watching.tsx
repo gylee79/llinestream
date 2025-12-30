@@ -6,7 +6,6 @@ import { collection, query, limit, orderBy } from 'firebase/firestore';
 import type { Episode, EpisodeViewLog } from '@/lib/types';
 import ContentCarousel from '@/components/shared/content-carousel';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toJSDate } from '@/lib/date-helpers';
 
 export default function ContinueWatching() {
     const { user } = useUser();
@@ -69,6 +68,6 @@ export default function ContinueWatching() {
     }
 
     return (
-        <ContentCarousel title="최근 시청 영상" items={watchedEpisodes} itemType="episode" />
+        <ContentCarousel items={watchedEpisodes} itemType="episode" />
     );
 }
