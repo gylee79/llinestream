@@ -18,6 +18,15 @@ const formatDuration = (seconds: number) => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
+interface EpisodeListItemProps {
+    episode: Episode;
+    instructor?: Instructor;
+    isPlayable: boolean;
+    classification: Classification | null;
+    user: User | null;
+    comments: EpisodeComment[];
+}
+
 export default function EpisodeListItem({ episode, instructor, isPlayable, classification, user, comments }: EpisodeListItemProps) {
     const [isPlayerOpen, setPlayerOpen] = useState(false);
     const [isPaymentOpen, setPaymentOpen] = useState(false);
@@ -45,55 +54,59 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
     return (
         <>
             <Card className="overflow-hidden">
-                <CardContent className="p-3 flex gap-4">
-                    {/* Left Column */}
-                    <div className="flex-grow flex flex-col justify-between">
-                        <div>
-                            <h3 className="text-base font-bold leading-tight line-clamp-2">{episode.title}</h3>
-                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{episode.description}</p>
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
-                            <span>강사: {instructor?.name || 'N/A'}</span>
-                            <div className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                <span>{formatDuration(episode.duration)}</span>
+                <CardContent className="p-3">
+                     <div className="flex gap-3">
+                        {/* Left Column */}
+                        <div className="flex-grow flex flex-col justify-between min-w-0">
+                            <div>
+                                <h3 className="text-base font-bold leading-tight line-clamp-2">{episode.title}</h3>
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{episode.description}</p>
+                            </div>
+                            <div className="space-y-1 mt-2">
+                                <p className="text-xs text-muted-foreground">강사: {instructor?.name || 'N/A'}</p>
+                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                    <div className="flex items-center gap-1">
+                                        <Clock className="w-3 h-3" />
+                                        <span>{formatDuration(episode.duration)}</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Right Column */}
-                    <div className="flex-shrink-0 flex flex-col items-center gap-1 w-32">
-                        <div className="w-full flex justify-between items-center h-6">
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                {ratedCommentsCount > 0 ? (
-                                    <>
-                                        <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                                        <span className="font-semibold text-foreground">{averageRating.toFixed(1)}</span>
-                                        <span>({ratedCommentsCount})</span>
-                                    </>
-                                ) : (
-                                    <div className="w-12 h-4"/> 
+                        {/* Right Column */}
+                        <div className="flex-shrink-0 flex flex-col items-center gap-1.5 w-24">
+                            <div className="w-full flex justify-between items-center h-6">
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    {ratedCommentsCount > 0 ? (
+                                        <>
+                                            <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                            <span className="font-semibold text-foreground">{averageRating.toFixed(1)}</span>
+                                            <span>({ratedCommentsCount})</span>
+                                        </>
+                                    ) : (
+                                        <div className="w-12 h-4"/> 
+                                    )}
+                                </div>
+                                <Button
+                                    variant="link"
+                                    className="h-auto p-0 text-xs text-muted-foreground"
+                                    onClick={() => user && setCommentOpen(true)}
+                                    disabled={!user}
+                                >
+                                    리뷰
+                                </Button>
+                            </div>
+                            <div className="relative aspect-video w-full bg-muted rounded-md overflow-hidden">
+                                <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="96px" className="object-cover" />
+                                {!episode.isFree && (
+                                    <Badge variant="secondary" className="absolute bottom-1 right-1 h-5 px-1.5 py-0 text-xs">구독필요</Badge>
                                 )}
                             </div>
-                            <Button
-                                variant="link"
-                                className="h-auto p-0 text-xs text-muted-foreground"
-                                onClick={() => user && setCommentOpen(true)}
-                                disabled={!user}
-                            >
-                                리뷰 작성
+                            <Button className="w-full mt-1 h-8 text-sm" onClick={handlePlayClick}>
+                                {isPlayable ? <Play className="mr-1.5 h-4 w-4" /> : <Lock className="mr-1.5 h-4 w-4" />}
+                                시청
                             </Button>
                         </div>
-                        <div className="relative aspect-video w-full bg-muted rounded-md overflow-hidden">
-                            <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="128px" className="object-cover" />
-                             {!episode.isFree && (
-                                <Badge variant="secondary" className="absolute bottom-1 right-1 h-5 px-1.5 py-0 text-xs">구독필요</Badge>
-                            )}
-                        </div>
-                        <Button className="w-full mt-1" size="sm" onClick={handlePlayClick}>
-                            {isPlayable ? <Play className="mr-1.5 h-4 w-4" /> : <Lock className="mr-1.5 h-4 w-4" />}
-                            시청
-                        </Button>
                     </div>
                 </CardContent>
             </Card>
