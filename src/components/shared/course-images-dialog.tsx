@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,29 @@ interface CourseImagesDialogProps {
 }
 
 export default function CourseImagesDialog({ isOpen, onOpenChange, images, courseName }: CourseImagesDialogProps) {
+
+  useEffect(() => {
+    const viewport = document.querySelector("meta[name=viewport]");
+    if (!viewport) return;
+    
+    const originalContent = viewport.getAttribute("content");
+
+    if (isOpen) {
+      // Allow scaling when dialog is open
+      viewport.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes");
+    } else {
+      // Revert to original or default when dialog is closed
+      viewport.setAttribute("content", originalContent || "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no");
+    }
+
+    // Cleanup function to restore original content on component unmount
+    return () => {
+      if (originalContent) {
+        viewport.setAttribute("content", originalContent);
+      }
+    };
+  }, [isOpen]);
+
   if (!images || images.length === 0) {
     return null;
   }
