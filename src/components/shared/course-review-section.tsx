@@ -91,7 +91,7 @@ export default function CourseReviewSection({ comments, user, episodes, onToggle
             <span className="md:text-2xl text-xl">리뷰</span>
             <span className="md:text-2xl text-lg"> ({totalReviews})</span>
           </h2>
-          <Button variant="ghost" className="h-8 px-2 flex items-center text-sm text-muted-foreground hover:text-muted-foreground/80 focus-visible:ring-0 focus-visible:ring-offset-0">
+          <Button variant="ghost" className="h-8 px-2 flex items-center text-sm text-muted-foreground hover:bg-transparent hover:text-muted-foreground/80 focus-visible:ring-0 focus-visible:ring-offset-0">
             {isReviewExpanded ? (
               <>
                 <span>접기</span>
@@ -130,7 +130,7 @@ export default function CourseReviewSection({ comments, user, episodes, onToggle
                 {/* Reviews Carousel */}
                 <div className="md:col-span-4">
                     <Carousel opts={{ align: 'start', loop: false }} className="w-full">
-                        <CarouselContent className="-ml-4">
+                        <CarouselContent className="-ml-4 h-[180px] overflow-y-auto">
                             {comments.map((comment) => (
                             <CarouselItem key={comment.id} className="md:basis-1/2 lg:basis-1/3 pl-4">
                                     <ReviewItem 
