@@ -1,3 +1,4 @@
+
 'use client';
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
@@ -104,18 +105,14 @@ export default function CourseDetailPage() {
     <div>
         <div className="w-full bg-muted">
             <div className="container mx-auto max-w-5xl py-12">
-                <div className="flex items-start gap-12">
-                    <div className="w-full md:w-2/5">
-                        <h1 className="font-headline text-3xl font-bold">{course.name}</h1>
-                        <p className="text-muted-foreground mt-4">{course.description}</p>
-                    </div>
-                    <div className="w-full md:w-3/5">
+                <div className="flex flex-col md:flex-row items-start gap-8 md:gap-12">
+                    <div className="w-full md:w-2/5 order-2 md:order-1">
                         <Carousel setApi={setApi} className="w-full">
                             <CarouselContent>
                                 {introImages.map((url, index) => (
                                     <CarouselItem key={index}>
                                         <div className="relative aspect-video">
-                                            <Image src={url} alt={`${course.name} 소개 이미지 ${index + 1}`} fill sizes="60vw" className="object-cover rounded-lg" />
+                                            <Image src={url} alt={`${course.name} 소개 이미지 ${index + 1}`} fill sizes="(max-width: 768px) 100vw, 40vw" className="object-cover rounded-lg" />
                                         </div>
                                     </CarouselItem>
                                 ))}
@@ -134,6 +131,10 @@ export default function CourseDetailPage() {
                                 <CarouselNext className="static translate-y-0" />
                             </div>
                         </Carousel>
+                    </div>
+                    <div className="w-full md:w-3/5 order-1 md:order-2">
+                        <h1 className="font-headline text-3xl font-bold">{course.name}</h1>
+                        <p className="text-muted-foreground mt-4">{course.description}</p>
                     </div>
                 </div>
             </div>
