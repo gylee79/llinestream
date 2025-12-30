@@ -3,7 +3,7 @@
 
 import Image from 'next/image';
 import { useState, useMemo } from 'react';
-import { Lock, Play, MessageSquare, Star, Clock } from 'lucide-react';
+import { Lock, Play, Star, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -54,48 +54,43 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
     return (
         <>
             <Card className="overflow-hidden">
-                <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
-                    <div className="relative aspect-video w-full sm:w-28 flex-shrink-0 bg-muted rounded-md overflow-hidden">
-                        <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="(max-width: 640px) 100vw, 112px" className="object-cover" />
+                <CardContent className="p-3 flex flex-col sm:flex-row gap-3">
+                    <div className="relative aspect-video w-full sm:w-24 flex-shrink-0 bg-muted rounded-md overflow-hidden">
+                        <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="(max-width: 640px) 100vw, 96px" className="object-cover" />
                     </div>
                     <div className="flex-grow">
-                        <div className="flex justify-between items-start">
-                           <h3 className="text-lg font-bold leading-tight">{episode.title}</h3>
-                        </div>
-
-                        <div className="flex justify-between items-center mt-1">
-                             <div className="flex items-center gap-2">
-                                <Badge variant={episode.isFree ? 'default' : 'secondary'} className="flex-shrink-0">{episode.isFree ? '무료' : '구독필요'}</Badge>
-                                <p className="text-sm text-muted-foreground">{instructor ? `강사: ${instructor.name}` : ''}</p>
-                            </div>
-                            <div className="flex flex-col items-end">
-                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                   <div className="flex items-center gap-1">
-                                        <Clock className="w-3 h-3" />
-                                        <span>{formatDuration(episode.duration)}</span>
-                                   </div>
-                                   {ratedCommentsCount > 0 && (
-                                        <div className="flex items-center gap-1">
-                                            <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                                            <span className="font-semibold text-foreground">{averageRating.toFixed(1)}</span>
-                                            <span>({ratedCommentsCount})</span>
-                                        </div>
-                                   )}
-                                </div>
-                                <Button
-                                    variant="link"
-                                    className="h-auto p-0 text-xs text-muted-foreground"
-                                    onClick={() => user && setCommentOpen(true)}
-                                    disabled={!user}
-                                >
-                                    리뷰 작성
-                                </Button>
-                            </div>
-                        </div>
-
+                       <h3 className="text-base font-bold leading-tight line-clamp-2">{episode.title}</h3>
+                       
+                       <div className="flex items-center text-xs text-muted-foreground mt-1.5">
+                           {!episode.isFree && <Badge variant="secondary" className="flex-shrink-0 mr-2 h-5">구독필요</Badge>}
+                           <p className="truncate">{instructor ? `강사: ${instructor.name}` : ''}</p>
+                       </div>
                     </div>
-                    <div className="flex-shrink-0 flex items-center justify-start sm:justify-center">
-                        <Button className="w-full sm:w-auto" onClick={handlePlayClick}>
+                    <div className="flex-shrink-0 flex sm:flex-col items-center justify-between sm:justify-center sm:w-28 gap-2">
+                        <div className='flex flex-col items-start sm:items-center'>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    <span>{formatDuration(episode.duration)}</span>
+                                </div>
+                                {ratedCommentsCount > 0 && (
+                                    <div className="flex items-center gap-1">
+                                        <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                        <span className="font-semibold text-foreground">{averageRating.toFixed(1)}</span>
+                                        <span className="hidden sm:inline">({ratedCommentsCount})</span>
+                                    </div>
+                                )}
+                            </div>
+                            <Button
+                                variant="link"
+                                className="h-auto p-0 mt-0.5 text-xs text-muted-foreground"
+                                onClick={() => user && setCommentOpen(true)}
+                                disabled={!user}
+                            >
+                                리뷰 작성
+                            </Button>
+                        </div>
+                        <Button className="w-28" size="sm" onClick={handlePlayClick}>
                            {isPlayable ? <Play className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
                            시청하기
                         </Button>
