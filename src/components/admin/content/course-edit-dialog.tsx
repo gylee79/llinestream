@@ -103,7 +103,7 @@ const ImageManager = ({ title, description, images, setImages, idPrefix }: Image
                             <Reorder.Item key={image.id} value={image} className="bg-muted p-2 rounded-lg flex items-center gap-4 group">
                                 <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
                                 <div className="relative w-40 h-24 rounded-md overflow-hidden">
-                                    <Image src={image.url} alt="업로드 이미지" fill className="object-cover" />
+                                    <Image src={image.url} alt="업로드 이미지" fill sizes="160px" className="object-cover" />
                                 </div>
                                 <div className="flex-1 text-sm text-muted-foreground truncate">
                                     {image.isNew ? image.file?.name : '기존 이미지'}
@@ -165,7 +165,7 @@ export default function CourseEditDialog({ open, onOpenChange, course }: CourseE
       const existingDetailImages = (course.detailImageUrls || []).map(url => ({ id: uuidv4(), url, isNew: false }));
       setDetailImages(existingDetailImages);
     }
-  }, [course, form]);
+  }, [course, form, open]);
 
 
   const onSubmit = async (data: CourseFormValues) => {
@@ -210,7 +210,7 @@ export default function CourseEditDialog({ open, onOpenChange, course }: CourseE
           <DialogDescription>&apos;{course.name}&apos; 강좌의 기본 정보와 이미지를 관리합니다.</DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[70vh] p-1">
-            <div className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <Card>
                 <CardHeader>
                     <CardTitle>기본 정보</CardTitle>
@@ -244,7 +244,7 @@ export default function CourseEditDialog({ open, onOpenChange, course }: CourseE
                     setImages={setDetailImages}
                     idPrefix="detail"
                 />
-            </div>
+            </form>
         </ScrollArea>
         <DialogFooter className="pt-6">
             <DialogClose asChild>
