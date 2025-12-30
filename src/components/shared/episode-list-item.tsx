@@ -32,12 +32,15 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
     const [isPaymentOpen, setPaymentOpen] = useState(false);
     const [isCommentOpen, setCommentOpen] = useState(false);
 
-    const averageRating = useMemo(() => {
-        if (!comments || comments.length === 0) return 0;
+    const { averageRating, ratedCommentsCount } = useMemo(() => {
+        if (!comments || comments.length === 0) return { averageRating: 0, ratedCommentsCount: 0 };
         const ratedComments = comments.filter(c => c.rating && c.rating > 0);
-        if (ratedComments.length === 0) return 0;
+        if (ratedComments.length === 0) return { averageRating: 0, ratedCommentsCount: 0 };
         const totalRating = ratedComments.reduce((acc, c) => acc + (c.rating || 0), 0);
-        return totalRating / ratedComments.length;
+        return { 
+            averageRating: totalRating / ratedComments.length,
+            ratedCommentsCount: ratedComments.length
+        };
     }, [comments]);
     
     const handlePlayClick = () => {
@@ -68,30 +71,32 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                                     <Clock className="w-3 h-3" />
                                     <span>{formatDuration(episode.duration)}</span>
                                </div>
-                               {comments.length > 0 && (
+                               {ratedCommentsCount > 0 && (
                                     <div className="flex items-center gap-1">
                                         <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
                                         <span className="font-semibold text-foreground">{averageRating.toFixed(1)}</span>
-                                        <span>({comments.length})</span>
+                                        <span>({ratedCommentsCount})</span>
                                     </div>
                                )}
                             </div>
                         </div>
 
+                         <div className="flex justify-end mt-1">
+                            <Button
+                                variant="link"
+                                className="h-auto p-0 text-xs text-muted-foreground"
+                                onClick={() => user && setCommentOpen(true)}
+                                disabled={!user}
+                            >
+                                리뷰 작성
+                            </Button>
+                        </div>
+
                     </div>
-                    <div className="flex-shrink-0 flex sm:flex-col items-center justify-start gap-2">
-                        <Button className="w-full" onClick={handlePlayClick}>
+                    <div className="flex-shrink-0 flex items-center justify-start">
+                        <Button className="w-full sm:w-auto" onClick={handlePlayClick}>
                            {isPlayable ? <Play className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
                            시청하기
-                        </Button>
-                        <Button 
-                            variant="outline" 
-                            className="w-full" 
-                            onClick={() => user && setCommentOpen(true)}
-                            disabled={!user}
-                        >
-                            <MessageSquare className="mr-2 h-4 w-4"/>
-                            리뷰
                         </Button>
                     </div>
                 </CardContent>
