@@ -30,7 +30,7 @@ const ReviewItem = ({ comment, isMobile = false }: { comment: EpisodeComment, is
     return (
         <Card className="h-full">
           <CardContent className="p-4 flex flex-col h-full">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col">
                 <span className="font-semibold text-sm">{comment.userName}</span>
                 <span className="text-xs text-muted-foreground">{toDisplayDate(comment.createdAt)}</span>
             </div>
