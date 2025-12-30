@@ -38,24 +38,31 @@ export default function CourseImagesDialog({ isOpen, onOpenChange, images, cours
               initialScale={1}
               minScale={1}
               maxScale={4}
+              panning={{ disabled: true, excluded: ["input", "select", "textarea"] }}
             >
-              <TransformComponent wrapperStyle={{ width: "100%", height: "auto" }}>
-                <div className="flex flex-col">
-                  {images.map((url, index) => (
-                    <div key={index} className="relative w-full h-auto">
-                      <Image 
-                        src={url} 
-                        alt={`상세 정보 이미지 ${index + 1}`} 
-                        width={1200}
-                        height={1200}
-                        className="w-full h-auto object-contain"
-                        sizes="(max-width: 768px) 100vw, 800px"
-                        priority={index === 0}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </TransformComponent>
+              {({ setPanning }) => (
+                <TransformComponent wrapperStyle={{ width: "100%", height: "auto" }}>
+                  <div 
+                    className="flex flex-col"
+                    onMouseEnter={() => setPanning(false)}
+                    onMouseLeave={() => setPanning(true)}
+                  >
+                    {images.map((url, index) => (
+                      <div key={index} className="relative w-full h-auto">
+                        <Image 
+                          src={url} 
+                          alt={`상세 정보 이미지 ${index + 1}`} 
+                          width={1200}
+                          height={1200}
+                          className="w-full h-auto object-contain"
+                          sizes="(max-width: 768px) 100vw, 800px"
+                          priority={index === 0}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </TransformComponent>
+              )}
             </TransformWrapper>
           </div>
         </ScrollArea>
