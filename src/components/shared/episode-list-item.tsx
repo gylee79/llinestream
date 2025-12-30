@@ -11,6 +11,7 @@ import type { Episode, Instructor, Classification, User, EpisodeComment } from '
 import VideoPlayerDialog from '@/components/shared/video-player-dialog';
 import PaymentDialog from '@/components/shared/payment-dialog';
 import EpisodeCommentDialog from '@/components/shared/episode-comment-dialog';
+import { cn } from '@/lib/utils';
 
 const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -25,9 +26,10 @@ interface EpisodeListItemProps {
     classification: Classification | null;
     user: User | null;
     comments: EpisodeComment[];
+    hasBeenWatched?: boolean;
 }
 
-export default function EpisodeListItem({ episode, instructor, isPlayable, classification, user, comments }: EpisodeListItemProps) {
+export default function EpisodeListItem({ episode, instructor, isPlayable, classification, user, comments, hasBeenWatched = false }: EpisodeListItemProps) {
     const [isPlayerOpen, setPlayerOpen] = useState(false);
     const [isPaymentOpen, setPaymentOpen] = useState(false);
     const [isCommentOpen, setCommentOpen] = useState(false);
@@ -99,8 +101,21 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                                     </span>
                                 </Button>
                             </div>
-                            <div className="relative aspect-video w-full bg-muted rounded-md overflow-hidden cursor-pointer" onClick={handlePlayClick}>
-                                <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="96px" className="object-cover" />
+                            <div className="relative aspect-video w-full bg-muted rounded-md overflow-hidden cursor-pointer border border-black group" onClick={handlePlayClick}>
+                                <Image 
+                                    src={episode.thumbnailUrl} 
+                                    alt={episode.title} 
+                                    fill sizes="96px" 
+                                    className={cn(
+                                        "object-cover transition-all duration-300",
+                                        !hasBeenWatched && "blur-sm brightness-75 group-hover:blur-none group-hover:brightness-100"
+                                    )} 
+                                />
+                                {!hasBeenWatched && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Play className="h-8 w-8 text-white" fill="white" />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

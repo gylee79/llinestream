@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where, onSnapshot, Unsubscribe } from 'firebase/firestore';
-import type { Course, Episode, Classification, Instructor, EpisodeComment, CarouselApi } from '@/lib/types';
+import type { Course, Episode, Classification, Instructor, EpisodeComment, CarouselApi, EpisodeViewLog } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect, useMemo } from 'react';
 import EpisodeListItem from '@/components/shared/episode-list-item';
@@ -49,6 +49,18 @@ export default function CourseDetailPage() {
 
   const instructorsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'instructors') : null), [firestore]);
   const { data: instructors, isLoading: instructorsLoading } = useCollection<Instructor>(instructorsQuery);
+
+  const viewHistoryQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, 'users', user.id, 'viewHistory');
+  }, [user, firestore]);
+  const { data: viewLogs, isLoading: viewLogsLoading } = useCollection<EpisodeViewLog>(viewHistoryQuery);
+
+  const watchedEpisodeIds = useMemo(() => {
+    if (!viewLogs) return new Set<string>();
+    return new Set(viewLogs.map(log => log.episodeId));
+  }, [viewLogs]);
+
 
   useEffect(() => {
     if (!firestore || !episodes || episodes.length === 0) {
@@ -96,7 +108,7 @@ export default function CourseDetailPage() {
   }, [firestore, episodes]);
 
 
-  const isLoading = courseLoading || episodesLoading || classificationLoading || instructorsLoading || commentsLoading;
+  const isLoading = courseLoading || episodesLoading || classificationLoading || instructorsLoading || commentsLoading || (!!user && viewLogsLoading);
   
   const hasSubscription = !!(user && classification && classification.id && user.activeSubscriptions?.[classification.id]);
 
@@ -182,6 +194,7 @@ export default function CourseDetailPage() {
                         classification={classification}
                         user={user}
                         comments={episodeComments}
+                        hasBeenWatched={watchedEpisodeIds.has(episode.id)}
                     />
                   );
               })
