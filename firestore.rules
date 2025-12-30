@@ -1,4 +1,3 @@
-
 /**
  * Core Philosophy: This ruleset enforces a hybrid security model tailored for a subscription-based video streaming service.
  * It combines three primary access control patterns:
@@ -103,7 +102,7 @@ service cloud.firestore {
      */
     match /users/{userId} {
       allow get: if isOwnerOrAdmin(userId);
-      allow list: if false;
+      allow list: if isAdmin();
       allow create: if isOwner(userId) && request.resource.data.id == userId;
       allow update: if isOwnerOrAdmin(userId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwnerOrAdmin(userId);
@@ -136,11 +135,13 @@ service cloud.firestore {
     }
     
     /**
-     * @description User's episode view logs. Writable by server action. Readable only by admins.
+     * @description User's episode view logs. Writable by server action. Admins can list all logs.
+     *              Users can read their own individual log entries.
      * @path /episode_view_logs/{logId}
      */
     match /episode_view_logs/{logId} {
-      allow read, list: if isAdmin();
+      allow get: if isOwner(resource.data.userId) || isAdmin();
+      allow list: if isAdmin();
       allow create: if isSignedIn(); // Server action writes on behalf of user
       allow update, delete: if false; // Immutable logs
     }
@@ -190,16 +191,25 @@ service cloud.firestore {
     }
     
     /**
-     * @description Stores episode metadata within a course. Publicly readable, but writable only by admins.
-     * @path /courses/{courseId}/episodes/{episodeId}
+     * @description Stores episode metadata. Publicly readable, but writable only by admins.
+     * @path /episodes/{episodeId}
      * @allow (get, list) Any user can view the list of episodes for a given course.
      * @deny (delete) A regular user tries to delete an episode from a course.
      * @principle Allows public read access for application content while securing writes to admins.
      */
-    match /courses/{courseId}/episodes/{episodeId} {
+    match /episodes/{episodeId} {
       allow get, list: if true;
       allow create: if isAdmin();
       allow update, delete: if isAdmin() && isExistingDoc();
+    }
+
+    match /episodes/{episodeId}/comments/{commentId} {
+      // Anyone can read comments
+      allow get, list: if true;
+      // Only signed-in users can create comments for themselves
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // Only the owner of the comment or an admin can update/delete
+      allow update, delete: if (isOwner(resource.data.userId) || isAdmin());
     }
 
     /**
