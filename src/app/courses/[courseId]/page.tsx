@@ -29,7 +29,7 @@ export default function CourseDetailPage() {
   const [comments, setComments] = useState<EpisodeComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(true);
   
-  const [api, setApi] = useState<CarouselApi | undefined>();
+  const [api, setApi] = useState<CarouselApi>();
   const { selectedIndex, scrollSnaps, onDotButtonClick } = useDotButton(api);
   const [isAllReviewsOpen, setAllReviewsOpen] = useState(false);
   const [isImagesDialogOpen, setImagesDialogOpen] = useState(false);
