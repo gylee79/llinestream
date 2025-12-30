@@ -35,8 +35,17 @@ export async function logEpisodeView(payload: LogViewPayload): Promise<{ success
       endedAt: admin.firestore.Timestamp.fromDate(new Date(endedAt)),
       duration: Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000), // duration in seconds
     };
-
-    await db.collection('episode_view_logs').add(logEntry);
+    
+    // Store log in both global collection for admin and user's subcollection
+    const batch = db.batch();
+    
+    const globalLogRef = db.collection('episode_view_logs').doc();
+    batch.set(globalLogRef, logEntry);
+    
+    const userLogRef = db.collection('users').doc(userId).collection('viewHistory').doc();
+    batch.set(userLogRef, logEntry);
+    
+    await batch.commit();
 
     return { success: true, message: '시청 기록이 성공적으로 저장되었습니다.' };
   } catch (error) {

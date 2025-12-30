@@ -1,0 +1,500 @@
+
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the LlineStream application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "User's contact phone number."
+        },
+        "birthDate": {
+          "type": "string",
+          "description": "User's birth date.",
+          "format": "date-time"
+        },
+        "activeSubscriptionIds": {
+          "type": "array",
+          "description": "References to active subscriptions. (Relationship: User 1:N Subscription)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "joinDate": {
+          "type": "string",
+          "description": "The date the user joined the application.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "phoneNumber",
+        "birthDate",
+        "joinDate"
+      ]
+    },
+    "Field": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Field",
+      "type": "object",
+      "description": "Represents a top-level category of content (e.g., Education, Movies).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the field entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the field (e.g., Education)."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the field."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description"
+      ]
+    },
+    "Classification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Classification",
+      "type": "object",
+      "description": "Represents a genre of content that can be subscribed to (e.g., Coding, Action).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the classification entity."
+        },
+        "fieldId": {
+          "type": "string",
+          "description": "Reference to Field. (Relationship: Field 1:N Classification)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the classification (e.g., Coding)."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the classification."
+        },
+        "monthlySubscriptionPrice": {
+          "type": "number",
+          "description": "Monthly subscription price for this classification."
+        },
+        "dailySubscriptionPrice": {
+          "type": "number",
+          "description": "Daily subscription price for this classification."
+        }
+      },
+      "required": [
+        "id",
+        "fieldId",
+        "name",
+        "description",
+        "monthlySubscriptionPrice",
+        "dailySubscriptionPrice"
+      ]
+    },
+    "Course": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Course",
+      "type": "object",
+      "description": "Represents a video series within a classification (e.g., React Master Class).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the course entity."
+        },
+        "classificationId": {
+          "type": "string",
+          "description": "Reference to Classification. (Relationship: Classification 1:N Course)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the course (e.g., React Master Class)."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the course."
+        },
+        "thumbnailUrl": {
+          "type": "string",
+          "description": "URL of the course thumbnail image.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "classificationId",
+        "name",
+        "description",
+        "thumbnailUrl"
+      ]
+    },
+    "Episode": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Episode",
+      "type": "object",
+      "description": "Represents an individual video within a course.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the episode entity."
+        },
+        "courseId": {
+          "type": "string",
+          "description": "Reference to Course. (Relationship: Course 1:N Episode)"
+        },
+        "instructorId": {
+            "type": "string",
+            "description": "Reference to Instructor. (Relationship: Instructor 1:N Episode)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the episode."
+        },
+        "videoUrl": {
+          "type": "string",
+          "description": "URL of the video file.",
+          "format": "uri"
+        },
+        "duration": {
+          "type": "number",
+          "description": "Duration of the episode in seconds."
+        },
+        "isFree": {
+          "type": "boolean",
+          "description": "Indicates whether the episode is free to watch."
+        }
+      },
+      "required": [
+        "id",
+        "courseId",
+        "title",
+        "videoUrl",
+        "duration",
+        "isFree"
+      ]
+    },
+    "Subscription": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Subscription",
+      "type": "object",
+      "description": "Represents a user's subscription to a classification.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the subscription entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Subscription)"
+        },
+        "classificationId": {
+          "type": "string",
+          "description": "Reference to Classification. (Relationship: Classification 1:N Subscription)"
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Start date of the subscription.",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "End date of the subscription.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "classificationId",
+        "startDate",
+        "endDate"
+      ]
+    },
+    "Policy": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Policy",
+      "type": "object",
+      "description": "Represents the various legal and informational policies of the application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the policy entity."
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of policy such as terms of service, privacy policy, or refund policy."
+        },
+        "content": {
+          "type": "string",
+          "description": "The text content of the policy."
+        },
+        "lastUpdated": {
+          "type": "string",
+          "description": "The date and time the policy was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "content",
+        "lastUpdated"
+      ]
+    },
+    "Instructor": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Instructor",
+      "type": "object",
+      "description": "Represents an instructor who creates and manages courses.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the instructor entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Instructor's full name."
+        },
+        "email": {
+          "type": "string",
+          "description": "Instructor's email address.",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Instructor's contact phone number."
+        },
+        "dob": {
+          "type": "string",
+          "description": "Instructor's date of birth (YYYY-MM-DD)."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The date the instructor was registered.",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "name", "email", "phone", "dob", "createdAt"]
+    },
+    "EpisodeViewLog": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "Episode View Log",
+        "type": "object",
+        "description": "Logs an instance of a user viewing an episode.",
+        "properties": {
+            "id": { "type": "string" },
+            "userId": { "type": "string" },
+            "userName": { "type": "string" },
+            "userEmail": { "type": "string", "format": "email" },
+            "episodeId": { "type": "string" },
+            "episodeTitle": { "type": "string" },
+            "courseId": { "type": "string" },
+            "startedAt": { "type": "string", "format": "date-time" },
+            "endedAt": { "type": "string", "format": "date-time" },
+            "duration": { "type": "number", "description": "Watched duration in seconds." }
+        },
+        "required": ["userId", "episodeId", "startedAt", "endedAt", "duration"]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. Accessible only by the user themselves and admins.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/fields/{fieldId}",
+        "definition": {
+          "entityName": "Field",
+          "schema": {
+            "$ref": "#/backend/entities/Field"
+          },
+          "description": "Stores top-level content categories (e.g., Education, Movies). Publicly readable.",
+          "params": [
+            {
+              "name": "fieldId",
+              "description": "The unique identifier of the field."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/classifications/{classificationId}",
+        "definition": {
+          "entityName": "Classification",
+          "schema": {
+            "$ref": "#/backend/entities/Classification"
+          },
+          "description": "Stores content classifications (e.g., Coding, Action). Publicly readable.",
+          "params": [
+            {
+              "name": "classificationId",
+              "description": "The unique identifier of the classification."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/courses/{courseId}",
+        "definition": {
+          "entityName": "Course",
+          "schema": {
+            "$ref": "#/backend/entities/Course"
+          },
+          "description": "Stores video series within a classification (e.g., React Master Class). Publicly readable.",
+          "params": [
+            {
+              "name": "courseId",
+              "description": "The unique identifier of the course."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/episodes/{episodeId}",
+        "definition": {
+          "entityName": "Episode",
+          "schema": {
+            "$ref": "#/backend/entities/Episode"
+          },
+          "description": "Stores individual videos within a course. Publicly readable, but access to video URL may require subscription.",
+          "params": [
+            {
+              "name": "episodeId",
+              "description": "The unique identifier of the episode."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/subscriptions/{subscriptionId}",
+        "definition": {
+          "entityName": "Subscription",
+          "schema": {
+            "$ref": "#/backend/entities/Subscription"
+          },
+          "description": "Stores user subscriptions. Accessible only by the user themselves and admins. Includes denormalized 'classificationId' for authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "subscriptionId",
+              "description": "The unique identifier of the subscription."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/viewHistory/{logId}",
+        "definition": {
+          "entityName": "EpisodeViewLog",
+          "schema": { "$ref": "#/backend/entities/EpisodeViewLog" },
+          "description": "Stores a user's viewing history. Writable by server action, readable only by the owning user.",
+          "params": [
+            { "name": "userId", "description": "The unique identifier of the user." },
+            { "name": "logId", "description": "The unique identifier of the log entry." }
+          ]
+        }
+      },
+      {
+        "path": "/policies/{policyId}",
+        "definition": {
+          "entityName": "Policy",
+          "schema": {
+            "$ref": "#/backend/entities/Policy"
+          },
+          "description": "Stores legal and informational policies. Publicly readable, but only modifiable by admins.",
+          "params": [
+            {
+              "name": "policyId",
+              "description": "The unique identifier of the policy."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/instructors/{instructorId}",
+        "definition": {
+          "entityName": "Instructor",
+          "schema": {
+            "$ref": "#/backend/entities/Instructor"
+          },
+          "description": "Stores instructor profiles. Writable only by admins.",
+          "params": [
+            {
+              "name": "instructorId",
+              "description": "The unique identifier of the instructor."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "roles_admin",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Documents in this collection indicate admin status. Existence determines role. (DBAC).",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/episode_view_logs/{logId}",
+        "definition": {
+          "entityName": "EpisodeViewLog",
+          "schema": { "$ref": "#/backend/entities/EpisodeViewLog" },
+          "description": "Logs user episode viewing activity for admin auditing. Writable by server action, readable only by admins.",
+          "params": [
+            { "name": "logId", "description": "The unique identifier of the log entry." }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support LlineStream's video streaming and subscription model, focusing on secure and efficient data access. It incorporates key strategies like Authorization Independence through denormalization, Structural Segregation for homogeneous security postures, and Access Modeling using path-based ownership and membership maps.\n\n**Authorization Independence (Denormalization):** The structure avoids `get()` calls in security rules by denormalizing authorization data. For instance, a user's viewing history is now stored in a subcollection `viewHistory` under their own user document, making security rules trivial.\n\n**Structural Segregation (Homogeneous Security Posture):** Each collection is designed to contain documents with the same security requirements. User-specific data is segregated under `/users/{userId}` paths (e.g., `subscriptions`, `viewHistory`), while global content like `fields`, `classifications`, `courses`, `episodes` and `policies` reside in root-level collections. A separate global `episode_view_logs` collection is maintained for admin auditing purposes.\n\n**Access Modeling:**\n*   **Path-Based Ownership:** User-owned data such as subscriptions and view history is located under `/users/{userId}/...`, providing clear ownership and simplifying security rules. A user can only read their own subcollections.\n*   **DBAC via Existence:** Admin roles are managed through the existence of documents in dedicated collections like `/roles_admin/{userId}`. This allows verifying admin status without reading user documents.\n\n**QAPs (Rules are not Filters):**\n*   Secure `list` operations are ensured by the structural segregation. Listing a user's own `viewHistory` or `subscriptions` is secure and efficient because the query path itself is scoped to the authenticated user's ID."
+  }
+}
