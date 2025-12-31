@@ -82,6 +82,8 @@ export interface Episode {
   customThumbnailUrl?: string;
   customThumbnailPath?: string;
 
+  transcript?: string; // Full transcript from Whisper
+
   createdAt: Timestamp;
 }
 
@@ -185,4 +187,10 @@ export interface EpisodeComment {
 
 export type CarouselApi = UseEmblaCarouselType[1];
 
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'model';
+  content: string;
+  createdAt: Date;
+}
     
