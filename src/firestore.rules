@@ -1,3 +1,4 @@
+
 /**
  * Core Philosophy: This ruleset enforces a hybrid security model tailored for a subscription-based video streaming service.
  * It combines three primary access control patterns:
@@ -93,8 +94,12 @@ service cloud.firestore {
     }
     
     /**
-     * @description Defines rules for user profile documents and their subcollections.
+     * @description Defines rules for user profile documents.
      * @path /users/{userId}
+     * @allow (create) A new user signs up and creates their own user profile document. `auth.uid` must match `userId`.
+     * @deny (list) A malicious actor tries to list all documents in the `/users` collection.
+     * @deny (update) A user tries to update another user's profile.
+     * @principle Restricts access to a user's own data tree and allows self-creation of a profile.
      */
     match /users/{userId} {
       allow get: if isOwnerOrAdmin(userId);
@@ -102,27 +107,23 @@ service cloud.firestore {
       allow create: if isOwner(userId) && request.resource.data.id == userId;
       allow update: if isOwnerOrAdmin(userId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwnerOrAdmin(userId);
-
-      /**
-       * @description Secures a user's subscription records.
-       * @path /users/{userId}/subscriptions/{subscriptionId}
-       */
-      match /subscriptions/{subscriptionId} {
-        allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && request.resource.data.userId == userId;
-        allow update: if isExistingOwnerOrAdmin(userId) && request.resource.data.userId == resource.data.userId;
-        allow delete: if isExistingOwnerOrAdmin(userId);
-      }
-      
-      /**
-       * @description Secures a user's personal view history.
-       * @path /users/{userId}/viewHistory/{logId}
-       */
-      match /viewHistory/{logId} {
-        allow read, list, write: if isOwner(userId);
-      }
     }
     
+    /**
+     * @description Secures a user's subscription records.
+     * @path /users/{userId}/subscriptions/{subscriptionId}
+     * @allow (create) A user (`auth.uid == userId`) creates a new subscription for themselves.
+     * @deny (list) User 'A' tries to list the subscriptions of User 'B'.
+     * @deny (update) A user tries to change the `userId` on an existing subscription document.
+     * @principle Enforces document ownership and validates relational integrity between the path and document data.
+     */
+    match /users/{userId}/subscriptions/{subscriptionId} {
+      allow get, list: if isOwnerOrAdmin(userId);
+      allow create: if isOwnerOrAdmin(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwnerOrAdmin(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwnerOrAdmin(userId);
+    }
+
     /**
      * @description User profile change history. Writable by any signed-in user (for their own changes via server action).
      *              Readable only by admins.
@@ -135,14 +136,26 @@ service cloud.firestore {
     }
     
     /**
-     * @description Global user's episode view logs for admin auditing.
-     *              Writable by server action. Admins can list all logs.
+     * @description User's episode view logs. Writable by server action. Admins can list all logs.
+     *              Users can read their own individual log entries.
      * @path /episode_view_logs/{logId}
      */
     match /episode_view_logs/{logId} {
-      allow get, list: if isAdmin();
+      allow get: if isOwner(resource.data.userId) || isAdmin();
+      allow list: if isAdmin();
       allow create: if isSignedIn(); // Server action writes on behalf of user
       allow update, delete: if false; // Immutable logs
+    }
+    
+    /**
+     * @description AI chat logs. Writable by server action on behalf of user. Admins can read and delete.
+     * @path /chats/{chatId}
+     */
+    match /chats/{chatId} {
+        allow get: if isOwner(resource.data.userId) || isAdmin();
+        allow list, delete: if isAdmin();
+        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid; // Server action writes on behalf of user.
+        allow update: if false; // Immutable logs
     }
 
     
@@ -153,6 +166,9 @@ service cloud.firestore {
     /**
      * @description Stores top-level content categories. Publicly readable, but writable only by admins.
      * @path /fields/{fieldId}
+     * @allow (get, list) Any user, including unauthenticated ones, can read the list of fields.
+     * @deny (create) A regular authenticated user tries to add a new content field.
+     * @principle Allows public read access for application content while securing writes to admins.
      */
     match /fields/{fieldId} {
       allow get, list: if true;
@@ -163,6 +179,9 @@ service cloud.firestore {
     /**
      * @description Stores content classifications/genres. Publicly readable, but writable only by admins.
      * @path /classifications/{classificationId}
+     * @allow (get, list) Any user can browse all available content classifications.
+     * @deny (update) A regular user tries to change the subscription price of a classification.
+     * @principle Allows public read access for application content while securing writes to admins.
      */
     match /classifications/{classificationId} {
       allow get, list: if true;
@@ -173,6 +192,9 @@ service cloud.firestore {
     /**
      * @description Stores course metadata. Publicly readable, but writable only by admins.
      * @path /courses/{courseId}
+     * @allow (get, list) Any user can list all courses to browse the catalog.
+     * @deny (create) A regular user attempts to upload a new course.
+     * @principle Allows public read access for application content while securing writes to admins.
      */
     match /courses/{courseId} {
       allow get, list: if true;
@@ -183,6 +205,9 @@ service cloud.firestore {
     /**
      * @description Stores episode metadata. Publicly readable, but writable only by admins.
      * @path /episodes/{episodeId}
+     * @allow (get, list) Any user can view the list of episodes for a given course.
+     * @deny (delete) A regular user tries to delete an episode from a course.
+     * @principle Allows public read access for application content while securing writes to admins.
      */
     match /episodes/{episodeId} {
       allow get, list: if true;
@@ -198,6 +223,13 @@ service cloud.firestore {
       // Only the owner of the comment or an admin can update/delete
       allow update, delete: if (isOwner(resource.data.userId) || isAdmin());
     }
+
+    match /episodes/{episodeId}/chunks/{chunkId} {
+      // Only authenticated users can access vector chunks
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
 
     /**
      * @description Stores instructor profiles. Read-only for signed in users, writable by admins.

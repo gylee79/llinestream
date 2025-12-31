@@ -1,3 +1,4 @@
+
 'use server';
 
 import {genkit} from 'genkit';
@@ -13,7 +14,6 @@ export const ai = genkit({
     googleAI(),
     firebase(),
   ],
-  model: 'googleai/gemini-1.5-flash',
+  logLevel: 'debug',
   enableTracingAndMetrics: true,
-  logLevel: 'debug'
 });
