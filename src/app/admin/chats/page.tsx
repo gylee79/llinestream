@@ -19,7 +19,7 @@ import {
   } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ChatLog, Episode, User } from '@/lib/types';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase/hooks';
 import { collection, query, orderBy, where, doc, deleteDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toDisplayDateTime } from '@/lib/date-helpers';
@@ -40,14 +40,14 @@ import {
 import { Trash2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-export default function AdminChatsPage() {
+
+function ChatLogViewer() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const [filterEpisode, setFilterEpisode] = useState('all');
   const [filterUser, setFilterUser] = useState('all');
 
-  // Queries for data and filters
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(
     useMemoFirebase(() => (firestore ? collection(firestore, 'episodes') : null), [firestore])
   );
@@ -84,10 +84,6 @@ export default function AdminChatsPage() {
   };
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold tracking-tight font-headline">AI 채팅 기록</h1>
-      <p className="text-muted-foreground">사용자와 AI 튜터 간의 대화 기록을 관리합니다.</p>
-      
       <Card className="mt-6">
         <CardHeader>
           <CardTitle>전체 채팅 기록</CardTitle>
@@ -173,6 +169,35 @@ export default function AdminChatsPage() {
           </ScrollArea>
         </CardContent>
       </Card>
+  )
+}
+
+export default function AdminChatsPage() {
+  const { user, isUserLoading } = useUser();
+  const isAdmin = user?.role === 'admin';
+
+  return (
+    <div>
+      <h1 className="text-3xl font-bold tracking-tight font-headline">AI 채팅 기록</h1>
+      <p className="text-muted-foreground">사용자와 AI 튜터 간의 대화 기록을 관리합니다.</p>
+      
+      {isUserLoading ? (
+        <Card className="mt-6">
+          <CardHeader><Skeleton className="h-8 w-1/4" /></CardHeader>
+          <CardContent>
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      ) : isAdmin ? (
+        <ChatLogViewer />
+      ) : (
+        // Non-admin users are handled by the layout, but as a fallback:
+        <Card className="mt-6">
+          <CardContent className="pt-6">
+            <p>이 콘텐츠를 볼 권한이 없습니다.</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
