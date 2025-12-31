@@ -4,16 +4,17 @@
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogClose
 } from '@/components/ui/dialog';
-import type { Episode, Instructor, User } from '@/lib/types';
+import type { Episode, Instructor } from '@/lib/types';
 import { useEffect, useRef } from 'react';
 import { Button } from '../ui/button';
 import { useUser } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
+import { Textarea } from '../ui/textarea';
+import { Send } from 'lucide-react';
+import { ScrollArea } from '../ui/scroll-area';
 
 interface VideoPlayerDialogProps {
   isOpen: boolean;
@@ -72,8 +73,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             onOpenChange(true);
         }
     }}>
-      <DialogContent className="max-w-4xl p-0 border-0 flex flex-col">
-        <div className="aspect-video w-full bg-black">
+      <DialogContent className="max-w-4xl p-0 border-0 flex flex-col h-[90vh]">
+        <div className="aspect-video w-full bg-black flex-shrink-0">
           <video
             id={`video-${videoKey}`}
             key={videoKey}
@@ -86,16 +87,29 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             브라우저가 비디오 태그를 지원하지 않습니다.
           </video>
         </div>
-        <DialogHeader className="p-6 pt-2 pb-0">
-          <DialogTitle>{episode.title}</DialogTitle>
+        <DialogHeader className="p-4 border-b flex-shrink-0">
+          <div className="flex justify-between items-center">
+            <div>
+              <DialogTitle>{episode.title}</DialogTitle>
+              {instructor && <p className="text-sm text-muted-foreground mt-1">강사: {instructor.name}</p>}
+            </div>
+            <Button variant="outline" onClick={handleClose}>나가기</Button>
+          </div>
         </DialogHeader>
-        <DialogFooter className="p-6 pt-2 flex items-center justify-between">
-           {instructor && <p className="text-sm text-muted-foreground">강사: {instructor.name}</p>}
-           <Button variant="outline" onClick={handleClose}>나가기</Button>
-        </DialogFooter>
+        <div className="flex-grow p-4 flex flex-col gap-4 min-h-0">
+          <p className="text-sm font-semibold flex-shrink-0">AI에게 질문하기</p>
+          <ScrollArea className="flex-grow bg-muted rounded-md p-4">
+            {/* AI Chat messages will go here */}
+            <p className="text-sm text-muted-foreground text-center">AI에게 궁금한 점을 물어보세요.</p>
+          </ScrollArea>
+          <div className="flex gap-2 flex-shrink-0">
+            <Textarea placeholder="AI에게 질문할 내용을 입력하세요..." className="flex-grow resize-none" rows={1} />
+            <Button>
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
 }
-
-    
