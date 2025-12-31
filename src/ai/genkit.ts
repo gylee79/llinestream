@@ -9,6 +9,4 @@ export const ai = genkit({
     googleAI(),
     firebase(),
   ],
-  logLevel: 'debug',
-  enableTracingAndMetrics: true,
 });
