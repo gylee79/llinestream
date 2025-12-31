@@ -62,7 +62,7 @@ const AdminNav = ({ className }: { className?: string }) => {
 };
 
 const NotAuthorized = () => (
-    <div className="flex flex-1 items-center justify-center p-6">
+    <div className="flex h-screen w-full items-center justify-center p-6 bg-muted">
         <Card className="w-full max-w-md">
             <CardHeader className="text-center">
                 <div className="mx-auto bg-destructive/10 p-3 rounded-full w-fit">
@@ -82,62 +82,64 @@ const NotAuthorized = () => (
     </div>
 );
 
+const AdminLayoutShell = ({ children }: { children: React.ReactNode }) => (
+  <div className="flex min-h-screen w-full">
+    <aside className="hidden w-64 flex-col border-r bg-muted/40 md:flex">
+      <div className="flex h-16 items-center border-b px-6">
+        <Link href="/" className="flex items-center gap-2 font-semibold">
+          <span className="font-headline text-lg">관리자 패널</span>
+        </Link>
+      </div>
+      <AdminNav />
+    </aside>
+    <div className="flex flex-1 flex-col">
+      <header className="flex h-16 items-center gap-4 border-b bg-muted/40 px-6 md:hidden">
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon" className="shrink-0">
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Toggle navigation menu</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="flex flex-col p-0">
+             <SheetHeader className="flex h-16 flex-row items-center justify-between border-b px-6">
+              <Link href="/" className="flex items-center gap-2 font-semibold">
+                 <span className="font-headline text-lg">관리자 패널</span>
+              </Link>
+              <SheetTitle className="sr-only">Admin Menu</SheetTitle>
+            </SheetHeader>
+            <AdminNav />
+          </SheetContent>
+        </Sheet>
+        <div className="flex-1 text-right">
+           {/* Admin Header Content (e.g., user profile) can go here */}
+        </div>
+      </header>
+      <main className="flex-1 bg-background p-6">{children}</main>
+    </div>
+  </div>
+);
+
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
-  
-  const footerRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
-  const { data: settings } = useDoc<FooterSettings>(footerRef);
-  const appName = settings?.appName || 'LlineStream';
-  
   const isAdmin = user?.role === 'admin';
 
   if (isUserLoading) {
     return (
-        <div className="flex h-screen w-full items-center justify-center">
-            <div className="w-64 space-y-4">
+        <div className="flex h-screen w-full items-center justify-center bg-muted">
+            <div className="w-full max-w-sm space-y-4 rounded-lg bg-background p-8 shadow-lg">
                 <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-64 w-full" />
+                <Skeleton className="h-40 w-full" />
+                <Skeleton className="h-10 w-1/2 mx-auto" />
             </div>
         </div>
     );
   }
 
-  return (
-    <div className="flex min-h-screen w-full">
-      <aside className="hidden w-64 flex-col border-r bg-muted/40 md:flex">
-        <div className="flex h-16 items-center border-b px-6">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
-            <span className="font-headline text-lg">관리자 패널</span>
-          </Link>
-        </div>
-        <AdminNav />
-      </aside>
-      <div className="flex flex-1 flex-col">
-        <header className="flex h-16 items-center gap-4 border-b bg-muted/40 px-6 md:hidden">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="shrink-0">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle navigation menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="flex flex-col p-0">
-               <SheetHeader className="flex h-16 flex-row items-center justify-between border-b px-6">
-                <Link href="/" className="flex items-center gap-2 font-semibold">
-                   <span className="font-headline text-lg">관리자 패널</span>
-                </Link>
-                <SheetTitle className="sr-only">Admin Menu</SheetTitle>
-              </SheetHeader>
-              <AdminNav />
-            </SheetContent>
-          </Sheet>
-          <div className="flex-1 text-right">
-             {/* Admin Header Content (e.g., user profile) can go here */}
-          </div>
-        </header>
-        {isAdmin ? <main className="flex-1 bg-background p-6">{children}</main> : <NotAuthorized />}
-      </div>
-    </div>
-  );
+  if (!isAdmin) {
+    return <NotAuthorized />;
+  }
+
+  return <AdminLayoutShell>{children}</AdminLayoutShell>;
 }
