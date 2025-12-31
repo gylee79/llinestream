@@ -15,13 +15,10 @@ import {
   History,
   ShieldAlert,
 } from 'lucide-react';
-import { LlineStreamLogo } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
-import type { FooterSettings } from '@/lib/types';
-import { doc } from 'firebase/firestore';
+import { useUser } from '@/firebase/hooks';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -123,8 +120,7 @@ const AdminLayoutShell = ({ children }: { children: React.ReactNode }) => (
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
-  const isAdmin = user?.role === 'admin';
-
+  
   if (isUserLoading) {
     return (
         <div className="flex h-screen w-full items-center justify-center bg-muted">
@@ -137,7 +133,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!isAdmin) {
+  if (user?.role !== 'admin') {
     return <NotAuthorized />;
   }
 
