@@ -12,7 +12,7 @@ initializeAdminApp();
 export const ai = genkit({
   plugins: [
     googleAI(),
-    firebase(),
+    firebase,
   ],
   logLevel: 'debug',
   enableTracingAndMetrics: true,
