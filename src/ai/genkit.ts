@@ -7,12 +7,12 @@ import {firebase} from '@genkit-ai/firebase';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 
 // This function call is crucial for Firebase Admin SDK initialization on the server.
-initializeAdminApp();
+const adminApp = initializeAdminApp();
 
 export const ai = genkit({
   plugins: [
     googleAI(),
-    firebase(),
+    firebase({ admin: adminApp }),
   ],
   logLevel: 'debug',
   enableTracingAndMetrics: true,
