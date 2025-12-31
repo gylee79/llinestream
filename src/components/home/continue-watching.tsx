@@ -12,22 +12,16 @@ export default function ContinueWatching() {
     const { user } = useUser();
     const firestore = useFirestore();
 
-    const historyQuery = useMemoFirebase(() => {
+    const viewLogsQuery = useMemoFirebase(() => {
         if (!user || !firestore) return null;
-        // This collection was removed from firestore.rules
-        // return query(
-        //     collection(firestore, 'users', user.id, 'viewHistory'),
-        //     orderBy('endedAt', 'desc'),
-        //     limit(20) // Fetch more to account for client-side deduplication
-        // );
-        return null
+        return query(
+            collection(firestore, 'users', user.id, 'viewHistory'),
+            orderBy('endedAt', 'desc'),
+            limit(20) // Fetch more to account for client-side deduplication
+        );
     }, [user, firestore]);
 
-    // This collection was removed from firestore.rules
-    // const { data: viewLogs, isLoading: historyLoading } = useCollection<EpisodeViewLog>(historyQuery);
-    const viewLogs: EpisodeViewLog[] = [];
-    const historyLoading = false;
-
+    const { data: viewLogs, isLoading: historyLoading } = useCollection<EpisodeViewLog>(viewLogsQuery);
 
     const episodesQuery = useMemoFirebase(() => {
         if (!firestore) return null;
