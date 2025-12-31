@@ -1,3 +1,4 @@
+
 /**
  * Core Philosophy: This ruleset enforces a hybrid security model tailored for a subscription-based video streaming service.
  * It combines three primary access control patterns:
@@ -145,6 +146,16 @@ service cloud.firestore {
       allow create: if isSignedIn(); // Server action writes on behalf of user
       allow update, delete: if false; // Immutable logs
     }
+    
+    /**
+     * @description AI chat logs. Writable by server action on behalf of user. Admins can read and delete.
+     * @path /chats/{chatId}
+     */
+    match /chats/{chatId} {
+        allow read, list, delete: if isAdmin();
+        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid; // Server action writes on behalf of user.
+        allow update: if false; // Immutable logs
+    }
 
     
     // ----------------------------------------------------------------
@@ -212,11 +223,16 @@ service cloud.firestore {
       allow update, delete: if (isOwner(resource.data.userId) || isAdmin());
     }
 
+    match /episodes/{episodeId}/chunks/{chunkId} {
+      // Only authenticated users can access vector chunks
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+
     /**
      * @description Stores instructor profiles. Read-only for signed in users, writable by admins.
      * @path /instructors/{instructorId}
-     * @allow (read) Authenticated users can view instructor profiles.
-     * @allow (write) if isAdmin();
      */
     match /instructors/{instructorId} {
         allow read: if isSignedIn();
@@ -226,9 +242,6 @@ service cloud.firestore {
     /**
      * @description Stores legal and informational policies. Publicly readable, but writable only by admins.
      * @path /policies/{policyId}
-     * @allow (get, list) Any user can read the Terms of Service or Privacy Policy.
-     * @deny (update) A regular user tries to modify the refund policy.
-     * @principle Allows public read access for application content while securing writes to admins.
      */
     match /policies/{policyId} {
       allow get, list: if true;
@@ -239,9 +252,6 @@ service cloud.firestore {
     /**
      * @description Stores global application settings like footer info and hero content.
      * @path /settings/{settingId}
-     * @allow (get, list) Allows any user to read application settings.
-     * @deny (create, update) Prevents non-admins from changing settings.
-     * @principle Public information should be readable, but modification must be restricted to admins.
      */
     match /settings/{settingId} {
       allow get, list: if true;

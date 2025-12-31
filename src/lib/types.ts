@@ -193,4 +193,13 @@ export interface ChatMessage {
   content: string;
   createdAt: Date;
 }
-    
+
+export interface ChatLog {
+    id: string;
+    userId: string;
+    episodeId: string;
+    question: string;
+    answer: string;
+    contextReferences: string[];
+    createdAt: Timestamp;
+}

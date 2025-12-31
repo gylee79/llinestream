@@ -10,6 +10,7 @@ import {
   FolderKanban,
   LayoutDashboard,
   Menu,
+  MessageSquare,
   Users,
   History,
 } from 'lucide-react';
@@ -29,6 +30,7 @@ const adminNavLinks = [
   { href: '/admin/subscriptions', label: '구독/결제 관리', icon: CreditCard },
   { href: '/admin/revenue', label: '매출 관리', icon: BarChart3 },
   { href: '/admin/view-history', label: '시청 기록', icon: History },
+  { href: '/admin/chats', label: 'AI 채팅 기록', icon: MessageSquare },
   { href: '/admin/settings', label: '설정', icon: Cog },
 ];
 
