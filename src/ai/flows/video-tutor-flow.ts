@@ -16,7 +16,8 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
-import { openai } from '@/lib/openai';
+import { googleAI } from '@/lib/google-ai';
+import { embed } from 'genkit/ai';
 
 const VideoTutorInputSchema = z.object({
   episodeId: z.string().describe('The ID of the video episode being asked about.'),
@@ -41,21 +42,29 @@ const videoTutorFlow = ai.defineFlow(
     outputSchema: VideoTutorOutputSchema,
   },
   async ({ episodeId, question, userId }) => {
-    // 1. Embed the user's question
+    // 1. Embed the user's question using Genkit's embedder
     console.log(`[Tutor-Flow] Embedding question: "${question}"`);
-    const embeddingResponse = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
-      input: question,
+    const embedding = await embed({
+        embedder: 'googleai/text-embedding-004', // Using Google's embedding model
+        content: question
     });
-    const questionVector = embeddingResponse.data[0].embedding;
+    const questionVector = embedding;
 
     // 2. Find relevant chunks from Firestore
     console.log(`[Tutor-Flow] Searching for relevant chunks in episode ${episodeId}`);
     const adminApp = initializeAdminApp();
     const db = admin.firestore(adminApp);
     
-    const chunksCollection = db.collection(`episodes/${episodeId}/chunks`);
-    const vectorQuery = chunksCollection.findNearest('vector', questionVector, {
+    // Check if the chunks collection exists and is not empty.
+    const chunksCollectionRef = db.collection(`episodes/${episodeId}/chunks`);
+    const chunksSnapshot = await chunksCollectionRef.limit(1).get();
+    if (chunksSnapshot.empty) {
+        console.log(`[Tutor-Flow] No chunks found. Responding with default message.`);
+        await episodeRef.update({ transcript: transcriptText });
+        return { answer: "죄송합니다, 이 비디오는 아직 AI 질문에 맞게 처리되지 않았습니다. 관리자에게 문의해주세요." };
+    }
+
+    const vectorQuery = chunksCollectionRef.findNearest('vector', questionVector, {
         limit: 5,
         distanceMeasure: 'COSINE'
     });
@@ -81,7 +90,7 @@ const videoTutorFlow = ai.defineFlow(
       ---
       
       User's Question: "${question}"`,
-      model: 'googleai/gemini-2.5-flash',
+      model: 'googleai/gemini-1.5-flash',
     });
 
     const answer = llmResponse.text;
