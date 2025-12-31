@@ -8,20 +8,11 @@ import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import type { Episode } from '../types';
 import { extractPathFromUrl } from '../utils';
-import OpenAI from 'openai';
+import { openai } from '@/lib/openai';
 import ffmpeg from 'fluent-ffmpeg';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-if (!process.env.OPENAI_API_KEY) {
-  console.warn('OPENAI_API_KEY environment variable is not set. Video processing will fail.');
-}
 
 /**
  * Splits text into chunks of a specified size, trying to break at sentence endings.
