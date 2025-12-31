@@ -562,22 +562,11 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                     </div>
                 </div>
             </div>
-             {uploadProgress !== null && (
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <div />
-                    <div className="col-span-3 mt-2">
-                        <Progress value={uploadProgress} />
-                        <p className="text-sm text-center text-muted-foreground mt-2">
-                            {uploadMessage} {Math.round(uploadProgress)}%
-                        </p>
-                    </div>
-                </div>
-            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleSafeClose} disabled={isProcessing}>취소</Button>
             <Button type="button" onClick={handleSaveEpisode} disabled={isProcessing || (!isEditMode && !videoFile) || !selectedCourseId }>
-              {isProcessing ? `처리 중...` : '에피소드 저장'}
+                {isProcessing ? `${uploadMessage} ${uploadProgress !== null ? `${Math.round(uploadProgress)}%` : ''}`.trim() : '에피소드 저장'}
             </Button>
           </DialogFooter>
         </DialogContent>
