@@ -1,6 +1,7 @@
+
 'use client';
     
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   DocumentReference,
   onSnapshot,
@@ -49,6 +50,31 @@ export function useDoc<T = any>(
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
+  const handleNext = useCallback((snapshot: DocumentSnapshot<DocumentData>) => {
+    if (snapshot.exists()) {
+      setData({ ...(snapshot.data() as T), id: snapshot.id });
+    } else {
+      setData(null);
+    }
+    setError(null);
+    setIsLoading(false);
+  }, []);
+
+  const handleError = useCallback((err: FirestoreError) => {
+    if (docRef) {
+      const contextualError = new FirestorePermissionError({
+        operation: 'get',
+        path: docRef.path,
+      }, authUser);
+      setError(contextualError);
+      errorEmitter.emit('permission-error', contextualError);
+    } else {
+      setError(err);
+    }
+    setData(null);
+    setIsLoading(false);
+  }, [docRef, authUser]);
+
   useEffect(() => {
     // If the ref is not ready, reset the state and wait.
     if (!docRef) {
@@ -61,34 +87,10 @@ export function useDoc<T = any>(
     setIsLoading(true);
     setError(null);
 
-    const unsubscribe = onSnapshot(
-      docRef,
-      (snapshot: DocumentSnapshot<DocumentData>) => {
-        if (snapshot.exists()) {
-          setData({ ...(snapshot.data() as T), id: snapshot.id });
-        } else {
-          // Document does not exist
-          setData(null);
-        }
-        setError(null); // Clear any previous error on successful snapshot (even if doc doesn't exist)
-        setIsLoading(false);
-      },
-      (err: FirestoreError) => {
-        const contextualError = new FirestorePermissionError({
-          operation: 'get',
-          path: docRef.path,
-        }, authUser);
-
-        setError(contextualError);
-        setData(null);
-        setIsLoading(false);
-
-        errorEmitter.emit('permission-error', contextualError);
-      }
-    );
+    const unsubscribe = onSnapshot(docRef, handleNext, handleError);
 
     return () => unsubscribe();
-  }, [docRef, authUser]); // Re-run if the docRef changes.
+  }, [docRef, handleNext, handleError]); // Re-run if the docRef changes.
 
   return { data, isLoading, error };
 }

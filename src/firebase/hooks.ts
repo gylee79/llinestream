@@ -57,8 +57,8 @@ export const useUser = (): UserHookResult => {
     isAuthLoading: boolean;
     authError: Error | null;
   }>({
-    authUser: auth.currentUser,
-    isAuthLoading: auth.currentUser === null, // if no user, we are likely loading
+    authUser: auth.currentUser, // Use auth.currentUser for initial state
+    isAuthLoading: true, // Always start as true to wait for onAuthStateChanged
     authError: null,
   });
 
@@ -96,14 +96,6 @@ export const useUser = (): UserHookResult => {
 export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const memoized = useMemo(factory, deps);
-  
-  if(memoized && typeof memoized === 'object' && memoized !== null) {
-    Object.defineProperty(memoized, '__memo', {
-        value: true,
-        writable: false,
-        enumerable: false,
-    });
-  }
   
   return memoized;
 }

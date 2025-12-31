@@ -48,12 +48,11 @@ function ChatLogViewer() {
   const [filterEpisode, setFilterEpisode] = useState('all');
   const [filterUser, setFilterUser] = useState('all');
 
-  const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(
-    useMemoFirebase(() => (firestore ? collection(firestore, 'episodes') : null), [firestore])
-  );
-  const { data: users, isLoading: usersLoading } = useCollection<User>(
-    useMemoFirebase(() => (firestore ? collection(firestore, 'users') : null), [firestore])
-  );
+  const episodesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'episodes') : null), [firestore]);
+  const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
+  
+  const usersQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
+  const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
   
   const chatsQuery = useMemoFirebase(() => {
     if (!firestore) return null;

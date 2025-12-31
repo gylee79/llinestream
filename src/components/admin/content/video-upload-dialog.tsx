@@ -22,7 +22,6 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Progress } from '@/components/ui/progress';
 import { useCollection, useFirestore, useStorage, useMemoFirebase } from '@/firebase';
 import { collection, doc, getDoc, query, where, setDoc } from 'firebase/firestore';
 import type { Field, Classification, Course, Episode, Instructor } from '@/lib/types';

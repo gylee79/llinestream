@@ -1,3 +1,4 @@
+
 'use client';
 import Hero from '@/components/home/hero';
 import { useCollection, useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';

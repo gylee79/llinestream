@@ -313,5 +313,3 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
     </Dialog>
   );
 }
-
-    

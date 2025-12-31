@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -42,6 +43,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { sanitize } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import VideoPlayerDialog from '@/components/shared/video-player-dialog';
 
 
 export default function VideoManager() {
@@ -65,7 +67,10 @@ export default function VideoManager() {
 
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [isThumbnailDialogOpen, setThumbnailDialogOpen] = useState(false);
+  const [isPlayerDialogOpen, setPlayerDialogOpen] = useState(false);
+  
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
+  const [selectedInstructor, setSelectedInstructor] = useState<Instructor | null>(null);
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [episodeToDelete, setEpisodeToDelete] = useState<Episode | null>(null);
@@ -79,6 +84,12 @@ export default function VideoManager() {
     setSelectedEpisode(episode);
     setThumbnailDialogOpen(true);
   };
+  
+  const handlePlayVideo = (episode: Episode) => {
+    setSelectedEpisode(episode);
+    setSelectedInstructor(instructors?.find(i => i.id === episode.instructorId) || null);
+    setPlayerDialogOpen(true);
+  }
 
   const getFullCoursePath = (courseId: string): string => {
     if (!courses || !classifications || !fields) return '? > ? > ?';
@@ -223,10 +234,8 @@ export default function VideoManager() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right space-x-2">
-                         <Button variant="outline" size="sm" asChild>
-                           <Link href={episode.videoUrl} target="_blank" rel="noopener noreferrer" >
-                              시청
-                           </Link>
+                         <Button variant="outline" size="sm" onClick={() => handlePlayVideo(episode)}>
+                            시청
                          </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -274,6 +283,15 @@ export default function VideoManager() {
               item={selectedEpisode}
               itemType="episodes"
           />
+      )}
+
+      {isPlayerDialogOpen && selectedEpisode && (
+        <VideoPlayerDialog 
+            isOpen={isPlayerDialogOpen}
+            onOpenChange={setPlayerDialogOpen}
+            episode={selectedEpisode}
+            instructor={selectedInstructor}
+        />
       )}
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -13,14 +14,20 @@ export default function ContinueWatching() {
 
     const historyQuery = useMemoFirebase(() => {
         if (!user || !firestore) return null;
-        return query(
-            collection(firestore, 'users', user.id, 'viewHistory'),
-            orderBy('endedAt', 'desc'),
-            limit(20) // Fetch more to account for client-side deduplication
-        );
+        // This collection was removed from firestore.rules
+        // return query(
+        //     collection(firestore, 'users', user.id, 'viewHistory'),
+        //     orderBy('endedAt', 'desc'),
+        //     limit(20) // Fetch more to account for client-side deduplication
+        // );
+        return null
     }, [user, firestore]);
 
-    const { data: viewLogs, isLoading: historyLoading } = useCollection<EpisodeViewLog>(historyQuery);
+    // This collection was removed from firestore.rules
+    // const { data: viewLogs, isLoading: historyLoading } = useCollection<EpisodeViewLog>(historyQuery);
+    const viewLogs: EpisodeViewLog[] = [];
+    const historyLoading = false;
+
 
     const episodesQuery = useMemoFirebase(() => {
         if (!firestore) return null;

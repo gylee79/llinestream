@@ -9,14 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import type { Policy, FooterSettings, HeroImageSettings } from '@/lib/types';
-import { useCollection, useDoc, useFirestore, useUser, errorEmitter, useStorage, useMemoFirebase } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useRef } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
-import { getPublicUrl } from "@/lib/utils";
 import { updateThumbnail } from '@/lib/actions/update-thumbnail';
 import {
   AlertDialog,
