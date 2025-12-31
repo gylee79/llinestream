@@ -16,7 +16,6 @@ import { ai } from '@/ai/genkit';
 import { z, embed } from 'genkit';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
-import { googleAI } from '@/lib/google-ai';
 
 const VideoTutorInputSchema = z.object({
   episodeId: z.string().describe('The ID of the video episode being asked about.'),
@@ -44,7 +43,7 @@ const videoTutorFlow = ai.defineFlow(
     // 1. Embed the user's question using Genkit's embedder
     console.log(`[Tutor-Flow] Embedding question: "${question}"`);
     const questionEmbedding = await embed({
-        embedder: googleAI.embedder('text-embedding-004'),
+        embedder: 'googleai/text-embedding-004',
         content: question,
     });
 
@@ -108,7 +107,7 @@ const videoTutorFlow = ai.defineFlow(
       ---
       
       User's Question: "${question}"`,
-      model: googleAI.model('gemini-1.5-flash'),
+      model: 'googleai/gemini-1.5-flash',
     });
 
     const answer = llmResponse.text;
