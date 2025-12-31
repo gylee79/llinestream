@@ -63,6 +63,23 @@ const getEpisodeDependenciesRecursive = async (db: Firestore, parentId: string, 
     return finalDependencies;
 }
 
+const deleteChunksSubcollection = async (db: Firestore, episodeId: string): Promise<void> => {
+    const chunksRef = db.collection('episodes').doc(episodeId).collection('chunks');
+    const snapshot = await chunksRef.get();
+    
+    if (snapshot.empty) {
+        return;
+    }
+
+    const batch = db.batch();
+    snapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+    console.log(`[DELETE SUCCESS] Deleted chunks subcollection for episode ${episodeId}.`);
+}
+
 
 export async function deleteHierarchyItem(
   collectionName: 'fields' | 'classifications' | 'courses' | 'episodes',
@@ -119,6 +136,8 @@ export async function deleteHierarchyItem(
         await deleteStorageFileByPath(storage, episode.filePath);
         await deleteStorageFileByPath(storage, episode.defaultThumbnailPath);
         await deleteStorageFileByPath(storage, episode.customThumbnailPath);
+        // Also delete the chunks subcollection
+        await deleteChunksSubcollection(db, episode.id);
     } else {
         const hierarchyItem = item as Field | Classification | Course;
         await deleteStorageFileByPath(storage, hierarchyItem.thumbnailPath);

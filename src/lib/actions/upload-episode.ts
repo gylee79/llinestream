@@ -10,6 +10,7 @@ import { revalidatePath } from 'next/cache';
 import type { Episode, Timestamp } from '../types';
 import { Storage } from 'firebase-admin/storage';
 import { extractPathFromUrl } from '../utils';
+import { processVideoForAI } from './process-video';
 
 
 type UploadResult = {
@@ -111,12 +112,26 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             customThumbnailUrl: customThumbnailUrl || '', // Store empty string if not provided
             customThumbnailPath: customThumbnailPath || '',
             createdAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
+            // Transcript will be populated by the AI process
         };
 
         await episodeRef.set(newEpisode);
 
+        // --- Trigger AI processing in the background ---
+        // We don't await this, so the UI can respond quickly.
+        // The AI processing happens independently on the server.
+        processVideoForAI(episodeId).then(result => {
+            if (result.success) {
+                console.log(`[BG-SUCCESS] AI processing finished for episode ${episodeId}`);
+            } else {
+                console.error(`[BG-ERROR] AI processing failed for episode ${episodeId}: ${result.message}`);
+                // Optional: Update Firestore to indicate failure
+                 db.collection('episodes').doc(episodeId).update({ transcript: `AI_PROCESSING_FAILED: ${result.message}` });
+            }
+        });
+
         revalidatePath('/admin/content', 'layout');
-        return { success: true, message: `에피소드 '${title}'의 정보가 성공적으로 저장되었습니다.` };
+        return { success: true, message: `에피소드 '${title}'의 정보가 성공적으로 저장되었습니다. AI 분석이 백그라운드에서 시작되었습니다.` };
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : '알 수 없는 서버 오류가 발생했습니다.';
@@ -150,11 +165,14 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             return { success: false, message: '업데이트할 에피소드를 찾을 수 없습니다.' };
         }
         const currentData = currentDoc.data() as Episode;
+        
+        let shouldReprocessVideo = false;
 
         // --- File Deletion Logic ---
         const oldFilePath = extractPathFromUrl(oldVideoUrl);
         if (newVideoData?.filePath && oldFilePath && newVideoData.filePath !== oldFilePath) {
           await deleteStorageFileByPath(storage, oldFilePath);
+          shouldReprocessVideo = true;
         }
         
         const oldDefaultThumbnailPath = extractPathFromUrl(oldDefaultThumbnailUrl);
@@ -179,6 +197,8 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         if (newVideoData) {
             dataToUpdate.videoUrl = newVideoData.downloadUrl;
             dataToUpdate.filePath = newVideoData.filePath;
+            // When a new video is uploaded, clear the old transcript to trigger re-processing
+            dataToUpdate.transcript = admin.firestore.FieldValue.delete();
         }
 
         if (newDefaultThumbnailData) {
@@ -197,6 +217,19 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         dataToUpdate.thumbnailUrl = finalCustomUrl || finalDefaultUrl || '';
 
         await episodeRef.update(dataToUpdate);
+
+        // If a new video was uploaded, trigger AI re-processing
+        if(shouldReprocessVideo){
+            processVideoForAI(episodeId).then(result => {
+                if (result.success) {
+                    console.log(`[BG-SUCCESS] AI re-processing finished for episode ${episodeId}`);
+                } else {
+                    console.error(`[BG-ERROR] AI re-processing failed for episode ${episodeId}: ${result.message}`);
+                    db.collection('episodes').doc(episodeId).update({ transcript: `AI_PROCESSING_FAILED: ${result.message}` });
+                }
+            });
+        }
+
 
         revalidatePath('/admin/content', 'layout');
         return { success: true, message: `에피소드 '${title}' 정보가 업데이트되었습니다.` };
