@@ -1,5 +1,5 @@
 
-import { GoogleGenerativeAI, GoogleAIFileManager } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const apiKey = process.env.GEMINI_API_KEY;
 
@@ -10,4 +10,4 @@ if (!apiKey) {
 }
 
 export const googleAI = new GoogleGenerativeAI(apiKey || '');
-export const fileManager = new GoogleAIFileManager(apiKey || '');
+export const fileManager = googleAI.files;
