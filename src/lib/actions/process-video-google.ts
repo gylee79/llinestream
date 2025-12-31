@@ -1,4 +1,3 @@
-
 'use server';
 
 import { config } from 'dotenv';
@@ -8,7 +7,7 @@ import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { extractPathFromUrl } from '../utils';
 import { googleAI, fileManager } from '@/lib/google-ai';
-import { FileState } from '@google/generative-ai/files';
+import { FileState } from '@google/generative-ai';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
