@@ -13,7 +13,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z, embed } from 'genkit';
+import { z } from 'genkit';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 
@@ -42,7 +42,7 @@ const videoTutorFlow = ai.defineFlow(
   async ({ episodeId, question, userId }) => {
     // 1. Embed the user's question using Genkit's embedder
     console.log(`[Tutor-Flow] Embedding question: "${question}"`);
-    const questionEmbedding = await embed({
+    const { embedding: questionEmbedding } = await ai.embed({
         embedder: 'googleai/text-embedding-004',
         content: question,
     });
