@@ -2,6 +2,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: [
+    "genkit",
+    "@genkit-ai/firebase",
+    "@genkit-ai/google-genai",
+    "firebase-admin",
+  ],
   experimental: {
     serverActions: {
       bodySizeLimit: '500mb',
