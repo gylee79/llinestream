@@ -51,11 +51,9 @@ export default function Home() {
       <div className="container mx-auto space-y-16 py-12">
         {user && (
           <section>
-            <div className="mb-6 border-b-2 border-accent pb-2 inline-block">
-              <h2 className="font-headline text-2xl font-semibold tracking-tight">
-                이어보기
-              </h2>
-            </div>
+            <h2 className="mb-6 font-headline text-xl font-bold tracking-tight">
+              이어보기
+            </h2>
             <ContinueWatching />
           </section>
         )}
@@ -68,9 +66,7 @@ export default function Home() {
 
           return (
             <section key={field.id}>
-              <div className="mb-6 border-b-2 border-accent pb-2 inline-block">
-                <h2 className="font-headline text-2xl font-semibold tracking-tight">{field.name}</h2>
-              </div>
+              <h2 className="mb-6 font-headline text-xl font-bold tracking-tight">{field.name}</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {classificationsInField.map((classification) => (
                   <ClassificationCard key={classification.id} classification={classification} />
