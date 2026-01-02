@@ -11,8 +11,8 @@ interface ClassificationCardProps {
 export default function ClassificationCard({ classification }: ClassificationCardProps) {
   return (
     <Link href={`/classifications/${classification.id}`} className="block h-full group">
-      <Card className="h-full overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 bg-card">
-        <div className="aspect-[4/3] overflow-hidden relative">
+      <Card className="relative h-full overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 bg-card">
+        <div className="aspect-[4/3] overflow-hidden">
           <Image
             src={classification.thumbnailUrl || 'https://picsum.photos/seed/placeholder/600/400'}
             alt={classification.name}
@@ -20,9 +20,9 @@ export default function ClassificationCard({ classification }: ClassificationCar
             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
             className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-105"
           />
-           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
         </div>
-        <CardHeader className="absolute bottom-0 left-0 right-0 p-4 bg-transparent">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+        <CardHeader className="absolute bottom-0 left-0 right-0 p-4 z-10">
           <CardTitle className="font-headline text-lg tracking-tight text-white">
             {classification.name}
           </CardTitle>
