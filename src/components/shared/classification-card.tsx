@@ -23,7 +23,7 @@ export default function ClassificationCard({ classification }: ClassificationCar
         </div>
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
         <CardHeader className="absolute bottom-0 left-0 right-0 p-4 z-10">
-          <CardTitle className="font-headline text-lg tracking-tight text-white">
+          <CardTitle className="font-headline text-base md:text-lg tracking-tight text-white">
             {classification.name}
           </CardTitle>
           <div className="flex items-center text-xs text-white/80 transition-opacity duration-300 opacity-0 group-hover:opacity-100">
