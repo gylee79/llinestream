@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -285,16 +284,20 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
 
   const handleSaveEpisode = async () => {
     if (!firestore || !storage) return;
-    if (!title || !selectedCourseId) {
-        toast({ variant: 'destructive', title: '입력 오류', description: '제목과 소속 상세분류는 필수입니다.' });
-        return;
-    }
-    if (!selectedInstructorId) {
-        toast({ variant: 'destructive', title: '입력 오류', description: '강사를 선택해주세요.' });
-        return;
-    }
-    if (!isEditMode && !videoFile) {
-        toast({ variant: 'destructive', title: '입력 오류', description: '새 에피소드에는 비디오 파일이 필수입니다.' });
+
+    // Validation checks
+    const missingFields = [];
+    if (!title.trim()) missingFields.push('제목');
+    if (!selectedCourseId) missingFields.push('상세분류');
+    if (!selectedInstructorId) missingFields.push('강사');
+    if (!isEditMode && !videoFile) missingFields.push('비디오 파일');
+
+    if (missingFields.length > 0) {
+        toast({
+            variant: 'destructive',
+            title: '입력 오류',
+            description: `다음 필수 항목을 입력해주세요: ${missingFields.join(', ')}`,
+        });
         return;
     }
 
@@ -568,7 +571,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleSafeClose} disabled={isProcessing}>취소</Button>
-            <Button type="button" onClick={handleSaveEpisode} disabled={isProcessing || (!isEditMode && !videoFile) || !selectedCourseId || !selectedInstructorId}>
+            <Button type="button" onClick={handleSaveEpisode} disabled={isProcessing}>
                 {isProcessing ? `${uploadMessage} ${uploadProgress !== null ? `${Math.round(uploadProgress)}%` : ''}`.trim() : '에피소드 저장'}
             </Button>
           </DialogFooter>
