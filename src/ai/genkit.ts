@@ -1,4 +1,3 @@
-
 'use server';
 
 import { genkit } from 'genkit';
@@ -8,6 +7,6 @@ import { firebase } from '@genkit-ai/firebase';
 export const ai = genkit({
   plugins: [
     googleAI(),
-    firebase(), 
+    firebase(),
   ],
 });
