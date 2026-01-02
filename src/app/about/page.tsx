@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Award, BrainCircuit, HandHeart, Users } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { doc } from 'firebase/firestore';
@@ -111,18 +111,6 @@ export default function AboutPage() {
       </section>
 
       <div className="container mx-auto py-16 md:py-24 space-y-16 md:space-y-24">
-        {/* Problem & Solution Section */}
-        <section className="text-center max-w-3xl mx-auto">
-            <h2 className="text-3xl font-bold tracking-tight">혼자서는 어려운 샵 운영의 모든 것</h2>
-            <p className="mt-4 text-muted-foreground text-lg">
-                직원 교육, 검증 안된 테크닉, 낮은 객단가. 원장님의 고민, 엘라인은 알고 있습니다.
-            </p>
-            <Card className="mt-8 bg-muted border-none p-8">
-                <p className="text-2xl font-bold text-primary">
-                사람의 손길(Touch) + AI의 데이터(Data) = <br className="sm:hidden" /> <span className="text-accent">대체 불가능한 전문가 양성</span>
-                </p>
-            </Card>
-        </section>
 
         {/* Curriculum Section */}
         <section>
@@ -140,7 +128,7 @@ export default function AboutPage() {
                       className="object-cover transition-transform duration-500 group-hover:scale-105"
                       data-ai-hint={item.aiHint}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
                   </div>
                   <CardContent className="absolute bottom-0 left-0 right-0 p-4 bg-transparent text-white">
                     <h3 className="font-headline text-xl font-bold">{item.title}</h3>
