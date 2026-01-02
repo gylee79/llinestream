@@ -115,7 +115,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             // Transcript will be populated by the AI process
         };
 
-        await episodeRef.set(newEpisode);
+        await episodeRef.set(newEpisode, { ignoreUndefinedProperties: true });
 
         // --- Trigger AI processing in the background ---
         // We don't await this, so the UI can respond quickly.
