@@ -55,7 +55,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
     
     return (
         <>
-            <Card className="overflow-hidden border-border">
+            <Card className="overflow-hidden border-input">
                 <CardContent className="p-3">
                      <div className="flex gap-3">
                         {/* Left Column */}
