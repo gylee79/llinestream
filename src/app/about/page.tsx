@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,27 +10,36 @@ import type { HeroImageSettings } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
+import Link from 'next/link';
 
 const curriculum = [
   {
     title: '국가자격증 반',
-    description: '체계적인 이론과 실습으로 합격률 90% 이상을 달성하는 피부/바디 기초 완성 과정입니다.',
-    icon: Award,
+    description: '피부/바디 기초 완성 과정',
+    imageUrl: 'https://images.unsplash.com/photo-1556760544-442285d3b2a5?w=800&h=600&fit=crop&q=80',
+    href: '/about/national-certificate',
+    aiHint: 'certificate award'
   },
   {
     title: '림프 마스터 반 (Signature)',
-    description: "'림프온'의 독보적인 재활/순환 테크닉을 전수받아 고객 만족도를 극대화하세요.",
-    icon: HandHeart,
+    description: '독보적인 재활/순환 테크닉',
+    imageUrl: 'https://images.unsplash.com/photo-1519824145371-296894a0d72b?w=800&h=600&fit=crop&q=80',
+    href: '/about/lymph-master',
+    aiHint: 'lymph massage'
   },
   {
     title: 'AI & 감정 아로마 반',
-    description: 'AI 진단과 도테라 오일을 활용한 멘탈 케어 및 조향 클래스로 차별화된 서비스를 제공합니다.',
-    icon: BrainCircuit,
+    description: 'AI 진단과 멘탈 케어 솔루션',
+    imageUrl: 'https://images.unsplash.com/photo-1540555233-1282491befe4?w=800&h=600&fit=crop&q=80',
+    href: '/about/ai-aroma',
+    aiHint: 'AI aromatherapy'
   },
   {
     title: '직원 위탁 교육 시스템',
-    description: '원장님을 대신하여 신입 직원을 3일 만에 실무형 인재로 육성하는 가장 효율적인 솔루션입니다.',
-    icon: Users,
+    description: '3일 완성 실무형 인재 육성',
+    imageUrl: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=600&fit=crop&q=80',
+    href: '/about/employee-training',
+    aiHint: 'team training'
   },
 ];
 
@@ -119,21 +127,32 @@ export default function AboutPage() {
         {/* Curriculum Section */}
         <section>
           <h2 className="text-3xl font-bold tracking-tight text-center mb-12">엘라인 아카데미 핵심 교육 과정</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10 max-w-4xl mx-auto">
-            {curriculum.map((item, index) => {
-              const IconComponent = item.icon;
-              return (
-                <div key={index} className="flex items-start gap-6">
-                  <div className="flex-shrink-0 flex items-center justify-center h-20 w-20 rounded-full border-2 border-accent bg-accent/10 text-accent">
-                    <IconComponent className="h-10 w-10" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {curriculum.map((item) => (
+              <Link href={item.href} key={item.title} className="group block">
+                <Card className="h-full overflow-hidden transition-all duration-300 ease-in-out hover:shadow-2xl hover:-translate-y-2">
+                  <div className="relative aspect-[3/4] w-full">
+                    <Image
+                      src={item.imageUrl}
+                      alt={item.title}
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      data-ai-hint={item.aiHint}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold font-headline text-primary">{item.title}</h3>
-                    <p className="mt-2 text-muted-foreground">{item.description}</p>
-                  </div>
-                </div>
-              );
-            })}
+                  <CardContent className="absolute bottom-0 left-0 right-0 p-4 bg-transparent text-white">
+                    <h3 className="font-headline text-xl font-bold">{item.title}</h3>
+                    <p className="text-sm text-white/80 mt-1">{item.description}</p>
+                    <div className="flex items-center text-xs text-accent mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <span>자세히 보기</span>
+                        <ArrowRight className="ml-1 h-3 w-3"/>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
           </div>
         </section>
 
