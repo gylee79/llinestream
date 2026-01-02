@@ -1,5 +1,3 @@
-
-
 'use server';
 /**
  * @fileOverview AI Tutor flow for answering questions about a video episode.
@@ -14,11 +12,10 @@
  */
 
 import { ai } from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
-import type { Episode, Course, Classification } from '@/lib/types';
-
 
 const VideoTutorInputSchema = z.object({
   episodeId: z.string().describe('The ID of the video episode being asked about.'),
@@ -60,8 +57,9 @@ const videoTutorFlow = ai.defineFlow(
     const context = episodeChunks.join('\n\n---\n\n');
     console.log(`[Tutor-Flow] Found ${episodeChunks.length} chunks for context.`);
 
-    // 2. Generate the answer using Gemini with the provided context
+    // 2. Generate the answer using Gemini with the provided context (Genkit 1.0+ syntax)
     const llmResponse = await ai.generate({
+      model: googleAI.model('gemini-pro'),
       prompt: `You are a friendly and helpful tutor. Based ONLY on the following video transcript context, answer the user's question in Korean.
       If the context doesn't contain the answer, you MUST state that the information is not in the video and you cannot answer. Do not use outside knowledge.
 
@@ -71,7 +69,6 @@ const videoTutorFlow = ai.defineFlow(
       ---
       
       User's Question: "${question}"`,
-      model: 'googleai/gemini-pro', // Using the recommended standard model
     });
 
     const answer = llmResponse.text;
