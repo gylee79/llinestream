@@ -24,7 +24,7 @@ type SaveMetadataPayload = {
     description: string;
     isFree: boolean;
     selectedCourseId: string;
-    instructorId?: string;
+    instructorId: string;
     videoUrl: string;
     filePath: string;
     // Default thumbnail is required for new episodes
@@ -38,7 +38,7 @@ type SaveMetadataPayload = {
 type UpdateEpisodePayload = {
     episodeId: string;
     courseId: string;
-    instructorId?: string;
+    instructorId: string;
     title: string;
     description: string;
     isFree: boolean;
@@ -85,8 +85,8 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
         customThumbnailUrl, customThumbnailPath
     } = payload;
 
-     if (!title || !selectedCourseId || !videoUrl || !episodeId || !filePath || !defaultThumbnailUrl || !defaultThumbnailPath) {
-        return { success: false, message: '필수 정보(에피소드ID, 제목, 강좌, 비디오 URL/경로, 대표 썸네일 URL/경로)가 누락되었습니다.' };
+     if (!title || !selectedCourseId || !videoUrl || !episodeId || !filePath || !defaultThumbnailUrl || !defaultThumbnailPath || !instructorId) {
+        return { success: false, message: '필수 정보(에피소드ID, 제목, 강좌, 강사, 비디오 URL/경로, 대표 썸네일 URL/경로)가 누락되었습니다.' };
     }
 
     try {
@@ -99,7 +99,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
         
         const newEpisode: Omit<Episode, 'id'> = {
             courseId: selectedCourseId,
-            instructorId: instructorId || undefined,
+            instructorId: instructorId,
             title,
             description,
             duration,
@@ -150,8 +150,8 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         oldVideoUrl, oldDefaultThumbnailUrl, oldCustomThumbnailUrl
     } = payload;
     
-    if (!episodeId || !courseId || !title) {
-        return { success: false, message: '에피소드 ID, 강좌 ID, 제목은 필수입니다.' };
+    if (!episodeId || !courseId || !title || !instructorId) {
+        return { success: false, message: '에피소드 ID, 강좌 ID, 강사 ID, 제목은 필수입니다.' };
     }
 
     try {
@@ -191,7 +191,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             description,
             isFree,
             courseId,
-            instructorId: instructorId || null,
+            instructorId: instructorId,
         };
 
         if (newVideoData) {

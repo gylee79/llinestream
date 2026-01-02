@@ -289,6 +289,10 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
         toast({ variant: 'destructive', title: '입력 오류', description: '제목과 소속 상세분류는 필수입니다.' });
         return;
     }
+    if (!selectedInstructorId) {
+        toast({ variant: 'destructive', title: '입력 오류', description: '강사를 선택해주세요.' });
+        return;
+    }
     if (!isEditMode && !videoFile) {
         toast({ variant: 'destructive', title: '입력 오류', description: '새 에피소드에는 비디오 파일이 필수입니다.' });
         return;
@@ -564,7 +568,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleSafeClose} disabled={isProcessing}>취소</Button>
-            <Button type="button" onClick={handleSaveEpisode} disabled={isProcessing || (!isEditMode && !videoFile) || !selectedCourseId }>
+            <Button type="button" onClick={handleSaveEpisode} disabled={isProcessing || (!isEditMode && !videoFile) || !selectedCourseId || !selectedInstructorId}>
                 {isProcessing ? `${uploadMessage} ${uploadProgress !== null ? `${Math.round(uploadProgress)}%` : ''}`.trim() : '에피소드 저장'}
             </Button>
           </DialogFooter>
