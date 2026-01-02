@@ -26,7 +26,7 @@ export default function ClassificationCard({ classification }: ClassificationCar
           <CardTitle className="font-headline text-lg tracking-tight text-white">
             {classification.name}
           </CardTitle>
-          <div className="flex items-center text-xs text-white/80 transition-opacity duration-300">
+          <div className="flex items-center text-xs text-white/80 transition-opacity duration-300 opacity-0 group-hover:opacity-100">
             <span>자세히 보기</span>
             <ArrowRight className="ml-1 h-3 w-3" />
           </div>
