@@ -38,7 +38,7 @@ export default function CourseCard({ course, instructor, field, rank }: CourseCa
           </div>
           
           <div className="pt-3">
-             <h3 className="font-bold text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors duration-300">{course.name}</h3>
+             <h3 className="font-headline font-semibold text-base leading-snug tracking-tight line-clamp-2 text-foreground group-hover:text-primary transition-colors duration-300">{course.name}</h3>
              <p className="text-sm text-muted-foreground mt-1 truncate">{course.description}</p>
              <p className="text-xs text-muted-foreground mt-2">{instructor?.name || 'LlineStream'}</p>
              <div className="flex items-center text-xs mt-2 gap-2">

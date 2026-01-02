@@ -141,7 +141,7 @@ export default function CourseDetailPage() {
         <div className="container mx-auto max-w-5xl py-12">
           <div className="flex flex-col md:flex-row items-start gap-8 md:gap-12">
             <div className="w-full md:w-1/2">
-              <h1 className="font-headline text-3xl font-bold">{course.name}</h1>
+              <h1 className="font-headline text-3xl font-bold tracking-tight">{course.name}</h1>
               <p className="text-muted-foreground mt-4">{course.description}</p>
             </div>
             <div className="w-full md:w-1/2">
@@ -183,7 +183,7 @@ export default function CourseDetailPage() {
         
         {user && <CourseReviewSection comments={comments} user={user} episodes={episodes || []} onToggleAllReviews={() => setAllReviewsOpen(true)} />}
         
-        <h2 className="font-headline text-2xl font-bold mt-12 mb-4">
+        <h2 className="font-headline text-2xl font-bold mt-12 mb-4 tracking-tight">
             에피소드 목록
         </h2>
         

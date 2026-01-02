@@ -61,7 +61,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                         {/* Left Column */}
                         <div className="flex-grow flex flex-col min-w-0">
                             <div className="mt-2 md:mt-0">
-                                <h3 className="text-base font-bold leading-tight line-clamp-2">{episode.title}</h3>
+                                <h3 className="font-headline text-base font-bold leading-tight tracking-tight line-clamp-2">{episode.title}</h3>
                                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{episode.description}</p>
                             </div>
                             <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">

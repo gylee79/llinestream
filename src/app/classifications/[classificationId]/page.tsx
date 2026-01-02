@@ -62,13 +62,13 @@ function ClassificationDetailClient({ classificationId }: { classificationId: st
   return (
     <div className="container mx-auto py-12">
       <header className="mb-12 text-center">
-        <h1 className="font-headline text-4xl font-bold tracking-tight">{classification.name}</h1>
+        <h1 className="font-headline text-4xl font-bold tracking-tight text-foreground">{classification.name}</h1>
         <p className="mt-4 text-lg text-muted-foreground max-w-3xl mx-auto">
           {classification.description}
         </p>
       </header>
 
-      <h2 className="text-2xl font-bold font-headline mb-6">관련 강좌 목록</h2>
+      <h2 className="text-2xl font-bold font-headline mb-6 tracking-tight">관련 강좌 목록</h2>
       {courses && courses.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-10">
           {courses.map((course, index) => {

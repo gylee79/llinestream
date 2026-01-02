@@ -26,7 +26,6 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
         className={cn(
             "relative overflow-hidden",
             "h-[70vh] min-h-[500px] md:h-[80vh] md:min-h-[600px]",
-            "md:rounded-b-[3rem]"
         )}
         initial={{ scale: 1.05, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -45,7 +44,7 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
         ) : (
           <Skeleton className="h-full w-full" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent" />
         <div className="absolute inset-0 z-10 flex h-full flex-col items-center justify-end p-6 text-center text-white">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -54,7 +53,7 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
             className="max-w-4xl pb-16 md:pb-24"
           >
             {title && (
-              <h1 className="font-headline text-4xl font-bold md:text-6xl text-balance">
+              <h1 className="font-headline text-4xl font-bold md:text-6xl text-balance tracking-tight">
                 {title}
               </h1>
             )}

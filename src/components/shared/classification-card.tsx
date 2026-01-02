@@ -11,7 +11,7 @@ interface ClassificationCardProps {
 export default function ClassificationCard({ classification }: ClassificationCardProps) {
   return (
     <Link href={`/classifications/${classification.id}`} className="block h-full group">
-      <Card className="h-full overflow-hidden transition-all duration-300 ease-in-out hover:shadow-2xl hover:-translate-y-2 bg-gradient-to-br from-card to-muted/50">
+      <Card className="h-full overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 bg-gradient-to-br from-card to-muted/50">
         <div className="aspect-[4/3] overflow-hidden relative">
           <Image
             src={classification.thumbnailUrl || 'https://picsum.photos/seed/placeholder/600/400'}

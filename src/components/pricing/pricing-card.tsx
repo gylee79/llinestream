@@ -80,11 +80,11 @@ export default function PricingCard({ item, classification, itemType }: PricingC
   return (
     <Card className="flex flex-col">
       <CardHeader>
-        <CardTitle className="font-headline text-2xl">{classification.name}</CardTitle>
+        <CardTitle className="font-headline text-2xl tracking-tight">{classification.name}</CardTitle>
         <CardDescription>{classification.description}</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow">
-        <div className="text-4xl font-bold">
+        <div className="text-4xl font-bold font-headline tracking-tight">
           {formatPrice(selectedPrice)}
           <span className="ml-1 text-base font-normal text-muted-foreground">/ {selectedLabelForDisplay}</span>
         </div>
