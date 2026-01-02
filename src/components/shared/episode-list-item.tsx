@@ -55,7 +55,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
     
     return (
         <>
-            <Card className="overflow-hidden border-muted">
+            <Card className="overflow-hidden border-border">
                 <CardContent className="p-3">
                      <div className="flex gap-3">
                         {/* Left Column */}
@@ -79,7 +79,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                         {/* Right Column */}
                         <div className="flex-shrink-0 flex flex-col items-center gap-1.5 w-24">
                             <div className="w-full flex justify-end items-center h-6 gap-2">
-                                <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1 text-[11px] md:text-xs text-muted-foreground">
                                     {ratedCommentsCount > 0 ? (
                                         <>
                                             <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
@@ -92,7 +92,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                                 </div>
                                 <Button
                                     variant="link"
-                                    className="h-auto p-0 text-[10px] md:text-xs text-muted-foreground"
+                                    className="h-auto p-0 text-[11px] md:text-xs text-muted-foreground"
                                     onClick={() => user && setCommentOpen(true)}
                                     disabled={!user}
                                 >
