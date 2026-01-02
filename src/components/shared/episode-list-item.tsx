@@ -55,7 +55,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
     
     return (
         <>
-            <Card className="overflow-hidden border-border">
+            <Card className="overflow-hidden border-muted">
                 <CardContent className="p-3">
                      <div className="flex gap-3">
                         {/* Left Column */}
@@ -64,7 +64,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                                 <h3 className="font-headline text-base font-bold leading-tight tracking-tight line-clamp-2">{episode.title}</h3>
                                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{episode.description}</p>
                             </div>
-                            <div className="flex items-center gap-4 text-[10px] md:text-xs text-muted-foreground mt-2">
+                            <div className="flex items-center gap-4 text-[11px] md:text-xs text-muted-foreground mt-2">
                                 <p>강사: {instructor?.name || 'N/A'}</p>
                                 <div className="flex items-center gap-1">
                                     <Clock className="w-3 h-3" />
@@ -101,7 +101,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                                     </span>
                                 </Button>
                             </div>
-                            <div className="relative aspect-video w-full bg-muted rounded-md overflow-hidden cursor-pointer border border-black" onClick={handlePlayClick}>
+                            <div className="relative aspect-video w-full bg-muted rounded-md overflow-hidden cursor-pointer border border-black/10" onClick={handlePlayClick}>
                                 <Image 
                                     src={episode.thumbnailUrl} 
                                     alt={episode.title} 
