@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from 'next/image';
@@ -55,7 +54,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
     
     return (
         <>
-            <Card className="overflow-hidden border-input">
+            <Card className="overflow-hidden border-primary/50 shadow-md transition-shadow hover:shadow-lg">
                 <CardContent className="p-3">
                      <div className="flex gap-3">
                         {/* Left Column */}
