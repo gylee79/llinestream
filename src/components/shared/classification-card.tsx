@@ -20,13 +20,13 @@ export default function ClassificationCard({ classification }: ClassificationCar
             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
             className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-105"
           />
-           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
         </div>
         <CardHeader className="absolute bottom-0 left-0 right-0 p-4 bg-transparent">
-          <CardTitle className="font-headline text-lg tracking-tight text-white group-hover:text-accent">
+          <CardTitle className="font-headline text-lg tracking-tight text-white">
             {classification.name}
           </CardTitle>
-          <div className="flex items-center text-xs text-white/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="flex items-center text-xs text-white/80 transition-opacity duration-300">
             <span>자세히 보기</span>
             <ArrowRight className="ml-1 h-3 w-3" />
           </div>
