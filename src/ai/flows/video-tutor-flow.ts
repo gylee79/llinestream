@@ -14,7 +14,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import type { Episode, Course, Classification } from '@/lib/types';
@@ -43,100 +43,27 @@ const videoTutorFlow = ai.defineFlow(
     outputSchema: VideoTutorOutputSchema,
   },
   async ({ episodeId, question, userId }) => {
-    // 1. Embed the user's question using Genkit's embedder
-    console.log(`[Tutor-Flow] Embedding question: "${question}"`);
-    const { embedding: questionEmbedding } = await ai.embed({
-        embedder: 'googleai/text-embedding-004',
-        content: question,
-    });
+    console.log(`[Tutor-Flow] Starting for episode ${episodeId} with question: "${question}"`);
 
-    // 2. Find relevant chunks from Firestore
-    console.log(`[Tutor-Flow] Searching for relevant chunks in episode ${episodeId}`);
     const adminApp = initializeAdminApp();
     const db = admin.firestore(adminApp);
+
+    // 1. Find relevant chunks from the specific episode's subcollection in Firestore
+    const chunksSnapshot = await db.collection('episodes').doc(episodeId).collection('chunks').get();
     
-    // Find the fieldId for the current episode
-    const episodeRef = db.collection('episodes').doc(episodeId);
-    const episodeDoc = await episodeRef.get();
-    if (!episodeDoc.exists) {
-        return { answer: "죄송합니다, 현재 비디오 정보를 찾을 수 없습니다." };
-    }
-    const episode = episodeDoc.data() as Episode;
-
-    const courseRef = db.collection('courses').doc(episode.courseId);
-    const courseDoc = await courseRef.get();
-    if (!courseDoc.exists) {
-        return { answer: "죄송합니다, 현재 강좌 정보를 찾을 수 없습니다." };
-    }
-    const course = courseDoc.data() as Course;
-
-    const classificationRef = db.collection('classifications').doc(course.classificationId);
-    const classificationDoc = await classificationRef.get();
-    if (!classificationDoc.exists) {
-        return { answer: "죄송합니다, 현재 분류 정보를 찾을 수 없습니다." };
-    }
-    const classification = classificationDoc.data() as Classification;
-    const fieldId = classification.fieldId;
-    console.log(`[Tutor-Flow] Found Field ID: ${fieldId}`);
-
-    // Get all episodes within the same field
-    const classificationsInFieldSnap = await db.collection('classifications').where('fieldId', '==', fieldId).get();
-    const classificationIds = classificationsInFieldSnap.docs.map(doc => doc.id);
-
-    const coursesInFieldSnap = await db.collection('courses').where('classificationId', 'in', classificationIds).get();
-    const courseIds = coursesInFieldSnap.docs.map(doc => doc.id);
-
-    const episodesInFieldSnap = await db.collection('episodes').where('courseId', 'in', courseIds).get();
-    const episodeIdsInField = episodesInFieldSnap.docs.map(doc => doc.id);
-    
-    console.log(`[Tutor-Flow] Found ${episodeIdsInField.length} episodes in the same field. Fetching chunks...`);
-    
-    const allChunks: { text: string; vector: number[] }[] = [];
-    for (const epId of episodeIdsInField) {
-        const chunksSnapshot = await db.collection('episodes').doc(epId).collection('chunks').get();
-        if (!chunksSnapshot.empty) {
-            chunksSnapshot.docs.forEach(doc => {
-                const data = doc.data();
-                if (data.text && data.vector) {
-                    allChunks.push({
-                        text: data.text as string,
-                        vector: data.vector as number[]
-                    });
-                }
-            });
-        }
-    }
-    
-    if (allChunks.length === 0) {
-        console.log(`[Tutor-Flow] No chunks found in this field. Responding with default message.`);
-        return { answer: "죄송합니다, 이 분야의 비디오는 아직 AI 질문에 맞게 처리되지 않았습니다." };
+    if (chunksSnapshot.empty) {
+        console.log(`[Tutor-Flow] No chunks found for episode ${episodeId}.`);
+        return { answer: "죄송합니다, 이 비디오는 아직 AI 질문에 맞게 처리되지 않았습니다. 다른 비디오를 선택해주세요." };
     }
 
-    // Simple cosine similarity calculation
-    const dotProduct = (vecA: number[], vecB: number[]) => vecA.map((val, i) => val * vecB[i]).reduce((a, b) => a + b, 0);
-    const magnitude = (vec: number[]) => Math.sqrt(vec.map(val => val * val).reduce((a, b) => a + b, 0));
-    const cosineSimilarity = (vecA: number[], vecB: number[]) => dotProduct(vecA, vecB) / (magnitude(vecA) * magnitude(vecB));
+    const episodeChunks = chunksSnapshot.docs.map(doc => doc.data().text as string);
+    const context = episodeChunks.join('\n\n---\n\n');
+    console.log(`[Tutor-Flow] Found ${episodeChunks.length} chunks for context.`);
 
-    const similarities = allChunks.map(chunk => ({
-        text: chunk.text,
-        similarity: cosineSimilarity(questionEmbedding, chunk.vector)
-    }));
-
-    // Sort by similarity and get the top 3
-    similarities.sort((a, b) => b.similarity - a.similarity);
-    const contextChunks = similarities.slice(0, 3).map(s => s.text);
-    const context = contextChunks.join('\n\n---\n\n');
-
-    if (contextChunks.length === 0) {
-        console.log(`[Tutor-Flow] No relevant chunks found. Responding with default message.`);
-        return { answer: "죄송합니다, 비디오 내용에서 질문과 관련된 정보를 찾을 수 없었습니다. 다른 질문을 해주시거나, 이 비디오가 AI 질문에 맞게 처리되었는지 확인해주세요." };
-    }
-
-    console.log(`[Tutor-Flow] Found ${contextChunks.length} relevant chunks. Generating answer...`);
-    
-    // 3. Generate the answer using Gemini
+    // 2. Generate the answer using Gemini with the provided context
     const llmResponse = await ai.generate({
-      prompt: `You are a friendly and helpful tutor. Based on the following video transcript context, answer the user's question in Korean. If the context doesn't contain the answer, say that you don't know.
+      prompt: `You are a friendly and helpful tutor. Based ONLY on the following video transcript context, answer the user's question in Korean.
+      If the context doesn't contain the answer, you MUST state that the information is not in the video and you cannot answer. Do not use outside knowledge.
 
       Context from the video:
       ---
@@ -144,22 +71,24 @@ const videoTutorFlow = ai.defineFlow(
       ---
       
       User's Question: "${question}"`,
-      model: 'googleai/gemini-1.5-flash',
+      model: 'googleai/gemini-pro', // Using the recommended standard model
     });
 
     const answer = llmResponse.text;
-    
-    // 4. (Optional but recommended) Save the chat interaction
-    console.log(`[Tutor-Flow] Saving chat interaction to Firestore.`);
+    console.log(`[Tutor-Flow] Generated answer.`);
+
+    // 3. Save the chat interaction to Firestore
     const chatRef = db.collection('chats').doc();
     await chatRef.set({
         userId,
         episodeId,
         question,
         answer,
-        contextReferences: contextChunks,
+        contextReferences: episodeChunks.slice(0, 5), // Save first 5 chunks for reference
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+    console.log(`[Tutor-Flow] Saved chat interaction to Firestore.`);
+
 
     return { answer };
   }
