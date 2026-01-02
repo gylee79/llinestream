@@ -99,23 +99,22 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
         
         const newEpisode: Omit<Episode, 'id'> = {
             courseId: selectedCourseId,
-            instructorId: instructorId,
-            title,
-            description,
+            instructorId: instructorId || '',
+            title: title || '',
+            description: description || '',
             duration,
-            isFree,
-            videoUrl,
-            filePath,
+            isFree: isFree || false,
+            videoUrl: videoUrl,
+            filePath: filePath,
             thumbnailUrl: customThumbnailUrl || defaultThumbnailUrl, // Use custom if available
-            defaultThumbnailUrl,
-            defaultThumbnailPath,
-            customThumbnailUrl: customThumbnailUrl || '', // Store empty string if not provided
+            defaultThumbnailUrl: defaultThumbnailUrl,
+            defaultThumbnailPath: defaultThumbnailPath,
+            customThumbnailUrl: customThumbnailUrl || '',
             customThumbnailPath: customThumbnailPath || '',
             createdAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
-            // Transcript will be populated by the AI process
         };
 
-        await episodeRef.set(newEpisode, { ignoreUndefinedProperties: true });
+        await episodeRef.set(newEpisode);
 
         // --- Trigger AI processing in the background ---
         // We don't await this, so the UI can respond quickly.
