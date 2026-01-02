@@ -1,5 +1,6 @@
+'use server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { GoogleGenerativeAIFileManager } from "@google/generative-ai/server";
+import { GoogleAIFileManager } from "@google/generative-ai/server";
 
 const apiKey = process.env.GEMINI_API_KEY;
 
@@ -10,4 +11,4 @@ if (!apiKey) {
 }
 
 export const googleAI = new GoogleGenerativeAI(apiKey || '');
-export const fileManager = new GoogleGenerativeAIFileManager(apiKey || '');
+export const fileManager = new GoogleAIFileManager(apiKey || '');

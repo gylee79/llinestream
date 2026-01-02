@@ -7,7 +7,7 @@ import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { extractPathFromUrl } from '../utils';
 import { googleAI, fileManager } from '@/lib/google-ai';
-import { FileState } from '@google/generative-ai/server';
+import type { FileState } from '@google/generative-ai/server';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -75,13 +75,13 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     
     // 3. Wait for the file to be processed
     let file = await fileManager.getFile(uploadResult.file.name);
-    while (file.state === FileState.PROCESSING) {
+    while (file.state === 'PROCESSING') {
       console.log('[Gemini-Process] File is processing, waiting 5 seconds...');
       await new Promise(resolve => setTimeout(resolve, 5000));
       file = await fileManager.getFile(uploadResult.file.name);
     }
     
-    if (file.state !== FileState.ACTIVE) {
+    if (file.state !== 'ACTIVE') {
         throw new Error(`File processing failed. Final state: ${file.state}`);
     }
     console.log('[Gemini-Process] File is ACTIVE. Proceeding with transcription.');
