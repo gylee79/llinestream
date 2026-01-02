@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -7,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import type { Episode, Instructor, ChatMessage, ChatLog } from '@/lib/types';
+import type { Episode, Instructor, ChatMessage, ChatLog, User } from '@/lib/types';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { Button } from '../ui/button';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';

@@ -7,7 +7,7 @@ import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { extractPathFromUrl } from '../utils';
 import { googleAI, fileManager } from '@/lib/google-ai';
-import { FileState } from '@google/generative-ai';
+import { FileState } from '@google/generative-ai/server';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
