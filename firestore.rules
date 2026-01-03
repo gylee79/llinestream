@@ -9,7 +9,7 @@
  * Data Structure:
  * - /users/{userId}/...: All data private to a specific user is nested under their unique user ID.
  * - /fields, /classifications, /courses, /policies: Top-level collections for publicly accessible application content.
- * - /roles_admin/{userId}: A dedicated collection where the existence of a document signifies that a user has administrative privileges.
+ * - /roles_admin/{userId}: A dedicated collection where the existence of a document signifies that a user has an administrative privileges.
  *
  * Key Security Decisions:
  * - Admin Supremacy: Users with an admin role have read/write access to all data to manage the platform. This role is granted by adding a document with their UID to the /roles_admin collection.
@@ -125,6 +125,26 @@ service cloud.firestore {
     }
 
     /**
+     * @description Secures a user's personal view history for the 'Continue Watching' feature.
+     * @path /users/{userId}/viewHistory/{logId}
+     * @allow (read, write) The owner of the history or an admin can access/modify the records.
+     * @deny (list) A regular user tries to list another user's watch history.
+     */
+    match /users/{userId}/viewHistory/{logId} {
+        allow read, write: if isOwnerOrAdmin(userId);
+    }
+    
+    /**
+     * @description Secures a user's personal chat history.
+     * @path /users/{userId}/chats/{chatId}
+     * @allow (read, write) The owner of the history or an admin can access/modify the records.
+     */
+    match /users/{userId}/chats/{chatId} {
+        allow read, write: if isOwnerOrAdmin(userId);
+    }
+
+
+    /**
      * @description User profile change history. Writable by any signed-in user (for their own changes via server action).
      *              Readable only by admins.
      * @path /user_audit_logs/{logId}
@@ -148,13 +168,13 @@ service cloud.firestore {
     }
     
     /**
-     * @description AI chat logs. Writable by server action on behalf of user. Admins can read and delete.
+     * @description Global AI chat logs for admin overview.
      * @path /chats/{chatId}
      */
     match /chats/{chatId} {
         allow read, list, delete: if isAdmin();
         allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid; // Server action writes on behalf of user.
-        allow update: if false; // Immutable logs
+        allow update: if false;
     }
 
     
