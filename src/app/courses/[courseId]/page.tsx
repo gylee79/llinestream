@@ -54,8 +54,8 @@ export default function CourseDetailPage() {
 
   const viewHistoryQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
-    return collection(firestore, 'users', user.id, 'viewHistory');
-  }, [user, firestore]);
+    return query(collection(firestore, 'users', user.id, 'viewHistory'), where('courseId', '==', params.courseId));
+  }, [user, firestore, params.courseId]);
   const { data: viewLogs, isLoading: viewLogsLoading } = useCollection<EpisodeViewLog>(viewHistoryQuery);
 
   const watchedEpisodeIds = useMemo(() => {
@@ -114,6 +114,14 @@ export default function CourseDetailPage() {
   
   const hasSubscription = !!(user && classification && classification.id && user.activeSubscriptions?.[classification.id]);
 
+  const introImages = useMemo(() => {
+    if (!course) return [];
+    const urls = course.introImageUrls && course.introImageUrls.length > 0 
+      ? course.introImageUrls 
+      : [course.thumbnailUrl];
+    return urls.filter((url): url is string => typeof url === 'string' && url.length > 0);
+  }, [course]);
+
   if (isLoading) {
     return (
         <div className="container mx-auto max-w-4xl py-8 space-y-8">
@@ -132,14 +140,6 @@ export default function CourseDetailPage() {
   if (!course) {
     notFound();
   }
-  
-  const introImages = useMemo(() => {
-    const urls = course.introImageUrls && course.introImageUrls.length > 0 
-      ? course.introImageUrls 
-      : [course.thumbnailUrl];
-    return urls.filter(url => url); // Filter out empty or null URLs
-  }, [course]);
-
 
   return (
     <>
@@ -237,4 +237,3 @@ export default function CourseDetailPage() {
     </>
   );
 }
-
