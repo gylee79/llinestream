@@ -1,3 +1,4 @@
+
 'use client';
 import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
@@ -184,7 +185,7 @@ export default function CourseDetailPage() {
         {user && <CourseReviewSection comments={comments} user={user} episodes={episodes || []} onToggleAllReviews={() => setAllReviewsOpen(true)} />}
         
         <h2 className="font-headline text-2xl font-bold mt-12 mb-4 tracking-tight">
-            에피소드 목록
+            에피소드 목록 (총 {episodes?.length || 0}강)
         </h2>
         
         <div className="space-y-4">
