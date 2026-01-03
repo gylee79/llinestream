@@ -133,7 +133,12 @@ export default function CourseDetailPage() {
     notFound();
   }
   
-  const introImages = course.introImageUrls && course.introImageUrls.length > 0 ? course.introImageUrls : [course.thumbnailUrl];
+  const introImages = useMemo(() => {
+    const urls = course.introImageUrls && course.introImageUrls.length > 0 
+      ? course.introImageUrls 
+      : [course.thumbnailUrl];
+    return urls.filter(url => url); // Filter out empty or null URLs
+  }, [course]);
 
 
   return (
@@ -232,3 +237,4 @@ export default function CourseDetailPage() {
     </>
   );
 }
+
