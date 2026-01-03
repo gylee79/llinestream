@@ -52,7 +52,7 @@ export default function Home() {
         {user && (
           <section>
             <h2 className="mb-6 font-headline text-xl font-bold tracking-tight">
-              이어보기
+              나의 강의실
             </h2>
             <ContinueWatching />
           </section>
