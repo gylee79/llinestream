@@ -117,17 +117,29 @@ const videoTutorFlow = ai.defineFlow(
       const answer = llmResponse.text;
       console.log(`[Tutor-Flow] Generated answer.`);
 
-      // 5. Save the chat interaction to Firestore
-      const chatRef = db.collection('chats').doc();
-      await chatRef.set({
+      // 5. Save the chat interaction to Firestore in two locations using a batch write.
+      const batch = db.batch();
+      const newChatId = db.collection('chats').doc().id;
+
+      const chatLogData = {
           userId,
           episodeId,
           question,
           answer,
           contextReferences: allChunks.slice(0, 5), // Save first 5 chunks for reference
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      console.log(`[Tutor-Flow] Saved chat interaction to Firestore.`);
+      };
+      
+      // Location 1: Global chat log for admins
+      const globalChatRef = db.collection('chats').doc(newChatId);
+      batch.set(globalChatRef, chatLogData);
+
+      // Location 2: User-specific chat log for the user themselves
+      const userChatRef = db.collection('users').doc(userId).collection('chats').doc(newChatId);
+      batch.set(userChatRef, chatLogData);
+      
+      await batch.commit();
+      console.log(`[Tutor-Flow] Saved chat interaction to both global and user-specific collections.`);
 
       return { answer };
 
