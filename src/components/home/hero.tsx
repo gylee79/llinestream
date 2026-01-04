@@ -63,11 +63,11 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
               </p>
             )}
              <div className="mt-8 flex justify-center gap-4">
-                <Button asChild size="lg" className="bg-white text-black hover:bg-white/90">
+                <Button asChild size="lg" variant="outline" className="border-white text-white backdrop-blur-sm bg-white/10 hover:bg-white/20">
                     <Link href="/contents">콘텐츠 둘러보기</Link>
                 </Button>
-                <Button asChild size="lg" variant="outline" className="border-white text-white backdrop-blur-sm bg-white/10 hover:bg-white/20">
-                    <Link href="/pricing">수강권 구매</Link>
+                <Button asChild size="lg" className="bg-white text-black hover:bg-white/90">
+                    <Link href="/about">엘라인아카데미소개</Link>
                 </Button>
              </div>
           </motion.div>
