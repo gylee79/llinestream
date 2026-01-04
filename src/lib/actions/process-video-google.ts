@@ -53,7 +53,13 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     const db = admin.firestore(adminApp);
     const storage = admin.storage(adminApp);
     const bucket = storage.bucket();
-    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
+    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+    if (!bucketName) {
+      throw new Error('Firebase Storage bucket name is not configured in environment variables.');
+    }
+    
+    const episodeRef = db.collection('episodes').doc(episodeId);
+    await episodeRef.update({ aiProcessingStatus: 'processing', aiProcessingError: null });
 
     const videoPath = extractPathFromUrl(fileUrl);
     if (!videoPath) {
@@ -118,13 +124,12 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     console.log(`[Gemini-Process] VTT file saved to Storage. URL: ${vttUrl}`);
 
     // 6. Save data to Firestore
-    const episodeRef = db.collection('episodes').doc(episodeId);
-    
     // Save full transcript and VTT URL
     await episodeRef.update({ 
         transcript: transcriptText,
         vttUrl: vttUrl,
         vttPath: vttPath,
+        aiProcessingStatus: 'completed',
     });
     console.log(`[Gemini-Process] Full transcript and VTT URL saved to Firestore.`);
 
@@ -165,6 +170,16 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
     console.error('[Gemini-Process-ERROR]', error);
+    
+    // Update Firestore with failure status
+    const db = admin.firestore(initializeAdminApp());
+    const episodeRef = db.collection('episodes').doc(episodeId);
+    try {
+        await episodeRef.update({ aiProcessingStatus: 'failed', aiProcessingError: errorMessage });
+    } catch (dbError) {
+        console.error(`[Gemini-Process-ERROR] Failed to write error status to Firestore for episode ${episodeId}:`, dbError);
+    }
+    
     return { success: false, message: `Video processing failed: ${errorMessage}` };
   } finally {
       // Clean up temporary file

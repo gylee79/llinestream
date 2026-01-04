@@ -44,7 +44,10 @@ const processImages = async (
     newFiles: File[],
     currentPaths: string[]
 ) => {
-    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
+    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+    if (!bucketName) {
+        throw new Error('Firebase Storage bucket name is not configured in environment variables.');
+    }
     const existingPaths = existingUrls.map(url => extractPathFromUrl(url)).filter(Boolean) as string[];
     const pathsToDelete = currentPaths.filter(path => !existingPaths.includes(path));
 
