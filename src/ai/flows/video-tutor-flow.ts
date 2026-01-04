@@ -47,60 +47,19 @@ const videoTutorFlow = ai.defineFlow(
     const db = admin.firestore(adminApp);
 
     try {
-      // 1. Get the current episode to find its hierarchy (Field > Classification > Course)
-      const episodeDoc = await db.collection('episodes').doc(episodeId).get();
-      if (!episodeDoc.exists) throw new Error(`Episode ${episodeId} not found.`);
-      const episodeData = episodeDoc.data() as Episode;
+      // 1. Get all chunks for the SPECIFIC episode
+      const chunksSnapshot = await db.collection('episodes').doc(episodeId).collection('chunks').get();
 
-      const courseDoc = await db.collection('courses').doc(episodeData.courseId).get();
-      if (!courseDoc.exists) throw new Error(`Course ${episodeData.courseId} not found.`);
-      const courseData = courseDoc.data() as Course;
-
-      const classDoc = await db.collection('classifications').doc(courseData.classificationId).get();
-      if (!classDoc.exists) throw new Error(`Classification ${courseData.classificationId} not found.`);
-      const classData = classDoc.data() as Classification;
-      
-      const targetFieldId = classData.fieldId;
-      console.log(`[Tutor-Flow] Target Field ID: ${targetFieldId}`);
-
-      // 2. Find all episodes within the same field
-      const classificationsInField = await db.collection('classifications').where('fieldId', '==', targetFieldId).get();
-      const classificationIds = classificationsInField.docs.map(doc => doc.id);
-
-      if (classificationIds.length === 0) {
-        throw new Error(`No classifications found for Field ID ${targetFieldId}`);
+      if (chunksSnapshot.empty) {
+        console.log(`[Tutor-Flow] No chunks found for episode ${episodeId}.`);
+        return { answer: "죄송합니다, 이 비디오는 아직 AI 질문에 맞게 처리되지 않았습니다. 잠시 후 다시 시도해주세요." };
       }
 
-      const coursesInField = await db.collection('courses').where('classificationId', 'in', classificationIds).get();
-      const courseIds = coursesInField.docs.map(doc => doc.id);
-
-      if (courseIds.length === 0) {
-        throw new Error(`No courses found for the classifications.`);
-      }
-
-      const episodesInField = await db.collection('episodes').where('courseId', 'in', courseIds).get();
-      const episodeIdsInField = episodesInField.docs.map(doc => doc.id);
-      
-      console.log(`[Tutor-Flow] Found ${episodeIdsInField.length} episodes in the same field.`);
-
-      // 3. Gather all chunks from all related episodes
-      const chunkPromises = episodeIdsInField.map(id => 
-        db.collection('episodes').doc(id).collection('chunks').get()
-      );
-      const chunkSnapshots = await Promise.all(chunkPromises);
-
-      const allChunks = chunkSnapshots.flatMap(snapshot => snapshot.docs.map(doc => doc.data().text as string));
-
-      if (allChunks.length === 0) {
-        console.log(`[Tutor-Flow] No chunks found for any episode in field ${targetFieldId}.`);
-        return { answer: "죄송합니다, 관련 비디오가 아직 AI 질문에 맞게 처리되지 않았습니다." };
-      }
-      
+      const allChunks = chunksSnapshot.docs.map(doc => doc.data().text as string);
       const context = allChunks.join('\n\n---\n\n');
-      console.log(`[Tutor-Flow] Found ${allChunks.length} total chunks for context.`);
+      console.log(`[Tutor-Flow] Found ${allChunks.length} chunks for context for episode ${episodeId}.`);
 
-
-      // 4. Generate the answer using Gemini with the provided context
+      // 2. Generate the answer using Gemini with the provided context
       const llmResponse = await ai.generate({
         model: googleAI.model('gemini-pro'),
         prompt: `You are a friendly and helpful tutor. Based ONLY on the following video transcript context, answer the user's question in Korean.
@@ -117,7 +76,7 @@ const videoTutorFlow = ai.defineFlow(
       const answer = llmResponse.text;
       console.log(`[Tutor-Flow] Generated answer.`);
 
-      // 5. Save the chat interaction only to the user's sub-collection
+      // 3. Save the chat interaction only to the user's sub-collection
       const newChatId = db.collection('users').doc(userId).collection('chats').doc().id;
       const userChatRef = db.collection('users').doc(userId).collection('chats').doc(newChatId);
 

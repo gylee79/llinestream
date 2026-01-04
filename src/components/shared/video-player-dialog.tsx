@@ -94,6 +94,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const videoKey = episode.id; 
 
   const handleClose = async () => {
+    const videoElement = document.getElementById(`video-${videoKey}`) as HTMLVideoElement;
+    if (videoElement) {
+        videoElement.pause();
+        videoElement.src = ''; // This forces the browser to stop downloading/buffering
+    }
+
     if (user && startTimeRef.current) {
         const endTime = new Date();
         const durationWatched = (endTime.getTime() - startTimeRef.current.getTime()) / 1000; // in seconds
@@ -122,17 +128,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     if (isOpen && user) {
         startTimeRef.current = new Date();
     }
-    
-    // When the dialog closes, pause the video by removing the src
-    // This is a simple way to stop playback and background loading
-    return () => {
-      const videoElement = document.getElementById(`video-${videoKey}`) as HTMLVideoElement;
-      if (videoElement) {
-        videoElement.pause();
-        videoElement.src = '';
-      }
-    };
-  }, [isOpen, videoKey, user]);
+  }, [isOpen, user]);
   
   useEffect(() => {
     // Scroll to bottom when new messages are added

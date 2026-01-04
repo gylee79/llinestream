@@ -149,6 +149,11 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     await batch.commit();
     console.log(`[Gemini-Process] Saved ${chunks.length} chunks to Firestore.`);
 
+    // 7. Clean up file from Google AI File API
+    console.log(`[Gemini-Process] Deleting file from Google AI File API: ${uploadResult.file.name}`);
+    await fileManager.deleteFile(uploadResult.file.name);
+    console.log(`[Gemini-Process] File deleted from Google AI File API.`);
+
     return { 
         success: true, 
         message: 'Video processed successfully with Gemini.', 
