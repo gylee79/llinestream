@@ -21,6 +21,8 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
   const isMobile = useIsMobile();
   const finalImageUrl = isMobile ? (imageUrlMobile || imageUrl) : imageUrl;
 
+  const heroDescription = "공부하며 궁금한 내용 AI가 도와드립니다~"
+
   return (
     <div className="w-full">
       <motion.div 
@@ -28,20 +30,24 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
             "relative overflow-hidden",
             "h-[70vh] min-h-[500px] md:h-[80vh] md:min-h-[600px]",
         )}
-        initial={{ scale: 1.05, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 1.2, ease: "circOut" }}
       >
         {finalImageUrl ? (
-          <Image
-            src={finalImageUrl}
-            alt={title || 'Hero background'}
-            fill
-            sizes="100vw"
-            className="object-cover"
-            priority
-            quality={90}
-          />
+          <motion.div
+            className="absolute inset-0"
+            initial={{ scale: 1.1 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 8, ease: "easeInOut" }}
+          >
+            <Image
+              src={finalImageUrl}
+              alt={title || 'Hero background'}
+              fill
+              sizes="100vw"
+              className="object-cover"
+              priority
+              quality={90}
+            />
+          </motion.div>
         ) : (
           <Skeleton className="h-full w-full" />
         )}
@@ -58,9 +64,9 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
                 {title}
               </h1>
             )}
-            {description && (
+            {heroDescription && (
               <p className="mt-4 max-w-prose text-base text-white/90 md:text-lg">
-                {description}
+                {heroDescription}
               </p>
             )}
              <div className="mt-8 flex justify-center gap-4">
