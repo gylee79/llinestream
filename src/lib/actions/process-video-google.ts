@@ -1,3 +1,4 @@
+
 'use server';
 
 import { config } from 'dotenv';
@@ -5,7 +6,7 @@ config();
 
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
-import { extractPathFromUrl } from '../utils';
+import { extractPathFromUrl, getPublicUrl } from '../utils';
 import { googleAI, fileManager } from '@/lib/google-ai';
 import type { FileState } from '@google/generative-ai/server';
 import fs from 'fs';
@@ -39,7 +40,7 @@ function chunkText(text: string, chunkSize = 500): string[] {
 }
 
 
-export async function extractScriptWithGemini(episodeId: string, fileUrl: string): Promise<{ success: boolean; message: string; transcript?: string }> {
+export async function extractScriptWithGemini(episodeId: string, fileUrl: string): Promise<{ success: boolean; message: string; transcript?: string; vttUrl?: string; vttPath?: string; }> {
   if (!process.env.GEMINI_API_KEY) {
       return { success: false, message: 'GEMINI_API_KEY is not configured on the server.' };
   }
@@ -52,6 +53,7 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     const db = admin.firestore(adminApp);
     const storage = admin.storage(adminApp);
     const bucket = storage.bucket();
+    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
 
     const videoPath = extractPathFromUrl(fileUrl);
     if (!videoPath) {
@@ -88,22 +90,43 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
 
     // 4. Transcribe using Gemini 1.5 Flash
     const model = googleAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const prompt = "이 오디오 파일의 내용을 빠짐없이 정확하게 전체 텍스트로 받아 적어줘(Transcribe). 타임스탬프는 필요 없어.";
+    const transcriptionPrompt = "이 오디오 파일의 내용을 빠짐없이 정확하게 전체 텍스트로 받아 적어줘(Transcribe). 타임스탬프는 필요 없어.";
+    const vttPrompt = "Transcribe this video file into a WebVTT (VTT) format subtitle file. Ensure accurate timestamps and text. Start with WEBVTT.";
 
-    const result = await model.generateContent([prompt, { fileData: { mimeType: file.mimeType, fileUri: file.uri } }]);
-    const transcriptText = result.response.text();
+    const [transcriptionResult, vttResult] = await Promise.all([
+        model.generateContent([transcriptionPrompt, { fileData: { mimeType: file.mimeType, fileUri: file.uri } }]),
+        model.generateContent([vttPrompt, { fileData: { mimeType: file.mimeType, fileUri: file.uri } }]),
+    ]);
     
-    if (!transcriptText) {
-        throw new Error('Transcription returned no text.');
+    const transcriptText = transcriptionResult.response.text();
+    let vttContent = vttResult.response.text();
+
+    // Clean up VTT content, remove markdown fences
+    vttContent = vttContent.replace(/^```vtt\n/,'').replace(/```$/, '');
+
+    if (!transcriptText || !vttContent) {
+        throw new Error('Transcription or VTT generation returned no text.');
     }
     console.log(`[Gemini-Process] Transcription successful. Length: ${transcriptText.length}`);
+    console.log(`[Gemini-Process] VTT generation successful. Length: ${vttContent.length}`);
 
-    // 5. Save data to Firestore
+    // 5. Save VTT file to Firebase Storage
+    const vttPath = `episodes/${episodeId}/subtitles/ko.vtt`;
+    const vttFile = bucket.file(vttPath);
+    await vttFile.save(vttContent, { metadata: { contentType: 'text/vtt' } });
+    const vttUrl = getPublicUrl(bucketName, vttPath);
+    console.log(`[Gemini-Process] VTT file saved to Storage. URL: ${vttUrl}`);
+
+    // 6. Save data to Firestore
     const episodeRef = db.collection('episodes').doc(episodeId);
     
-    // Save full transcript
-    await episodeRef.update({ transcript: transcriptText });
-    console.log(`[Gemini-Process] Full transcript saved to Firestore.`);
+    // Save full transcript and VTT URL
+    await episodeRef.update({ 
+        transcript: transcriptText,
+        vttUrl: vttUrl,
+        vttPath: vttPath,
+    });
+    console.log(`[Gemini-Process] Full transcript and VTT URL saved to Firestore.`);
 
     // Chunk and save to subcollection
     const chunks = chunkText(transcriptText);
@@ -126,7 +149,13 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     await batch.commit();
     console.log(`[Gemini-Process] Saved ${chunks.length} chunks to Firestore.`);
 
-    return { success: true, message: 'Video processed successfully with Gemini.', transcript: transcriptText };
+    return { 
+        success: true, 
+        message: 'Video processed successfully with Gemini.', 
+        transcript: transcriptText,
+        vttUrl,
+        vttPath,
+    };
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';

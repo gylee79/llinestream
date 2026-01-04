@@ -86,6 +86,8 @@ export interface Episode {
   customThumbnailPath?: string;
 
   transcript?: string | null; // Full transcript from AI, null if processing failed or not started
+  vttUrl?: string; // URL for the VTT subtitle file
+  vttPath?: string; // Path in Firebase Storage for the VTT file
 
   createdAt: Timestamp;
 }

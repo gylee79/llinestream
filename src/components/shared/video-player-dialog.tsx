@@ -200,8 +200,18 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             autoPlay
             className="w-full h-full"
             poster={episode.thumbnailUrl}
+            crossOrigin="anonymous"
           >
             <source src={episode.videoUrl} type="video/mp4" />
+            {episode.vttUrl && (
+                <track 
+                    src={episode.vttUrl} 
+                    kind="subtitles" 
+                    srcLang="ko" 
+                    label="한국어" 
+                    default 
+                />
+            )}
             브라우저가 비디오 태그를 지원하지 않습니다.
           </video>
         </div>

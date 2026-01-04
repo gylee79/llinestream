@@ -125,7 +125,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             } else {
                 console.error(`[BG-ERROR] AI processing failed for episode ${episodeId}: ${result.message}`);
                 // Optional: Update Firestore to indicate failure
-                 db.collection('episodes').doc(episodeId).update({ transcript: `AI_PROCESSING_FAILED: ${result.message}` });
+                 db.collection('episodes').doc(episodeId).update({ transcript: `AI_PROCESSING_FAILED: ${result.message}`, vttUrl: null, vttPath: null });
             }
         });
 
@@ -171,6 +171,10 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         const oldFilePath = extractPathFromUrl(oldVideoUrl);
         if (newVideoData?.filePath && oldFilePath && newVideoData.filePath !== oldFilePath) {
           await deleteStorageFileByPath(storage, oldFilePath);
+          // Also delete old VTT file if a new video is uploaded
+          if (currentData.vttPath) {
+            await deleteStorageFileByPath(storage, currentData.vttPath);
+          }
           shouldReprocessVideo = true;
         }
         
@@ -196,8 +200,10 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         if (newVideoData) {
             dataToUpdate.videoUrl = newVideoData.downloadUrl;
             dataToUpdate.filePath = newVideoData.filePath;
-            // When a new video is uploaded, clear the old transcript to trigger re-processing
+            // When a new video is uploaded, clear the old transcript and VTT info to trigger re-processing
             dataToUpdate.transcript = admin.firestore.FieldValue.delete();
+            dataToUpdate.vttUrl = admin.firestore.FieldValue.delete();
+            dataToUpdate.vttPath = admin.firestore.FieldValue.delete();
         }
 
         if (newDefaultThumbnailData) {
@@ -224,7 +230,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
                     console.log(`[BG-SUCCESS] AI re-processing finished for episode ${episodeId}`);
                 } else {
                     console.error(`[BG-ERROR] AI re-processing failed for episode ${episodeId}: ${result.message}`);
-                    db.collection('episodes').doc(episodeId).update({ transcript: `AI_PROCESSING_FAILED: ${result.message}` });
+                    db.collection('episodes').doc(episodeId).update({ transcript: `AI_PROCESSING_FAILED: ${result.message}`, vttUrl: null, vttPath: null });
                 }
             });
         }
