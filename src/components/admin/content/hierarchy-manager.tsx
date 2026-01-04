@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2, ImageIcon, ExternalLink } from 'lucide-react';
 import type { Field, Classification, Course, Episode } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
-import { collection, query, where, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
@@ -226,6 +226,7 @@ export default function HierarchyManager() {
                         thumbnailUrl: '',
                         introImageUrls: [],
                         introImagePaths: [],
+                        createdAt: serverTimestamp(),
                     });
                 }
                 toast({ title: '추가 성공', description: `${type} '${itemData.name}'이(가) 추가되었습니다.` });

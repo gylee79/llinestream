@@ -62,6 +62,7 @@ export interface Course {
     day60: number;
     day90: number;
   };
+  createdAt?: Timestamp;
 }
 
 export interface Episode {
