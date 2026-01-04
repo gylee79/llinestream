@@ -89,6 +89,9 @@ export interface Episode {
   vttUrl?: string; // URL for the VTT subtitle file
   vttPath?: string; // Path in Firebase Storage for the VTT file
 
+  aiProcessingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  aiProcessingError?: string | null;
+  
   createdAt: Timestamp;
 }
 

@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, PlusCircle, ImageIcon } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, ImageIcon, CheckCircle2, AlertTriangle, Loader, HelpCircle } from 'lucide-react';
 import type { Episode, Course, Classification, Field, Instructor } from '@/lib/types';
 import VideoUploadDialog from '@/components/admin/content/video-upload-dialog';
 import {
@@ -45,6 +45,49 @@ import { sanitize } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import VideoPlayerDialog from '@/components/shared/video-player-dialog';
 
+const AIStatusIndicator = ({ status, error }: { status?: Episode['aiProcessingStatus'], error?: string | null }) => {
+    if (!status || status === 'pending') {
+        return (
+            <Tooltip>
+                <TooltipTrigger>
+                    <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent><p>AI 분석 대기 중</p></TooltipContent>
+            </Tooltip>
+        )
+    }
+    switch (status) {
+        case 'processing':
+            return (
+                <Tooltip>
+                    <TooltipTrigger>
+                        <Loader className="h-4 w-4 text-blue-500 animate-spin" />
+                    </TooltipTrigger>
+                    <TooltipContent><p>AI 분석 처리 중...</p></TooltipContent>
+                </Tooltip>
+            );
+        case 'completed':
+            return (
+                <Tooltip>
+                    <TooltipTrigger>
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    </TooltipTrigger>
+                    <TooltipContent><p>AI 분석 완료</p></TooltipContent>
+                </Tooltip>
+            );
+        case 'failed':
+            return (
+                <Tooltip>
+                    <TooltipTrigger>
+                        <AlertTriangle className="h-4 w-4 text-destructive" />
+                    </TooltipTrigger>
+                    <TooltipContent><p>AI 분석 실패: {error || '알 수 없는 오류'}</p></TooltipContent>
+                </Tooltip>
+            );
+        default:
+            return null;
+    }
+};
 
 export default function VideoManager() {
   const firestore = useFirestore();
@@ -177,8 +220,9 @@ export default function VideoManager() {
                   <TableHead className="w-[80px]">썸네일</TableHead>
                   <TableHead>제목</TableHead>
                   <TableHead>소속 상세분류</TableHead>
-                  <TableHead>재생 시간(초)</TableHead>
+                  <TableHead>재생 시간</TableHead>
                   <TableHead>강사</TableHead>
+                  <TableHead>AI 상태</TableHead>
                   <TableHead>무료 여부</TableHead>
                   <TableHead className="text-right">관리</TableHead>
                 </TableRow>
@@ -187,7 +231,7 @@ export default function VideoManager() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                       <TableRow key={i}>
-                          <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
+                          <TableCell colSpan={8}><Skeleton className="h-8 w-full" /></TableCell>
                       </TableRow>
                   ))
                 ) : (
@@ -212,8 +256,11 @@ export default function VideoManager() {
                       </TableCell>
                       <TableCell className="font-medium">{episode.title}</TableCell>
                       <TableCell>{getFullCoursePath(episode.courseId)}</TableCell>
-                      <TableCell>{episode.duration}</TableCell>
+                      <TableCell>{episode.duration}초</TableCell>
                       <TableCell>{getInstructorName(episode.instructorId)}</TableCell>
+                      <TableCell>
+                        <AIStatusIndicator status={episode.aiProcessingStatus} error={episode.aiProcessingError} />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Switch

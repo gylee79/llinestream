@@ -112,6 +112,8 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             customThumbnailUrl: customThumbnailUrl || '',
             customThumbnailPath: customThumbnailPath || '',
             createdAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
+            aiProcessingStatus: 'pending', // Set initial status
+            aiProcessingError: null,
         };
 
         await episodeRef.set(newEpisode);
@@ -121,11 +123,10 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
         // The AI processing happens independently on the server.
         processVideoForAI(episodeId).then(result => {
             if (result.success) {
-                console.log(`[BG-SUCCESS] AI processing finished for episode ${episodeId}`);
+                console.log(`[BG-SUCCESS] AI processing triggered for episode ${episodeId}`);
             } else {
-                console.error(`[BG-ERROR] AI processing failed for episode ${episodeId}: ${result.message}`);
-                // Optional: Update Firestore to indicate failure
-                 db.collection('episodes').doc(episodeId).update({ transcript: `AI_PROCESSING_FAILED: ${result.message}`, vttUrl: null, vttPath: null });
+                console.error(`[BG-ERROR] Failed to trigger AI processing for episode ${episodeId}: ${result.message}`);
+                 db.collection('episodes').doc(episodeId).update({ aiProcessingStatus: 'failed', aiProcessingError: `Failed to start processing: ${result.message}` });
             }
         });
 
@@ -200,10 +201,12 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         if (newVideoData) {
             dataToUpdate.videoUrl = newVideoData.downloadUrl;
             dataToUpdate.filePath = newVideoData.filePath;
-            // When a new video is uploaded, clear the old transcript and VTT info to trigger re-processing
+            // When a new video is uploaded, clear the old transcript and VTT info and set status to pending
             dataToUpdate.transcript = admin.firestore.FieldValue.delete();
             dataToUpdate.vttUrl = admin.firestore.FieldValue.delete();
             dataToUpdate.vttPath = admin.firestore.FieldValue.delete();
+            dataToUpdate.aiProcessingStatus = 'pending';
+            dataToUpdate.aiProcessingError = null;
         }
 
         if (newDefaultThumbnailData) {
@@ -227,10 +230,10 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         if(shouldReprocessVideo){
             processVideoForAI(episodeId).then(result => {
                 if (result.success) {
-                    console.log(`[BG-SUCCESS] AI re-processing finished for episode ${episodeId}`);
+                    console.log(`[BG-SUCCESS] AI re-processing triggered for episode ${episodeId}`);
                 } else {
                     console.error(`[BG-ERROR] AI re-processing failed for episode ${episodeId}: ${result.message}`);
-                    db.collection('episodes').doc(episodeId).update({ transcript: `AI_PROCESSING_FAILED: ${result.message}`, vttUrl: null, vttPath: null });
+                    db.collection('episodes').doc(episodeId).update({ aiProcessingStatus: 'failed', aiProcessingError: `Failed to start re-processing: ${result.message}` });
                 }
             });
         }

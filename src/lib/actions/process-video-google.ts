@@ -61,27 +61,28 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     const episodeRef = db.collection('episodes').doc(episodeId);
     await episodeRef.update({ aiProcessingStatus: 'processing', aiProcessingError: null });
 
+    // Use a service account to get a signed URL for the video, as CORS might not be sufficient
+    // for server-to-server communication with Google AI APIs.
     const videoPath = extractPathFromUrl(fileUrl);
     if (!videoPath) {
-      throw new Error('Could not determine video path from URL.');
+        throw new Error('Could not determine video path from URL.');
     }
     console.log(`[Gemini-Process] Found video path: ${videoPath}`);
 
-    // 1. Download video file
-    tempVideoPath = path.join(os.tmpdir(), `video_${episodeId}_${Date.now()}.mp4`);
-    console.log(`[Gemini-Process] Downloading video to ${tempVideoPath}`);
-    await bucket.file(videoPath).download({ destination: tempVideoPath });
-    console.log(`[Gemini-Process] Download complete.`);
+    const [signedUrl] = await bucket.file(videoPath).getSignedUrl({
+        action: 'read',
+        expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+    });
 
-    // 2. Upload to Google AI File API
-    console.log(`[Gemini-Process] Uploading file to Google AI File API...`);
-    const uploadResult = await fileManager.uploadFile(tempVideoPath, {
+    // 1. Upload to Google AI File API
+    console.log(`[Gemini-Process] Uploading file to Google AI File API from signed URL...`);
+    const uploadResult = await fileManager.uploadFile(signedUrl, {
       mimeType: 'video/mp4',
       displayName: `episode-${episodeId}`,
     });
     console.log(`[Gemini-Process] File uploaded. URI: ${uploadResult.file.uri}`);
     
-    // 3. Wait for the file to be processed
+    // 2. Wait for the file to be processed
     let file = await fileManager.getFile(uploadResult.file.name);
     while (file.state === 'PROCESSING') {
       console.log('[Gemini-Process] File is processing, waiting 5 seconds...');
@@ -90,11 +91,11 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     }
     
     if (file.state !== 'ACTIVE') {
-        throw new Error(`File processing failed. Final state: ${file.state}`);
+        throw new Error(`File processing failed. Final state: ${file.state}, Error: ${file.error?.message}`);
     }
     console.log('[Gemini-Process] File is ACTIVE. Proceeding with transcription.');
 
-    // 4. Transcribe using Gemini 1.5 Flash
+    // 3. Transcribe using Gemini 1.5 Flash
     const model = googleAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const transcriptionPrompt = "이 오디오 파일의 내용을 빠짐없이 정확하게 전체 텍스트로 받아 적어줘(Transcribe). 타임스탬프는 필요 없어.";
     const vttPrompt = "Transcribe this video file into a WebVTT (VTT) format subtitle file. Ensure accurate timestamps and text. Start with WEBVTT.";
@@ -116,14 +117,14 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     console.log(`[Gemini-Process] Transcription successful. Length: ${transcriptText.length}`);
     console.log(`[Gemini-Process] VTT generation successful. Length: ${vttContent.length}`);
 
-    // 5. Save VTT file to Firebase Storage
+    // 4. Save VTT file to Firebase Storage
     const vttPath = `episodes/${episodeId}/subtitles/ko.vtt`;
     const vttFile = bucket.file(vttPath);
     await vttFile.save(vttContent, { metadata: { contentType: 'text/vtt' } });
     const vttUrl = getPublicUrl(bucketName, vttPath);
     console.log(`[Gemini-Process] VTT file saved to Storage. URL: ${vttUrl}`);
 
-    // 6. Save data to Firestore
+    // 5. Save data to Firestore
     // Save full transcript and VTT URL
     await episodeRef.update({ 
         transcript: transcriptText,
@@ -154,7 +155,7 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     await batch.commit();
     console.log(`[Gemini-Process] Saved ${chunks.length} chunks to Firestore.`);
 
-    // 7. Clean up file from Google AI File API
+    // 6. Clean up file from Google AI File API
     console.log(`[Gemini-Process] Deleting file from Google AI File API: ${uploadResult.file.name}`);
     await fileManager.deleteFile(uploadResult.file.name);
     console.log(`[Gemini-Process] File deleted from Google AI File API.`);
