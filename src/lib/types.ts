@@ -65,7 +65,7 @@ export interface Course {
 export interface Episode {
   id: string; // This will be the document ID from Firestore, added on the client
   courseId: string;
-  instructorId?: string;
+  instructorId: string;
   title: string;
   description?: string;
   duration: number; // in seconds
@@ -82,7 +82,7 @@ export interface Episode {
   customThumbnailUrl?: string;
   customThumbnailPath?: string;
 
-  transcript?: string; // Full transcript from Whisper
+  transcript?: string | null; // Full transcript from AI, null if processing failed or not started
 
   createdAt: Timestamp;
 }

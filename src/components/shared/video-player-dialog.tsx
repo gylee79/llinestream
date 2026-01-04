@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -35,8 +36,7 @@ const ChatHistory = ({ episode, user }: { episode: Episode, user: User | null })
     const chatHistoryQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
         return query(
-            collection(firestore, 'chats'),
-            where('userId', '==', user.id),
+            collection(firestore, 'users', user.id, 'chats'),
             where('episodeId', '==', episode.id),
             orderBy('createdAt', 'desc')
         );
@@ -81,6 +81,7 @@ const ChatHistory = ({ episode, user }: { episode: Episode, user: User | null })
 
 export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
   const { user } = useUser();
+  const { toast } = useToast();
   const startTimeRef = useRef<Date | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -95,17 +96,21 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const handleClose = async () => {
     if (user && startTimeRef.current) {
         const endTime = new Date();
-        const payload = {
-            userId: user.id,
-            userName: user.name,
-            userEmail: user.email,
-            episodeId: episode.id,
-            episodeTitle: episode.title,
-            courseId: episode.courseId,
-            startedAt: startTimeRef.current,
-            endedAt: endTime,
-        };
-        await logEpisodeView(payload);
+        const durationWatched = (endTime.getTime() - startTimeRef.current.getTime()) / 1000; // in seconds
+        
+        if (durationWatched > 1) { // Only log if watched for more than 1 second
+            const payload = {
+                userId: user.id,
+                userName: user.name,
+                userEmail: user.email,
+                episodeId: episode.id,
+                episodeTitle: episode.title,
+                courseId: episode.courseId,
+                startedAt: startTimeRef.current,
+                endedAt: endTime,
+            };
+            await logEpisodeView(payload);
+        }
         startTimeRef.current = null; // Reset start time
     }
     onOpenChange(false);
@@ -175,6 +180,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         }
     });
   }
+
+  const isAIAvailable = episode.transcript !== undefined && episode.transcript !== null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -262,7 +269,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     </ScrollArea>
                     <div className="flex gap-2 flex-shrink-0">
                         <Textarea 
-                            placeholder={episode.transcript === undefined ? "AI 분석이 완료되지 않았습니다." : "AI에게 질문할 내용을 입력하세요..."}
+                            placeholder={!isAIAvailable ? "AI 분석이 아직 완료되지 않았습니다." : "AI에게 질문할 내용을 입력하세요..."}
                             className="flex-grow resize-none" 
                             rows={1}
                             value={userQuestion}
@@ -273,10 +280,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                                     handleAskQuestion();
                                 }
                             }}
-                            disabled={isPending || episode.transcript === undefined}
+                            disabled={isPending || !isAIAvailable}
                         />
-                        <Button onClick={handleAskQuestion} disabled={isPending || !userQuestion.trim() || episode.transcript === undefined}>
-                        <Send className="h-4 w-4" />
+                        <Button onClick={handleAskQuestion} disabled={isPending || !userQuestion.trim() || !isAIAvailable}>
+                            <Send className="h-4 w-4" />
                         </Button>
                     </div>
                 </TabsContent>
