@@ -7,11 +7,13 @@ import { Lock, Play, Star, Clock, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import type { Episode, Instructor, Classification, User, EpisodeComment } from '@/lib/types';
+import type { Episode, Instructor, Course, User, EpisodeComment } from '@/lib/types';
 import VideoPlayerDialog from '@/components/shared/video-player-dialog';
 import PaymentDialog from '@/components/shared/payment-dialog';
 import EpisodeCommentDialog from '@/components/shared/episode-comment-dialog';
 import { cn } from '@/lib/utils';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
 const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -22,17 +24,21 @@ const formatDuration = (seconds: number) => {
 interface EpisodeListItemProps {
     episode: Episode;
     instructor?: Instructor;
-    isPlayable: boolean;
-    classification: Classification | null;
     user: User | null;
     comments: EpisodeComment[];
     hasBeenWatched?: boolean;
 }
 
-export default function EpisodeListItem({ episode, instructor, isPlayable, classification, user, comments, hasBeenWatched = false }: EpisodeListItemProps) {
+export default function EpisodeListItem({ episode, instructor, user, comments, hasBeenWatched = false }: EpisodeListItemProps) {
+    const firestore = useFirestore();
     const [isPlayerOpen, setPlayerOpen] = useState(false);
     const [isPaymentOpen, setPaymentOpen] = useState(false);
     const [isCommentOpen, setCommentOpen] = useState(false);
+    
+    const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
+    const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
+
+    const isPlayable = !!(episode.isFree || (user && course && user.activeSubscriptions?.[course.id]));
 
     const { averageRating, ratedCommentsCount } = useMemo(() => {
         if (!comments || comments.length === 0) return { averageRating: 0, ratedCommentsCount: 0 };
@@ -46,6 +52,7 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
     }, [comments]);
     
     const handlePlayClick = () => {
+        if (courseLoading) return;
         if (isPlayable) {
             setPlayerOpen(true);
         } else {
@@ -131,15 +138,12 @@ export default function EpisodeListItem({ episode, instructor, isPlayable, class
                     user={user}
                 />
             )}
-            {!isPlayable && classification && (
+            {!isPlayable && course && (
                 <PaymentDialog 
                     open={isPaymentOpen}
                     onOpenChange={setPaymentOpen}
-                    item={classification}
-                    itemType="classification"
-                    selectedDuration="day30"
-                    selectedPrice={classification.prices.day30}
-                    selectedLabel="30일 이용권"
+                    item={course}
+                    itemType="course"
                 >
                     <div></div>
                 </PaymentDialog>

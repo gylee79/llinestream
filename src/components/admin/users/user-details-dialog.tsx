@@ -29,7 +29,7 @@ import {
     SelectTrigger,
     SelectValue,
   } from '@/components/ui/select';
-import type { User, Course, Subscription, Timestamp, Classification } from '@/lib/types';
+import type { User, Course, Subscription, Timestamp } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, where, doc, updateDoc, writeBatch, Timestamp as FirebaseTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -56,10 +56,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
     const [dob, setDob] = useState(initialUser.dob);
     
     const [bonusDays, setBonusDays] = useState<number>(0);
-    const [bonusClassificationId, setBonusClassificationId] = useState('');
-
-    const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
-    const { data: classifications } = useCollection<Classification>(classificationsQuery);
+    const [bonusCourseId, setBonusCourseId] = useState('');
 
     useEffect(() => {
         setUser(initialUser);
@@ -67,7 +64,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
         setPhone(initialUser.phone);
         setDob(initialUser.dob);
         setBonusDays(0);
-        setBonusClassificationId('');
+        setBonusCourseId('');
     }, [initialUser, open]);
 
 
@@ -76,7 +73,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
     ), [firestore, user.id]);
     const { data: subscriptions } = useCollection<Subscription>(subscriptionsQuery);
 
-    const getClassificationName = (id: string) => classifications?.find(c => c.id === id)?.name || '알 수 없음';
+    const getCourseName = (id: string) => courses?.find(c => c.id === id)?.name || '알 수 없음';
     
     const handleSaveUserInfo = async () => {
       if (!firestore) return;
@@ -91,12 +88,12 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
     };
     
     const handleApplyBonusDays = async () => {
-        if (!firestore || !bonusClassificationId || bonusDays === 0) {
+        if (!firestore || !bonusCourseId || bonusDays === 0) {
             toast({ variant: 'destructive', title: '입력 오류', description: '상세분류를 선택하고 변경할 일수(토큰)를 입력해주세요.' });
             return;
         }
 
-        const currentSub = user.activeSubscriptions?.[bonusClassificationId];
+        const currentSub = user.activeSubscriptions?.[bonusCourseId];
         const currentExpiry = currentSub?.expiresAt ? toJSDate(currentSub.expiresAt) : null;
         const currentPurchase = currentSub?.purchasedAt ? toJSDate(currentSub.purchasedAt) : null;
 
@@ -132,7 +129,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
             };
             
             batch.update(userRef, {
-                [`activeSubscriptions.${bonusClassificationId}`]: newActiveSub
+                [`activeSubscriptions.${bonusCourseId}`]: newActiveSub
             });
             
             const bonusSubscriptionRef = doc(collection(firestore, 'users', user.id, 'subscriptions'));
@@ -141,7 +138,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
 
             const bonusSubscriptionData: Omit<Subscription, 'id'> = {
                 userId: user.id,
-                classificationId: bonusClassificationId,
+                courseId: bonusCourseId,
                 purchasedAt: FirebaseTimestamp.now() as Timestamp,
                 expiresAt: newExpiryTimestamp as Timestamp,
                 amount: 0,
@@ -158,8 +155,8 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                 ...currentUser,
                 activeSubscriptions: {
                     ...currentUser.activeSubscriptions,
-                    [bonusClassificationId]: {
-                        ...currentUser.activeSubscriptions?.[bonusClassificationId],
+                    [bonusCourseId]: {
+                        ...currentUser.activeSubscriptions?.[bonusCourseId],
                         expiresAt: newExpiryTimestamp,
                     }
                 }
@@ -253,9 +250,9 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
               <Table>
                   <TableHeader><TableRow><TableHead className="p-2 text-xs">상세분류</TableHead><TableHead className="p-2 text-xs">만료일</TableHead></TableRow></TableHeader>
                   <TableBody>
-                      {user.activeSubscriptions && Object.entries(user.activeSubscriptions).map(([id, sub]) => (
-                          <TableRow key={id}>
-                              <TableCell className="p-2 text-xs">{getClassificationName(id)}</TableCell>
+                      {user.activeSubscriptions && Object.entries(user.activeSubscriptions).map(([courseId, sub]) => (
+                          <TableRow key={courseId}>
+                              <TableCell className="p-2 text-xs">{getCourseName(courseId)}</TableCell>
                               <TableCell className="p-2 text-xs">{toDisplayDate(sub.expiresAt)}</TableCell>
                           </TableRow>
                       ))}
@@ -264,9 +261,9 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
             </ScrollArea>
             <h4 className="font-semibold mt-6 mb-2">보너스 이용 기간 관리</h4>
             <div className="flex gap-2 items-center">
-                <Select value={bonusClassificationId} onValueChange={setBonusClassificationId}>
-                    <SelectTrigger className="w-[180px]"><SelectValue placeholder="큰분류 선택" /></SelectTrigger>
-                    <SelectContent>{classifications?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                <Select value={bonusCourseId} onValueChange={setBonusCourseId}>
+                    <SelectTrigger className="w-[180px]"><SelectValue placeholder="상세분류 선택" /></SelectTrigger>
+                    <SelectContent>{courses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                 </Select>
                 <div className="flex items-center">
                   <Button variant="outline" size="icon" className="h-10 w-10" onClick={() => adjustBonusDays(-1)}><Minus className="h-4 w-4" /></Button>
@@ -298,7 +295,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                         {subscriptions?.map((sub) => (
                             <TableRow key={sub.id}>
                                 <TableCell className="p-2 text-xs">{toDisplayDate(sub.purchasedAt)}</TableCell>
-                                <TableCell className="p-2 text-xs">{getClassificationName(sub.classificationId)}</TableCell>
+                                <TableCell className="p-2 text-xs">{getCourseName(sub.courseId)}</TableCell>
                                 <TableCell className="p-2 text-xs">{getPaymentMethod(sub)}</TableCell>
                                 <TableCell className="p-2 text-xs">{sub.orderName}</TableCell>
                                 <TableCell className="p-2 text-xs text-right">{sub.amount.toLocaleString('ko-KR')}원</TableCell>

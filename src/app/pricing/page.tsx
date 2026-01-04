@@ -3,7 +3,7 @@
 import PricingCard from '@/components/pricing/pricing-card';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, where } from 'firebase/firestore';
-import type { Course, Classification } from '@/lib/types';
+import type { Course } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCart } from '@/context/cart-context';
 import { formatPrice } from '@/lib/utils';
@@ -71,19 +71,12 @@ function CartSummary() {
 export default function PricingPage() {
   const firestore = useFirestore();
 
+  // Query courses that have at least one price defined and greater than 0
   const coursesQuery = useMemoFirebase(() => 
-    firestore ? collection(firestore, 'courses') : null,
+    firestore ? query(collection(firestore, 'courses'), where('prices.day30', '>', 0)) : null,
     [firestore]
   );
-  const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
-  
-  const classificationsQuery = useMemoFirebase(() => 
-    firestore ? query(collection(firestore, 'classifications'), where('prices.day30', '>', 0)) : null,
-    [firestore]
-  );
-  const { data: subscribableClassifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
-
-  const isLoading = coursesLoading || classificationsLoading;
+  const { data: subscribableCourses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
 
   return (
     <>
@@ -95,21 +88,18 @@ export default function PricingPage() {
           </p>
         </header>
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-          {isLoading ? (
+          {coursesLoading ? (
             <>
               <Skeleton className="h-96 w-full" />
               <Skeleton className="h-96 w-full" />
               <Skeleton className="h-96 w-full" />
             </>
           ) : (
-            subscribableClassifications?.map((classification) => {
-              const representativeCourse = courses?.find(c => c.classificationId === classification.id);
-              if (!representativeCourse) return null;
+            subscribableCourses?.map((course) => {
               return (
                 <PricingCard 
-                  key={classification.id} 
-                  item={representativeCourse}
-                  classification={classification}
+                  key={course.id} 
+                  item={course}
                   itemType="course" 
                 />
               )

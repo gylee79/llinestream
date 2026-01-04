@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { notFound, useParams } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where, onSnapshot, Unsubscribe } from 'firebase/firestore';
-import type { Course, Episode, Classification, Instructor, EpisodeComment, CarouselApi, EpisodeViewLog } from '@/lib/types';
+import type { Course, Episode, Instructor, EpisodeComment, CarouselApi, EpisodeViewLog } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect, useMemo } from 'react';
 import EpisodeListItem from '@/components/shared/episode-list-item';
@@ -43,12 +43,6 @@ export default function CourseDetailPage() {
   );
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
   
-  const classificationRef = useMemoFirebase(() => 
-    firestore && course?.classificationId ? doc(firestore, 'classifications', course.classificationId) : null,
-    [firestore, course?.classificationId]
-  );
-  const { data: classification, isLoading: classificationLoading } = useDoc<Classification>(classificationRef);
-
   const instructorsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'instructors') : null), [firestore]);
   const { data: instructors, isLoading: instructorsLoading } = useCollection<Instructor>(instructorsQuery);
 
@@ -62,7 +56,6 @@ export default function CourseDetailPage() {
     if (!viewLogs) return new Set<string>();
     return new Set(viewLogs.map(log => log.episodeId));
   }, [viewLogs]);
-
 
   useEffect(() => {
     if (!firestore || !episodes || episodes.length === 0) {
@@ -84,10 +77,8 @@ export default function CourseDetailPage() {
         });
         episodeCommentMap.set(episode.id, episodeComments);
 
-        // Combine all comments from the map
         const allComments = Array.from(episodeCommentMap.values()).flat();
         
-        // Sort all comments by creation date
         allComments.sort((a, b) => {
           const dateA = a.createdAt ? (a.createdAt as any).toDate() : new Date(0);
           const dateB = b.createdAt ? (b.createdAt as any).toDate() : new Date(0);
@@ -103,25 +94,21 @@ export default function CourseDetailPage() {
       unsubscribers.push(unsubscribe);
     });
 
-    // Cleanup function to unsubscribe from all listeners when the component unmounts or dependencies change
     return () => {
       unsubscribers.forEach(unsub => unsub());
     };
   }, [firestore, episodes]);
-
-
-  const isLoading = courseLoading || episodesLoading || classificationLoading || instructorsLoading || commentsLoading || (!!user && viewLogsLoading);
   
-  const hasSubscription = !!(user && classification && classification.id && user.activeSubscriptions?.[classification.id]);
-
   const introImages = useMemo(() => {
     if (!course) return [];
     const urls = course.introImageUrls && course.introImageUrls.length > 0 
       ? course.introImageUrls 
-      : [course.thumbnailUrl];
+      : (course.thumbnailUrl ? [course.thumbnailUrl] : []);
     return urls.filter((url): url is string => typeof url === 'string' && url.length > 0);
   }, [course]);
 
+  const isLoading = courseLoading || episodesLoading || instructorsLoading || commentsLoading || (!!user && viewLogsLoading);
+  
   if (isLoading) {
     return (
         <div className="container mx-auto max-w-4xl py-8 space-y-8">
@@ -203,8 +190,6 @@ export default function CourseDetailPage() {
                         key={episode.id}
                         episode={episode}
                         instructor={instructor}
-                        isPlayable={episode.isFree || hasSubscription}
-                        classification={classification}
                         user={user}
                         comments={episodeComments}
                         hasBeenWatched={watchedEpisodeIds.has(episode.id)}

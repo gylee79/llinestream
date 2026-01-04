@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import type { Subscription, User, Classification } from '@/lib/types';
+import type { Subscription, User, Course } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection, collectionGroup, query, orderBy } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,16 +30,16 @@ export default function AdminSubscriptionsPage() {
   );
   
   const usersQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'users') : null), [firestore]);
-  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
+  const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
 
   const { data: subscriptions, isLoading: subsLoading } = useCollection<Subscription>(subscriptionsQuery);
   const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
-  const { data: classifications, isLoading: classLoading } = useCollection<Classification>(classificationsQuery);
+  const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
   
-  const isLoading = subsLoading || usersLoading || classLoading;
+  const isLoading = subsLoading || usersLoading || coursesLoading;
 
   const getUserName = (userId: string) => users?.find(u => u.id === userId)?.name || '알 수 없음';
-  const getClassificationName = (classId: string) => classifications?.find(c => c.id === classId)?.name || '알 수 없음';
+  const getCourseName = (courseId: string) => courses?.find(c => c.id === courseId)?.name || '알 수 없음';
 
   const getSubscriptionStatus = (expiresAt: Date) => {
     const isExpired = new Date() > expiresAt;
@@ -77,7 +77,7 @@ export default function AdminSubscriptionsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>사용자</TableHead>
-                <TableHead>이용권(분류)</TableHead>
+                <TableHead>이용권(상세분류)</TableHead>
                 <TableHead>지급토큰</TableHead>
                 <TableHead>결제일</TableHead>
                 <TableHead>만료일</TableHead>
@@ -97,7 +97,7 @@ export default function AdminSubscriptionsPage() {
                     return (
                       <TableRow key={sub.id}>
                         <TableCell className="font-medium">{getUserName(sub.userId)}</TableCell>
-                        <TableCell>{getClassificationName(sub.classificationId)}</TableCell>
+                        <TableCell>{getCourseName(sub.courseId)}</TableCell>
                         <TableCell>N/A</TableCell>
                         <TableCell>{toDisplayDate(sub.purchasedAt)}</TableCell>
                         <TableCell>{toDisplayDate(sub.expiresAt)}</TableCell>

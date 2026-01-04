@@ -2,16 +2,16 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import type { Classification } from '@/lib/types';
+import type { Course } from '@/lib/types';
 
 export interface CartItem {
   id: string; // Composite ID: `${itemId}-${duration}`
   itemId: string;
-  itemType: 'classification'; // Future-proof for other item types
+  itemType: 'course'; // Changed from 'classification'
   name: string;
   price: number;
   quantity: number;
-  duration: keyof Classification['prices'];
+  duration: keyof Course['prices'];
   durationLabel: string;
   thumbnailUrl: string;
 }
@@ -38,13 +38,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prevItems) => {
       const existingItem = prevItems.find((item) => item.id === itemToAdd.id);
       if (existingItem) {
-        // If item already exists, maybe just highlight it or show a toast, but don't add again.
-        // For simplicity, we'll allow re-adding to show toast again, but won't change quantity.
         return prevItems.map(item => item.id === itemToAdd.id ? { ...item, quantity: 1 } : item);
       }
       return [...prevItems, { ...itemToAdd, quantity: 1 }];
     });
-    // setIsCartOpen(true); // Don't open cart automatically
   };
 
   const removeFromCart = (itemId: string) => {

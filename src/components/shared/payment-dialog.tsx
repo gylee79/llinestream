@@ -13,11 +13,12 @@ import {
   DialogClose
 } from "@/components/ui/dialog"
 import { Button } from "../ui/button"
-import type { Classification } from "@/lib/types"
+import type { Course } from "@/lib/types"
 import type { PortOnePaymentRequest, PortOnePaymentResponse } from "@/lib/portone";
 import { useToast } from "@/hooks/use-toast"
 import { useUser } from "@/firebase/hooks"
 import { v4 as uuidv4 } from "uuid";
+import { formatPrice } from "@/lib/utils"
 
 declare global {
   interface Window {
@@ -27,11 +28,8 @@ declare global {
 
 interface PaymentDialogProps {
     children: React.ReactNode;
-    item: Classification;
-    itemType: 'classification';
-    selectedDuration: keyof Classification['prices'];
-    selectedPrice: number;
-    selectedLabel: string;
+    item: Course;
+    itemType: 'course';
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
 }
@@ -40,15 +38,17 @@ export default function PaymentDialog({
     children, 
     item,
     itemType,
-    selectedDuration,
-    selectedPrice,
-    selectedLabel,
     open,
     onOpenChange
 }: PaymentDialogProps) {
     const { toast } = useToast();
     const { user } = useUser();
     const [isSdkReady, setSdkReady] = useState(false);
+
+    // For single item purchase, default to 30 days
+    const selectedDuration = 'day30';
+    const selectedPrice = item.prices?.[selectedDuration] || 0;
+    const selectedLabel = '30일 이용권';
 
     useEffect(() => {
         const script = document.createElement('script');
@@ -98,9 +98,7 @@ export default function PaymentDialog({
                 phoneNumber: user.phone,
                 email: user.email,
             },
-            // 포트원 권장: 서버가 결제 이벤트를 직접 수신할 웹훅 URL
             noticeUrls: [`${window.location.origin}/api/webhook/portone`],
-            // 사용자가 결제 완료 후 돌아올 주소
             redirectUrl: `${window.location.origin}/api/payment/complete`,
         };
 
@@ -129,7 +127,6 @@ export default function PaymentDialog({
         }
     }
 
-    // If 'open' and 'onOpenChange' are provided, use it as a controlled dialog
     if (open !== undefined && onOpenChange) {
         return (
             <Dialog open={open} onOpenChange={onOpenChange}>
@@ -141,8 +138,8 @@ export default function PaymentDialog({
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
-                        <p className="font-semibold">{`결제 상품: ${selectedLabel}`}</p>
-                        <p className="text-2xl font-bold">₩{new Intl.NumberFormat('ko-KR').format(selectedPrice)}</p>
+                        <p className="font-semibold">{`결제 상품: ${item.name} ${selectedLabel}`}</p>
+                        <p className="text-2xl font-bold">{formatPrice(selectedPrice)}</p>
                         <p className="text-sm text-muted-foreground mt-4">결제하기 버튼을 누르면 포트원 결제창으로 이동합니다.</p>
                     </div>
                     <DialogFooter>
@@ -156,7 +153,6 @@ export default function PaymentDialog({
         );
     }
     
-    // Default behavior as a triggered dialog
     return (
         <Dialog>
         <DialogTrigger asChild>
@@ -171,7 +167,7 @@ export default function PaymentDialog({
             </DialogHeader>
             <div className="py-4">
                 <p className="font-semibold">{`결제 금액 (${selectedLabel})`}</p>
-                <p className="text-2xl font-bold">₩{new Intl.NumberFormat('ko-KR').format(selectedPrice)}</p>
+                <p className="text-2xl font-bold">{formatPrice(selectedPrice)}</p>
                 <p className="text-sm text-muted-foreground mt-4">버튼 클릭 시 포트원 결제창으로 이동합니다.</p>
             </div>
             <DialogFooter>

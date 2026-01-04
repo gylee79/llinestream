@@ -56,7 +56,7 @@ export async function uploadMockData() {
     const classificationIds = [];
     for (let i = 0; i < classifications.length; i++) {
         const classification = classifications[i];
-        const fieldId = fieldIds[i % fieldIds.length]; // Distribute classifications among fields
+        const fieldId = fieldIds[i % fieldIds.length];
         const docRef = firestore.collection('classifications').doc();
         batch.set(docRef, { ...classification, fieldId });
         classificationIds.push(docRef.id);
@@ -96,28 +96,28 @@ export async function uploadMockData() {
         });
     }
 
-    // 6. Upload Subscriptions, linking to created users and classifications
+    // 6. Upload Subscriptions, linking to created users and courses
     console.log(`Uploading ${subscriptions.length} subscriptions...`);
     for (const sub of subscriptions) {
         const userEmail = sub.userId.includes('@') ? sub.userId : `${sub.userId}@example.com`; // Normalize email
         const userId = userMap.get(userEmail);
 
-        // Find a valid classificationId from the ones we created
-        const classificationId = classificationIds[subscriptions.indexOf(sub) % classificationIds.length];
+        // Find a valid courseId from the ones we created
+        const courseId = courseIds[subscriptions.indexOf(sub) % courseIds.length];
         
-        if (userId && classificationId) {
+        if (userId && courseId) {
             const subDocRef = firestore.collection('users').doc(userId).collection('subscriptions').doc();
             batch.set(subDocRef, {
                 ...sub,
                 userId,
-                classificationId,
+                courseId, // Changed from classificationId
                 purchasedAt: Timestamp.fromDate(sub.purchasedAt as Date),
                 expiresAt: Timestamp.fromDate(sub.expiresAt as Date),
             });
             // Update the activeSubscriptions map on the user
             const userRef = firestore.collection('users').doc(userId);
             batch.update(userRef, {
-                [`activeSubscriptions.${classificationId}`]: {
+                [`activeSubscriptions.${courseId}`]: { // Changed from classificationId
                     purchasedAt: Timestamp.fromDate(sub.purchasedAt as Date),
                     expiresAt: Timestamp.fromDate(sub.expiresAt as Date),
                 }

@@ -18,8 +18,8 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
-import type { User, Subscription, Classification, Course } from '@/lib/types';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import type { User, Subscription, Course } from '@/lib/types';
+import { collection, query, orderBy } from 'firebase/firestore';
 import { toDisplayDate, toJSDate } from '@/lib/date-helpers';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
@@ -36,9 +36,6 @@ interface BillingDialogProps {
 export default function BillingDialog({ user, open, onOpenChange }: BillingDialogProps) {
   const firestore = useFirestore();
   
-  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
-  const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
-
   const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
 
@@ -51,9 +48,9 @@ export default function BillingDialog({ user, open, onOpenChange }: BillingDialo
   );
   const { data: subscriptions, isLoading: subsLoading } = useCollection<Subscription>(subscriptionsQuery);
   
-  const getClassificationName = (classificationId: string) => classifications?.find((c) => c.id === classificationId)?.name || '알 수 없음';
+  const getCourseName = (courseId: string) => courses?.find((c) => c.id === courseId)?.name || '알 수 없음';
   
-  const isLoading = coursesLoading || subsLoading || classificationsLoading;
+  const isLoading = coursesLoading || subsLoading;
 
   const getSubscriptionStatusBadge = (sub: Subscription) => {
     const expires = toJSDate(sub.expiresAt);
@@ -74,7 +71,6 @@ export default function BillingDialog({ user, open, onOpenChange }: BillingDialo
       return '서비스 지급';
     }
     if (sub.amount > 0) {
-      // In a real scenario, you might have more details in sub.method
       return sub.method === 'CARD' ? '카드 결제' : sub.method;
     }
     return 'N/A';
@@ -100,7 +96,7 @@ export default function BillingDialog({ user, open, onOpenChange }: BillingDialo
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="p-2 text-xs">카테고리</TableHead>
+                    <TableHead className="p-2 text-xs">상세분류</TableHead>
                     <TableHead className="p-2 text-xs">만료일</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -108,9 +104,9 @@ export default function BillingDialog({ user, open, onOpenChange }: BillingDialo
                   {isLoading ? (
                     <TableRow><TableCell colSpan={2}><Skeleton className="h-8 w-full"/></TableCell></TableRow>
                   ) : user.activeSubscriptions && Object.keys(user.activeSubscriptions).length > 0 ? (
-                    Object.entries(user.activeSubscriptions).map(([classificationId, sub]) => (
-                      <TableRow key={classificationId}>
-                        <TableCell className="p-2 text-sm">{getClassificationName(classificationId)}</TableCell>
+                    Object.entries(user.activeSubscriptions).map(([courseId, sub]) => (
+                      <TableRow key={courseId}>
+                        <TableCell className="p-2 text-sm">{getCourseName(courseId)}</TableCell>
                         <TableCell className="p-2 text-sm">{toDisplayDate(sub.expiresAt)}</TableCell>
                       </TableRow>
                     ))
@@ -143,7 +139,7 @@ export default function BillingDialog({ user, open, onOpenChange }: BillingDialo
                             subscriptions.map((sub) => (
                                 <TableRow key={sub.id}>
                                     <TableCell className="p-2 text-sm">{toDisplayDate(sub.purchasedAt)}</TableCell>
-                                    <TableCell className="p-2 text-sm">{getClassificationName(sub.classificationId)}</TableCell>
+                                    <TableCell className="p-2 text-sm">{getCourseName(sub.courseId)}</TableCell>
                                     <TableCell className="p-2 text-sm">{getPaymentMethod(sub)}</TableCell>
                                     <TableCell className="p-2 text-sm">{sub.orderName}</TableCell>
                                     <TableCell className="p-2 text-sm text-right">{formatPrice(sub.amount)}</TableCell>
