@@ -156,7 +156,7 @@ function AuditLogTab() {
     ), [firestore]);
     const { data: auditLogs, isLoading } = useCollection<UserAuditLog>(auditLogQuery);
 
-    const fieldNameMap = {
+    const fieldNameMap: Record<string, string> = {
         name: '이름',
         phone: '연락처',
         dob: '생년월일'

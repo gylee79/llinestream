@@ -252,8 +252,8 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                   <TableBody>
                       {user.activeSubscriptions && Object.entries(user.activeSubscriptions).map(([courseId, sub]) => (
                           <TableRow key={courseId}>
-                              <TableCell className="p-2 text-xs">{getCourseName(courseId)}</TableCell>
-                              <TableCell className="p-2 text-xs">{toDisplayDate(sub.expiresAt)}</TableCell>
+                              <TableCell className="p-2 text-sm">{getCourseName(courseId)}</TableCell>
+                              <TableCell className="p-2 text-sm">{toDisplayDate(sub.expiresAt)}</TableCell>
                           </TableRow>
                       ))}
                   </TableBody>
@@ -294,11 +294,11 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
                     <TableBody>
                         {subscriptions?.map((sub) => (
                             <TableRow key={sub.id}>
-                                <TableCell className="p-2 text-xs">{toDisplayDate(sub.purchasedAt)}</TableCell>
-                                <TableCell className="p-2 text-xs">{getCourseName(sub.courseId)}</TableCell>
-                                <TableCell className="p-2 text-xs">{getPaymentMethod(sub)}</TableCell>
-                                <TableCell className="p-2 text-xs">{sub.orderName}</TableCell>
-                                <TableCell className="p-2 text-xs text-right">{sub.amount.toLocaleString('ko-KR')}원</TableCell>
+                                <TableCell className="p-2 text-sm">{toDisplayDate(sub.purchasedAt)}</TableCell>
+                                <TableCell className="p-2 text-sm">{getCourseName(sub.courseId)}</TableCell>
+                                <TableCell className="p-2 text-sm">{getPaymentMethod(sub)}</TableCell>
+                                <TableCell className="p-2 text-sm">{sub.orderName}</TableCell>
+                                <TableCell className="p-2 text-sm text-right">{sub.amount.toLocaleString('ko-KR')}원</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
