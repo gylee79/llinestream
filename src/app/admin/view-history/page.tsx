@@ -12,7 +12,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { EpisodeViewLog } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collectionGroup, query, orderBy } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toDisplayDate, toDisplayTime } from '@/lib/date-helpers';
 
@@ -20,7 +20,7 @@ export default function AdminViewHistoryPage() {
   const firestore = useFirestore();
 
   const viewLogsQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'episode_view_logs'), orderBy('endedAt', 'desc')) : null),
+    () => (firestore ? query(collectionGroup(firestore, 'viewHistory'), orderBy('endedAt', 'desc')) : null),
     [firestore]
   );
   

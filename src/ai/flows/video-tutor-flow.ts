@@ -117,9 +117,9 @@ const videoTutorFlow = ai.defineFlow(
       const answer = llmResponse.text;
       console.log(`[Tutor-Flow] Generated answer.`);
 
-      // 5. Save the chat interaction to Firestore in two locations using a batch write.
-      const batch = db.batch();
-      const newChatId = db.collection('chats').doc().id;
+      // 5. Save the chat interaction only to the user's sub-collection
+      const newChatId = db.collection('users').doc(userId).collection('chats').doc().id;
+      const userChatRef = db.collection('users').doc(userId).collection('chats').doc(newChatId);
 
       const chatLogData = {
           userId,
@@ -130,16 +130,8 @@ const videoTutorFlow = ai.defineFlow(
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
       };
       
-      // Location 1: Global chat log for admins
-      const globalChatRef = db.collection('chats').doc(newChatId);
-      batch.set(globalChatRef, chatLogData);
-
-      // Location 2: User-specific chat log for the user themselves
-      const userChatRef = db.collection('users').doc(userId).collection('chats').doc(newChatId);
-      batch.set(userChatRef, chatLogData);
-      
-      await batch.commit();
-      console.log(`[Tutor-Flow] Saved chat interaction to both global and user-specific collections.`);
+      await userChatRef.set(chatLogData);
+      console.log(`[Tutor-Flow] Saved chat interaction to user-specific collection.`);
 
       return { answer };
 

@@ -8,16 +8,16 @@ import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
 
-export async function deleteChatLog(chatId: string): Promise<{ success: boolean; message: string }> {
-  if (!chatId) {
-    return { success: false, message: '채팅 ID가 제공되지 않았습니다.' };
+export async function deleteChatLog(userId: string, chatId: string): Promise<{ success: boolean; message: string }> {
+  if (!userId || !chatId) {
+    return { success: false, message: '사용자 ID와 채팅 ID가 제공되지 않았습니다.' };
   }
 
   try {
     const adminApp = initializeAdminApp();
     const db = admin.firestore(adminApp);
     
-    await db.collection('chats').doc(chatId).delete();
+    await db.collection('users').doc(userId).collection('chats').doc(chatId).delete();
     
     // Revalidate the admin chats page to reflect the deletion
     revalidatePath('/admin/chats');

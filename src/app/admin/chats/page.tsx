@@ -20,7 +20,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ChatLog, Episode, User } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase/hooks';
-import { collection, query, orderBy, where, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, where, collectionGroup } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toDisplayDateTime } from '@/lib/date-helpers';
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Trash2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -56,7 +55,7 @@ function ChatLogViewer() {
   
   const chatsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    let q = query(collection(firestore, 'chats'), orderBy('createdAt', 'desc'));
+    let q: any = query(collectionGroup(firestore, 'chats'), orderBy('createdAt', 'desc'));
     if (filterEpisode !== 'all') {
       q = query(q, where('episodeId', '==', filterEpisode));
     }
@@ -73,8 +72,8 @@ function ChatLogViewer() {
   const getUserName = (userId: string) => users?.find(u => u.id === userId)?.name || userId;
   const getEpisodeTitle = (episodeId: string) => episodes?.find(e => e.id === episodeId)?.title || episodeId;
 
-  const handleDelete = async (chatId: string) => {
-    const result = await deleteChatLog(chatId);
+  const handleDelete = async (userId: string, chatId: string) => {
+    const result = await deleteChatLog(userId, chatId);
     if (result.success) {
       toast({ title: '삭제 완료', description: '채팅 기록이 삭제되었습니다.' });
     } else {
@@ -149,7 +148,7 @@ function ChatLogViewer() {
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
                                           <AlertDialogCancel>취소</AlertDialogCancel>
-                                          <AlertDialogAction onClick={() => handleDelete(log.id)}>삭제</AlertDialogAction>
+                                          <AlertDialogAction onClick={() => handleDelete(log.userId, log.id)}>삭제</AlertDialogAction>
                                       </AlertDialogFooter>
                                   </AlertDialogContent>
                               </AlertDialog>

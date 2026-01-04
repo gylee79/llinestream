@@ -36,16 +36,9 @@ export async function logEpisodeView(payload: LogViewPayload): Promise<{ success
       duration: Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000), // duration in seconds
     };
     
-    // Store log in both global collection for admin and user's subcollection
-    const batch = db.batch();
-    
-    const globalLogRef = db.collection('episode_view_logs').doc();
-    batch.set(globalLogRef, logEntry);
-    
+    // Store log only in the user's subcollection
     const userLogRef = db.collection('users').doc(userId).collection('viewHistory').doc();
-    batch.set(userLogRef, logEntry);
-    
-    await batch.commit();
+    await userLogRef.set(logEntry);
 
     return { success: true, message: '시청 기록이 성공적으로 저장되었습니다.' };
   } catch (error) {
@@ -54,5 +47,3 @@ export async function logEpisodeView(payload: LogViewPayload): Promise<{ success
     return { success: false, message: `시청 기록 저장 실패: ${errorMessage}` };
   }
 }
-
-    
