@@ -55,7 +55,7 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     const episodeRef = db.collection('episodes').doc(episodeId);
     await episodeRef.update({ aiProcessingStatus: 'processing', aiProcessingError: null });
 
-    const model = googleAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = googleAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const videoFilePart = {
         fileData: {
             mimeType: "video/mp4",
