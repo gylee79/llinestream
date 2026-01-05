@@ -101,8 +101,8 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     }
     console.log('[Gemini-Process] File is ACTIVE. Proceeding with transcription.');
 
-    // 3. Transcribe using Gemini 1.5 Flash
-    const model = googleAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // 3. Transcribe using Gemini 2.5 Flash
+    const model = googleAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const transcriptionPrompt = "이 오디오 파일의 내용을 빠짐없이 정확하게 전체 텍스트로 받아 적어줘(Transcribe). 타임스탬프는 필요 없어.";
     const vttPrompt = "Transcribe this video file into a WebVTT (VTT) format subtitle file. Ensure accurate timestamps and text. Start with WEBVTT.";
 
@@ -179,9 +179,9 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     console.error('[Gemini-Process-ERROR]', error);
     
     // Update Firestore with failure status
-    const db = admin.firestore(initializeAdminApp());
-    const episodeRef = db.collection('episodes').doc(episodeId);
     try {
+        const db = admin.firestore(initializeAdminApp());
+        const episodeRef = db.collection('episodes').doc(episodeId);
         await episodeRef.update({ aiProcessingStatus: 'failed', aiProcessingError: errorMessage });
     } catch (dbError) {
         console.error(`[Gemini-Process-ERROR] Failed to write error status to Firestore for episode ${episodeId}:`, dbError);
