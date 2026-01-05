@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -44,8 +44,14 @@ import {
 import { sanitize } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import VideoPlayerDialog from '@/components/shared/video-player-dialog';
+import { processVideoForAI } from '@/lib/actions/process-video';
 
-const AIStatusIndicator = ({ status, error }: { status?: Episode['aiProcessingStatus'], error?: string | null }) => {
+
+const AIStatusIndicator = ({ status, error, onRetry }: { 
+    status?: Episode['aiProcessingStatus'], 
+    error?: string | null,
+    onRetry?: () => void,
+}) => {
     if (!status || status === 'pending') {
         return (
             <Tooltip>
@@ -78,10 +84,15 @@ const AIStatusIndicator = ({ status, error }: { status?: Episode['aiProcessingSt
         case 'failed':
             return (
                 <Tooltip>
-                    <TooltipTrigger>
-                        <AlertTriangle className="h-4 w-4 text-destructive" />
+                    <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-auto w-auto p-0" onClick={onRetry}>
+                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                        </Button>
                     </TooltipTrigger>
-                    <TooltipContent><p>AI 분석 실패: {error || '알 수 없는 오류'}</p></TooltipContent>
+                    <TooltipContent>
+                        <p>AI 분석 실패: {error || '알 수 없는 오류'}</p>
+                        <p className="font-semibold">클릭하여 재시도</p>
+                    </TooltipContent>
                 </Tooltip>
             );
         default:
@@ -92,6 +103,7 @@ const AIStatusIndicator = ({ status, error }: { status?: Episode['aiProcessingSt
 export default function VideoManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
   
   const episodesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'episodes'), orderBy('createdAt', 'desc')) : null), [firestore]);
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
@@ -132,6 +144,13 @@ export default function VideoManager() {
     setSelectedEpisode(episode);
     setSelectedInstructor(instructors?.find(i => i.id === episode.instructorId) || null);
     setPlayerDialogOpen(true);
+  }
+
+  const handleRetryAI = (episodeId: string, videoUrl: string) => {
+    startTransition(async () => {
+        toast({ title: "AI 분석 재시도", description: `'${episodes?.find(e => e.id === episodeId)?.title}'에 대한 분석을 다시 요청합니다.` });
+        await processVideoForAI(episodeId, videoUrl);
+    });
   }
 
   const getFullCoursePath = (courseId: string): string => {
@@ -259,7 +278,11 @@ export default function VideoManager() {
                       <TableCell>{episode.duration}초</TableCell>
                       <TableCell>{getInstructorName(episode.instructorId)}</TableCell>
                       <TableCell>
-                        <AIStatusIndicator status={episode.aiProcessingStatus} error={episode.aiProcessingError} />
+                        <AIStatusIndicator 
+                            status={episode.aiProcessingStatus} 
+                            error={episode.aiProcessingError}
+                            onRetry={() => handleRetryAI(episode.id, episode.videoUrl)}
+                        />
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
