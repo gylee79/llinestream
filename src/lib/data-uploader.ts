@@ -6,7 +6,7 @@ config();
 
 import * as admin from 'firebase-admin';
 import { initializeAdminApp } from '@/lib/firebase-admin';
-import { fields, classifications, courses, episodes, users, subscriptions, policies } from '@/lib/data';
+import { fields, classifications, courses, episodes, users, subscriptions, policies, instructors } from '@/lib/data';
 import { Timestamp, WriteBatch } from 'firebase-admin/firestore';
 import { User, Subscription } from './types';
 import { revalidatePath } from 'next/cache';
@@ -62,27 +62,38 @@ export async function uploadMockData() {
         classificationIds.push(docRef.id);
     }
     
-    // 3. Upload Courses, mapping them to classifications
+    // 3. Upload Instructors
+    console.log(`Uploading ${instructors.length} instructors...`);
+    const instructorIds: string[] = [];
+    for (const instructor of instructors) {
+        const docRef = firestore.collection('instructors').doc();
+        batch.set(docRef, { ...instructor, createdAt: Timestamp.now() });
+        instructorIds.push(docRef.id);
+    }
+    
+    // 4. Upload Courses, mapping them to classifications and instructors
     console.log(`Uploading ${courses.length} courses...`);
     const courseIds = [];
     for (let i = 0; i < courses.length; i++) {
         const course = courses[i];
         const classificationId = classificationIds[i % classificationIds.length];
+        const instructorId = instructorIds[i % instructorIds.length];
         const docRef = firestore.collection('courses').doc();
-        batch.set(docRef, { ...course, classificationId });
+        batch.set(docRef, { ...course, classificationId, instructorId });
         courseIds.push(docRef.id);
     }
 
-    // 4. Upload Episodes, mapping them to courses
+    // 5. Upload Episodes, mapping them to courses and instructors
     console.log(`Uploading ${episodes.length} episodes...`);
     for (let i = 0; i < episodes.length; i++) {
         const episode = episodes[i];
         const courseId = courseIds[i % courseIds.length];
+        const instructorId = instructorIds[i % instructorIds.length];
         const docRef = firestore.collection('episodes').doc();
-        batch.set(docRef, { ...episode, courseId, createdAt: Timestamp.fromDate(episode.createdAt as Date) });
+        batch.set(docRef, { ...episode, courseId, instructorId, createdAt: Timestamp.fromDate(episode.createdAt as Date) });
     }
 
-    // 5. Upload Users and create Auth users
+    // 6. Upload Users and create Auth users
     console.log(`Uploading ${users.length} users...`);
     const userMap = new Map<string, string>(); // email -> uid
     for (const user of users) {
@@ -96,7 +107,7 @@ export async function uploadMockData() {
         });
     }
 
-    // 6. Upload Subscriptions, linking to created users and courses
+    // 7. Upload Subscriptions, linking to created users and courses
     console.log(`Uploading ${subscriptions.length} subscriptions...`);
     for (const sub of subscriptions) {
         const userEmail = sub.userId.includes('@') ? sub.userId : `${sub.userId}@example.com`; // Normalize email
@@ -125,7 +136,7 @@ export async function uploadMockData() {
         }
     }
     
-    // 7. Upload Policies
+    // 8. Upload Policies
     console.log(`Uploading ${policies.length} policies...`);
     for (const policy of policies) {
       const docRef = firestore.collection('policies').doc(policy.slug);
