@@ -1,5 +1,5 @@
 
-import { Field, Classification, Course, Episode, User, Subscription, Policy, Timestamp } from './types';
+import { Field, Classification, Course, Episode, User, Subscription, Policy, Timestamp, Instructor } from './types';
 import { Timestamp as FirebaseTimestamp } from 'firebase/firestore';
 
 
