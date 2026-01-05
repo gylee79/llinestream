@@ -29,6 +29,13 @@
       "fields": [
         { "fieldPath": "endedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "subscriptions",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "purchasedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
