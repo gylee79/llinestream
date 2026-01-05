@@ -121,7 +121,7 @@ export default function PricingManager() {
     <Card>
       <CardHeader>
         <CardTitle>상세분류 가격 관리</CardTitle>
-        <p className="text-sm text-muted-foreground">각 '상세분류(강좌)'별 이용권 가격을 설정합니다. 큰분류 제목을 클릭하여 펼쳐보세요.</p>
+        <p className="text-sm text-muted-foreground">각 &apos;상세분류(강좌)&apos;별 이용권 가격을 설정합니다. 큰분류 제목을 클릭하여 펼쳐보세요.</p>
       </CardHeader>
       <CardContent>
         <Accordion type="multiple" className="w-full">
