@@ -37,32 +37,6 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
     }
 };
 
-const getEpisodeDependenciesRecursive = async (db: Firestore, parentId: string, parentType: 'field' | 'classification' | 'course'): Promise<string[]> => {
-    let finalDependencies: string[] = [];
-
-    if (parentType === 'field') {
-        const classificationsSnap = await db.collection('classifications').where('fieldId', '==', parentId).get();
-        for (const classDoc of classificationsSnap.docs) {
-            const classification = classDoc.data() as Classification;
-            const deps = await getEpisodeDependenciesRecursive(db, classDoc.id, 'classification');
-            finalDependencies = finalDependencies.concat(deps.map(dep => `${classification.name} > ${dep}`));
-        }
-    } else if (parentType === 'classification') {
-        const coursesSnap = await db.collection('courses').where('classificationId', '==', parentId).get();
-        for (const courseDoc of coursesSnap.docs) {
-            const course = courseDoc.data() as Course;
-            const deps = await getEpisodeDependenciesRecursive(db, courseDoc.id, 'course');
-            finalDependencies = finalDependencies.concat(deps.map(dep => `${course.name} > ${dep}`));
-        }
-    } else if (parentType === 'course') {
-        const episodesSnap = await db.collection('episodes').where('courseId', '==', parentId).get();
-        if (!episodesSnap.empty) {
-            return episodesSnap.docs.map(doc => (doc.data() as Episode).title);
-        }
-    }
-    return finalDependencies;
-}
-
 const deleteChunksSubcollection = async (db: Firestore, episodeId: string): Promise<void> => {
     const chunksRef = db.collection('episodes').doc(episodeId).collection('chunks');
     const snapshot = await chunksRef.get();
@@ -78,8 +52,22 @@ const deleteChunksSubcollection = async (db: Firestore, episodeId: string): Prom
 
     await batch.commit();
     console.log(`[DELETE SUCCESS] Deleted chunks subcollection for episode ${episodeId}.`);
+};
+
+async function getFieldDependencies(db: Firestore, fieldId: string): Promise<string[]> {
+    const classificationsSnap = await db.collection('classifications').where('fieldId', '==', fieldId).get();
+    return classificationsSnap.docs.map(doc => (doc.data() as Classification).name);
 }
 
+async function getClassificationDependencies(db: Firestore, classificationId: string): Promise<string[]> {
+    const coursesSnap = await db.collection('courses').where('classificationId', '==', classificationId).get();
+    return coursesSnap.docs.map(doc => (doc.data() as Course).name);
+}
+
+async function getCourseDependencies(db: Firestore, courseId: string): Promise<string[]> {
+    const episodesSnap = await db.collection('episodes').where('courseId', '==', courseId).get();
+    return episodesSnap.docs.map(doc => (doc.data() as Episode).title);
+}
 
 export async function deleteHierarchyItem(
   collectionName: 'fields' | 'classifications' | 'courses' | 'episodes',
@@ -106,26 +94,20 @@ export async function deleteHierarchyItem(
 
     const item = docSnap.data() as Field | Classification | Course | Episode;
     
+    // Check for dependencies before deleting
     let dependencies: string[] = [];
-
     if (collectionName === 'fields') {
-        const fieldItem = item as Field;
-        const fieldDeps = await getEpisodeDependenciesRecursive(db, id, 'field');
-        dependencies = fieldDeps.map(dep => `${fieldItem.name} > ${dep}`);
+        dependencies = await getFieldDependencies(db, id);
     } else if (collectionName === 'classifications') {
-        const classItem = item as Classification;
-        const classDeps = await getEpisodeDependenciesRecursive(db, id, 'classification');
-        dependencies = classDeps.map(dep => `${classItem.name} > ${dep}`);
+        dependencies = await getClassificationDependencies(db, id);
     } else if (collectionName === 'courses') {
-        const courseItem = item as Course;
-        const courseDeps = await getEpisodeDependenciesRecursive(db, id, 'course');
-        dependencies = courseDeps.map(dep => `${courseItem.name} > ${dep}`);
+        dependencies = await getCourseDependencies(db, id);
     }
 
     if (dependencies.length > 0) {
       return {
         success: false,
-        message: '하위 에피소드가 존재하여 삭제할 수 없습니다. 가장 하위의 에피소드를 먼저 삭제해주세요.',
+        message: '하위 항목이 존재하여 삭제할 수 없습니다. 하위 항목을 먼저 삭제해주세요.',
         dependencies,
       };
     }
@@ -136,10 +118,22 @@ export async function deleteHierarchyItem(
         await deleteStorageFileByPath(storage, episode.filePath);
         await deleteStorageFileByPath(storage, episode.defaultThumbnailPath);
         await deleteStorageFileByPath(storage, episode.customThumbnailPath);
+        // Also delete the VTT file if it exists
+        if (episode.vttPath) {
+          await deleteStorageFileByPath(storage, episode.vttPath);
+        }
         // Also delete the chunks subcollection
-        await deleteChunksSubcollection(db, episode.id);
-    } else {
-        const hierarchyItem = item as Field | Classification | Course;
+        await deleteChunksSubcollection(db, id);
+    } else if (collectionName === 'courses') {
+        const course = item as Course;
+        if (course.thumbnailPath) await deleteStorageFileByPath(storage, course.thumbnailPath);
+        if (course.introImagePaths) {
+            for (const path of course.introImagePaths) {
+                await deleteStorageFileByPath(storage, path);
+            }
+        }
+    } else { // Fields and Classifications
+        const hierarchyItem = item as Field | Classification;
         await deleteStorageFileByPath(storage, hierarchyItem.thumbnailPath);
     }
 
