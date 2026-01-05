@@ -90,7 +90,13 @@ export async function uploadMockData() {
         const courseId = courseIds[i % courseIds.length];
         const instructorId = instructorIds[i % instructorIds.length];
         const docRef = firestore.collection('episodes').doc();
-        batch.set(docRef, { ...episode, courseId, instructorId, createdAt: Timestamp.fromDate(episode.createdAt as Date) });
+        batch.set(docRef, { 
+            ...episode, 
+            courseId, 
+            instructorId, 
+            aiProcessingStatus: 'pending',
+            createdAt: Timestamp.fromDate(episode.createdAt as Date) 
+        });
     }
 
     // 6. Upload Users and create Auth users
