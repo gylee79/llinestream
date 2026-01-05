@@ -47,22 +47,32 @@ import VideoPlayerDialog from '@/components/shared/video-player-dialog';
 import { processVideoForAI } from '@/lib/actions/process-video';
 
 
-const AIStatusIndicator = ({ status, error, onRetry }: { 
-    status?: Episode['aiProcessingStatus'], 
-    error?: string | null,
-    onRetry?: () => void,
+const AIStatusIndicator = ({ episode }: { 
+    episode: Episode
 }) => {
-    if (!status || status === 'pending') {
-        return (
+    const { toast } = useToast();
+    const [isPending, startTransition] = useTransition();
+
+    const handleRetry = () => {
+        startTransition(async () => {
+            toast({ title: "AI 분석 재시도", description: `'${episode.title}'에 대한 분석을 다시 요청합니다.` });
+            await processVideoForAI(episode.id, episode.videoUrl);
+            // Optionally, you can add another toast on completion/failure by handling the return value.
+        });
+    }
+
+    if (isPending) {
+         return (
             <Tooltip>
                 <TooltipTrigger>
-                    <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                    <Loader className="h-4 w-4 text-blue-500 animate-spin" />
                 </TooltipTrigger>
-                <TooltipContent><p>AI 분석 대기 중</p></TooltipContent>
+                <TooltipContent><p>AI 분석 재시도 요청 중...</p></TooltipContent>
             </Tooltip>
-        )
+        );
     }
-    switch (status) {
+    
+    switch (episode.aiProcessingStatus) {
         case 'processing':
             return (
                 <Tooltip>
@@ -85,18 +95,26 @@ const AIStatusIndicator = ({ status, error, onRetry }: {
             return (
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-auto w-auto p-0" onClick={onRetry}>
+                        <Button variant="ghost" size="icon" className="h-auto w-auto p-0" onClick={handleRetry}>
                             <AlertTriangle className="h-4 w-4 text-destructive" />
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                        <p>AI 분석 실패: {error || '알 수 없는 오류'}</p>
+                        <p>AI 분석 실패: {episode.aiProcessingError || '알 수 없는 오류'}</p>
                         <p className="font-semibold">클릭하여 재시도</p>
                     </TooltipContent>
                 </Tooltip>
             );
+        case 'pending':
         default:
-            return null;
+             return (
+                <Tooltip>
+                    <TooltipTrigger>
+                        <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent><p>AI 분석 대기 중</p></TooltipContent>
+                </Tooltip>
+            )
     }
 };
 
@@ -144,13 +162,6 @@ export default function VideoManager() {
     setSelectedEpisode(episode);
     setSelectedInstructor(instructors?.find(i => i.id === episode.instructorId) || null);
     setPlayerDialogOpen(true);
-  }
-
-  const handleRetryAI = (episodeId: string, videoUrl: string) => {
-    startTransition(async () => {
-        toast({ title: "AI 분석 재시도", description: `'${episodes?.find(e => e.id === episodeId)?.title}'에 대한 분석을 다시 요청합니다.` });
-        await processVideoForAI(episodeId, videoUrl);
-    });
   }
 
   const getFullCoursePath = (courseId: string): string => {
@@ -278,11 +289,7 @@ export default function VideoManager() {
                       <TableCell>{episode.duration}초</TableCell>
                       <TableCell>{getInstructorName(episode.instructorId)}</TableCell>
                       <TableCell>
-                        <AIStatusIndicator 
-                            status={episode.aiProcessingStatus} 
-                            error={episode.aiProcessingError}
-                            onRetry={() => handleRetryAI(episode.id, episode.videoUrl)}
-                        />
+                        <AIStatusIndicator episode={episode} />
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
