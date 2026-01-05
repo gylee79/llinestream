@@ -38,6 +38,7 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
 };
 
 const deleteChunksSubcollection = async (db: Firestore, episodeId: string): Promise<void> => {
+    // This is the corrected line:
     const chunksRef = db.collection('episodes').doc(episodeId).collection('chunks');
     const snapshot = await chunksRef.get();
     
