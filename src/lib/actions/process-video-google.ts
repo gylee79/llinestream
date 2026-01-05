@@ -60,23 +60,29 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     
     const episodeRef = db.collection('episodes').doc(episodeId);
     await episodeRef.update({ aiProcessingStatus: 'processing', aiProcessingError: null });
-
-    // Use a service account to get a signed URL for the video, as CORS might not be sufficient
-    // for server-to-server communication with Google AI APIs.
+    
     const videoPath = extractPathFromUrl(fileUrl);
     if (!videoPath) {
         throw new Error('Could not determine video path from URL.');
     }
-    console.log(`[Gemini-Process] Found video path: ${videoPath}`);
 
-    const [signedUrl] = await bucket.file(videoPath).getSignedUrl({
-        action: 'read',
-        expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-    });
+    const videoFile = bucket.file(videoPath);
+    const [videoExists] = await videoFile.exists();
+    if (!videoExists) {
+        throw new Error(`Video file does not exist in Storage at path: ${videoPath}`);
+    }
+
+    // --- Download video to a temporary local file ---
+    const tempDir = os.tmpdir();
+    tempVideoPath = path.join(tempDir, `episode-${episodeId}-${Date.now()}.mp4`);
+    console.log(`[Gemini-Process] Downloading video to temporary path: ${tempVideoPath}`);
+    await videoFile.download({ destination: tempVideoPath });
+    console.log(`[Gemini-Process] Video downloaded successfully.`);
+
 
     // 1. Upload to Google AI File API
-    console.log(`[Gemini-Process] Uploading file to Google AI File API from signed URL...`);
-    const uploadResult = await fileManager.uploadFile(signedUrl, {
+    console.log(`[Gemini-Process] Uploading file to Google AI File API from temp path...`);
+    const uploadResult = await fileManager.uploadFile(tempVideoPath, {
       mimeType: 'video/mp4',
       displayName: `episode-${episodeId}`,
     });
