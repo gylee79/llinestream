@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -334,7 +335,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
         if (isEditMode) {
             const payload = {
                 episodeId, title, description, isFree, courseId: selectedCourseId, instructorId: selectedInstructorId,
-                newVideoData: newVideoUploadResult,
+                newVideoData: videoFile ? { ...newVideoUploadResult!, fileSize: videoFile.size } : undefined,
                 newDefaultThumbnailData: newDefaultThumbUploadResult,
                 newCustomThumbnailData: newCustomThumbUploadResult,
                 oldVideoUrl: initialEpisode?.videoUrl,
@@ -353,6 +354,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 episodeId, title, description, isFree, selectedCourseId, instructorId: selectedInstructorId,
                 videoUrl: newVideoUploadResult.downloadUrl,
                 filePath: newVideoUploadResult.filePath,
+                fileSize: videoFile.size,
                 defaultThumbnailUrl: newDefaultThumbUploadResult.downloadUrl,
                 defaultThumbnailPath: newDefaultThumbUploadResult.filePath,
                 customThumbnailUrl: newCustomThumbUploadResult?.downloadUrl,

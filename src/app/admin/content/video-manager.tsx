@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -118,6 +118,15 @@ const AIStatusIndicator = ({ episode }: {
     }
 };
 
+const formatFileSize = (bytes: number | undefined): string => {
+    if (bytes === undefined || bytes === 0) return 'N/A';
+    if (bytes < 1024) return `${bytes} B`;
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
+}
+
+
 export default function VideoManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -147,6 +156,11 @@ export default function VideoManager() {
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [episodeToDelete, setEpisodeToDelete] = useState<Episode | null>(null);
+
+  const totalFileSize = useMemo(() => {
+    if (!episodes) return 0;
+    return episodes.reduce((acc, episode) => acc + (episode.fileSize || 0), 0);
+  }, [episodes]);
 
   const handleOpenUploadDialog = (episode: Episode | null = null) => {
     setSelectedEpisode(episode);
@@ -251,6 +265,10 @@ export default function VideoManager() {
                   <TableHead>제목</TableHead>
                   <TableHead>소속 상세분류</TableHead>
                   <TableHead>재생 시간</TableHead>
+                  <TableHead>
+                    <div>파일 용량</div>
+                    <div className="text-xs font-normal text-muted-foreground">({formatFileSize(totalFileSize)})</div>
+                  </TableHead>
                   <TableHead>강사</TableHead>
                   <TableHead>AI 상태</TableHead>
                   <TableHead>무료 여부</TableHead>
@@ -261,7 +279,7 @@ export default function VideoManager() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                       <TableRow key={i}>
-                          <TableCell colSpan={8}><Skeleton className="h-8 w-full" /></TableCell>
+                          <TableCell colSpan={9}><Skeleton className="h-8 w-full" /></TableCell>
                       </TableRow>
                   ))
                 ) : (
@@ -287,6 +305,7 @@ export default function VideoManager() {
                       <TableCell className="font-medium">{episode.title}</TableCell>
                       <TableCell>{getFullCoursePath(episode.courseId)}</TableCell>
                       <TableCell>{episode.duration}초</TableCell>
+                      <TableCell>{formatFileSize(episode.fileSize)}</TableCell>
                       <TableCell>{getInstructorName(episode.instructorId)}</TableCell>
                       <TableCell>
                         <AIStatusIndicator episode={episode} />

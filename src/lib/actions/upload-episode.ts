@@ -27,6 +27,7 @@ type SaveMetadataPayload = {
     instructorId: string;
     videoUrl: string;
     filePath: string;
+    fileSize: number;
     // Default thumbnail is required for new episodes
     defaultThumbnailUrl: string;
     defaultThumbnailPath: string;
@@ -44,7 +45,7 @@ type UpdateEpisodePayload = {
     isFree: boolean;
     
     // New files data
-    newVideoData?: { downloadUrl: string; filePath: string; };
+    newVideoData?: { downloadUrl: string; filePath: string; fileSize: number; };
     newDefaultThumbnailData?: { downloadUrl: string; filePath: string; };
     newCustomThumbnailData?: { downloadUrl: string | null; filePath: string | null; }; // null indicates deletion
 
@@ -81,7 +82,7 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
 export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise<UploadResult> {
     const { 
         episodeId, title, description, isFree, selectedCourseId, instructorId, 
-        videoUrl, filePath, defaultThumbnailUrl, defaultThumbnailPath,
+        videoUrl, filePath, fileSize, defaultThumbnailUrl, defaultThumbnailPath,
         customThumbnailUrl, customThumbnailPath
     } = payload;
 
@@ -106,6 +107,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             isFree: isFree || false,
             videoUrl: videoUrl,
             filePath: filePath,
+            fileSize: fileSize,
             thumbnailUrl: customThumbnailUrl || defaultThumbnailUrl, // Use custom if available
             defaultThumbnailUrl: defaultThumbnailUrl,
             defaultThumbnailPath: defaultThumbnailPath,
@@ -201,6 +203,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         if (newVideoData) {
             dataToUpdate.videoUrl = newVideoData.downloadUrl;
             dataToUpdate.filePath = newVideoData.filePath;
+            dataToUpdate.fileSize = newVideoData.fileSize;
             // When a new video is uploaded, clear the old transcript and VTT info and set status to pending
             dataToUpdate.transcript = admin.firestore.FieldValue.delete();
             dataToUpdate.vttUrl = admin.firestore.FieldValue.delete();
