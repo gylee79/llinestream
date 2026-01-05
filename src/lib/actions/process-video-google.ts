@@ -102,7 +102,7 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     console.log('[Gemini-Process] File is ACTIVE. Proceeding with transcription.');
 
     // 3. Transcribe using Gemini 1.5 Flash
-    const model = googleAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = googleAI.getGenerativeModel({ model: "gemini-pro-vision" });
     const transcriptionPrompt = "이 오디오 파일의 내용을 빠짐없이 정확하게 전체 텍스트로 받아 적어줘(Transcribe). 타임스탬프는 필요 없어.";
     const vttPrompt = "Transcribe this video file into a WebVTT (VTT) format subtitle file. Ensure accurate timestamps and text. Start with WEBVTT.";
 
