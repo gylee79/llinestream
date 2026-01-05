@@ -56,10 +56,12 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     await episodeRef.update({ aiProcessingStatus: 'processing', aiProcessingError: null });
 
     const model = googleAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    
+    // --- 핵심 변경점: 파일을 다시 업로드하는 대신 URL을 직접 사용 ---
     const videoFilePart = {
         fileData: {
-            mimeType: "video/mp4",
-            fileUri: fileUrl
+            mimeType: "video/mp4", // 비디오 파일의 MIME 타입
+            fileUri: fileUrl       // Firebase Storage의 공개 URL
         }
     };
     
@@ -102,6 +104,7 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     const batch = db.batch();
     const chunkCollectionRef = episodeRef.collection('chunks');
     
+    // Delete old chunks before adding new ones
     const oldChunks = await chunkCollectionRef.listDocuments();
     oldChunks.forEach(doc => batch.delete(doc));
 
@@ -109,7 +112,8 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
         const chunkDocRef = chunkCollectionRef.doc();
         batch.set(chunkDocRef, {
             text: text,
-            startTime: i * 30,
+            // You might want to get actual timestamps from VTT if available
+            startTime: i * 30, // Placeholder
         });
     });
     
