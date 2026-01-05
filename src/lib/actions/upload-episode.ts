@@ -121,7 +121,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
         // --- Trigger AI processing in the background ---
         // We don't await this, so the UI can respond quickly.
         // The AI processing happens independently on the server.
-        processVideoForAI(episodeId).then(result => {
+        processVideoForAI(episodeId, videoUrl).then(result => {
             if (result.success) {
                 console.log(`[BG-SUCCESS] AI processing triggered for episode ${episodeId}`);
             } else {
@@ -220,15 +220,18 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         }
 
         // Recalculate the final thumbnailUrl based on all updates
-        const finalCustomUrl = dataToUpdate.customThumbnailUrl ?? currentData?.customThumbnailUrl;
-        const finalDefaultUrl = dataToUpdate.defaultThumbnailUrl ?? currentData?.defaultThumbnailUrl;
+        const finalCustomUrl = newCustomThumbnailData ? newCustomThumbnailData.downloadUrl : currentData?.customThumbnailUrl;
+        const finalDefaultUrl = newDefaultThumbnailData ? newDefaultThumbnailData.downloadUrl : currentData?.defaultThumbnailUrl;
         dataToUpdate.thumbnailUrl = finalCustomUrl || finalDefaultUrl || '';
 
         await episodeRef.update(dataToUpdate);
 
         // If a new video was uploaded, trigger AI re-processing
         if(shouldReprocessVideo){
-            processVideoForAI(episodeId).then(result => {
+            const videoUrlToProcess = newVideoData?.downloadUrl;
+            if (!videoUrlToProcess) throw new Error("New video URL is not available for processing.");
+
+            processVideoForAI(episodeId, videoUrlToProcess).then(result => {
                 if (result.success) {
                     console.log(`[BG-SUCCESS] AI re-processing triggered for episode ${episodeId}`);
                 } else {
