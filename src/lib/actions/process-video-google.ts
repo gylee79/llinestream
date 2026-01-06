@@ -79,7 +79,7 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     console.log(`[Gemini-Process-MultiModal] Google AI file processed. State: ${uploadState.state}`);
 
 
-    const model = googleAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    const model = googleAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     const videoFilePart: Part = {
         fileData: {
@@ -123,7 +123,7 @@ Structure your response as a single JSON object with the following three keys: "
 
     // --- VTT Processing ---
     let vttContent = vttResult.response.text();
-    vttContent = vttContent.replace(/^```(vtt)?\n/,'').replace(/```$/, '');
+    vttContent = vttContent.replace(/^`\'\'\'(vtt)?\n/,'').replace(/`\'\'\'$/, '');
     if (!vttContent) {
         throw new Error('VTT generation returned no text.');
     }
