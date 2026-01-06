@@ -37,10 +37,10 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
         }}
         className="w-full"
       >
-        <CarouselContent>
+        <CarouselContent className="-ml-1">
           {items.map((item) => (
-            <CarouselItem key={item.id} className="basis-1/3 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6">
-              <div className="p-1 h-full">
+            <CarouselItem key={item.id} className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6 pl-1">
+              <div className="h-full">
                 {itemType === 'course' ? (
                     <CourseCard course={item as Course} />
                 ) : (
