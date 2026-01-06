@@ -28,11 +28,10 @@ export default function EpisodeCard({ episode }: EpisodeCardProps) {
             </div>
           )}
         </div>
-        <CardHeader className="p-4">
-          <CardTitle className="font-headline text-base tracking-tight truncate">{episode.title}</CardTitle>
-          {episode.description && (
-             <CardDescription className="line-clamp-2 text-xs mt-1">{episode.description}</CardDescription>
-          )}
+        <CardHeader className="p-3">
+          <CardTitle className="font-headline text-sm leading-snug tracking-tight line-clamp-2 h-[2.5em]">
+            {episode.title}
+          </CardTitle>
         </CardHeader>
       </Card>
     </Link>
