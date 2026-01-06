@@ -1,4 +1,5 @@
-import * as functions from 'firebase-functions';
+
+import * as functions from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -6,8 +7,12 @@ import * as path from 'path';
 
 import { initializeGenkit } from './genkit';
 import { generate } from 'genkit/ai';
-import { Part, FileDataPart } from '@google/generative-ai';
+import { FileDataPart } from '@google/generative-ai';
 import { z } from 'zod';
+import { setGlobalOptions } from 'firebase-functions/v2';
+
+// Cloud Functions 리전 및 옵션 설정 (중요)
+setGlobalOptions({ region: 'asia-northeast3' });
 
 // Firebase Admin SDK 초기화
 admin.initializeApp();
@@ -22,41 +27,69 @@ const AnalysisOutputSchema = z.object({
 });
 
 /**
- * Firestore 'episodes' 컬렉션에 문서가 생성될 때 트리거되는 Cloud Function.
- * 비디오를 다운로드하고, Genkit을 사용하여 AI 분석을 수행한 후, 결과를 Firestore에 다시 쓴다.
+ * Firestore 'episodes' 컬렉션의 문서가 생성되거나 업데이트 될 때 트리거되는 Cloud Function.
  */
-export const analyzeVideoOnCreate = functions.runWith({
-    timeoutSeconds: 540, // 9분 타임아웃
-    memory: '1GiB',      // 1GB 메모리 할당
-}).firestore
-  .document('episodes/{episodeId}')
-  .onCreate(async (snap, context) => {
-    const episodeData = snap.data();
-    const { episodeId } = context.params;
-
-    // aiProcessingStatus가 'pending'이 아니거나 videoUrl이 없으면 함수 종료
-    if (episodeData.aiProcessingStatus !== 'pending' || !episodeData.videoUrl) {
-      functions.logger.info(`[${episodeId}] Skipping analysis. Status: ${episodeData.aiProcessingStatus}, URL: ${!!episodeData.videoUrl}`);
-      return null;
+export const analyzeVideoOnWrite = functions.onDocumentWritten(
+  {
+    document: 'episodes/{episodeId}',
+    timeoutSeconds: 540,
+    memory: '1GiB',
+  },
+  async (event) => {
+    const change = event.data;
+    if (!change) {
+      console.log(`[${event.params.episodeId}] Event data is undefined, skipping.`);
+      return;
     }
 
-    const episodeRef = snap.ref;
-    const videoUrl = episodeData.videoUrl;
+    const { episodeId } = event.params;
+    const beforeData = change.before.data();
+    const afterData = change.after.data();
+
+    // 멱등성(Idempotency) 로직:
+    // 1. 문서가 삭제되었으면 무시
+    if (!afterData) {
+      console.log(`[${episodeId}] Document deleted, skipping.`);
+      return;
+    }
+    // 2. 상태가 'pending'이 아니면 무시 (실행 조건)
+    if (afterData.aiProcessingStatus !== 'pending') {
+      console.log(`[${episodeId}] Status is not 'pending' (${afterData.aiProcessingStatus}), skipping.`);
+      return;
+    }
+    // 3. 이미 'processing' 상태에서 'pending'으로 온 경우(예: 오류)가 아니라면,
+    //    이전 상태가 'pending'이었으면 중복 실행 방지
+    if (beforeData?.aiProcessingStatus === 'pending') {
+        console.log(`[${episodeId}] Status was already 'pending', skipping to prevent loops.`);
+        return;
+    }
+    
+    console.log(`[${episodeId}] AI analysis triggered.`);
+    
+    const episodeRef = change.after.ref;
+    const videoUrl = afterData.videoUrl;
+    const filePath = afterData.filePath;
+
+    if (!videoUrl || !filePath) {
+      console.error(`[${episodeId}] videoUrl or filePath is missing.`);
+      await episodeRef.update({ aiProcessingStatus: 'failed', aiProcessingError: 'Video URL or file path is missing.' });
+      return;
+    }
 
     // 1. 상태를 'processing'으로 즉시 업데이트
     await episodeRef.update({ aiProcessingStatus: 'processing', aiProcessingError: null });
-    functions.logger.info(`[${episodeId}] Status updated to 'processing'.`);
+    console.log(`[${episodeId}] Status updated to 'processing'.`);
 
     const tempFilePath = path.join(os.tmpdir(), `episode_${episodeId}.mp4`);
 
     try {
       // 2. Firebase Storage에서 비디오 파일을 스트림으로 다운로드
       const bucket = admin.storage().bucket();
-      const file = bucket.file(episodeData.filePath); // Assuming filePath is stored on the document
+      const file = bucket.file(filePath);
 
-      functions.logger.info(`[${episodeId}] Starting video download from ${episodeData.filePath}.`);
+      console.log(`[${episodeId}] Starting video download from ${filePath}.`);
       await file.download({ destination: tempFilePath });
-      functions.logger.info(`[${episodeId}] Video downloaded to temporary path: ${tempFilePath}`);
+      console.log(`[${episodeId}] Video downloaded to temporary path: ${tempFilePath}`);
       
       const fileBuffer = fs.readFileSync(tempFilePath);
       
@@ -74,7 +107,7 @@ export const analyzeVideoOnCreate = functions.runWith({
         3) 'keywords': An array of relevant keywords.`;
 
       // 4. Genkit을 사용하여 Gemini 2.5 Flash 모델 호출
-      functions.logger.info(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
+      console.log(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
       const llmResponse = await generate({
         model: 'googleai/gemini-2.5-flash',
         prompt: [prompt, videoFilePart],
@@ -89,7 +122,7 @@ export const analyzeVideoOnCreate = functions.runWith({
         throw new Error('AI analysis returned no output.');
       }
       
-      functions.logger.info(`[${episodeId}] AI analysis successful.`);
+      console.log(`[${episodeId}] AI analysis successful.`);
 
       // 5. Firestore에 결과 저장
       await episodeRef.update({
@@ -97,11 +130,11 @@ export const analyzeVideoOnCreate = functions.runWith({
         aiGeneratedContent: `Keywords: ${analysisResult.keywords.join(', ')}\n\nVisual Summary:\n${analysisResult.visualSummary}`,
         aiProcessingStatus: 'completed',
       });
-      functions.logger.info(`[${episodeId}] Firestore updated with analysis results.`);
+      console.log(`[${episodeId}] Firestore updated with analysis results.`);
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-      functions.logger.error(`[${episodeId}] AI analysis failed:`, error);
+      console.error(`[${episodeId}] AI analysis failed:`, error);
       await episodeRef.update({
         aiProcessingStatus: 'failed',
         aiProcessingError: errorMessage,
@@ -111,9 +144,8 @@ export const analyzeVideoOnCreate = functions.runWith({
       // 6. 임시 파일 정리
       if (fs.existsSync(tempFilePath)) {
         fs.unlinkSync(tempFilePath);
-        functions.logger.info(`[${episodeId}] Cleaned up temporary file: ${tempFilePath}`);
+        console.log(`[${episodeId}] Cleaned up temporary file: ${tempFilePath}`);
       }
     }
-
-    return null;
-  });
+  }
+);

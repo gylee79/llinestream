@@ -44,7 +44,7 @@ import {
 import { sanitize } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import VideoPlayerDialog from '@/components/shared/video-player-dialog';
-import { processVideoForAI } from '@/lib/actions/process-video';
+import { resetAIEpisodeStatus } from '@/lib/actions/process-video';
 
 
 const AIStatusIndicator = ({ episode }: { 
@@ -56,7 +56,7 @@ const AIStatusIndicator = ({ episode }: {
     const handleStartAnalysis = () => {
         startTransition(async () => {
             toast({ title: "AI 분석 요청", description: `'${episode.title}'에 대한 분석을 시작합니다.` });
-            const result = await processVideoForAI(episode.id, episode.videoUrl);
+            const result = await resetAIEpisodeStatus(episode.id);
             if (result.success) {
                 toast({ title: "성공", description: result.message });
             } else {
@@ -412,3 +412,4 @@ export default function VideoManager() {
     
 
     
+
