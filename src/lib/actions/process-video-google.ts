@@ -79,7 +79,7 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     console.log(`[Gemini-Process-MultiModal] Google AI file processed. State: ${uploadState.state}`);
 
 
-    const model = googleAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
+    const model = googleAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
     
     const videoFilePart: Part = {
         fileData: {
