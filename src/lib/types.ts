@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
@@ -86,7 +85,8 @@ export interface Episode {
   customThumbnailUrl?: string;
   customThumbnailPath?: string;
 
-  transcript?: string | null; // Full transcript from AI, null if processing failed or not started
+  transcript?: string | null; // Pure audio transcript
+  aiGeneratedContent?: string | null; // Full analysis including visual descriptions and summary
   vttUrl?: string; // URL for the VTT subtitle file
   vttPath?: string; // Path in Firebase Storage for the VTT file
 

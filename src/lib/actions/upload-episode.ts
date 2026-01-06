@@ -1,4 +1,3 @@
-
 'use server';
 
 import { config } from 'dotenv';
@@ -116,6 +115,8 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             createdAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
             aiProcessingStatus: 'pending', // Set initial status
             aiProcessingError: null,
+            aiGeneratedContent: null,
+            transcript: null,
         };
 
         await episodeRef.set(newEpisode);
@@ -205,7 +206,8 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             dataToUpdate.filePath = newVideoData.filePath;
             dataToUpdate.fileSize = newVideoData.fileSize;
             // When a new video is uploaded, clear the old transcript and VTT info and set status to pending
-            dataToUpdate.transcript = admin.firestore.FieldValue.delete();
+            dataToUpdate.transcript = null;
+            dataToUpdate.aiGeneratedContent = null;
             dataToUpdate.vttUrl = admin.firestore.FieldValue.delete();
             dataToUpdate.vttPath = admin.firestore.FieldValue.delete();
             dataToUpdate.aiProcessingStatus = 'pending';

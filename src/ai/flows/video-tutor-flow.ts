@@ -47,22 +47,26 @@ const videoTutorFlow = ai.defineFlow(
     const db = admin.firestore(adminApp);
 
     try {
-      // 1. Get all chunks for the SPECIFIC episode
-      const chunksSnapshot = await db.collection('episodes').doc(episodeId).collection('chunks').get();
+      // 1. Get the AI-generated content from the episode document
+      const episodeDoc = await db.collection('episodes').doc(episodeId).get();
+      if (!episodeDoc.exists) {
+          throw new Error(`Episode with ID ${episodeId} not found.`);
+      }
+      const episodeData = episodeDoc.data() as Episode;
+      const context = episodeData.aiGeneratedContent;
 
-      if (chunksSnapshot.empty) {
-        console.log(`[Tutor-Flow] No chunks found for episode ${episodeId}.`);
+      if (!context) {
+        console.log(`[Tutor-Flow] No AI-generated content found for episode ${episodeId}.`);
         return { answer: "죄송합니다, 이 비디오는 아직 AI 질문에 맞게 처리되지 않았습니다. 잠시 후 다시 시도해주세요." };
       }
-
-      const allChunks = chunksSnapshot.docs.map(doc => doc.data().text as string);
-      const context = allChunks.join('\n\n---\n\n');
-      console.log(`[Tutor-Flow] Found ${allChunks.length} chunks for context for episode ${episodeId}.`);
+      
+      console.log(`[Tutor-Flow] Found AI-generated content for context for episode ${episodeId}.`);
 
       // 2. Generate the answer using Gemini with the provided context
       const llmResponse = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash'),
-        prompt: `You are a friendly and helpful tutor. Based ONLY on the following video transcript context, answer the user's question in Korean.
+        model: googleAI.model('gemini-1.5-flash-latest'),
+        prompt: `You are a friendly and helpful tutor. Based ONLY on the following video content analysis, answer the user's question in Korean.
+        The context includes a summary and a description of visual elements from the video.
         If the context doesn't contain the answer, you MUST state that the information is not in the video and you cannot answer. Do not use outside knowledge.
 
         Context from the video:
@@ -85,7 +89,7 @@ const videoTutorFlow = ai.defineFlow(
           episodeId,
           question,
           answer,
-          contextReferences: allChunks.slice(0, 5), // Save first 5 chunks for reference
+          contextReferences: [context.substring(0, 500)], // Save first 500 chars of context for reference
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
       };
       
