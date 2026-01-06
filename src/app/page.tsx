@@ -7,6 +7,7 @@ import { Course, Classification, Episode, HeroImageSettings, Field } from '@/lib
 import { Skeleton } from '@/components/ui/skeleton';
 import ClassificationCard from '@/components/shared/classification-card';
 import ContinueWatching from '@/components/home/continue-watching';
+import ContentCarousel from '@/components/shared/content-carousel';
 
 export default function Home() {
   const firestore = useFirestore();
@@ -66,12 +67,11 @@ export default function Home() {
 
           return (
             <section key={field.id}>
-              <h2 className="mb-6 font-headline text-xl font-bold tracking-tight">{field.name}</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {classificationsInField.map((classification) => (
-                  <ClassificationCard key={classification.id} classification={classification} />
-                ))}
-              </div>
+              <ContentCarousel
+                title={field.name}
+                items={classificationsInField}
+                itemType="classification"
+              />
             </section>
           );
         })}

@@ -10,12 +10,13 @@ import {
 } from '@/components/ui/carousel';
 import CourseCard from './course-card';
 import EpisodeCard from './episode-card';
-import type { Course, Episode } from '@/lib/types';
+import ClassificationCard from './classification-card';
+import type { Course, Episode, Classification } from '@/lib/types';
 
 interface ContentCarouselProps {
   title?: string;
-  items: (Course | Episode)[];
-  itemType: 'course' | 'episode';
+  items: (Course | Episode | Classification)[];
+  itemType: 'course' | 'episode' | 'classification';
 }
 
 export default function ContentCarousel({ title, items, itemType }: ContentCarouselProps) {
@@ -41,11 +42,9 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
           {items.map((item) => (
             <CarouselItem key={item.id} className="basis-2/5 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6 pl-1">
               <div className="h-full">
-                {itemType === 'course' ? (
-                    <CourseCard course={item as Course} />
-                ) : (
-                    <EpisodeCard episode={item as Episode} />
-                )}
+                {itemType === 'course' && <CourseCard course={item as Course} />}
+                {itemType === 'episode' && <EpisodeCard episode={item as Episode} />}
+                {itemType === 'classification' && <ClassificationCard classification={item as Classification} />}
               </div>
             </CarouselItem>
           ))}
