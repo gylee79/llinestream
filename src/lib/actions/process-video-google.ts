@@ -6,10 +6,8 @@ config();
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { googleAI, fileManager } from '@/lib/google-ai';
-import type { FileState } from '@google/generative-ai/server';
 import { Part } from '@google/generative-ai';
 import { getPublicUrl } from '../utils';
-
 
 /**
  * Splits text into chunks of a specified size.
@@ -58,10 +56,22 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     const episodeRef = db.collection('episodes').doc(episodeId);
     await episodeRef.update({ aiProcessingStatus: 'processing', aiProcessingError: null });
 
-    // 1. Upload the file to Google AI
-    console.log(`[Gemini-Process-MultiModal] Uploading file to Google AI from URL: ${fileUrl}`);
-    uploadedFile = await fileManager.uploadFile(fileUrl, {
-        mimeType: 'video/mp4',
+    // 1. Download the file from the URL to a buffer
+    console.log(`[Gemini-Process-MultiModal] Downloading file from URL: ${fileUrl}`);
+    const videoResponse = await fetch(fileUrl);
+    if (!videoResponse.ok) {
+        throw new Error(`Failed to download video file. Status: ${videoResponse.status}`);
+    }
+    const videoBuffer = Buffer.from(await videoResponse.arrayBuffer());
+    console.log(`[Gemini-Process-MultiModal] File downloaded successfully. Size: ${videoBuffer.length} bytes.`);
+
+    // 2. Upload the file buffer to Google AI
+    console.log(`[Gemini-Process-MultiModal] Uploading file to Google AI...`);
+    uploadedFile = await fileManager.uploadFile({
+        file: {
+            contents: videoBuffer,
+            mimeType: 'video/mp4',
+        },
         displayName: `episode-${episodeId}`,
     });
 
