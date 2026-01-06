@@ -123,12 +123,10 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
 
         await episodeRef.set(newEpisode);
 
-        // IMPORTANT: We no longer trigger AI processing automatically from here
-        // to prevent serverless function timeouts and memory issues.
-        // AI processing should be triggered manually by the admin from the UI.
+        // Firestore Trigger in Cloud Functions will now handle the AI processing automatically.
         
         revalidatePath('/admin/content', 'layout');
-        return { success: true, message: `에피소드 '${title}'의 정보가 성공적으로 저장되었습니다. AI 분석은 관리자 페이지에서 수동으로 시작해주세요.` };
+        return { success: true, message: `에피소드 '${title}'의 정보가 성공적으로 저장되었으며, AI 분석이 백그라운드에서 자동으로 시작됩니다.` };
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : '알 수 없는 서버 오류가 발생했습니다.';
