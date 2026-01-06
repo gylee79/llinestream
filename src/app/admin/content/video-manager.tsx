@@ -130,7 +130,6 @@ const formatFileSize = (bytes: number | undefined): string => {
 export default function VideoManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const [isPending, startTransition] = useTransition();
   
   const episodesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'episodes'), orderBy('createdAt', 'desc')) : null), [firestore]);
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
@@ -412,3 +411,5 @@ export default function VideoManager() {
     </>
   );
 }
+
+    
