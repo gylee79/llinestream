@@ -403,7 +403,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             await setDoc(doc(firestore, 'classifications', id), {
                 id, fieldId: selectedFieldId, name: item.name,
                 description: `${item.name}에 대한 설명입니다.`,
-                prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
                 thumbnailUrl: '',
             });
             setSelectedClassificationId(id);
@@ -413,6 +412,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
                 id, classificationId: selectedClassificationId, name: item.name,
                 description: `${item.name}에 대한 상세 설명입니다.`,
                 thumbnailUrl: '',
+                prices: { day1: 0, day30: 10000, day60: 18000, day90: 25000 },
             });
             setSelectedCourseId(id);
         }

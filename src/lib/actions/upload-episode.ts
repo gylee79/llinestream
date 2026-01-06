@@ -94,6 +94,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
         const adminApp = initializeAdminApp();
         const db = admin.firestore(adminApp);
         
+        // This is a placeholder, a more accurate duration could be extracted on the client.
         const duration = Math.floor(Math.random() * (3600 - 60 + 1)) + 60;
         
         const episodeRef = db.collection('episodes').doc(episodeId);
@@ -114,7 +115,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             customThumbnailUrl: customThumbnailUrl || '',
             customThumbnailPath: customThumbnailPath || '',
             createdAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
-            aiProcessingStatus: 'pending', // Set initial status
+            aiProcessingStatus: 'pending', // Set initial status to 'pending'
             aiProcessingError: null,
             aiGeneratedContent: null,
             transcript: null,
@@ -122,20 +123,12 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
 
         await episodeRef.set(newEpisode);
 
-        // --- Trigger AI processing in the background ---
-        // We don't await this, so the UI can respond quickly.
-        // The AI processing happens independently on the server.
-        processVideoForAI(episodeId, videoUrl).then(result => {
-            if (result.success) {
-                console.log(`[BG-SUCCESS] AI processing triggered for episode ${episodeId}`);
-            } else {
-                console.error(`[BG-ERROR] Failed to trigger AI processing for episode ${episodeId}: ${result.message}`);
-                 db.collection('episodes').doc(episodeId).update({ aiProcessingStatus: 'failed', aiProcessingError: `Failed to start processing: ${result.message}` });
-            }
-        });
-
+        // IMPORTANT: We no longer trigger AI processing automatically from here
+        // to prevent serverless function timeouts and memory issues.
+        // AI processing should be triggered manually by the admin from the UI.
+        
         revalidatePath('/admin/content', 'layout');
-        return { success: true, message: `에피소드 '${title}'의 정보가 성공적으로 저장되었습니다. AI 분석이 백그라운드에서 시작되었습니다.` };
+        return { success: true, message: `에피소드 '${title}'의 정보가 성공적으로 저장되었습니다. AI 분석은 관리자 페이지에서 수동으로 시작해주세요.` };
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : '알 수 없는 서버 오류가 발생했습니다.';
@@ -170,7 +163,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         }
         const currentData = currentDoc.data() as Episode;
         
-        let shouldReprocessVideo = false;
+        let shouldResetAIState = false;
 
         // --- File Deletion Logic ---
         const oldFilePath = extractPathFromUrl(oldVideoUrl);
@@ -180,7 +173,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
           if (currentData.vttPath) {
             await deleteStorageFileByPath(storage, currentData.vttPath);
           }
-          shouldReprocessVideo = true;
+          shouldResetAIState = true;
         }
         
         const oldDefaultThumbnailPath = extractPathFromUrl(oldDefaultThumbnailUrl);
@@ -206,6 +199,9 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             dataToUpdate.videoUrl = newVideoData.downloadUrl;
             dataToUpdate.filePath = newVideoData.filePath;
             dataToUpdate.fileSize = newVideoData.fileSize;
+        }
+
+        if (shouldResetAIState) {
             // When a new video is uploaded, clear the old transcript and VTT info and set status to pending
             dataToUpdate.transcript = null;
             dataToUpdate.aiGeneratedContent = null;
@@ -232,22 +228,6 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
 
         await episodeRef.update(dataToUpdate);
 
-        // If a new video was uploaded, trigger AI re-processing
-        if(shouldReprocessVideo){
-            const videoUrlToProcess = newVideoData?.downloadUrl;
-            if (!videoUrlToProcess) throw new Error("New video URL is not available for processing.");
-
-            processVideoForAI(episodeId, videoUrlToProcess).then(result => {
-                if (result.success) {
-                    console.log(`[BG-SUCCESS] AI re-processing triggered for episode ${episodeId}`);
-                } else {
-                    console.error(`[BG-ERROR] AI re-processing failed for episode ${episodeId}: ${result.message}`);
-                    db.collection('episodes').doc(episodeId).update({ aiProcessingStatus: 'failed', aiProcessingError: `Failed to start re-processing: ${result.message}` });
-                }
-            });
-        }
-
-
         revalidatePath('/admin/content', 'layout');
         return { success: true, message: `에피소드 '${title}' 정보가 업데이트되었습니다.` };
 
@@ -257,5 +237,3 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         return { success: false, message: `에피소드 업데이트 실패: ${errorMessage}` };
     }
 }
-
-    
