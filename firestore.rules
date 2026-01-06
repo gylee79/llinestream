@@ -2,10 +2,125 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // 개발 중에는 모든 읽기/쓰기를 허용합니다.
-      // 주의: 프로덕션 배포 전에는 반드시 보안 규칙을 강화해야 합니다.
-      allow read, write: if true;
+
+    // ----------------------------------------------------------------
+    // Helper Functions
+    // ----------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+    function isOwnerOrAdmin(userId) {
+      return isOwner(userId) || isAdmin();
+    }
+    function isExistingDoc() {
+      return resource != null;
+    }
+    function isExistingOwnerOrAdmin(userId) {
+      return isOwnerOrAdmin(userId) && isExistingDoc();
+    }
+    
+    // ----------------------------------------------------------------
+    // Admin & User Roles & Data
+    // ----------------------------------------------------------------
+    match /roles_admin/{userId} {
+      allow read, list, create, update, delete: if isAdmin();
+    }
+    
+    match /users/{userId} {
+      allow get: if isOwnerOrAdmin(userId);
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isOwnerOrAdmin(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwnerOrAdmin(userId);
+    }
+    
+    match /users/{userId}/subscriptions/{subscriptionId} {
+      allow get, list: if isOwnerOrAdmin(userId);
+      allow create: if isOwnerOrAdmin(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwnerOrAdmin(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwnerOrAdmin(userId);
+    }
+
+    match /users/{userId}/viewHistory/{logId} {
+      allow read, list: if isOwnerOrAdmin(userId);
+      allow create: if isOwner(userId);
+      allow update, delete: if false;
+    }
+
+    match /users/{userId}/chats/{chatId} {
+        allow read, write: if isOwnerOrAdmin(userId);
+    }
+    
+    match /user_audit_logs/{logId} {
+        allow read, list: if isAdmin();
+        allow create: if isSignedIn();
+        allow update, delete: if false;
+    }
+    
+    // --- Collection Group Rules for Admin Queries ---
+    match /{path=**}/viewHistory/{logId} {
+      allow get, list: if isAdmin();
+    }
+    match /{path=**}/subscriptions/{subscriptionId} {
+      allow get, list: if isAdmin();
+    }
+    match /{path=**}/chats/{chatId} {
+      allow get, list: if isAdmin();
+    }
+
+    // ----------------------------------------------------------------
+    // Public Content Collections (Admin-Managed)
+    // ----------------------------------------------------------------
+    match /fields/{fieldId} {
+      allow get, list: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /classifications/{classificationId} {
+      allow get, list: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /courses/{courseId} {
+      allow get, list: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /episodes/{episodeId} {
+      allow get, list: if true;
+      allow write: if isAdmin();
+    }
+
+    match /episodes/{episodeId}/comments/{commentId} {
+      allow read, list: if true;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+
+    match /episodes/{episodeId}/chunks/{chunkId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /instructors/{instructorId} {
+        allow read: if true;
+        allow write: if isAdmin();
+    }
+    
+    match /policies/{policyId} {
+      allow get, list: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow get, list: if true;
+      allow write: if isAdmin();
     }
   }
 }
