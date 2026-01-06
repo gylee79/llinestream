@@ -53,35 +53,30 @@ const AIStatusIndicator = ({ episode }: {
     const { toast } = useToast();
     const [isPending, startTransition] = useTransition();
 
-    const handleRetry = () => {
+    const handleStartAnalysis = () => {
         startTransition(async () => {
-            toast({ title: "AI 분석 재시도", description: `'${episode.title}'에 대한 분석을 다시 요청합니다.` });
-            await processVideoForAI(episode.id, episode.videoUrl);
-            // Optionally, you can add another toast on completion/failure by handling the return value.
+            toast({ title: "AI 분석 요청", description: `'${episode.title}'에 대한 분석을 시작합니다.` });
+            const result = await processVideoForAI(episode.id, episode.videoUrl);
+            if (result.success) {
+                toast({ title: "성공", description: result.message });
+            } else {
+                toast({ variant: 'destructive', title: "실패", description: result.message });
+            }
         });
     }
 
-    if (isPending) {
+    if (isPending || episode.aiProcessingStatus === 'processing') {
          return (
             <Tooltip>
                 <TooltipTrigger>
                     <Loader className="h-4 w-4 text-blue-500 animate-spin" />
                 </TooltipTrigger>
-                <TooltipContent><p>AI 분석 재시도 요청 중...</p></TooltipContent>
+                <TooltipContent><p>AI 분석 처리 중...</p></TooltipContent>
             </Tooltip>
         );
     }
     
     switch (episode.aiProcessingStatus) {
-        case 'processing':
-            return (
-                <Tooltip>
-                    <TooltipTrigger>
-                        <Loader className="h-4 w-4 text-blue-500 animate-spin" />
-                    </TooltipTrigger>
-                    <TooltipContent><p>AI 분석 처리 중...</p></TooltipContent>
-                </Tooltip>
-            );
         case 'completed':
             return (
                 <Tooltip>
@@ -95,7 +90,7 @@ const AIStatusIndicator = ({ episode }: {
             return (
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-auto w-auto p-0" onClick={handleRetry}>
+                        <Button variant="ghost" size="icon" className="h-auto w-auto p-0" onClick={handleStartAnalysis}>
                             <AlertTriangle className="h-4 w-4 text-destructive" />
                         </Button>
                     </TooltipTrigger>
@@ -109,10 +104,12 @@ const AIStatusIndicator = ({ episode }: {
         default:
              return (
                 <Tooltip>
-                    <TooltipTrigger>
-                        <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                    <TooltipTrigger asChild>
+                         <Button variant="ghost" size="icon" className="h-auto w-auto p-0" onClick={handleStartAnalysis}>
+                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                        </Button>
                     </TooltipTrigger>
-                    <TooltipContent><p>AI 분석 대기 중</p></TooltipContent>
+                    <TooltipContent><p>AI 분석 대기 중. 클릭하여 시작</p></TooltipContent>
                 </Tooltip>
             )
     }
