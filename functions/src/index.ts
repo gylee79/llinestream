@@ -25,7 +25,10 @@ const AnalysisOutputSchema = z.object({
  * Firestore 'episodes' 컬렉션에 문서가 생성될 때 트리거되는 Cloud Function.
  * 비디오를 다운로드하고, Genkit을 사용하여 AI 분석을 수행한 후, 결과를 Firestore에 다시 쓴다.
  */
-export const analyzeVideoOnCreate = functions.firestore
+export const analyzeVideoOnCreate = functions.runWith({
+    timeoutSeconds: 540, // 9분 타임아웃
+    memory: '1GiB',      // 1GB 메모리 할당
+}).firestore
   .document('episodes/{episodeId}')
   .onCreate(async (snap, context) => {
     const episodeData = snap.data();
