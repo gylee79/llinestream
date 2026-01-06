@@ -1,4 +1,3 @@
-
 'use server';
 
 import { config } from 'dotenv';
@@ -6,10 +5,10 @@ config();
 
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
-import { getPublicUrl } from '../utils';
-import { googleAI } from '@/lib/google-ai';
+import { googleAI, fileManager } from '@/lib/google-ai';
 import type { FileState } from '@google/generative-ai/server';
 import { Part } from '@google/generative-ai';
+import { getPublicUrl } from '../utils';
 
 
 /**
@@ -45,6 +44,8 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
   }
   console.log(`[Gemini-Process-MultiModal] Starting video processing for episode: ${episodeId}`);
   
+  let uploadedFile;
+
   try {
     const adminApp = initializeAdminApp();
     const db = admin.firestore(adminApp);
@@ -57,17 +58,36 @@ export async function extractScriptWithGemini(episodeId: string, fileUrl: string
     const episodeRef = db.collection('episodes').doc(episodeId);
     await episodeRef.update({ aiProcessingStatus: 'processing', aiProcessingError: null });
 
+    // 1. Upload the file to Google AI
+    console.log(`[Gemini-Process-MultiModal] Uploading file to Google AI from URL: ${fileUrl}`);
+    uploadedFile = await fileManager.uploadFile(fileUrl, {
+        mimeType: 'video/mp4',
+        displayName: `episode-${episodeId}`,
+    });
+
+    let uploadState = await uploadedFile.getState();
+    while(uploadState.state === 'PROCESSING') {
+        process.stdout.write('.');
+        await new Promise(resolve => setTimeout(resolve, 10_000));
+        uploadState = await uploadedFile.getState();
+    }
+
+    if (uploadState.state !== 'ACTIVE') {
+        throw new Error(`Google AI File processing failed. State: ${uploadState.state}`);
+    }
+    
+    console.log(`[Gemini-Process-MultiModal] Google AI file processed. State: ${uploadState.state}`);
+
+
     const model = googleAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
     
     const videoFilePart: Part = {
         fileData: {
-            mimeType: "video/mp4",
-            fileUri: fileUrl
+            mimeType: uploadedFile.mimeType,
+            fileUri: uploadedFile.uri,
         }
     };
     
-    console.log(`[Gemini-Process-MultiModal] Starting multimodal analysis for URL: ${fileUrl}`);
-
     const multimodalPrompt = `You are an expert transcriber and content analyst.
 Analyze the provided video file and perform the following tasks precisely in Korean:
 1.  **Full Transcription**: Transcribe the entire audio content of the video accurately. This will be the pure audio script.
@@ -164,7 +184,10 @@ Structure your response as a single JSON object with the following three keys: "
     }
     
     return { success: false, message: `Video processing failed: ${errorMessage}` };
+  } finally {
+      if (uploadedFile) {
+        await fileManager.deleteFile(uploadedFile.name);
+        console.log(`[Gemini-Process-MultiModal] Cleaned up uploaded Google AI file: ${uploadedFile.name}`);
+      }
   }
 }
-
-    
