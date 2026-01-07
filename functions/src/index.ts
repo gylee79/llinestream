@@ -5,8 +5,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { initializeGenkit } from './genkit.js';
-import { generate } from 'genkit';
+import { ai } from './genkit.js'; // [핵심 변경 1] ai 인스턴스를 import합니다.
 import { z } from 'zod';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import type { FileDataPart } from '@google/generative-ai';
@@ -16,8 +15,7 @@ setGlobalOptions({ region: 'asia-northeast3' });
 
 // Firebase Admin SDK 초기화
 admin.initializeApp();
-// Genkit 초기화
-initializeGenkit();
+// Genkit은 genkit.ts에서 초기화되고 여기서 import 됩니다.
 
 // AI 응답을 위한 Zod 스키마 정의
 const AnalysisOutputSchema = z.object({
@@ -92,7 +90,8 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten(
 
       // 4. Genkit을 사용하여 Gemini 2.5 Flash 모델 호출
       console.log(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
-      const llmResponse = await generate({
+      // [핵심 변경 2] generate() 대신 ai.generate()를 사용합니다.
+      const llmResponse = await ai.generate({
         model: 'googleai/gemini-2.5-flash',
         prompt: [prompt, videoFilePart],
         output: {
