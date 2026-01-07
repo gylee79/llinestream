@@ -2,12 +2,13 @@
 'use client';
 import Hero from '@/components/home/hero';
 import { useCollection, useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
-import { collection, doc } from 'firebase/firestore';
-import { Course, Classification, Episode, HeroImageSettings, Field } from '@/lib/types';
+import { collection, doc, query, limit, orderBy } from 'firebase/firestore';
+import { Course, Classification, Episode, HeroImageSettings, Field, EpisodeViewLog } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import ClassificationCard from '@/components/shared/classification-card';
 import ContinueWatching from '@/components/home/continue-watching';
 import ContentCarousel from '@/components/shared/content-carousel';
+import { useMemo } from 'react';
 
 export default function Home() {
   const firestore = useFirestore();
@@ -22,7 +23,29 @@ export default function Home() {
   const heroImagesRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'heroImages') : null), [firestore]);
   const { data: heroImagesData, isLoading: heroImagesLoading } = useDoc<HeroImageSettings>(heroImagesRef);
 
-  const isLoading = fieldsLoading || classificationsLoading || heroImagesLoading;
+  const viewLogsQuery = useMemoFirebase(() => {
+      if (!user || !firestore) return null;
+      return query(
+          collection(firestore, 'users', user.id, 'viewHistory'),
+          orderBy('endedAt', 'desc'),
+          limit(20)
+      );
+  }, [user, firestore]);
+  const { data: viewLogs, isLoading: historyLoading } = useCollection<EpisodeViewLog>(viewLogsQuery);
+
+  const episodesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'episodes') : null), [firestore]);
+  const { data: allEpisodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
+
+  const watchedEpisodes = useMemo(() => {
+      if (!viewLogs || !allEpisodes) return [];
+      const episodeMap = new Map(allEpisodes.map(e => [e.id, e]));
+      const validLogs = viewLogs.filter(log => log.duration >= 5);
+      const uniqueEpisodeIds = [...new Set(validLogs.map(log => log.episodeId))];
+      return uniqueEpisodeIds.slice(0, 10).map(episodeId => episodeMap.get(episodeId)).filter(Boolean) as Episode[];
+  }, [viewLogs, allEpisodes]);
+
+
+  const isLoading = fieldsLoading || classificationsLoading || heroImagesLoading || (user && (historyLoading || episodesLoading));
   
   if (isLoading) {
       return (
@@ -50,12 +73,13 @@ export default function Home() {
           imageUrlMobile={heroImagesData?.home?.urlMobile}
         />
       <div className="container mx-auto space-y-16 py-12">
-        {user && (
+        {user && watchedEpisodes.length > 0 && (
           <section>
-            <h2 className="mb-6 font-headline text-xl font-bold tracking-tight">
-              나의 강의실
-            </h2>
-            <ContinueWatching />
+            <ContentCarousel
+              title="나의 강의실"
+              items={watchedEpisodes}
+              itemType="episode"
+            />
           </section>
         )}
         {fields?.map((field) => {
