@@ -62,7 +62,7 @@ function ClassificationDetailClient({ classificationId }: { classificationId: st
   return (
     <div className="container mx-auto py-12">
       <header className="mb-12 text-center">
-        <h1 className="font-headline text-4xl font-bold tracking-tight text-foreground">{classification.name}</h1>
+        <h1 className="font-headline text-2xl font-bold tracking-tight text-foreground">{classification.name}</h1>
         <p className="mt-4 text-lg text-muted-foreground max-w-3xl mx-auto">
           {classification.description}
         </p>
