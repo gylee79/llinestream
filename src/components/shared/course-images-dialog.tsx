@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,28 @@ interface CourseImagesDialogProps {
 }
 
 export default function CourseImagesDialog({ isOpen, onOpenChange, images, courseName }: CourseImagesDialogProps) {
+
+  useEffect(() => {
+    const viewport = document.getElementById('viewport');
+    if (!viewport) return;
+
+    const originalContent = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+    const zoomableContent = 'width=device-width, initial-scale=1.0, user-scalable=yes';
+
+    if (isOpen) {
+      viewport.setAttribute('content', zoomableContent);
+    } else {
+      // Restore the original non-zoomable state when the dialog closes.
+      // A timeout ensures the content is restored after the closing animation.
+      const timer = setTimeout(() => viewport.setAttribute('content', originalContent), 300);
+      return () => clearTimeout(timer);
+    }
+
+    // Cleanup function to restore original state if component unmounts while open
+    return () => {
+      viewport.setAttribute('content', originalContent);
+    };
+  }, [isOpen]);
 
   if (!images || images.length === 0) {
     return null;
