@@ -1,12 +1,15 @@
 
-import * as functions from 'firebase-functions/v2/firestore';
-import * as admin from 'firebase-admin';
+'use server';
+
+import { onDocumentWritten, type Change, type FirestoreEvent } from 'firebase-functions/v2/firestore';
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore, type DocumentData, type DocumentSnapshot } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { initializeGenkit } from './genkit.js';
-import { generate } from 'genkit';
+import { ai } from './genkit.js';
 import { z } from 'zod';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import type { FileDataPart } from '@google/generative-ai';
@@ -14,10 +17,12 @@ import type { FileDataPart } from '@google/generative-ai';
 // Cloud Functions 리전 및 옵션 설정 (중요)
 setGlobalOptions({ region: 'asia-northeast3' });
 
-// Firebase Admin SDK 초기화
-admin.initializeApp();
-// Genkit 초기화
-initializeGenkit();
+// Firebase Admin SDK 초기화 (ESM 방식)
+if (!getApps().length) {
+  initializeApp();
+}
+
+// Genkit은 genkit.ts에서 초기화되고 여기서 import 됩니다.
 
 // AI 응답을 위한 Zod 스키마 정의
 const AnalysisOutputSchema = z.object({
@@ -29,13 +34,13 @@ const AnalysisOutputSchema = z.object({
 /**
  * Firestore 'episodes' 컬렉션의 문서가 생성되거나 업데이트 될 때 트리거되는 Cloud Function.
  */
-export const analyzeVideoOnWrite = functions.onDocumentWritten(
+export const analyzeVideoOnWrite = onDocumentWritten(
   {
     document: 'episodes/{episodeId}',
     timeoutSeconds: 540,
     memory: '1GiB',
   },
-  async (event) => {
+  async (event: FirestoreEvent<Change<DocumentSnapshot> | undefined, { episodeId: string }>) => {
     const change = event.data;
     if (!change) {
       console.log(`[${event.params.episodeId}] Event data is undefined, skipping.`);
@@ -71,16 +76,16 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten(
 
     try {
       // 2. Firebase Storage에서 비디오 파일을 스트림으로 다운로드
-      const bucket = admin.storage().bucket();
+      const bucket = getStorage().bucket();
       const file = bucket.file(filePath);
 
       console.log(`[${episodeId}] Starting video download from gs://${bucket.name}/${filePath} to ${tempFilePath}.`);
       await file.download({ destination: tempFilePath });
       console.log(`[${episodeId}] Video downloaded successfully.`);
       
-      const videoFilePart: FileDataPart = {
+      const videoFilePart = {
         fileData: {
-          filePath: tempFilePath,
+          fileUri: tempFilePath,
           mimeType: 'video/mp4',
         }
       };
@@ -92,7 +97,7 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten(
 
       // 4. Genkit을 사용하여 Gemini 2.5 Flash 모델 호출
       console.log(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
-      const llmResponse = await generate({
+      const llmResponse = await ai.generate({
         model: 'googleai/gemini-2.5-flash',
         prompt: [prompt, videoFilePart],
         output: {
@@ -101,7 +106,7 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten(
         },
       });
 
-      const analysisResult = llmResponse.output();
+      const analysisResult = llmResponse.output;
       if (!analysisResult) {
         throw new Error('AI analysis returned no output.');
       }
