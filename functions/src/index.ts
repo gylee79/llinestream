@@ -5,11 +5,11 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { initializeGenkit } from './genkit';
+import { initializeGenkit } from './genkit.js';
 import { generate } from 'genkit/ai';
 import { z } from 'zod';
 import { setGlobalOptions } from 'firebase-functions/v2';
-import { FileDataPart } from '@google/generative-ai';
+import type { FileDataPart } from '@google/generative-ai';
 
 // Cloud Functions 리전 및 옵션 설정 (중요)
 setGlobalOptions({ region: 'asia-northeast3' });
