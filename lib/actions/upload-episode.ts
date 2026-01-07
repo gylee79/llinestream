@@ -7,9 +7,9 @@ config();
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
-import type { Episode, Timestamp } from '../types';
+import type { Episode, Timestamp } from '@/lib/types';
 import { Storage } from 'firebase-admin/storage';
-import { extractPathFromUrl } from '../utils';
+import { extractPathFromUrl } from '@/lib/utils';
 
 
 type UploadResult = {

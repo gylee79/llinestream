@@ -1,7 +1,7 @@
 
 'use server';
 
-import * as functions from 'firebase-functions/v2/firestore';
+import { onDocumentWritten, type Change } from 'firebase-functions/v2/firestore';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getStorage } from 'firebase-admin/storage';
 import * as os from 'os';
@@ -12,6 +12,7 @@ import { ai } from './genkit.js';
 import { z } from 'zod';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import type { FileDataPart } from '@google/generative-ai';
+import { DocumentData } from 'firebase-admin/firestore';
 
 // Cloud Functions 리전 및 옵션 설정 (중요)
 setGlobalOptions({ region: 'asia-northeast3' });
@@ -33,13 +34,13 @@ const AnalysisOutputSchema = z.object({
 /**
  * Firestore 'episodes' 컬렉션의 문서가 생성되거나 업데이트 될 때 트리거되는 Cloud Function.
  */
-export const analyzeVideoOnWrite = functions.onDocumentWritten(
+export const analyzeVideoOnWrite = onDocumentWritten(
   {
     document: 'episodes/{episodeId}',
     timeoutSeconds: 540,
     memory: '1GiB',
   },
-  async (event) => {
+  async (event: Change<DocumentData | undefined>) => {
     const change = event.data;
     if (!change) {
       console.log(`[${event.params.episodeId}] Event data is undefined, skipping.`);
@@ -82,7 +83,7 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten(
       await file.download({ destination: tempFilePath });
       console.log(`[${episodeId}] Video downloaded successfully.`);
       
-      const videoFilePart = {
+      const videoFilePart: FileDataPart = {
         fileData: {
           filePath: tempFilePath,
           mimeType: 'video/mp4',
