@@ -1,8 +1,9 @@
 
 'use server';
 
-import { onDocumentWritten, type Change } from 'firebase-functions/v2/firestore';
+import { onDocumentWritten, type Change, type FirestoreEvent } from 'firebase-functions/v2/firestore';
 import { initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore, type DocumentData, type DocumentSnapshot } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -12,7 +13,6 @@ import { ai } from './genkit.js';
 import { z } from 'zod';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import type { FileDataPart } from '@google/generative-ai';
-import { DocumentData } from 'firebase-admin/firestore';
 
 // Cloud Functions 리전 및 옵션 설정 (중요)
 setGlobalOptions({ region: 'asia-northeast3' });
@@ -40,7 +40,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     timeoutSeconds: 540,
     memory: '1GiB',
   },
-  async (event: Change<DocumentData | undefined>) => {
+  async (event: FirestoreEvent<Change<DocumentSnapshot> | undefined, { episodeId: string }>) => {
     const change = event.data;
     if (!change) {
       console.log(`[${event.params.episodeId}] Event data is undefined, skipping.`);
@@ -83,9 +83,9 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       await file.download({ destination: tempFilePath });
       console.log(`[${episodeId}] Video downloaded successfully.`);
       
-      const videoFilePart: FileDataPart = {
+      const videoFilePart = {
         fileData: {
-          filePath: tempFilePath,
+          fileUri: tempFilePath,
           mimeType: 'video/mp4',
         }
       };
@@ -106,7 +106,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         },
       });
 
-      const analysisResult = llmResponse.output();
+      const analysisResult = llmResponse.output;
       if (!analysisResult) {
         throw new Error('AI analysis returned no output.');
       }
