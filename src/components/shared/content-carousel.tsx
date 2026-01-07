@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -68,15 +69,17 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
           ))}
         </CarouselContent>
         
-        <div className="relative mt-4 flex justify-center items-center gap-2">
-            {scrollSnaps.map((_, index) => (
-                <DotButton
-                key={index}
-                selected={index === selectedIndex}
-                onClick={() => onDotButtonClick(index)}
-                />
-            ))}
-        </div>
+        {!isContinueWatching && (
+          <div className="relative mt-4 flex justify-center items-center gap-2">
+              {scrollSnaps.map((_, index) => (
+                  <DotButton
+                  key={index}
+                  selected={index === selectedIndex}
+                  onClick={() => onDotButtonClick(index)}
+                  />
+              ))}
+          </div>
+        )}
       </Carousel>
     </section>
   );
