@@ -57,9 +57,9 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
         }}
         className="w-full"
       >
-        <CarouselContent className={cn(isContinueWatching ? "-ml-4" : "-ml-2")}>
+        <CarouselContent className={cn(isContinueWatching ? "-ml-2 md:-ml-4" : "-ml-2")}>
           {items.map((item) => (
-            <CarouselItem key={item.id} className={cn(getItemBasisClass(), isContinueWatching ? "pl-4" : "pl-2")}>
+            <CarouselItem key={item.id} className={cn(getItemBasisClass(), isContinueWatching ? "pl-2 md:pl-4" : "pl-2")}>
               <div className="h-full">
                 {itemType === 'course' && <CourseCard course={item as Course} />}
                 {itemType === 'episode' && <EpisodeCard episode={item as Episode} />}
