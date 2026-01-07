@@ -83,12 +83,12 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       await file.download({ destination: tempFilePath });
       console.log(`[${episodeId}] Video downloaded successfully.`);
       
-      const videoFilePart = {
+      const videoFilePart: FileDataPart = {
         fileData: {
           fileUri: `file://${tempFilePath}`,
           mimeType: 'video/mp4',
         }
-      } as FileDataPart;
+      };
       
       const prompt = `Analyze this video and provide the following in JSON format:
         1) 'transcript': The full audio transcript.
