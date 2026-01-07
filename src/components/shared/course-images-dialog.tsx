@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,7 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import Image from 'next/image';
-import { ScrollArea } from '../ui/scroll-area';
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 interface CourseImagesDialogProps {
   isOpen: boolean;
@@ -19,57 +18,49 @@ interface CourseImagesDialogProps {
 
 export default function CourseImagesDialog({ isOpen, onOpenChange, images, courseName }: CourseImagesDialogProps) {
 
-  useEffect(() => {
-    const viewport = document.getElementById('viewport');
-    if (!viewport) return;
-
-    const originalContent = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-    const zoomableContent = 'width=device-width, initial-scale=1.0, user-scalable=yes';
-
-    if (isOpen) {
-      viewport.setAttribute('content', zoomableContent);
-    } else {
-      // Restore the original non-zoomable state when the dialog closes.
-      // A timeout ensures the content is restored after the closing animation.
-      const timer = setTimeout(() => viewport.setAttribute('content', originalContent), 300);
-      return () => clearTimeout(timer);
-    }
-
-    // Cleanup function to restore original state if component unmounts while open
-    return () => {
-      viewport.setAttribute('content', originalContent);
-    };
-  }, [isOpen]);
-
   if (!images || images.length === 0) {
     return null;
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[90vw] md:max-w-4xl h-[90vh] flex flex-col p-0">
-        <DialogHeader className="p-4 border-b flex-shrink-0">
+      <DialogContent className="max-w-[90vw] md:max-w-4xl h-[90vh] flex flex-col p-0 bg-muted/80 backdrop-blur-sm">
+        <DialogHeader className="p-4 border-b flex-shrink-0 bg-background">
           <DialogTitle>{courseName} 상세 정보</DialogTitle>
         </DialogHeader>
         
-        {/* 배경색을 살짝 어둡게 해서 이미지 영역 구분 */}
-        <ScrollArea className="flex-grow min-h-0 bg-black/5">
-          <div className="p-4 md:p-6">
-            {images.map((url, index) => (
-              <div key={index} className="relative w-full h-auto mb-4">
-                <Image 
-                  src={url} 
-                  alt={`상세 정보 이미지 ${index + 1}`} 
-                  width={1200}
-                  height={1200}
-                  className="w-full h-auto object-contain"
-                  sizes="(max-width: 768px) 100vw, 800px"
-                  priority={index === 0}
-                />
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
+        <div className="flex-grow min-h-0 w-full h-full">
+            <TransformWrapper
+                initialScale={1}
+                minScale={0.5}
+                maxScale={10}
+                centerOnInit={true}
+                limitToBounds={true}
+                doubleClick={{ disabled: true }}
+                wheel={{ step: 0.1 }}
+            >
+                <TransformComponent
+                    wrapperStyle={{ width: "100%", height: "100%" }}
+                    contentStyle={{ width: "100%", height: "auto" }}
+                >
+                    <div className="p-4 md:p-6 flex flex-col items-center">
+                        {images.map((url, index) => (
+                        <div key={index} className="relative w-full h-auto mb-4 max-w-full">
+                            <Image 
+                                src={url} 
+                                alt={`상세 정보 이미지 ${index + 1}`} 
+                                width={1200}
+                                height={1600} 
+                                className="w-full h-auto object-contain"
+                                sizes="(max-width: 768px) 90vw, 1200px"
+                                priority={index === 0}
+                            />
+                        </div>
+                        ))}
+                    </div>
+                </TransformComponent>
+            </TransformWrapper>
+        </div>
       </DialogContent>
     </Dialog>
   );
