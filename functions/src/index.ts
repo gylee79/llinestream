@@ -3,7 +3,6 @@
 
 import * as functions from 'firebase-functions/v2/firestore';
 import { initializeApp, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -83,7 +82,7 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten(
       await file.download({ destination: tempFilePath });
       console.log(`[${episodeId}] Video downloaded successfully.`);
       
-      const videoFilePart: FileDataPart = {
+      const videoFilePart = {
         fileData: {
           filePath: tempFilePath,
           mimeType: 'video/mp4',

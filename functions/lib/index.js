@@ -1,15 +1,19 @@
+'use server';
 import * as functions from 'firebase-functions/v2/firestore';
-import * as admin from 'firebase-admin';
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getStorage } from 'firebase-admin/storage';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ai } from './genkit.js'; // [핵심 변경 1] ai 인스턴스를 import합니다.
+import { ai } from './genkit.js';
 import { z } from 'zod';
 import { setGlobalOptions } from 'firebase-functions/v2';
 // Cloud Functions 리전 및 옵션 설정 (중요)
 setGlobalOptions({ region: 'asia-northeast3' });
-// Firebase Admin SDK 초기화
-admin.initializeApp();
+// Firebase Admin SDK 초기화 (ESM 방식)
+if (!getApps().length) {
+    initializeApp();
+}
 // Genkit은 genkit.ts에서 초기화되고 여기서 import 됩니다.
 // AI 응답을 위한 Zod 스키마 정의
 const AnalysisOutputSchema = z.object({
@@ -52,7 +56,7 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten({
     const tempFilePath = path.join(os.tmpdir(), `episode_${episodeId}_${Date.now()}.mp4`);
     try {
         // 2. Firebase Storage에서 비디오 파일을 스트림으로 다운로드
-        const bucket = admin.storage().bucket();
+        const bucket = getStorage().bucket();
         const file = bucket.file(filePath);
         console.log(`[${episodeId}] Starting video download from gs://${bucket.name}/${filePath} to ${tempFilePath}.`);
         await file.download({ destination: tempFilePath });
@@ -69,7 +73,6 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten({
         3) 'keywords': An array of relevant keywords.`;
         // 4. Genkit을 사용하여 Gemini 2.5 Flash 모델 호출
         console.log(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
-        // [핵심 변경 2] generate() 대신 ai.generate()를 사용합니다.
         const llmResponse = await ai.generate({
             model: 'googleai/gemini-2.5-flash',
             prompt: [prompt, videoFilePart],
