@@ -72,7 +72,7 @@ export default function Home() {
           imageUrl={heroImagesData?.home?.url}
           imageUrlMobile={heroImagesData?.home?.urlMobile}
         />
-      <div className="container mx-auto space-y-16 py-12">
+      <div className="container mx-auto space-y-10 md:space-y-12 py-12">
         {user && watchedEpisodes.length > 0 && (
           <section>
             <ContentCarousel
