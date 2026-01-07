@@ -3,6 +3,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from './button';
+import type { CarouselApi } from '@/lib/types';
 
 type UseDotButtonType = {
   selectedIndex: number;
@@ -11,37 +12,36 @@ type UseDotButtonType = {
 };
 
 export const useDotButton = (
-  emblaApi: any,
-  onButtonClick?: (emblaApi: any) => void
+  api: CarouselApi | undefined,
 ): UseDotButtonType => {
   const [selectedIndex, setSelectedIndex] = React.useState(0);
   const [scrollSnaps, setScrollSnaps] = React.useState<number[]>([]);
 
   const onDotButtonClick = React.useCallback(
     (index: number) => {
-      if (!emblaApi) return;
-      emblaApi.scrollTo(index);
-      if (onButtonClick) onButtonClick(emblaApi);
+      if (!api) return;
+      api.scrollTo(index);
     },
-    [emblaApi, onButtonClick]
+    [api]
   );
 
-  const onInit = React.useCallback((emblaApi: any) => {
-    setScrollSnaps(emblaApi.scrollSnapList());
+  const onInit = React.useCallback((api: CarouselApi) => {
+    if (!api) return;
+    setScrollSnaps(api.scrollSnapList());
   }, []);
 
-  const onSelect = React.useCallback((emblaApi: any) => {
-    setSelectedIndex(emblaApi.selectedScrollSnap());
+  const onSelect = React.useCallback((api: CarouselApi) => {
+    if (!api) return;
+    setSelectedIndex(api.selectedScrollSnap());
   }, []);
 
   React.useEffect(() => {
-    if (!emblaApi) return;
-    onInit(emblaApi);
-    onSelect(emblaApi);
-    emblaApi.on('reInit', onInit);
-    emblaApi.on('reInit', onSelect);
-    emblaApi.on('select', onSelect);
-  }, [emblaApi, onInit, onSelect]);
+    if (!api) return;
+    onInit(api);
+    onSelect(api);
+    api.on('reInit', onInit);
+    api.on('select', onSelect);
+  }, [api, onInit, onSelect]);
 
   return { selectedIndex, scrollSnaps, onDotButtonClick };
 };
@@ -57,9 +57,9 @@ export const DotButton = React.forwardRef<HTMLButtonElement, DotButtonProps>((pr
             ref={ref}
             variant="ghost"
             size="icon"
-            className={cn('h-3 w-3 rounded-full p-0', {
+            className={cn('h-3 w-3 rounded-full p-0 transition-colors', {
                 'bg-primary': selected,
-                'bg-muted-foreground/50': !selected,
+                'bg-muted-foreground/50 hover:bg-muted-foreground': !selected,
             }, className)}
             {...restProps}
         />

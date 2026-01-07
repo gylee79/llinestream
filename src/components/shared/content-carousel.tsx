@@ -1,18 +1,17 @@
-
 'use client';
 
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
 } from '@/components/ui/carousel';
 import CourseCard from './course-card';
 import EpisodeCard from './episode-card';
 import ClassificationCard from './classification-card';
-import type { Course, Episode, Classification } from '@/lib/types';
+import type { Course, Episode, Classification, CarouselApi } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
+import { DotButton, useDotButton } from '../ui/dot-button';
 
 interface ContentCarouselProps {
   title?: string;
@@ -21,6 +20,9 @@ interface ContentCarouselProps {
 }
 
 export default function ContentCarousel({ title, items, itemType }: ContentCarouselProps) {
+  const [api, setApi] = useState<CarouselApi>();
+  const { selectedIndex, scrollSnaps, onDotButtonClick } = useDotButton(api);
+
   if (!items || items.length === 0) {
     return null;
   }
@@ -28,14 +30,11 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
   const isContinueWatching = title === '나의 강의실';
   const isClassificationCarousel = itemType === 'classification';
   
-  // Determine item basis based on the type of carousel
   const getItemBasisClass = () => {
     if (isContinueWatching) {
-      // "나의 강의실": 2.5개 보이도록 설정
       return 'basis-[45%] sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6';
     }
     if (isClassificationCarousel) {
-      // "큰 분류": 2개 보이도록 설정
       return 'basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6';
     }
     // Default
@@ -50,6 +49,7 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
           </h2>
       )}
       <Carousel
+        setApi={setApi}
         opts={{
           align: 'start',
           loop: false,
@@ -68,12 +68,15 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
           ))}
         </CarouselContent>
         
-        {isClassificationCarousel && (
-          <>
-            <CarouselPrevious />
-            <CarouselNext />
-          </>
-        )}
+        <div className="relative mt-4 flex justify-center items-center gap-2">
+            {scrollSnaps.map((_, index) => (
+                <DotButton
+                key={index}
+                selected={index === selectedIndex}
+                onClick={() => onDotButtonClick(index)}
+                />
+            ))}
+        </div>
       </Carousel>
     </section>
   );
