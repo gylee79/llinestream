@@ -1,64 +1,28 @@
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.analyzeVideoOnWrite = void 0;
-const functions = __importStar(require("firebase-functions/v2/firestore"));
-const admin = __importStar(require("firebase-admin"));
-const os = __importStar(require("os"));
-const fs = __importStar(require("fs"));
-const path = __importStar(require("path"));
-const genkit_1 = require("./genkit");
-const ai_1 = require("genkit/ai");
-const zod_1 = require("zod");
-const v2_1 = require("firebase-functions/v2");
+import * as functions from 'firebase-functions/v2/firestore';
+import * as admin from 'firebase-admin';
+import * as os from 'os';
+import * as fs from 'fs';
+import * as path from 'path';
+import { initializeGenkit } from './genkit.js';
+import { generate } from 'genkit/ai';
+import { z } from 'zod';
+import { setGlobalOptions } from 'firebase-functions/v2';
 // Cloud Functions 리전 및 옵션 설정 (중요)
-(0, v2_1.setGlobalOptions)({ region: 'asia-northeast3' });
+setGlobalOptions({ region: 'asia-northeast3' });
 // Firebase Admin SDK 초기화
 admin.initializeApp();
 // Genkit 초기화
-(0, genkit_1.initializeGenkit)();
+initializeGenkit();
 // AI 응답을 위한 Zod 스키마 정의
-const AnalysisOutputSchema = zod_1.z.object({
-    transcript: zod_1.z.string().describe('The full audio transcript of the video.'),
-    visualSummary: zod_1.z.string().describe('A summary of the key visual elements and events in the video.'),
-    keywords: zod_1.z.array(zod_1.z.string()).describe('An array of relevant keywords extracted from the video content.'),
+const AnalysisOutputSchema = z.object({
+    transcript: z.string().describe('The full audio transcript of the video.'),
+    visualSummary: z.string().describe('A summary of the key visual elements and events in the video.'),
+    keywords: z.array(z.string()).describe('An array of relevant keywords extracted from the video content.'),
 });
 /**
  * Firestore 'episodes' 컬렉션의 문서가 생성되거나 업데이트 될 때 트리거되는 Cloud Function.
  */
-exports.analyzeVideoOnWrite = functions.onDocumentWritten({
+export const analyzeVideoOnWrite = functions.onDocumentWritten({
     document: 'episodes/{episodeId}',
     timeoutSeconds: 540,
     memory: '1GiB',
@@ -107,7 +71,7 @@ exports.analyzeVideoOnWrite = functions.onDocumentWritten({
         3) 'keywords': An array of relevant keywords.`;
         // 4. Genkit을 사용하여 Gemini 2.5 Flash 모델 호출
         console.log(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
-        const llmResponse = await (0, ai_1.generate)({
+        const llmResponse = await generate({
             model: 'googleai/gemini-2.5-flash',
             prompt: [prompt, videoFilePart],
             output: {

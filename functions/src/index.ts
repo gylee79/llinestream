@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { initializeGenkit } from './genkit.js';
-import { generate } from 'genkit/ai';
+import { generate } from 'genkit';
 import { z } from 'zod';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import type { FileDataPart } from '@google/generative-ai';
