@@ -4,7 +4,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import { initializeGenkit } from './genkit.js';
-import { generate } from 'genkit/ai';
+import { generate } from 'genkit';
 import { z } from 'zod';
 import { setGlobalOptions } from 'firebase-functions/v2';
 // Cloud Functions 리전 및 옵션 설정 (중요)
