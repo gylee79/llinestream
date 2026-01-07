@@ -90,10 +90,10 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten(
         2) 'visualSummary': A summary of key visual elements.
         3) 'keywords': An array of relevant keywords.`;
 
-      // 4. Genkit을 사용하여 Gemini 1.5 Flash 모델 호출
-      console.log(`[${episodeId}] Sending request to Gemini 1.5 Flash model.`);
+      // 4. Genkit을 사용하여 Gemini 2.5 Flash 모델 호출
+      console.log(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
       const llmResponse = await generate({
-        model: 'googleai/gemini-1.5-flash-latest',
+        model: 'googleai/gemini-2.5-flash',
         prompt: [prompt, videoFilePart],
         output: {
           format: 'json',
