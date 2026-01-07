@@ -7,9 +7,9 @@ import * as path from 'path';
 
 import { initializeGenkit } from './genkit';
 import { generate } from 'genkit/ai';
-import { FileDataPart } from '@google/generative-ai';
 import { z } from 'zod';
 import { setGlobalOptions } from 'firebase-functions/v2';
+import { FileDataPart } from '@google/generative-ai';
 
 // Cloud Functions 리전 및 옵션 설정 (중요)
 setGlobalOptions({ region: 'asia-northeast3' });
@@ -47,32 +47,19 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten(
     const afterData = change.after.data();
 
     // 멱등성(Idempotency) 로직:
-    // 1. 문서가 삭제되었으면 무시
-    if (!afterData) {
-      console.log(`[${episodeId}] Document deleted, skipping.`);
+    if (!afterData || afterData.aiProcessingStatus !== 'pending') {
+      console.log(`[${episodeId}] Status is not 'pending' (${afterData?.aiProcessingStatus || 'deleted'}), skipping.`);
       return;
-    }
-    // 2. 상태가 'pending'이 아니면 무시 (실행 조건)
-    if (afterData.aiProcessingStatus !== 'pending') {
-      console.log(`[${episodeId}] Status is not 'pending' (${afterData.aiProcessingStatus}), skipping.`);
-      return;
-    }
-    // 3. 이미 'processing' 상태에서 'pending'으로 온 경우(예: 오류)가 아니라면,
-    //    이전 상태가 'pending'이었으면 중복 실행 방지
-    if (beforeData?.aiProcessingStatus === 'pending') {
-        console.log(`[${episodeId}] Status was already 'pending', skipping to prevent loops.`);
-        return;
     }
     
     console.log(`[${episodeId}] AI analysis triggered.`);
     
     const episodeRef = change.after.ref;
-    const videoUrl = afterData.videoUrl;
     const filePath = afterData.filePath;
 
-    if (!videoUrl || !filePath) {
-      console.error(`[${episodeId}] videoUrl or filePath is missing.`);
-      await episodeRef.update({ aiProcessingStatus: 'failed', aiProcessingError: 'Video URL or file path is missing.' });
+    if (!filePath) {
+      console.error(`[${episodeId}] filePath is missing.`);
+      await episodeRef.update({ aiProcessingStatus: 'failed', aiProcessingError: 'Video file path is missing.' });
       return;
     }
 
@@ -91,12 +78,9 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten(
       await file.download({ destination: tempFilePath });
       console.log(`[${episodeId}] Video downloaded to temporary path: ${tempFilePath}`);
       
-      const fileBuffer = fs.readFileSync(tempFilePath);
-      
-      // 3. Genkit Input을 위한 Part 생성
       const videoFilePart: FileDataPart = {
-        data: {
-          contents: fileBuffer,
+        fileData: {
+          filePath: tempFilePath,
           mimeType: 'video/mp4',
         }
       };
@@ -109,7 +93,7 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten(
       // 4. Genkit을 사용하여 Gemini 2.5 Flash 모델 호출
       console.log(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
       const llmResponse = await generate({
-        model: 'googleai/gemini-2.5-flash',
+        model: 'googleai/gemini-1.5-flash-latest',
         prompt: [prompt, videoFilePart],
         output: {
           format: 'json',
