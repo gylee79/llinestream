@@ -5,9 +5,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from '@/components/ui/dialog';
 import Image from 'next/image';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { X } from 'lucide-react';
 
 interface CourseImagesDialogProps {
   isOpen: boolean;
@@ -25,8 +27,12 @@ export default function CourseImagesDialog({ isOpen, onOpenChange, images, cours
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[90vw] md:max-w-4xl h-[90vh] flex flex-col p-0 bg-muted/80 backdrop-blur-sm">
-        <DialogHeader className="p-4 border-b flex-shrink-0 bg-background z-10">
+        <DialogHeader className="p-4 border-b flex-shrink-0 bg-background z-10 flex flex-row justify-between items-center">
           <DialogTitle>{courseName} 상세 정보</DialogTitle>
+          <DialogClose className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
         </DialogHeader>
         
         <div className="flex-grow min-h-0 w-full h-full">
