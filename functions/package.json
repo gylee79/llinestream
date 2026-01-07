@@ -13,6 +13,7 @@
     "node": "22"
   },
   "main": "lib/index.js",
+  "type": "module",
   "dependencies": {
     "@genkit-ai/firebase": "^1.27.0",
     "@genkit-ai/google-genai": "^1.27.0",
