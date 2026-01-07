@@ -25,19 +25,18 @@ export default function CourseImagesDialog({ isOpen, onOpenChange, images, cours
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[90vw] md:max-w-4xl h-[90vh] flex flex-col p-0 bg-muted/80 backdrop-blur-sm">
-        <DialogHeader className="p-4 border-b flex-shrink-0 bg-background">
+        <DialogHeader className="p-4 border-b flex-shrink-0 bg-background z-10">
           <DialogTitle>{courseName} 상세 정보</DialogTitle>
         </DialogHeader>
         
         <div className="flex-grow min-h-0 w-full h-full">
             <TransformWrapper
                 initialScale={1}
-                minScale={0.5}
-                maxScale={10}
-                centerOnInit={true}
+                minScale={1}
+                maxScale={4}
                 limitToBounds={true}
                 doubleClick={{ disabled: true }}
-                wheel={{ step: 0.1 }}
+                wheel={{ step: 0.2 }}
             >
                 <TransformComponent
                     wrapperStyle={{ width: "100%", height: "100%" }}
