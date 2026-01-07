@@ -1,4 +1,3 @@
-
 'use server';
 
 import { config } from 'dotenv';
@@ -31,7 +30,7 @@ export async function resetAIEpisodeStatus(episodeId: string): Promise<{ success
         aiProcessingError: null,
     });
     
-    revalidatePath('/admin/content', 'layout');
+    revalidatePath('/admin/content');
 
     return { success: true, message: `'${episodeId}' 에피소드에 대한 AI 분석이 재시작됩니다.` };
 

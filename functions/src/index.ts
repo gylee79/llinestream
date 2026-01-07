@@ -43,16 +43,16 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten(
     }
 
     const { episodeId } = event.params;
-    const beforeData = change.before.data();
     const afterData = change.after.data();
 
     // 멱등성(Idempotency) 로직:
+    // 'pending' 상태일 때만 함수를 실행합니다.
     if (!afterData || afterData.aiProcessingStatus !== 'pending') {
       console.log(`[${episodeId}] Status is not 'pending' (${afterData?.aiProcessingStatus || 'deleted'}), skipping.`);
       return;
     }
     
-    console.log(`[${episodeId}] AI analysis triggered.`);
+    console.log(`[${episodeId}] AI analysis triggered for document write.`);
     
     const episodeRef = change.after.ref;
     const filePath = afterData.filePath;
@@ -63,20 +63,20 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten(
       return;
     }
 
-    // 1. 상태를 'processing'으로 즉시 업데이트
+    // 1. 상태를 'processing'으로 즉시 업데이트하여 중복 실행 방지
     await episodeRef.update({ aiProcessingStatus: 'processing', aiProcessingError: null });
     console.log(`[${episodeId}] Status updated to 'processing'.`);
 
-    const tempFilePath = path.join(os.tmpdir(), `episode_${episodeId}.mp4`);
+    const tempFilePath = path.join(os.tmpdir(), `episode_${episodeId}_${Date.now()}.mp4`);
 
     try {
       // 2. Firebase Storage에서 비디오 파일을 스트림으로 다운로드
       const bucket = admin.storage().bucket();
       const file = bucket.file(filePath);
 
-      console.log(`[${episodeId}] Starting video download from ${filePath}.`);
+      console.log(`[${episodeId}] Starting video download from gs://${bucket.name}/${filePath} to ${tempFilePath}.`);
       await file.download({ destination: tempFilePath });
-      console.log(`[${episodeId}] Video downloaded to temporary path: ${tempFilePath}`);
+      console.log(`[${episodeId}] Video downloaded successfully.`);
       
       const videoFilePart: FileDataPart = {
         fileData: {
@@ -93,7 +93,7 @@ export const analyzeVideoOnWrite = functions.onDocumentWritten(
       // 4. Genkit을 사용하여 Gemini 2.5 Flash 모델 호출
       console.log(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
       const llmResponse = await generate({
-        model: 'googleai/gemini-1.5-flash-latest',
+        model: 'googleai/gemini-2.5-flash',
         prompt: [prompt, videoFilePart],
         output: {
           format: 'json',
