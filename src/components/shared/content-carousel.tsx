@@ -70,8 +70,8 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
         
         {isClassificationCarousel && (
           <>
-            <CarouselPrevious className="hidden sm:flex" />
-            <CarouselNext className="hidden sm:flex" />
+            <CarouselPrevious />
+            <CarouselNext />
           </>
         )}
       </Carousel>
