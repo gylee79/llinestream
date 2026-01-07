@@ -1,4 +1,3 @@
-
 'use server';
 
 import { onDocumentWritten, type Change, type FirestoreEvent } from 'firebase-functions/v2/firestore';
@@ -12,7 +11,7 @@ import * as path from 'path';
 import { ai } from './genkit.js';
 import { z } from 'zod';
 import { setGlobalOptions } from 'firebase-functions/v2';
-import type { FileDataPart } from '@google/generative-ai';
+import type { FileDataPart } from '@google/generative-ai/server';
 
 // Cloud Functions 리전 및 옵션 설정 (중요)
 setGlobalOptions({ region: 'asia-northeast3' });
@@ -85,10 +84,10 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       
       const videoFilePart = {
         fileData: {
-          fileUri: tempFilePath,
+          fileUri: `file://${tempFilePath}`,
           mimeType: 'video/mp4',
         }
-      };
+      } as FileDataPart;
       
       const prompt = `Analyze this video and provide the following in JSON format:
         1) 'transcript': The full audio transcript.
