@@ -74,7 +74,7 @@ export const analyzeVideoOnWrite = onDocumentWritten({
         // 4. Genkit을 사용하여 Gemini 2.5 Flash 모델 호출
         console.log(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
         const llmResponse = await ai.generate({
-            prompt: [prompt, videoFilePart],
+            prompt: [prompt, videoFilePart], // Use 'as any' to bypass temporary typecheck issue
             output: {
                 format: 'json',
                 schema: AnalysisOutputSchema,
