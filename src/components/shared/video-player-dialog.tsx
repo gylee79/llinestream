@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from '@/components/ui/dialog';
 import type { Episode, Instructor, ChatMessage, ChatLog, User } from '@/lib/types';
 import { useEffect, useRef, useState, useTransition } from 'react';
@@ -13,13 +14,12 @@ import { Button } from '../ui/button';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
-import { Send, Sparkles, Bot, User as UserIcon, History } from 'lucide-react';
+import { Send, Sparkles, Bot, User as UserIcon, History, X } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import { toDisplayDateTime } from '@/lib/date-helpers';
 import { Skeleton } from '../ui/skeleton';
@@ -87,6 +87,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [userQuestion, setUserQuestion] = useState('');
+  const [activeView, setActiveView] = useState<'chat' | 'history'>('chat');
   const chatScrollAreaRef = useRef<HTMLDivElement>(null);
 
 
@@ -120,8 +121,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         startTimeRef.current = null; // Reset start time
     }
     onOpenChange(false);
+    // Reset state for next time
     setChatMessages([]);
     setUserQuestion('');
+    setActiveView('chat');
   }
   
   useEffect(() => {
@@ -132,10 +135,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   
   useEffect(() => {
     // Scroll to bottom when new messages are added
-    if (chatScrollAreaRef.current) {
+    if (activeView === 'chat' && chatScrollAreaRef.current) {
         chatScrollAreaRef.current.scrollTo({ top: chatScrollAreaRef.current.scrollHeight, behavior: 'smooth' });
     }
-  }, [chatMessages]);
+  }, [chatMessages, activeView]);
 
   const handleAskQuestion = () => {
     if (!userQuestion.trim() || !user) return;
@@ -180,14 +183,18 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const isAIAvailable = episode.transcript !== undefined && episode.transcript !== null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-        if (!open) {
-            handleClose();
-        } else {
-            onOpenChange(true);
-        }
-    }}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <DialogContent className="max-w-4xl p-0 border-0 flex flex-col h-[90vh]">
+         <DialogClose asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-3 top-3 z-10 bg-black/50 hover:bg-black/70 text-white hover:text-white rounded-full"
+          >
+            <X className="h-5 w-5" />
+            <span className="sr-only">닫기</span>
+          </Button>
+        </DialogClose>
         <div className="aspect-video w-full bg-black flex-shrink-0">
           <video
             id={`video-${videoKey}`}
@@ -213,21 +220,25 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         </div>
         <DialogHeader className="px-4 py-2 border-b flex-shrink-0">
             <div className="flex justify-between items-center">
-                <DialogTitle className="text-base font-bold truncate pr-4">{episode.title}</DialogTitle>
+                <DialogTitle className="text-base font-bold truncate pr-4">{activeView === 'chat' ? episode.title : '과거 채팅 기록'}</DialogTitle>
                 <div className="flex flex-col items-end flex-shrink-0">
                     {instructor && <p className="text-xs text-muted-foreground">강사: {instructor.name}</p>}
-                    <Button variant="outline" size="sm" className="h-7 mt-1" onClick={handleClose}>나가기</Button>
+                     <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-7 mt-1" 
+                        onClick={() => setActiveView(prev => prev === 'chat' ? 'history' : 'chat')}
+                     >
+                        <History className="h-3 w-3 mr-1.5" />
+                        {activeView === 'chat' ? '기록 보기' : '채팅 하기'}
+                    </Button>
                 </div>
             </div>
         </DialogHeader>
         
          <div className="flex-grow p-4 pt-0 flex flex-col gap-4 min-h-0">
-            <Tabs defaultValue="chat" className="flex-grow flex flex-col min-h-0">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="chat">AI에게 질문하기</TabsTrigger>
-                    <TabsTrigger value="history">과거 채팅 기록</TabsTrigger>
-                </TabsList>
-                <TabsContent value="chat" className="flex-grow flex flex-col gap-4 min-h-0 mt-2">
+            {activeView === 'chat' ? (
+                <>
                     <ScrollArea className="flex-grow bg-muted rounded-md p-4" viewportRef={chatScrollAreaRef}>
                         {chatMessages.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-center">
@@ -290,11 +301,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                             <Send className="h-4 w-4" />
                         </Button>
                     </div>
-                </TabsContent>
-                <TabsContent value="history" className="flex-grow min-h-0 mt-2">
-                    <ChatHistory episode={episode} user={user} />
-                </TabsContent>
-            </Tabs>
+                </>
+            ) : (
+                <ChatHistory episode={episode} user={user} />
+            )}
         </div>
       </DialogContent>
     </Dialog>
