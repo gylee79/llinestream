@@ -74,7 +74,6 @@ export const analyzeVideoOnWrite = onDocumentWritten({
         // 4. Genkit을 사용하여 Gemini 2.5 Flash 모델 호출
         console.log(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
         const llmResponse = await ai.generate({
-            model: 'googleai/gemini-2.5-flash',
             prompt: [prompt, videoFilePart],
             output: {
                 format: 'json',

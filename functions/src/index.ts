@@ -9,22 +9,35 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { ai } from './genkit.js';
-import { z } from 'zod';
+import { genkit, z } from 'genkit';
+import { googleAI } from '@genkit-ai/google-genai';
+import { enableFirebaseTelemetry } from '@genkit-ai/firebase';
 import { setGlobalOptions } from 'firebase-functions/v2';
+import { defineSecret } from 'firebase-functions/params';
 import type { FileDataPart } from '@google/generative-ai';
 
-// Cloud Functions 리전 및 옵션 설정 (중요)
-setGlobalOptions({ region: 'asia-northeast3' });
+// Secrets and global options
+const googleApiKey = defineSecret("GEMINI_API_KEY");
+setGlobalOptions({ region: 'asia-northeast3', secrets: [googleApiKey] });
 
-// Firebase Admin SDK 초기화 (ESM 방식)
+// Firebase Admin SDK Initialization
 if (!getApps().length) {
   initializeApp();
 }
 
-// Genkit은 genkit.ts에서 초기화되고 여기서 import 됩니다.
+// Genkit Initialization with Google AI Plugin
+enableFirebaseTelemetry();
+export const ai = genkit({
+  plugins: [
+    googleAI({
+      apiVersion: "v1beta",
+    }),
+  ],
+  model: 'googleai/gemini-2.5-flash',
+});
 
-// AI 응답을 위한 Zod 스키마 정의
+
+// Zod Schema for AI Analysis Output
 const AnalysisOutputSchema = z.object({
   transcript: z.string().describe('The full audio transcript of the video.'),
   visualSummary: z.string().describe('A summary of the key visual elements and events in the video.'),
@@ -32,7 +45,7 @@ const AnalysisOutputSchema = z.object({
 });
 
 /**
- * Firestore 'episodes' 컬렉션의 문서가 생성되거나 업데이트 될 때 트리거되는 Cloud Function.
+ * Cloud Function that triggers on document write in the 'episodes' collection.
  */
 export const analyzeVideoOnWrite = onDocumentWritten(
   {
@@ -50,8 +63,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     const { episodeId } = event.params;
     const afterData = change.after.data();
 
-    // 멱등성(Idempotency) 로직:
-    // 'pending' 상태일 때만 함수를 실행합니다.
+    // Idempotency check: Only run for 'pending' status
     if (!afterData || afterData.aiProcessingStatus !== 'pending') {
       console.log(`[${episodeId}] Status is not 'pending' (${afterData?.aiProcessingStatus || 'deleted'}), skipping.`);
       return;
@@ -68,14 +80,14 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       return;
     }
 
-    // 1. 상태를 'processing'으로 즉시 업데이트하여 중복 실행 방지
+    // 1. Update status to 'processing' to prevent redundant executions
     await episodeRef.update({ aiProcessingStatus: 'processing', aiProcessingError: null });
     console.log(`[${episodeId}] Status updated to 'processing'.`);
 
     const tempFilePath = path.join(os.tmpdir(), `episode_${episodeId}_${Date.now()}.mp4`);
 
     try {
-      // 2. Firebase Storage에서 비디오 파일을 스트림으로 다운로드
+      // 2. Download video file from Firebase Storage
       const bucket = getStorage().bucket();
       const file = bucket.file(filePath);
 
@@ -95,7 +107,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         2) 'visualSummary': A summary of key visual elements.
         3) 'keywords': An array of relevant keywords.`;
 
-      // 4. Genkit을 사용하여 Gemini 2.5 Flash 모델 호출
+      // 4. Call Genkit with the Gemini model
       console.log(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
       const llmResponse = await ai.generate({
         prompt: [prompt, videoFilePart],
@@ -112,7 +124,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       
       console.log(`[${episodeId}] AI analysis successful.`);
 
-      // 5. Firestore에 결과 저장
+      // 5. Update Firestore with the analysis results
       await episodeRef.update({
         transcript: analysisResult.transcript,
         aiGeneratedContent: `Keywords: ${analysisResult.keywords.join(', ')}\n\nVisual Summary:\n${analysisResult.visualSummary}`,
@@ -129,7 +141,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       });
 
     } finally {
-      // 6. 임시 파일 정리
+      // 6. Clean up the temporary file
       if (fs.existsSync(tempFilePath)) {
         fs.unlinkSync(tempFilePath);
         console.log(`[${episodeId}] Cleaned up temporary file: ${tempFilePath}`);
