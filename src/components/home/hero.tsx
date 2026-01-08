@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from 'next/image';
@@ -30,7 +29,7 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
       <motion.div 
         className={cn(
             "relative overflow-hidden",
-            "h-[70vh] min-h-[500px] md:h-[80vh] md:min-h-[600px]",
+            "h-[50vh] min-h-[400px] md:h-[80vh] md:min-h-[600px]",
         )}
       >
         {finalImageUrl ? (
