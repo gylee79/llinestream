@@ -27,7 +27,11 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
   const isContinueWatching = title === '시청 기록';
   
   const getItemBasisClass = () => {
-    // 2.5 items visible on larger screens
+    // For "Continue Watching" on mobile, show 2.5 items.
+    if (isContinueWatching) {
+      return 'basis-[45%] sm:basis-1/3 md:basis-1/4 lg:basis-1/5';
+    }
+    // For other carousels, use the default behavior.
     return 'basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5';
   };
 
