@@ -8,6 +8,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import Image from 'next/image';
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { X } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -38,17 +39,22 @@ export default function CourseImagesDialog({ isOpen, onOpenChange, images, cours
         <ScrollArea className="flex-grow min-h-0 w-full h-full">
             <div className="p-4 md:p-6 flex flex-col items-center">
                 {images.map((url, index) => (
-                <div key={index} className="relative w-full h-auto mb-4 max-w-full">
-                    <Image 
-                        src={url} 
-                        alt={`상세 정보 이미지 ${index + 1}`} 
-                        width={1200}
-                        height={1600} 
-                        className="w-full h-auto object-contain"
-                        sizes="(max-width: 768px) 90vw, 1200px"
-                        priority={index === 0}
-                    />
-                </div>
+                    <TransformWrapper key={index} initialScale={1} minScale={1} maxScale={4}>
+                        <TransformComponent
+                          wrapperStyle={{ marginBottom: '1rem', maxWidth: '100%', width: '100%' }}
+                          contentStyle={{ width: '100%', height: '100%' }}
+                        >
+                            <Image 
+                                src={url} 
+                                alt={`상세 정보 이미지 ${index + 1}`} 
+                                width={1200}
+                                height={1600} 
+                                className="w-full h-auto object-contain"
+                                sizes="(max-width: 768px) 90vw, 1200px"
+                                priority={index === 0}
+                            />
+                        </TransformComponent>
+                    </TransformWrapper>
                 ))}
             </div>
         </ScrollArea>
