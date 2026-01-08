@@ -115,7 +115,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
           format: 'json',
           schema: AnalysisOutputSchema,
         },
-      });
+      } as any);
 
       const analysisResult = llmResponse.output;
       if (!analysisResult) {
