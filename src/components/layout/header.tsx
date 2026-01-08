@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import {
   CreditCard,
@@ -61,6 +61,7 @@ const adminLink = { href: '/admin', label: '관리자', icon: Shield };
 
 export default function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const firestore = useFirestore();
   const { user, authUser, isUserLoading } = useUser();
   const auth = useAuth();
