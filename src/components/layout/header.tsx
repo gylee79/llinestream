@@ -15,6 +15,7 @@ import {
   X,
   ShoppingCart,
   Info,
+  BookUser,
 } from 'lucide-react';
 
 import { LlineStreamLogo } from '@/components/icons';
@@ -185,6 +186,10 @@ export default function Header() {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
+                    <DropdownMenuItem onSelect={() => router.push('/my-courses')}>
+                        <BookUser className="mr-2 h-4 w-4" />
+                        <span>나의 강의실</span>
+                    </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
                       <UserIcon className="mr-2 h-4 w-4" />
                       <span>프로필</span>

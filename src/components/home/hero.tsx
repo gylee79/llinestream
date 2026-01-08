@@ -9,6 +9,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import Link from 'next/link';
+import { useUser } from '@/firebase';
 
 interface HeroProps {
   title?: string;
@@ -19,6 +20,7 @@ interface HeroProps {
 
 export default function Hero({ title, description, imageUrl, imageUrlMobile }: HeroProps) {
   const isMobile = useIsMobile();
+  const { user } = useUser();
   const finalImageUrl = isMobile ? (imageUrlMobile || imageUrl) : imageUrl;
 
   const heroDescription = "공부하며 궁금한 내용 AI가 도와드립니다~"
@@ -73,9 +75,11 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
                 <Button asChild size="lg" variant="outline" className="border-white text-white backdrop-blur-sm bg-white/10 hover:bg-white/20">
                     <Link href="/contents">콘텐츠 둘러보기</Link>
                 </Button>
-                <Button asChild size="lg" variant="outline" className="border-white text-white backdrop-blur-sm bg-white/10 hover:bg-white/20">
-                    <Link href="/about">아카데미소개</Link>
-                </Button>
+                {user && (
+                    <Button asChild size="lg" variant="outline" className="border-white text-white backdrop-blur-sm bg-white/10 hover:bg-white/20">
+                        <Link href="/my-courses">나의 강의실</Link>
+                    </Button>
+                )}
              </div>
           </motion.div>
         </div>
