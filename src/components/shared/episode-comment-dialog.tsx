@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import * as z from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Star, MessageSquare } from 'lucide-react';
+import { Star, MessageSquare, CornerUpLeft } from 'lucide-react';
 import {
   useFirestore,
 } from '@/firebase/hooks';
@@ -34,7 +34,6 @@ import { toDisplayDate } from '@/lib/date-helpers';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '../ui/card';
-import { useEffect } from 'react';
 
 
 const commentSchema = z.object({
@@ -121,6 +120,13 @@ export default function EpisodeCommentDialog({
 
   const [dbComments, setDbComments] = useState<EpisodeComment[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [internalView, setInternalView] = useState<'list' | 'form'>('list');
+
+  useEffect(() => {
+    if (isOpen) {
+      setInternalView('list'); // Reset to list view whenever dialog opens
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!firestore || !episode || mode !== 'comment') {
@@ -188,6 +194,7 @@ export default function EpisodeCommentDialog({
       await addDoc(collection(firestore, 'episodes', episode.id, 'comments'), commentData);
       toast({ title: '성공', description: '댓글이 등록되었습니다.' });
       reset();
+      setInternalView('list'); // Go back to list after submitting
     } catch (error) {
       console.error(error);
       toast({
@@ -199,11 +206,11 @@ export default function EpisodeCommentDialog({
   };
   
   const dialogTitle = mode === 'view' 
-    ? `전체 리뷰`
-    : `리뷰 및 질문`;
+    ? '전체 리뷰'
+    : (internalView === 'form' ? '리뷰 작성' : '리뷰 및 질문');
     
   const mobileDialogTitle = mode === 'view' ? dialogTitle : episode?.title;
-  const pcDialogTitle = mode === 'view' ? dialogTitle : '리뷰 및 질문';
+  const pcDialogTitle = mode === 'view' ? dialogTitle : (internalView === 'form' ? '리뷰 작성' : '리뷰 및 질문');
 
   const dialogDescription = mode === 'view' ? `모든 리뷰를 확인합니다.` : episode?.title;
 
@@ -217,13 +224,19 @@ export default function EpisodeCommentDialog({
           <DialogDescription className="hidden md:block">{dialogDescription}</DialogDescription>
         </DialogHeader>
 
-        <div className={cn("flex-grow grid min-h-0", mode === 'comment' ? "grid-cols-1 md:grid-cols-2 gap-6" : "grid-cols-1")}>
+        <div className={cn("flex-grow grid min-h-0", internalView === 'list' ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2 gap-6")}>
           {/* Comment List */}
-          <div className="flex flex-col min-h-0">
-            <h3 className="text-lg font-semibold mb-2 flex-shrink-0 md:flex hidden">
-              <MessageSquare className="inline-block w-5 h-5 mr-2" />
-              모든 댓글 ({comments?.length || 0})
-            </h3>
+          <div className={cn("flex-col min-h-0", internalView === 'list' ? 'flex' : 'hidden md:flex')}>
+            <div className="flex justify-between items-center mb-2 flex-shrink-0">
+                <h3 className="text-lg font-semibold flex items-center">
+                    <MessageSquare className="inline-block w-5 h-5 mr-2" />
+                    모든 댓글 ({comments?.length || 0})
+                </h3>
+                 {mode === 'comment' && internalView === 'list' && (
+                    <Button onClick={() => setInternalView('form')}>리뷰 작성하기</Button>
+                )}
+            </div>
+
             <ScrollArea className="flex-grow h-full border rounded-md p-4 bg-muted/50">
               {isLoading && <p>댓글을 불러오는 중...</p>}
               {!isLoading && comments?.length === 0 && (
@@ -235,10 +248,16 @@ export default function EpisodeCommentDialog({
             </ScrollArea>
           </div>
 
-          {/* Comment Form - shown only in 'comment' mode */}
-          {mode === 'comment' && (
+          {/* Comment Form - shown only in 'comment' mode and when internalView is 'form' */}
+          {mode === 'comment' && internalView === 'form' && (
             <div className="flex flex-col">
-              <h3 className="text-lg font-semibold mb-2">댓글 작성하기</h3>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-semibold">댓글 작성하기</h3>
+                <Button variant="ghost" onClick={() => setInternalView('list')}>
+                  <CornerUpLeft className="mr-2 h-4 w-4" />
+                  목록으로
+                </Button>
+              </div>
               <form
                 onSubmit={handleSubmit(onSubmit)}
                 className="flex-grow flex flex-col space-y-4 border rounded-md p-4"
