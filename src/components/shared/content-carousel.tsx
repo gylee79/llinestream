@@ -12,6 +12,7 @@ import EpisodeCard from './episode-card';
 import ClassificationCard from './classification-card';
 import type { Course, Episode, Classification } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ContentCarouselProps {
   title?: string;
@@ -20,6 +21,8 @@ interface ContentCarouselProps {
 }
 
 export default function ContentCarousel({ title, items, itemType }: ContentCarouselProps) {
+  const isMobile = useIsMobile();
+  
   if (!items || items.length === 0) {
     return null;
   }
@@ -28,8 +31,8 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
   
   const getItemBasisClass = () => {
     // For "Continue Watching" on mobile, show 2.5 items.
-    if (isContinueWatching) {
-      return 'basis-[45%] sm:basis-1/3 md:basis-1/4 lg:basis-1/5';
+    if (isContinueWatching && isMobile) {
+      return 'basis-[40%]';
     }
     // For other carousels, use the default behavior.
     return 'basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5';
