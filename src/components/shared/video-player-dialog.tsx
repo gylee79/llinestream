@@ -275,7 +275,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     <div className="flex-shrink-0 flex gap-2 items-center">
                         <Textarea 
                             placeholder={!isAIAvailable ? "AI 분석이 아직 완료되지 않았습니다." : "AI에게 질문할 내용을 입력하세요..."}
-                            className="flex-grow resize-none" 
+                            className="flex-grow resize-none h-10 min-h-0" 
                             rows={1}
                             value={userQuestion}
                             onChange={(e) => setUserQuestion(e.target.value)}
