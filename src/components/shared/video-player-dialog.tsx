@@ -211,7 +211,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             브라우저가 비디오 태그를 지원하지 않습니다.
           </video>
         </div>
-        <DialogHeader className="p-2 border-b flex-shrink-0">
+        <DialogHeader className="px-4 py-2 border-b flex-shrink-0">
             <div className="flex justify-between items-center">
                 <DialogTitle className="text-base font-bold truncate pr-4">{episode.title}</DialogTitle>
                 <div className="flex flex-col items-end flex-shrink-0">
