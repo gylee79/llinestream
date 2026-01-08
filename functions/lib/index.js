@@ -11,8 +11,8 @@ import { enableFirebaseTelemetry } from '@genkit-ai/firebase';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { defineSecret } from 'firebase-functions/params';
 // Secrets and global options
-const googleApiKey = defineSecret("GEMINI_API_KEY");
-setGlobalOptions({ region: 'asia-northeast3', secrets: [googleApiKey] });
+const apiKey = defineSecret("GOOGLE_GENAI_API_KEY");
+setGlobalOptions({ region: 'asia-northeast3', secrets: [apiKey] });
 // Firebase Admin SDK Initialization
 if (!getApps().length) {
     initializeApp();
@@ -21,11 +21,9 @@ if (!getApps().length) {
 enableFirebaseTelemetry();
 export const ai = genkit({
     plugins: [
-        googleAI({
-            apiVersion: "v1beta",
-        }),
+        googleAI(),
     ],
-    model: 'googleai/gemini-2.5-flash',
+    model: googleAI.model('gemini-2.5-flash'),
 });
 // Zod Schema for AI Analysis Output
 const AnalysisOutputSchema = z.object({
