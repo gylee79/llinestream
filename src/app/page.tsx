@@ -76,7 +76,7 @@ export default function Home() {
         {user && watchedEpisodes.length > 0 && (
           <section>
             <ContentCarousel
-              title="나의 강의실"
+              title="시청 기록"
               items={watchedEpisodes}
               itemType="episode"
             />
