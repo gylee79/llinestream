@@ -7,9 +7,9 @@ config();
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
-import type { Episode, Timestamp } from '../types';
+import type { Episode, Timestamp } from '@/lib/types';
 import { Storage } from 'firebase-admin/storage';
-import { extractPathFromUrl } from '../utils';
+import { extractPathFromUrl } from '@/lib/utils';
 
 
 type UploadResult = {
@@ -166,10 +166,6 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         const oldFilePath = extractPathFromUrl(oldVideoUrl);
         if (newVideoData?.filePath && oldFilePath && newVideoData.filePath !== oldFilePath) {
           await deleteStorageFileByPath(storage, oldFilePath);
-          // Also delete old VTT file if a new video is uploaded
-          if (currentData.vttPath) {
-            await deleteStorageFileByPath(storage, currentData.vttPath);
-          }
           shouldResetAIState = true;
         }
         
