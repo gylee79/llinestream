@@ -3,7 +3,7 @@
 
 import { onDocumentWritten, type Change, type FirestoreEvent } from 'firebase-functions/v2/firestore';
 import { initializeApp, getApps } from 'firebase-admin/app';
-import { type DocumentData, type DocumentSnapshot } from 'firebase-admin/firestore';
+import { type DocumentSnapshot } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -98,7 +98,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       // 4. Genkit을 사용하여 Gemini 2.5 Flash 모델 호출
       console.log(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
       const llmResponse = await ai.generate({
-        model: 'googleai/gemini-2.5-flash',
         prompt: [prompt, videoFilePart],
         output: {
           format: 'json',
