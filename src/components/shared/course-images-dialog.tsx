@@ -36,28 +36,32 @@ export default function CourseImagesDialog({ isOpen, onOpenChange, images, cours
           </DialogClose>
         </DialogHeader>
         
-        <ScrollArea className="flex-grow min-h-0 w-full h-full">
-            <div className="p-4 md:p-6 flex flex-col items-center">
-                {images.map((url, index) => (
-                    <TransformWrapper key={index} initialScale={1} minScale={1} maxScale={4}>
-                        <TransformComponent
-                          wrapperStyle={{ marginBottom: '1rem', maxWidth: '100%', width: '100%' }}
-                          contentStyle={{ width: '100%', height: '100%' }}
-                        >
-                            <Image 
-                                src={url} 
-                                alt={`상세 정보 이미지 ${index + 1}`} 
-                                width={1200}
-                                height={1600} 
-                                className="w-full h-auto object-contain"
-                                sizes="(max-width: 768px) 90vw, 1200px"
-                                priority={index === 0}
-                            />
-                        </TransformComponent>
-                    </TransformWrapper>
-                ))}
-            </div>
-        </ScrollArea>
+        <div className="flex-grow min-h-0 w-full h-full">
+            <TransformWrapper initialScale={1} minScale={1} maxScale={4}>
+              <TransformComponent
+                wrapperStyle={{ width: '100%', height: '100%' }}
+                contentStyle={{ width: '100%', height: '100%' }}
+              >
+                <ScrollArea className="w-full h-full">
+                    <div className="p-4 md:p-6 flex flex-col items-center">
+                        {images.map((url, index) => (
+                           <div key={index} className="w-full mb-4">
+                                <Image 
+                                    src={url} 
+                                    alt={`상세 정보 이미지 ${index + 1}`} 
+                                    width={1200}
+                                    height={1600} 
+                                    className="w-full h-auto object-contain"
+                                    sizes="(max-width: 768px) 90vw, 1200px"
+                                    priority={index === 0}
+                                />
+                           </div>
+                        ))}
+                    </div>
+                </ScrollArea>
+              </TransformComponent>
+            </TransformWrapper>
+        </div>
       </DialogContent>
     </Dialog>
   );
