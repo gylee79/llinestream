@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -210,16 +211,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             브라우저가 비디오 태그를 지원하지 않습니다.
           </video>
         </div>
-        <DialogHeader className="p-4 border-b flex-shrink-0">
-          <div className="flex justify-between items-center">
-            <div>
-              <DialogTitle>{episode.title}</DialogTitle>
-              {instructor && <p className="text-sm text-muted-foreground mt-1">강사: {instructor.name}</p>}
+        <DialogHeader className="p-2 border-b flex-shrink-0">
+            <div className="flex justify-between items-center">
+                <DialogTitle className="text-base font-bold truncate pr-4">{episode.title}</DialogTitle>
+                <div className="flex flex-col items-end flex-shrink-0">
+                    {instructor && <p className="text-xs text-muted-foreground">강사: {instructor.name}</p>}
+                    <Button variant="outline" size="sm" className="h-7 mt-1" onClick={handleClose}>나가기</Button>
+                </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={handleClose}>나가기</Button>
-            </div>
-          </div>
         </DialogHeader>
         
          <div className="flex-grow p-4 pt-0 flex flex-col gap-4 min-h-0">
