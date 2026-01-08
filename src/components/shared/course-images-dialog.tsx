@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { X } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface CourseImagesDialogProps {
   isOpen: boolean;
@@ -20,10 +21,29 @@ interface CourseImagesDialogProps {
 }
 
 export default function CourseImagesDialog({ isOpen, onOpenChange, images, courseName }: CourseImagesDialogProps) {
+  const isMobile = useIsMobile();
 
   if (!images || images.length === 0) {
     return null;
   }
+
+  const imageContent = (
+    <div className="p-4 md:p-6 flex flex-col items-center">
+      {images.map((url, index) => (
+         <div key={index} className="w-full mb-4">
+              <Image 
+                  src={url} 
+                  alt={`상세 정보 이미지 ${index + 1}`} 
+                  width={1200}
+                  height={1600} 
+                  className="w-full h-auto object-contain"
+                  sizes="(max-width: 768px) 90vw, 1200px"
+                  priority={index === 0}
+              />
+         </div>
+      ))}
+    </div>
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -37,30 +57,22 @@ export default function CourseImagesDialog({ isOpen, onOpenChange, images, cours
         </DialogHeader>
         
         <div className="flex-grow min-h-0 w-full h-full">
+          {isMobile ? (
             <TransformWrapper initialScale={1} minScale={1} maxScale={4}>
               <TransformComponent
                 wrapperStyle={{ width: '100%', height: '100%' }}
-                contentStyle={{ width: '100%', height: '100%' }}
+                contentStyle={{ width: '100%', height: 'auto' }}
               >
                 <ScrollArea className="w-full h-full">
-                    <div className="p-4 md:p-6 flex flex-col items-center">
-                        {images.map((url, index) => (
-                           <div key={index} className="w-full mb-4">
-                                <Image 
-                                    src={url} 
-                                    alt={`상세 정보 이미지 ${index + 1}`} 
-                                    width={1200}
-                                    height={1600} 
-                                    className="w-full h-auto object-contain"
-                                    sizes="(max-width: 768px) 90vw, 1200px"
-                                    priority={index === 0}
-                                />
-                           </div>
-                        ))}
-                    </div>
+                  {imageContent}
                 </ScrollArea>
               </TransformComponent>
             </TransformWrapper>
+          ) : (
+            <ScrollArea className="w-full h-full">
+              {imageContent}
+            </ScrollArea>
+          )}
         </div>
       </DialogContent>
     </Dialog>
