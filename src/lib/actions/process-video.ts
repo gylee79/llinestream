@@ -1,3 +1,4 @@
+
 'use server';
 
 import { config } from 'dotenv';
@@ -8,7 +9,7 @@ import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
 
 /**
- * Resets the AI processing status of an episode to 'pending'.
+ * Resets the AI processing status of an episode to 'processing'.
  * This will trigger the onDocumentWritten Cloud Function to re-process the video.
  * @param episodeId The ID of the episode to reset.
  * @returns A result object indicating success or failure.
@@ -26,7 +27,7 @@ export async function resetAIEpisodeStatus(episodeId: string): Promise<{ success
     const episodeRef = db.collection('episodes').doc(episodeId);
 
     await episodeRef.update({
-        aiProcessingStatus: 'pending',
+        aiProcessingStatus: 'processing', // 'pending'에서 'processing'으로 변경
         aiProcessingError: null,
     });
     
