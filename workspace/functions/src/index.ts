@@ -2,6 +2,7 @@
 import { onDocumentWritten, onDocumentDeleted, Change, FirestoreEvent } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import { genkit } from "genkit";
+import { z } from "zod";
 import { googleAI } from "@genkit-ai/google-genai";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
@@ -10,7 +11,6 @@ import * as os from "os";
 import * as fs from "fs";
 import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
 import { DocumentSnapshot } from "firebase-admin/firestore";
-import { z } from "zod"; // [수정됨] "genkit/zod"에서 "zod"로 변경
 
 // 0. Firebase Admin 초기화
 if (!getApps().length) {
@@ -131,7 +131,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       }
 
       console.log(`🎥 Analyzing...`);
-      // [수정됨] ai.generate 호출 구조를 올바르게 변경
       const llmResponse = await ai.generate({
         model: 'gemini-2.5-flash',
         prompt: {
