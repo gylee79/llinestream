@@ -13,5 +13,4 @@ export const ai = genkit({
       apiVersion: "v1beta",
     }),
   ],
-  model: 'googleai/gemini-2.5-flash', // Set the default model for this ai instance
 });

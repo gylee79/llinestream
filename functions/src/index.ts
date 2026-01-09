@@ -59,8 +59,8 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     document: "episodes/{episodeId}",
     region: "asia-northeast3",
     secrets: [apiKey],
-    timeoutSeconds: 540, // 9분 타임아웃
-    memory: "1GiB",
+    timeoutSeconds: 7200, // 9분 타임아웃
+    memory: "2GiB",
   },
   async (event) => {
     const snapshot = event.data?.after;
