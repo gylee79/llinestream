@@ -1,7 +1,8 @@
 
 import { onDocumentWritten, onDocumentDeleted, Change, FirestoreEvent } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
-import { genkit, z } from "genkit";
+import { genkit } from "genkit";
+import { z } from "zod";
 import { googleAI } from "@genkit-ai/google-genai";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
@@ -224,5 +225,3 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted(
     console.log(`✅ Cleanup finished: ${event.params.episodeId}`);
   }
 );
-
-    
