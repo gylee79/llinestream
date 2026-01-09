@@ -54,15 +54,39 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     }
 
     const { episodeId } = event.params;
+    const beforeData = change.before.data();
     const afterData = change.after.data();
 
-    // [핵심 수정] 멱등성(Idempotency) 로직: 'pending' 상태일 때만 함수를 실행합니다.
-    if (!afterData || afterData.aiProcessingStatus !== 'pending') {
-      console.log(`[${episodeId}] Status is not 'pending' (${afterData?.aiProcessingStatus || 'deleted'}), skipping.`);
+    // 문서가 삭제되었거나, aiProcessingStatus가 없는 경우 함수 종료
+    if (!afterData) {
+        console.log(`[${episodeId}] Document was deleted, skipping analysis.`);
+        return;
+    }
+    
+    // --- 1. 자동화 로직: 'pending' 상태를 감지하고 'processing'으로 변경 ---
+    if (afterData.aiProcessingStatus === 'pending') {
+        // 이미 'pending'에서 'processing'으로 변경되는 과정에 있다면 중복 실행 방지
+        if (beforeData?.aiProcessingStatus === 'pending' && afterData.aiProcessingStatus === 'pending') {
+            console.log(`[${episodeId}] Status is 'pending', updating to 'processing' to start analysis.`);
+            await change.after.ref.update({ aiProcessingStatus: 'processing' });
+            // 상태 업데이트 후 함수를 종료합니다. 이 업데이트가 함수를 다시 트리거하여 아래의 분석 로직을 실행하게 됩니다.
+            return;
+        }
+    }
+
+    // --- 2. 분석 실행 로직: 'processing' 상태일 때만 실제 분석 수행 ---
+    if (afterData.aiProcessingStatus !== 'processing') {
+      console.log(`[${episodeId}] Status is not 'processing' (it's '${afterData.aiProcessingStatus}'), skipping main logic.`);
       return;
     }
     
-    console.log(`[${episodeId}] AI analysis triggered for document write.`);
+    // 이미 처리 중인 상태로 변경된 경우 중복 실행 방지
+    if(beforeData?.aiProcessingStatus === 'processing' && afterData.aiProcessingStatus === 'processing') {
+        console.log(`[${episodeId}] Analysis is already in progress, skipping duplicate run.`);
+        return;
+    }
+
+    console.log(`[${episodeId}] AI analysis triggered. Status is 'processing'.`);
     
     const episodeRef = change.after.ref;
     const filePath = afterData.filePath;
@@ -73,14 +97,9 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       return;
     }
 
-    // 1. 상태를 'processing'으로 즉시 업데이트하여 중복 실행 방지
-    await episodeRef.update({ aiProcessingStatus: 'processing', aiProcessingError: null });
-    console.log(`[${episodeId}] Status updated to 'processing'.`);
-
     const tempFilePath = path.join(os.tmpdir(), `episode_${episodeId}_${Date.now()}.mp4`);
 
     try {
-      // 2. Firebase Storage에서 비디오 파일을 스트림으로 다운로드
       const bucket = getStorage().bucket();
       const file = bucket.file(filePath);
 
@@ -104,7 +123,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         - visualCues: Important text or objects visible on screen.
         - keywords: A list of main topics and keywords.`;
 
-      // 4. Genkit을 사용하여 Gemini 2.5 Flash 모델 호출
       console.log(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
       const llmResponse = await ai.generate({
         model: 'gemini-2.5-flash',
@@ -113,7 +131,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
           format: 'json',
           schema: AnalysisOutputSchema,
         },
-      } as any); // Use 'as any' to bypass strict type checks for build stability
+      } as any);
 
       const analysisResult = llmResponse.output;
       if (!analysisResult) {
@@ -122,8 +140,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       
       console.log(`[${episodeId}] AI analysis successful.`);
 
-      // 5. Firestore에 결과 저장
-      // aiGeneratedContent에는 튜터가 답변에 사용할 모든 컨텍스트를 저장합니다.
       const combinedContent = `
         Summary: ${analysisResult.summary}\n\n
         Timeline:
@@ -136,6 +152,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         transcript: analysisResult.transcript,
         aiGeneratedContent: combinedContent,
         aiProcessingStatus: 'completed',
+        aiProcessingError: null, // Clear any previous error
       });
       console.log(`[${episodeId}] Firestore updated with detailed analysis results.`);
 
@@ -148,7 +165,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       });
 
     } finally {
-      // 6. 임시 파일 정리
       if (fs.existsSync(tempFilePath)) {
         fs.unlinkSync(tempFilePath);
         console.log(`[${episodeId}] Cleaned up temporary file: ${tempFilePath}`);
