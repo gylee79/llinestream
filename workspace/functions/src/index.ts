@@ -1,16 +1,15 @@
 
 import { onDocumentWritten, onDocumentDeleted, Change, FirestoreEvent } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
-import { genkit } from "genkit";
-import { z } from "zod";
+import { genkit, z } from "genkit";
 import { googleAI } from "@genkit-ai/google-genai";
-import { initializeApp, getApps } from "firebase-admin/app";
-import { getStorage } from "firebase-admin/storage";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
 import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
 import { DocumentSnapshot } from "firebase-admin/firestore";
+import { initializeApp, getApps } from "firebase-admin/app";
+import { getStorage } from "firebase-admin/storage";
 
 // 0. Firebase Admin 초기화
 if (!getApps().length) {
@@ -20,23 +19,45 @@ if (!getApps().length) {
 // 1. API Key 비밀 설정
 const apiKey = defineSecret("GOOGLE_GENAI_API_KEY");
 
-// 2. Genkit 초기화
+// 2. Genkit 초기화 (Cloud Function 실행 컨텍스트 내에서 직접)
 const ai = genkit({
-  plugins: [googleAI()],
+  plugins: [googleAI({ apiVersion: "v1beta" })],
 });
 
-// 3. 정밀 분석 스키마 정의
-const AnalysisOutputSchema = z.object({
-  transcript: z.string().describe('The full and accurate audio transcript of the video.'),
-  summary: z.string().describe('A concise summary of the entire video content.'),
-  timeline: z.array(z.object({
-    timestamp: z.string().describe('The timestamp of the event in HH:MM:SS format.'),
-    event: z.string().describe('A description of what is happening at this timestamp.'),
-    visualDetail: z.string().describe('Notable visual details, like objects or character appearances.'),
-  })).describe('An array of time-stamped logs detailing events throughout the video.'),
-  visualCues: z.array(z.string()).describe('A list of important on-screen text (OCR) or significant visual objects.'),
-  keywords: z.array(z.string()).describe('An array of relevant keywords for searching and tagging.'),
-});
+// 3. AI 분석 로직을 담당할 Flow 정의
+const videoAnalysisFlow = ai.defineFlow(
+  {
+    name: 'videoAnalysisFlow',
+    inputSchema: z.object({
+      fileUri: z.string().describe("The URI of the uploaded file in Gemini (File API)"),
+      mimeType: z.string().describe("The MIME type of the video file"),
+    }),
+    outputSchema: z.object({
+      transcript: z.string().describe('The full and accurate audio transcript of the video.'),
+      summary: z.string().describe('A concise summary of the entire video content.'),
+      timeline: z.array(z.object({
+        timestamp: z.string().describe('The timestamp of the event in HH:MM:SS format.'),
+        event: z.string().describe('A description of what is happening at this timestamp.'),
+        visualDetail: z.string().describe('Notable visual details, like objects or character appearances.'),
+      })).describe('An array of time-stamped logs detailing events throughout the video.'),
+      visualCues: z.array(z.string()).describe('A list of important on-screen text (OCR) or significant visual objects.'),
+      keywords: z.array(z.string()).describe('An array of relevant keywords for searching and tagging.'),
+    }),
+  },
+  async (input) => {
+    const { output } = await ai.generate({
+      model: 'gemini-1.5-flash',
+      prompt: [
+        { text: "Analyze this video file comprehensively based on the provided JSON schema." },
+        { media: { url: input.fileUri, contentType: input.mimeType } }
+      ],
+      output: { format: "json", schema: z.any() }, // Output 스키마를 Flow에서 관리하므로 여기서는 any로 설정
+    });
+    if (!output) throw new Error('AI 분석 결과를 생성하지 못했습니다.');
+    return output;
+  }
+);
+
 
 // [Helper] 파일 확장자에 따라 MIME Type을 찾아주는 도구
 function getMimeType(filePath: string): string {
@@ -56,15 +77,15 @@ function getMimeType(filePath: string): string {
   }
 }
 
-// ==========================================
-// 기능 1: 비디오 업로드 시 AI 분석 (File API 사용 버전)
-// ==========================================
+// =============================================================
+// 기능 1: 비디오 업로드 시 AI 분석을 트리거하는 Cloud Function
+// =============================================================
 export const analyzeVideoOnWrite = onDocumentWritten(
   {
     document: "episodes/{episodeId}",
     region: "asia-northeast3",
     secrets: [apiKey],
-    timeoutSeconds: 540,
+    timeoutSeconds: 3600,
     memory: "2GiB",
   },
   async (event: FirestoreEvent<Change<DocumentSnapshot> | undefined, { episodeId: string }>) => {
@@ -77,7 +98,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     if (!afterData) return;
 
     if (afterData.aiProcessingStatus === "pending") {
-      console.log(`✨ New upload detected [${event.params.episodeId}]. Auto-starting analysis...`);
+      console.log(`✨ [${event.params.episodeId}] New upload detected. Auto-starting analysis...`);
       await change.after.ref.update({ aiProcessingStatus: "processing" });
       return;
     }
@@ -88,26 +109,20 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
     const filePath = afterData.filePath;
     if (!filePath) {
-      console.error("No filePath found");
       await change.after.ref.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath found" });
       return;
     }
-
-    console.log("🚀 Gemini 2.5 Video Analysis Started:", event.params.episodeId);
 
     const fileManager = new GoogleAIFileManager(apiKey.value());
     const tempFilePath = path.join(os.tmpdir(), `video_${event.params.episodeId}${path.extname(filePath)}`);
     let uploadedFileId = "";
 
     try {
+      // 1. 파일 준비 (Storage 다운로드 -> Gemini 업로드)
       const bucket = getStorage().bucket();
-
-      console.log(`📥 Downloading video from Storage...`);
       await bucket.file(filePath).download({ destination: tempFilePath });
-
       const mimeType = getMimeType(filePath);
 
-      console.log(`📡 Uploading to Gemini File API... (${mimeType})`);
       const uploadResult = await fileManager.uploadFile(tempFilePath, {
         mimeType: mimeType,
         displayName: `Episode ${event.params.episodeId}`,
@@ -115,46 +130,20 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       const file = uploadResult.file;
       uploadedFileId = file.name;
-      console.log(`✅ Uploaded to Gemini: ${file.uri}`);
-
+      
       let state = file.state;
-      console.log(`⏳ Waiting for video processing... Current state: ${state}`);
       while (state === FileState.PROCESSING) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
         const freshFile = await fileManager.getFile(file.name);
         state = freshFile.state;
-        console.log(`... processing state: ${state}`);
       }
+      if (state === FileState.FAILED) throw new Error("Video processing failed on Gemini side.");
 
-      if (state === FileState.FAILED) {
-        throw new Error("Video processing failed on Gemini side.");
-      }
+      // 2. 준비된 파일 정보로 Genkit Flow 실행
+      const result = await videoAnalysisFlow({ fileUri: file.uri, mimeType });
 
-      console.log(`🎥 Analyzing...`);
-      const llmResponse = await ai.generate({
-        model: 'gemini-2.5-flash',
-        prompt: {
-          parts: [
-            { text: "Analyze this video file comprehensively based on the provided JSON schema." },
-            { fileData: { fileUri: file.uri, mimeType: mimeType } }
-          ]
-        },
-        output: {
-          format: "json",
-          schema: AnalysisOutputSchema,
-        },
-      });
-
-      const result = llmResponse.output;
-      if (!result) throw new Error("No output from AI");
-
-      const combinedContent = `
-Summary: ${result.summary}\n
-Timeline:
-${result.timeline.map(t => `- [${t.timestamp}] ${t.event} (Visual: ${t.visualDetail})`).join('\n')}\n
-Visual Cues: ${result.visualCues.join(', ')}\n
-Keywords: ${result.keywords.join(', ')}
-      `.trim();
+      // 3. 결과 포맷팅 및 저장
+      const combinedContent = `Summary: ${result.summary}\n\nTimeline:\n${result.timeline.map(t => `- [${t.timestamp}] ${t.event} (Visual: ${t.visualDetail})`).join('\n')}\n\nVisual Cues: ${result.visualCues.join(', ')}\n\nKeywords: ${result.keywords.join(', ')}`.trim();
 
       await change.after.ref.update({
         aiProcessingStatus: "completed",
@@ -163,67 +152,40 @@ Keywords: ${result.keywords.join(', ')}
         aiProcessingError: null,
         updatedAt: new Date()
       });
-      console.log("✅ Analysis Finished & Data Saved!");
+      console.log(`✅ [${event.params.episodeId}] Analysis Finished & Data Saved!`);
 
     } catch (error) {
-      console.error("❌ Error:", error);
-      await change.after.ref.update({
-        aiProcessingStatus: "failed",
-        aiProcessingError: String(error)
-      });
+      await change.after.ref.update({ aiProcessingStatus: "failed", aiProcessingError: String(error) });
     } finally {
-      if (fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
-        console.log("🧹 Local temp file cleaned up.");
-      }
+      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
       if (uploadedFileId) {
-        try {
-          await fileManager.deleteFile(uploadedFileId);
-          console.log("🧹 Gemini File cleaned up.");
-        } catch (e) {
-          console.log("⚠️ Failed to cleanup Gemini file (might be already deleted).");
-        }
+        try { await fileManager.deleteFile(uploadedFileId); } catch (e) { console.warn("Cleanup warning: Failed to delete Gemini file."); }
       }
     }
   }
 );
 
-// ==========================================
-// 기능 2: 문서 삭제 시 파일 자동 청소
-// ==========================================
+// ========================================================
+// 기능 2: 문서 삭제 시 Storage 파일 자동 청소 (기존과 동일)
+// ========================================================
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted(
   {
     document: "episodes/{episodeId}",
     region: "asia-northeast3",
   },
   async (event) => {
-    const snap = event.data;
-    if (!snap) return;
-
-    const data = snap.data();
+    const data = event.data?.data();
     if (!data) return;
 
     const bucket = getStorage().bucket();
     const cleanupPromises: Promise<any>[] = [];
 
-    // 파일 삭제 목록 추가
-    if (data.filePath) {
-      console.log(`🗑️ Deleting video: ${data.filePath}`);
-      cleanupPromises.push(bucket.file(data.filePath).delete().catch(e => console.log(`⚠️ Skip: ${e.message}`)));
-    }
-    if (data.defaultThumbnailPath) {
-      cleanupPromises.push(bucket.file(data.defaultThumbnailPath).delete().catch(e => console.log(`⚠️ Skip: ${e.message}`)));
-    }
-    if (data.customThumbnailPath) {
-      cleanupPromises.push(bucket.file(data.customThumbnailPath).delete().catch(e => console.log(`⚠️ Skip: ${e.message}`)));
-    }
-    if (data.vttPath) {
-      cleanupPromises.push(bucket.file(data.vttPath).delete().catch(e => console.log(`⚠️ Skip: ${e.message}`)));
-    }
+    if (data.filePath) cleanupPromises.push(bucket.file(data.filePath).delete().catch(() => {}));
+    if (data.defaultThumbnailPath) cleanupPromises.push(bucket.file(data.defaultThumbnailPath).delete().catch(() => {}));
+    if (data.customThumbnailPath) cleanupPromises.push(bucket.file(data.customThumbnailPath).delete().catch(() => {}));
+    if (data.vttPath) cleanupPromises.push(bucket.file(data.vttPath).delete().catch(() => {}));
 
     await Promise.all(cleanupPromises);
-    console.log(`✅ Cleanup finished: ${event.params.episodeId}`);
+    console.log(`✅ [${event.params.episodeId}] Cleanup finished.`);
   }
 );
-
-    
