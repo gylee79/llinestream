@@ -1,16 +1,15 @@
 
 import { onDocumentWritten, onDocumentDeleted, Change, FirestoreEvent } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
-import { genkit } from "genkit";
-import { z } from "zod";
+import { genkit, z } from "genkit";
 import { googleAI } from "@genkit-ai/google-genai";
-import { initializeApp, getApps } from "firebase-admin/app";
-import { getStorage } from "firebase-admin/storage";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
 import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
 import { DocumentSnapshot } from "firebase-admin/firestore";
+import { initializeApp, getApps } from "firebase-admin/app";
+import { getStorage } from "firebase-admin/storage";
 
 // 0. Firebase Admin 초기화
 if (!getApps().length) {
@@ -20,9 +19,9 @@ if (!getApps().length) {
 // 1. API Key 비밀 설정
 const apiKey = defineSecret("GOOGLE_GENAI_API_KEY");
 
-// 2. Genkit 초기화
+// 2. Genkit 초기화 (공식 가이드에 따라 실행 파일에서 직접 초기화)
 const ai = genkit({
-  plugins: [googleAI()],
+  plugins: [googleAI({ apiVersion: "v1beta" })],
 });
 
 // 3. 정밀 분석 스키마 정의
@@ -136,7 +135,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         prompt: {
           parts: [
             { text: "Analyze this video file comprehensively based on the provided JSON schema." },
-            { fileData: { fileUri: file.uri, mimeType: mimeType } }
+            { fileData: { fileUri: file.uri, mimeType: file.mimeType } }
           ]
         },
         output: {
