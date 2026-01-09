@@ -99,7 +99,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     const bucket = getStorage().bucket();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
     const fileManager = new GoogleAIFileManager(process.env.GOOGLE_GENAI_API_KEY!);
-    let uploadedFile = null;
+    let uploadedFile: any = null;
 
     try {
         // 1. Storage에서 임시 폴더로 다운로드
