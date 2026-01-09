@@ -1,30 +1,21 @@
+import { onDocumentWritten } from "firebase-functions/v2/firestore";
+import { defineSecret } from "firebase-functions/params";
+import { genkit, z } from "genkit";
+import { googleAI } from "@genkit-ai/google-genai";
+import { initializeApp, getApps } from "firebase-admin/app";
+import { getStorage } from "firebase-admin/storage";
 
-'use server';
-
-import { onDocumentWritten, type Change, type FirestoreEvent } from 'firebase-functions/v2/firestore';
-import { initializeApp, getApps } from 'firebase-admin/app';
-import { getFirestore, type DocumentData, type DocumentSnapshot } from 'firebase-admin/firestore';
-import { getStorage } from 'firebase-admin/storage';
-import * as os from 'os';
-import * as fs from 'fs';
-import * as path from 'path';
-
-import { ai } from './genkit.js';
-import { z } from 'zod';
-import { setGlobalOptions } from 'firebase-functions/v2';
-import type { FileDataPart } from '@google/generative-ai';
-
-// Cloud Functions 리전 및 옵션 설정 (중요)
-setGlobalOptions({ region: 'asia-northeast3' });
-
-// Firebase Admin SDK 초기화 (ESM 방식)
 if (!getApps().length) {
   initializeApp();
 }
 
-// Genkit은 genkit.ts에서 초기화되고 여기서 import 됩니다.
+const apiKey = defineSecret("GOOGLE_GENAI_API_KEY");
 
-// AI 응답을 위한 확장된 Zod 스키마 정의
+const ai = genkit({
+  plugins: [googleAI()],
+  model: googleAI.model("gemini-2.5-flash"), 
+});
+
 const AnalysisOutputSchema = z.object({
   transcript: z.string().describe('The full and accurate audio transcript of the video.'),
   summary: z.string().describe('A concise summary of the entire video content.'),
@@ -37,121 +28,75 @@ const AnalysisOutputSchema = z.object({
   keywords: z.array(z.string()).describe('An array of relevant keywords for searching and tagging.'),
 });
 
-/**
- * Firestore 'episodes' 컬렉션의 문서가 생성되거나 업데이트 될 때 트리거되는 Cloud Function.
- */
 export const analyzeVideoOnWrite = onDocumentWritten(
   {
-    document: 'episodes/{episodeId}',
+    document: "episodes/{episodeId}",
+    region: "asia-northeast3",
+    secrets: [apiKey],
     timeoutSeconds: 540,
-    memory: '1GiB',
+    memory: "1GiB",
   },
-  async (event: FirestoreEvent<Change<DocumentSnapshot> | undefined, { episodeId: string }>) => {
-    const change = event.data;
-    if (!change) {
-      console.log(`[${event.params.episodeId}] Event data is undefined, skipping.`);
-      return;
+  async (event) => {
+    const snapshot = event.data?.after;
+    if (!snapshot) return;
+
+    const data = snapshot.data();
+    
+    if (data?.aiProcessingStatus !== "processing") {
+        return;
     }
 
-    const { episodeId } = event.params;
-    const afterData = change.after.data();
-
-    // 멱등성(Idempotency) 로직: 'pending' 상태일 때만 함수를 실행합니다.
-    if (!afterData || afterData.aiProcessingStatus !== 'pending') {
-      console.log(`[${episodeId}] Status is not 'pending' (${afterData?.aiProcessingStatus || 'deleted'}), skipping.`);
-      return;
-    }
-    
-    console.log(`[${episodeId}] AI analysis triggered for document write.`);
-    
-    const episodeRef = change.after.ref;
-    const filePath = afterData.filePath;
-
+    const filePath = data.filePath;
     if (!filePath) {
-      console.error(`[${episodeId}] filePath is missing.`);
-      await episodeRef.update({ aiProcessingStatus: 'failed', aiProcessingError: 'Video file path is missing.' });
-      return;
+        console.error("No filePath found");
+        return;
     }
 
-    // 1. 상태를 'processing'으로 즉시 업데이트하여 중복 실행 방지
-    await episodeRef.update({ aiProcessingStatus: 'processing', aiProcessingError: null });
-    console.log(`[${episodeId}] Status updated to 'processing'.`);
-
-    const tempFilePath = path.join(os.tmpdir(), `episode_${episodeId}_${Date.now()}.mp4`);
+    console.log("🚀 Gemini 2.5 Video Analysis Started:", event.params.episodeId);
 
     try {
-      // 2. Firebase Storage에서 비디오 파일을 스트림으로 다운로드
-      const bucket = getStorage().bucket();
-      const file = bucket.file(filePath);
-
-      console.log(`[${episodeId}] Starting video download from gs://${bucket.name}/${filePath} to ${tempFilePath}.`);
-      await file.download({ destination: tempFilePath });
-      console.log(`[${episodeId}] Video downloaded successfully.`);
+      const bucketName = getStorage().bucket().name;
+      const gsUrl = `gs://${bucketName}/${filePath}`;
       
-      const videoFilePart: FileDataPart = {
-        fileData: {
-          fileUri: `file://${tempFilePath}`,
-          mimeType: 'video/mp4',
-        }
-      };
-      
-      const prompt = `Analyze this video file comprehensively. Extract all the information required by the provided JSON schema, including a full transcript, a summary, a detailed timeline of events, visual cues like on-screen text, and a list of keywords.
+      console.log(`🎥 Analyzing Video via Direct URL: ${gsUrl}`);
 
-        Please provide the output in a structured JSON format that adheres to the following schema:
-        - transcript: The full audio transcript.
-        - summary: A high-level summary of the video.
-        - timeline: A detailed log of events with timestamps.
-        - visualCues: Important text or objects visible on screen.
-        - keywords: A list of main topics and keywords.`;
-
-      // 4. Genkit을 사용하여 Gemini 2.5 Flash 모델 호출
-      console.log(`[${episodeId}] Sending request to Gemini 2.5 Flash model.`);
       const llmResponse = await ai.generate({
-        prompt: [prompt, videoFilePart],
+        prompt: [
+          { text: "Analyze this video file comprehensively based on the provided schema." },
+          { media: { url: gsUrl } }
+        ],
         output: {
-          format: 'json',
+          format: "json",
           schema: AnalysisOutputSchema,
         },
-      } as any); // Use 'as any' to bypass strict type checks for build stability
+      });
 
-      const analysisResult = llmResponse.output;
-      if (!analysisResult) {
-        throw new Error('AI analysis returned no output.');
-      }
-      
-      console.log(`[${episodeId}] AI analysis successful.`);
+      const result = llmResponse.output;
+      if (!result) throw new Error("No output from AI");
 
-      // 5. Firestore에 결과 저장
-      // aiGeneratedContent에는 튜터가 답변에 사용할 모든 컨텍스트를 저장합니다.
       const combinedContent = `
-        Summary: ${analysisResult.summary}\n\n
-        Timeline:
-        ${analysisResult.timeline.map(t => `- ${t.timestamp}: ${t.event} (Visuals: ${t.visualDetail})`).join('\n')}\n\n
-        Visual Cues: ${analysisResult.visualCues.join(', ')}\n\n
-        Keywords: ${analysisResult.keywords.join(', ')}
+Summary: ${result.summary}\n
+Timeline:
+${result.timeline.map(t => `- [${t.timestamp}] ${t.event} (Visual: ${t.visualDetail})`).join('\n')}\n
+Visual Cues: ${result.visualCues.join(', ')}\n
+Keywords: ${result.keywords.join(', ')}
       `.trim();
 
-      await episodeRef.update({
-        transcript: analysisResult.transcript,
+      await snapshot.ref.update({
+        aiProcessingStatus: "completed",
+        transcript: result.transcript,
         aiGeneratedContent: combinedContent,
-        aiProcessingStatus: 'completed',
+        aiProcessingError: null,
+        updatedAt: new Date()
       });
-      console.log(`[${episodeId}] Firestore updated with detailed analysis results.`);
+      console.log("✅ Analysis Finished & Data Saved!");
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-      console.error(`[${episodeId}] AI analysis failed:`, error);
-      await episodeRef.update({
-        aiProcessingStatus: 'failed',
-        aiProcessingError: errorMessage,
+      console.error("❌ Error:", error);
+      await snapshot.ref.update({ 
+        aiProcessingStatus: "failed", 
+        aiProcessingError: String(error) 
       });
-
-    } finally {
-      // 6. 임시 파일 정리
-      if (fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
-        console.log(`[${episodeId}] Cleaned up temporary file: ${tempFilePath}`);
-      }
     }
   }
 );

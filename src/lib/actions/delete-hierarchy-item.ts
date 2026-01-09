@@ -38,7 +38,6 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
 };
 
 const deleteChunksSubcollection = async (db: Firestore, episodeId: string): Promise<void> => {
-    // This is the corrected line:
     const chunksRef = db.collection('episodes').doc(episodeId).collection('chunks');
     const snapshot = await chunksRef.get();
     
@@ -119,11 +118,9 @@ export async function deleteHierarchyItem(
         await deleteStorageFileByPath(storage, episode.filePath);
         await deleteStorageFileByPath(storage, episode.defaultThumbnailPath);
         await deleteStorageFileByPath(storage, episode.customThumbnailPath);
-        // Also delete the VTT file if it exists
         if (episode.vttPath) {
           await deleteStorageFileByPath(storage, episode.vttPath);
         }
-        // Also delete the chunks subcollection
         await deleteChunksSubcollection(db, id);
     } else if (collectionName === 'courses') {
         const course = item as Course;
