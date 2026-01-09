@@ -85,14 +85,14 @@ export async function deleteHierarchyItem(
     const storage = admin.storage(adminApp);
     
     const docRef = db.collection(collectionName).doc(id);
-    const docSnap = await docRef.get();
+    // Use passed itemData if available, otherwise fetch from Firestore.
+    // This is crucial for episode deletion where paths are needed.
+    const item = itemData || (await docRef.get()).data();
 
-    if (!docSnap.exists) {
+    if (!item) {
         console.warn(`[NOT FOUND] Document with ID ${id} not found in ${collectionName}.`);
         return { success: false, message: '삭제할 항목을 찾을 수 없습니다.' };
     }
-
-    const item = docSnap.data() as Field | Classification | Course | Episode;
     
     // Check for dependencies before deleting
     let dependencies: string[] = [];
@@ -132,7 +132,9 @@ export async function deleteHierarchyItem(
         }
     } else { // Fields and Classifications
         const hierarchyItem = item as Field | Classification;
-        await deleteStorageFileByPath(storage, hierarchyItem.thumbnailPath);
+        if (hierarchyItem.thumbnailPath) {
+          await deleteStorageFileByPath(storage, hierarchyItem.thumbnailPath);
+        }
     }
 
     await docRef.delete();
