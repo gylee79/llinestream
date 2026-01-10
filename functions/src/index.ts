@@ -1,3 +1,4 @@
+
 import { onDocumentWritten, onDocumentDeleted, Change, FirestoreEvent } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import { genkit, z } from "genkit";
@@ -18,35 +19,36 @@ if (!getApps().length) {
 // 1. API Key 비밀 설정
 const apiKey = defineSecret("GOOGLE_GENAI_API_KEY");
 
-// 2. Genkit 초기화 (gemini-2.5-flash 기본 설정)
+// 2. Genkit 초기화 (공식 가이드 방식)
+// ai 객체를 생성할 때 사용할 플러그인과 기본 모델을 명시적으로 지정합니다.
 const ai = genkit({
   plugins: [googleAI()],
-  model: googleAI.model("gemini-2.5-flash"), // 여기서 모델을 고정합니다.
+  model: googleAI.model('gemini-2.5-flash'), // 기본 모델 설정
 });
 
 // ==========================================
 // [Genkit Flow] AI 로직 정의 (Brain)
 // ==========================================
 
-// 3. 입/출력 스키마 정의
+// 3. AI 분석 Flow의 입력과 출력 타입을 Zod 스키마로 명확하게 정의합니다.
 const VideoAnalysisInputSchema = z.object({
-  fileUri: z.string().describe("Gemini File API URI"),
-  mimeType: z.string().describe("Video MIME type"),
+  fileUri: z.string().describe("Gemini File API에 업로드된 비디오의 URI"),
+  mimeType: z.string().describe("비디오의 MIME 타입"),
 });
 
 const AnalysisOutputSchema = z.object({
-  transcript: z.string().describe('The full and accurate audio transcript of the video.'),
-  summary: z.string().describe('A concise summary of the entire video content.'),
+  transcript: z.string().describe('비디오의 전체 음성 스크립트'),
+  summary: z.string().describe('비디오 전체 내용에 대한 간결한 요약'),
   timeline: z.array(z.object({
-    timestamp: z.string().describe('The timestamp of the event in HH:MM:SS format.'),
-    event: z.string().describe('A description of what is happening at this timestamp.'),
-    visualDetail: z.string().describe('Notable visual details, like objects or character appearances.'),
-  })).describe('An array of time-stamped logs detailing events throughout the video.'),
-  visualCues: z.array(z.string()).describe('A list of important on-screen text (OCR) or significant visual objects.'),
-  keywords: z.array(z.string()).describe('An array of relevant keywords for searching and tagging.'),
+    timestamp: z.string().describe('이벤트 타임스탬프 (HH:MM:SS 형식)'),
+    event: z.string().describe('해당 타임스탬프에 일어나는 일에 대한 설명'),
+    visualDetail: z.string().describe('객체나 인물 등장과 같은 주목할 만한 시각적 정보'),
+  })).describe('비디오 전체의 시간대별 이벤트 로그 배열'),
+  visualCues: z.array(z.string()).describe('화면에 표시되는 중요한 텍스트(OCR) 또는 중요한 시각적 객체 목록'),
+  keywords: z.array(z.string()).describe('검색 및 태깅을 위한 관련 키워드 배열'),
 });
 
-// 4. Flow 정의 (여기가 핵심!)
+// 4. 비디오 분석 로직을 담당하는 Flow를 정의합니다. (공식 가이드 방식)
 export const videoAnalysisFlow = ai.defineFlow(
   {
     name: 'videoAnalysisFlow',
@@ -54,20 +56,23 @@ export const videoAnalysisFlow = ai.defineFlow(
     outputSchema: AnalysisOutputSchema,
   },
   async (input) => {
-    // 프롬프트와 미디어를 결합하여 AI에게 요청
+    // ai.generate를 직접 호출합니다.
+    // 비디오 파일(media)과 텍스트 지시문(text)을 prompt 배열에 함께 전달합니다.
     const { output } = await ai.generate({
-      prompt: "Analyze this video file comprehensively based on the provided JSON schema.",
-      docs: [
+      prompt: [
+        { text: "제공된 JSON 스키마에 따라 이 비디오 파일을 종합적으로 분석해주세요." },
         { media: { url: input.fileUri, contentType: input.mimeType } }
       ],
-      output: { schema: AnalysisOutputSchema }, // 출력 포맷 강제
+      output: { schema: AnalysisOutputSchema }, // 출력 포맷을 Zod 스키마로 강제합니다.
     });
 
-    if (!output) throw new Error("AI analysis failed to produce output.");
+    if (!output) {
+      throw new Error("AI 분석이 결과를 생성하지 못했습니다.");
+    }
+
     return output;
   }
 );
-
 
 // ==========================================
 // [Trigger] 파일 처리 및 Flow 실행 (Hand)
@@ -92,7 +97,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     document: "episodes/{episodeId}",
     region: "asia-northeast3",
     secrets: [apiKey],
-    timeoutSeconds: 3600, // 1시간
+    timeoutSeconds: 3600,
     memory: "2GiB",
   },
   async (event: FirestoreEvent<Change<DocumentSnapshot> | undefined, { episodeId: string }>) => {
@@ -103,16 +108,17 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     const afterData = change.after.data();
     if (!afterData) return;
 
-    // 상태 관리: Pending -> Processing
+    // 상태가 'pending'일 때만 'processing'으로 변경하고 함수를 트리거합니다.
     if (afterData.aiProcessingStatus === "pending") {
       console.log(`✨ New upload detected [${event.params.episodeId}]. Auto-starting...`);
       await change.after.ref.update({ aiProcessingStatus: "processing" });
       return;
     }
 
-    // 이미 처리 중이거나 완료된 경우 스킵
-    if (afterData.aiProcessingStatus !== "processing") return;
-    if (beforeData?.aiProcessingStatus === "processing") return;
+    // 이미 처리 중이거나 완료된 경우, 또는 상태가 'processing'이 아닌 경우는 무시합니다.
+    if (afterData.aiProcessingStatus !== "processing" || beforeData?.aiProcessingStatus === "processing") {
+      return;
+    }
 
     const filePath = afterData.filePath;
     if (!filePath) {
@@ -127,11 +133,11 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     let uploadedFileId = "";
 
     try {
-      // 1. Storage에서 다운로드
+      // 1. Storage에서 비디오 파일을 임시 디렉토리로 다운로드
       console.log(`📥 Downloading...`);
       await getStorage().bucket().file(filePath).download({ destination: tempFilePath });
 
-      // 2. Gemini File API 업로드
+      // 2. 임시 파일을 Gemini File API로 업로드
       const mimeType = getMimeType(filePath);
       console.log(`📡 Uploading to Gemini... (${mimeType})`);
       const uploadResult = await fileManager.uploadFile(tempFilePath, {
@@ -142,24 +148,23 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       const file = uploadResult.file;
       uploadedFileId = file.name;
 
-      // 3. 처리 대기 (Polling)
+      // 3. Gemini 측의 비디오 처리 완료 대기 (Polling)
       let state = file.state;
       console.log(`⏳ Waiting for Gemini processing...`);
       while (state === FileState.PROCESSING) {
         await new Promise((r) => setTimeout(r, 5000));
         state = (await fileManager.getFile(file.name)).state;
       }
-
       if (state === FileState.FAILED) throw new Error("Gemini File Processing Failed.");
 
-      // 4. ★ Genkit Flow 호출 (리팩토링된 부분)
+      // 4. ★ 정의된 Genkit Flow 호출
       console.log(`🎥 Calling Genkit Flow...`);
       const result = await videoAnalysisFlow({
         fileUri: file.uri,
         mimeType: mimeType
       });
 
-      // 5. 결과 저장
+      // 5. 결과 포맷팅 및 Firestore에 저장
       const combinedContent = `
 Summary: ${result.summary}\n
 Timeline:
@@ -184,7 +189,7 @@ Keywords: ${result.keywords.join(', ')}
         aiProcessingError: String(error)
       });
     } finally {
-      // 6. 청소 (Cleanup)
+      // 6. 모든 작업 후 임시 파일 정리
       if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
       if (uploadedFileId) {
         try { await fileManager.deleteFile(uploadedFileId); } catch (e) { console.log("⚠️ Cleanup warning"); }
@@ -193,9 +198,7 @@ Keywords: ${result.keywords.join(', ')}
   }
 );
 
-// ==========================================
-// 기능 2: 문서 삭제 시 파일 자동 청소 (기존 유지)
-// ==========================================
+// 문서 삭제 시 Storage 파일 자동 청소 기능 (기존 유지)
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted(
   {
     document: "episodes/{episodeId}",
