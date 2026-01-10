@@ -26,6 +26,11 @@ export async function resetAIEpisodeStatus(episodeId: string): Promise<{ success
     const db = admin.firestore(adminApp);
     const episodeRef = db.collection('episodes').doc(episodeId);
 
+    const doc = await episodeRef.get();
+    if (!doc.exists) {
+        return { success: false, message: '해당 에피소드를 찾을 수 없습니다.' };
+    }
+
     await episodeRef.update({
         aiProcessingStatus: 'processing', // 'pending'에서 'processing'으로 변경
         aiProcessingError: null,
@@ -33,7 +38,7 @@ export async function resetAIEpisodeStatus(episodeId: string): Promise<{ success
     
     revalidatePath('/admin/content');
 
-    return { success: true, message: `'${episodeId}' 에피소드에 대한 AI 분석이 재시작됩니다.` };
+    return { success: true, message: `'${doc.data()?.title}' 에피소드에 대한 AI 분석이 재시작됩니다.` };
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';

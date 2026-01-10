@@ -1,8 +1,7 @@
 
-
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -17,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, PlusCircle, ImageIcon } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, ImageIcon, CheckCircle2, AlertTriangle, Loader, HelpCircle } from 'lucide-react';
 import type { Episode, Course, Classification, Field, Instructor } from '@/lib/types';
 import VideoUploadDialog from '@/components/admin/content/video-upload-dialog';
 import {
@@ -45,6 +44,84 @@ import {
 import { sanitize } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import VideoPlayerDialog from '@/components/shared/video-player-dialog';
+import { resetAIEpisodeStatus } from '@/lib/actions/process-video';
+
+
+const AIStatusIndicator = ({ episode }: { 
+    episode: Episode
+}) => {
+    const { toast } = useToast();
+    const [isPending, startTransition] = useTransition();
+
+    const handleStartAnalysis = () => {
+        startTransition(async () => {
+            toast({ title: "AI 분석 요청", description: `'${episode.title}'에 대한 분석을 시작합니다.` });
+            const result = await resetAIEpisodeStatus(episode.id);
+            if (result.success) {
+                toast({ title: "성공", description: result.message });
+            } else {
+                toast({ variant: 'destructive', title: "실패", description: result.message });
+            }
+        });
+    }
+
+    if (isPending || episode.aiProcessingStatus === 'processing') {
+         return (
+            <Tooltip>
+                <TooltipTrigger>
+                    <Loader className="h-4 w-4 text-blue-500 animate-spin" />
+                </TooltipTrigger>
+                <TooltipContent><p>AI 분석 처리 중...</p></TooltipContent>
+            </Tooltip>
+        );
+    }
+    
+    switch (episode.aiProcessingStatus) {
+        case 'completed':
+            return (
+                <Tooltip>
+                    <TooltipTrigger>
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    </TooltipTrigger>
+                    <TooltipContent><p>AI 분석 완료</p></TooltipContent>
+                </Tooltip>
+            );
+        case 'failed':
+            return (
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-auto w-auto p-0" onClick={handleStartAnalysis}>
+                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>AI 분석 실패: {episode.aiProcessingError || '알 수 없는 오류'}</p>
+                        <p className="font-semibold">클릭하여 재시도</p>
+                    </TooltipContent>
+                </Tooltip>
+            );
+        case 'pending':
+        default:
+             return (
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                         <Button variant="ghost" size="icon" className="h-auto w-auto p-0" onClick={handleStartAnalysis}>
+                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>AI 분석 대기 중. 클릭하여 시작</p></TooltipContent>
+                </Tooltip>
+            )
+    }
+};
+
+const formatFileSize = (bytes: number | undefined): string => {
+    if (bytes === undefined || bytes === 0) return 'N/A';
+    if (bytes < 1024) return `${bytes} B`;
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
+}
 
 
 export default function VideoManager() {
@@ -75,6 +152,11 @@ export default function VideoManager() {
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [episodeToDelete, setEpisodeToDelete] = useState<Episode | null>(null);
+
+  const totalFileSize = useMemo(() => {
+    if (!episodes) return 0;
+    return episodes.reduce((acc, episode) => acc + (episode.fileSize || 0), 0);
+  }, [episodes]);
 
   const handleOpenUploadDialog = (episode: Episode | null = null) => {
     setSelectedEpisode(episode);
@@ -178,8 +260,13 @@ export default function VideoManager() {
                   <TableHead className="w-[80px]">썸네일</TableHead>
                   <TableHead>제목</TableHead>
                   <TableHead>소속 상세분류</TableHead>
-                  <TableHead>재생 시간(초)</TableHead>
+                  <TableHead>재생 시간</TableHead>
+                  <TableHead>
+                    <div>파일 용량</div>
+                    <div className="text-xs font-normal text-muted-foreground">({formatFileSize(totalFileSize)})</div>
+                  </TableHead>
                   <TableHead>강사</TableHead>
+                  <TableHead>AI 상태</TableHead>
                   <TableHead>무료 여부</TableHead>
                   <TableHead className="text-right">관리</TableHead>
                 </TableRow>
@@ -188,7 +275,7 @@ export default function VideoManager() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                       <TableRow key={i}>
-                          <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
+                          <TableCell colSpan={9}><Skeleton className="h-8 w-full" /></TableCell>
                       </TableRow>
                   ))
                 ) : (
@@ -213,8 +300,12 @@ export default function VideoManager() {
                       </TableCell>
                       <TableCell className="font-medium">{episode.title}</TableCell>
                       <TableCell>{getFullCoursePath(episode.courseId)}</TableCell>
-                      <TableCell>{episode.duration}</TableCell>
+                      <TableCell>{episode.duration}초</TableCell>
+                      <TableCell>{formatFileSize(episode.fileSize)}</TableCell>
                       <TableCell>{getInstructorName(episode.instructorId)}</TableCell>
+                      <TableCell>
+                        <AIStatusIndicator episode={episode} />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Switch
@@ -317,6 +408,3 @@ export default function VideoManager() {
     </>
   );
 }
-
-
-    
