@@ -24,7 +24,7 @@ const ai = genkit({
   plugins: [googleAI()],
 });
 
-// 3. AI 분석 결과에 대한 Zod 스키마 정의 (재사용을 위해 유지)
+// 3. AI 분석 결과에 대한 Zod 스키마 정의
 const AnalysisOutputSchema = z.object({
   transcript: z.string().describe('The full and accurate audio transcript of the video.'),
   summary: z.string().describe('A concise summary of the entire video content.'),
@@ -121,8 +121,8 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       if (state === FileState.FAILED) throw new Error("Gemini File Processing Failed.");
 
-      // 4. ★ AI 분석 직접 호출 (Genkit 1.0 공식 가이드 방식)
-      console.log(`🎥 Calling ai.generate...`);
+      // 4. ★ AI 분석 직접 호출 (file.uri 사용하도록 수정)
+      console.log(`🎥 Calling ai.generate with correct file URI: ${file.uri}`);
       const { output } = await ai.generate({
         model: 'gemini-2.5-flash',
         prompt: [
@@ -133,7 +133,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       });
 
       if (!output) throw new Error("AI analysis failed to produce output.");
-      const result = output; // 이제 result는 이미 스키마에 맞는 객체입니다.
+      const result = output;
 
       // 5. 결과 저장
       const combinedContent = `
@@ -190,5 +190,3 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted(
     console.log(`✅ Cleanup finished: ${event.params.episodeId}`);
   }
 );
-
-    
