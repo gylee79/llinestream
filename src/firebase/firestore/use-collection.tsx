@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { useFirebase } from '@/firebase/provider';
+import { useAuth } from '@/firebase/hooks';
 
 /** Utility type to add an 'id' field to a given type T. */
 export type WithId<T> = T & { id: string };
@@ -55,7 +55,7 @@ export function useCollection<T = any>(
   type ResultItemType = WithId<T>;
   type StateDataType = ResultItemType[] | null;
 
-  const { authUser } = useFirebase();
+  const auth = useAuth(); // Use the auth instance directly
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
@@ -78,7 +78,7 @@ export function useCollection<T = any>(
     const contextualError = new FirestorePermissionError({
       operation: 'list',
       path,
-    }, authUser);
+    }, auth.currentUser); // Get the currentUser at the moment of error
 
     setError(contextualError);
     setData(null);
@@ -86,7 +86,7 @@ export function useCollection<T = any>(
 
     // trigger global error propagation
     errorEmitter.emit('permission-error', contextualError);
-  }, [targetRefOrQuery, authUser]);
+  }, [targetRefOrQuery, auth]);
 
   useEffect(() => {
     // If the query is not ready, or is invalid, reset the state and wait.
