@@ -19,7 +19,7 @@ if (!getApps().length) {
 // 1. API Key 비밀 설정
 const apiKey = defineSecret("GOOGLE_GENAI_API_KEY");
 
-// 2. Genkit 초기화 (플러그인만 등록)
+// 2. Genkit 초기화 (최신 가이드에 따라 apiVersion 제거)
 const ai = genkit({
   plugins: [googleAI()],
 });
@@ -116,12 +116,13 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       console.log(`⏳ Waiting for Gemini processing...`);
       while (state === FileState.PROCESSING) {
         await new Promise((r) => setTimeout(r, 5000));
-        state = (await fileManager.getFile(file.name)).state;
+        const freshFile = await fileManager.getFile(file.name);
+        state = freshFile.state;
       }
 
       if (state === FileState.FAILED) throw new Error("Gemini File Processing Failed.");
 
-      // 4. ★ AI 분석 직접 호출 (file.uri 사용하도록 수정)
+      // 4. ★ AI 분석 직접 호출 (file.uri 사용, 모델을 gemini-2.5-flash로 업그레이드)
       console.log(`🎥 Calling ai.generate with correct file URI: ${file.uri}`);
       const { output } = await ai.generate({
         model: 'gemini-2.5-flash',
