@@ -47,7 +47,7 @@ function getMimeType(filePath: string): string {
   const extension = path.extname(filePath).toLowerCase();
   switch (extension) {
     case ".mp4": return "video/mp4";
-    case ".mov": return "video/quicktime";
+    case ".mov": "video/quicktime";
     case ".avi": return "video/x-msvideo";
     case ".wmv": return "video/x-ms-wmv";
     case ".webm": return "video/webm";
@@ -116,13 +116,15 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       console.log(`⏳ Waiting for Gemini processing...`);
       while (state === FileState.PROCESSING) {
         await new Promise((r) => setTimeout(r, 5000));
-        state = (await fileManager.getFile(file.name)).state;
+        const freshFile = await fileManager.getFile(file.name);
+        state = freshFile.state;
+        console.log(`... processing state: ${state}`);
       }
 
       if (state === FileState.FAILED) throw new Error("Gemini File Processing Failed.");
 
-      // 4. ★ AI 분석 직접 호출 (file.uri 사용하도록 수정)
-      console.log(`🎥 Calling ai.generate with correct file URI: ${file.uri}`);
+      // 4. ★ AI 분석 직접 호출 (가장 중요하게 수정된 부분)
+      console.log(`🎥 Calling ai.generate with correct prompt structure. URI: ${file.uri}`);
       const { output } = await ai.generate({
         model: 'gemini-2.5-flash',
         prompt: [
