@@ -44,28 +44,19 @@ export function useDoc<T = any>(
   docRef: DocumentReference<DocumentData> | null | undefined,
 ): UseDocResult<T> {
   type StateDataType = WithId<T> | null;
-  const auth = useAuth(); // Use the auth instance directly
-
+  const auth = useAuth();
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
-  const handleNext = useCallback((snapshot: DocumentSnapshot<DocumentData>) => {
-    if (snapshot.exists()) {
-      setData({ ...(snapshot.data() as T), id: snapshot.id });
-    } else {
-      setData(null);
-    }
-    setError(null);
-    setIsLoading(false);
-  }, []);
-
   const handleError = useCallback((err: FirestoreError) => {
     if (docRef) {
+      // auth.currentUser is a stable reference within the auth object from context
+      const currentUser = auth.currentUser;
       const contextualError = new FirestorePermissionError({
         operation: 'get',
         path: docRef.path,
-      }, auth.currentUser); // Get the currentUser at the moment of error
+      }, currentUser);
       setError(contextualError);
       errorEmitter.emit('permission-error', contextualError);
     } else {
@@ -79,7 +70,7 @@ export function useDoc<T = any>(
     // If the ref is not ready, reset the state and wait.
     if (!docRef) {
       setData(null);
-      setIsLoading(true); // Keep loading until a valid ref is provided
+      setIsLoading(true);
       setError(null);
       return;
     }
@@ -87,10 +78,20 @@ export function useDoc<T = any>(
     setIsLoading(true);
     setError(null);
 
+    const handleNext = (snapshot: DocumentSnapshot<DocumentData>) => {
+      if (snapshot.exists()) {
+        setData({ ...(snapshot.data() as T), id: snapshot.id });
+      } else {
+        setData(null);
+      }
+      setError(null);
+      setIsLoading(false);
+    };
+
     const unsubscribe = onSnapshot(docRef, handleNext, handleError);
 
     return () => unsubscribe();
-  }, [docRef, handleNext, handleError]); // Re-run if the docRef changes.
+  }, [docRef, handleError]);
 
   return { data, isLoading, error };
 }

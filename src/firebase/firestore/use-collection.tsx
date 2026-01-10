@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -55,30 +56,22 @@ export function useCollection<T = any>(
   type ResultItemType = WithId<T>;
   type StateDataType = ResultItemType[] | null;
 
-  const auth = useAuth(); // Use the auth instance directly
+  const auth = useAuth();
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
-
-  const handleNext = useCallback((snapshot: QuerySnapshot<DocumentData>) => {
-    const results: ResultItemType[] = snapshot.docs.map(doc => ({
-      ...(doc.data() as T),
-      id: doc.id
-    }));
-    setData(results);
-    setError(null);
-    setIsLoading(false);
-  }, []);
 
   const handleError = useCallback((err: FirestoreError) => {
     const path = targetRefOrQuery?.type === 'collection'
       ? (targetRefOrQuery as CollectionReference).path
       : ((targetRefOrQuery as InternalQuery)._query?.path?.canonicalString() || 'unknown path');
-
+    
+    // auth.currentUser is a stable reference within the auth object from context
+    const currentUser = auth.currentUser;
     const contextualError = new FirestorePermissionError({
       operation: 'list',
       path,
-    }, auth.currentUser); // Get the currentUser at the moment of error
+    }, currentUser);
 
     setError(contextualError);
     setData(null);
@@ -92,7 +85,7 @@ export function useCollection<T = any>(
     // If the query is not ready, or is invalid, reset the state and wait.
     if (!targetRefOrQuery || !(targetRefOrQuery as InternalQuery)._query?.path.segments.length) {
       setData(null);
-      setIsLoading(true); // Keep loading until a valid query is provided
+      setIsLoading(true);
       setError(null);
       return;
     }
@@ -100,10 +93,20 @@ export function useCollection<T = any>(
     setIsLoading(true);
     setError(null);
 
+    const handleNext = (snapshot: QuerySnapshot<DocumentData>) => {
+        const results: ResultItemType[] = snapshot.docs.map(doc => ({
+            ...(doc.data() as T),
+            id: doc.id
+        }));
+        setData(results);
+        setError(null);
+        setIsLoading(false);
+    };
+
     const unsubscribe = onSnapshot(targetRefOrQuery, handleNext, handleError);
 
     return () => unsubscribe();
-  }, [targetRefOrQuery, handleNext, handleError]);
+  }, [targetRefOrQuery, handleError]);
 
   return { data, isLoading, error };
 }
