@@ -1,7 +1,8 @@
 
 import { onDocumentWritten, onDocumentDeleted, Change, FirestoreEvent } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
-import { genkit, z } from "genkit";
+import { genkit } from "genkit";
+import { z } from "zod";
 import { googleAI } from "@genkit-ai/google-genai";
 import * as path from "path";
 import * as os from "os";
@@ -19,12 +20,12 @@ if (!getApps().length) {
 // 1. API Key 비밀 설정
 const apiKey = defineSecret("GOOGLE_GENAI_API_KEY");
 
-// 2. Genkit 초기화 (공식 가이드에 따라 실행 파일에서 직접 초기화)
+// 2. Genkit 초기화 (Cloud Function 실행 컨텍스트 내에서 직접)
 const ai = genkit({
-  plugins: [googleAI({ apiVersion: "v1beta" })],
+  plugins: [googleAI()],
 });
 
-// 3. 정밀 분석 스키마 정의
+// 3. 분석 결과에 대한 Zod 스키마 정의
 const AnalysisOutputSchema = z.object({
   transcript: z.string().describe('The full and accurate audio transcript of the video.'),
   summary: z.string().describe('A concise summary of the entire video content.'),
@@ -63,7 +64,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     document: "episodes/{episodeId}",
     region: "asia-northeast3",
     secrets: [apiKey],
-    timeoutSeconds: 540,
+    timeoutSeconds: 3600, // 1시간
     memory: "2GiB",
   },
   async (event: FirestoreEvent<Change<DocumentSnapshot> | undefined, { episodeId: string }>) => {
@@ -92,7 +93,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       return;
     }
 
-    console.log("🚀 Gemini 2.5 Video Analysis Started:", event.params.episodeId);
+    console.log("🚀 Gemini Video Analysis Started:", event.params.episodeId);
 
     const fileManager = new GoogleAIFileManager(apiKey.value());
     const tempFilePath = path.join(os.tmpdir(), `video_${event.params.episodeId}${path.extname(filePath)}`);
@@ -130,14 +131,13 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       }
 
       console.log(`🎥 Analyzing...`);
+      
       const llmResponse = await ai.generate({
-        model: 'gemini-2.5-flash',
-        prompt: {
-          parts: [
-            { text: "Analyze this video file comprehensively based on the provided JSON schema." },
-            { fileData: { fileUri: file.uri, mimeType: file.mimeType } }
-          ]
-        },
+        model: 'gemini-1.5-flash',
+        prompt: [
+          { text: "Analyze this video file comprehensively based on the provided JSON schema." },
+          { media: { url: file.uri, contentType: file.mimeType } }
+        ],
         output: {
           format: "json",
           schema: AnalysisOutputSchema,
