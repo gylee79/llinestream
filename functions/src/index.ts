@@ -121,7 +121,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       if (state === FileState.FAILED) throw new Error("Gemini File Processing Failed.");
 
-      // 4. ★ AI 분석 직접 호출 (Genkit 1.0 공식 가이드 방식)
+      // 4. ★ AI 분석 직접 호출 (file.uri 사용하도록 수정)
       console.log(`🎥 Calling ai.generate with correct file URI: ${file.uri}`);
       const { output } = await ai.generate({
         model: 'gemini-2.5-flash',
