@@ -64,7 +64,7 @@ const videoTutorFlow = ai.defineFlow(
 
       // 2. Generate the answer using Gemini with the provided context
       const llmResponse = await ai.generate({
-        model: 'googleai/gemini-2.5-flash',
+        model: googleAI.model('gemini-2.5-pro'),
         prompt: `You are a friendly and helpful tutor. Based ONLY on the following video content analysis, answer the user's question in Korean.
         The context includes a summary and a description of visual elements from the video.
         If the context doesn't contain the answer, you MUST state that the information is not in the video and you cannot answer. Do not use outside knowledge.
@@ -75,7 +75,17 @@ const videoTutorFlow = ai.defineFlow(
         ---
         
         User's Question: "${question}"`,
+        config: {
+          thinkingConfig: {
+            thinkingBudget: 8192,
+            includeThoughts: true,
+          },
+        }
       });
+
+      if (llmResponse.reasoning) {
+        console.log('Reasoning:', llmResponse.reasoning);
+      }
 
       const answer = llmResponse.text;
       console.log(`[Tutor-Flow] Generated answer.`);
