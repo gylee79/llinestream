@@ -33,6 +33,11 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
             console.log(`[SKIP DELETE] File does not exist, skipping deletion: ${filePath}`);
         }
     } catch (error: any) {
+        // Suppress "Not Found" errors during cleanup, as they are not critical.
+        if (error.code === 404) {
+             console.log(`[SKIP DELETE] File not found during cleanup, which is acceptable: ${filePath}`);
+             return;
+        }
         console.error(`[DELETE FAILED] Could not delete storage file at path ${filePath}. Error: ${error.message}`);
     }
 };
@@ -87,11 +92,13 @@ export async function deleteHierarchyItem(
     const docRef = db.collection(collectionName).doc(id);
     // Use passed itemData if available, otherwise fetch from Firestore.
     // This is crucial for episode deletion where paths are needed.
-    const item = itemData || (await docRef.get()).data();
+    const docSnap = await docRef.get();
+    const item = itemData || docSnap.data();
 
-    if (!item) {
-        console.warn(`[NOT FOUND] Document with ID ${id} not found in ${collectionName}.`);
-        return { success: false, message: '삭제할 항목을 찾을 수 없습니다.' };
+    if (!docSnap.exists || !item) {
+        console.warn(`[NOT FOUND] Document with ID ${id} not found in ${collectionName}. Assuming already deleted.`);
+        revalidatePath('/admin/content', 'layout');
+        return { success: true, message: '항목을 찾을 수 없어 이미 삭제된 것으로 간주합니다.' };
     }
     
     // Check for dependencies before deleting
