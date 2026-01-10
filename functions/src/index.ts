@@ -122,7 +122,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       if (state === FileState.FAILED) throw new Error("Gemini File Processing Failed.");
 
-      // 4. ★ AI 분석 직접 호출 (file.uri 사용, 모델을 gemini-2.5-flash로 업그레이드)
+      // 4. ★ AI 분석 직접 호출 (Zod 스키마 적용)
       console.log(`🎥 Calling ai.generate with correct file URI: ${file.uri}`);
       const { output } = await ai.generate({
         model: 'gemini-2.5-flash',
