@@ -1,219 +1,66 @@
 
-import { onDocumentWritten, onDocumentDeleted, Change, FirestoreEvent } from "firebase-functions/v2/firestore";
-import { defineSecret } from "firebase-functions/params";
-import { genkit, z } from "genkit";
-import { googleAI } from "@genkit-ai/google-genai";
-import * as path from "path";
-import * as os from "os";
-import * as fs from "fs";
-import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
-import { DocumentSnapshot } from "firebase-admin/firestore";
-import { initializeApp, getApps } from "firebase-admin/app";
-import { getStorage } from "firebase-admin/storage";
+import { googleAI } from '@genkit-ai/google-genai';
+import { genkit, z } from 'genkit';
 
-// 0. Firebase Admin 초기화
-if (!getApps().length) {
-  initializeApp();
-}
-
-// 1. API Key 비밀 설정
-const apiKey = defineSecret("GOOGLE_GENAI_API_KEY");
-
-// 2. Genkit 초기화 (플러그인만 등록)
+// Initialize Genkit with the Google AI plugin
 const ai = genkit({
   plugins: [googleAI()],
+  model: googleAI.model('gemini-2.5-flash', {
+    temperature: 0.8,
+  }),
 });
 
-// 3. AI 분석 결과에 대한 Zod 스키마 정의
-const AnalysisOutputSchema = z.object({
-  transcript: z.string().describe('The full and accurate audio transcript of the video.'),
-  summary: z.string().describe('A concise summary of the entire video content.'),
-  timeline: z.array(z.object({
-    timestamp: z.string().describe('The timestamp of the event in HH:MM:SS format.'),
-    event: z.string().describe('A description of what is happening at this timestamp.'),
-    visualDetail: z.string().describe('Notable visual details, like objects or character appearances.'),
-  })).describe('An array of time-stamped logs detailing events throughout the video.'),
-  visualCues: z.array(z.string()).describe('A list of important on-screen text (OCR) or significant visual objects.'),
-  keywords: z.array(z.string()).describe('An array of relevant keywords for searching and tagging.'),
+// Define input schema
+const RecipeInputSchema = z.object({
+  ingredient: z.string().describe('Main ingredient or cuisine type'),
+  dietaryRestrictions: z.string().optional().describe('Any dietary restrictions'),
 });
 
-// 4. 비디오 분석을 위한 Genkit Flow 정의 (AI 로직)
-const videoAnalysisFlow = ai.defineFlow(
+// Define output schema
+const RecipeSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  prepTime: z.string(),
+  cookTime: z.string(),
+  servings: z.number(),
+  ingredients: z.array(z.string()),
+  instructions: z.array(z.string()),
+  tips: z.array(z.string()).optional(),
+});
+
+// Define a recipe generator flow
+export const recipeGeneratorFlow = ai.defineFlow(
   {
-    name: 'videoAnalysisFlow',
-    inputSchema: z.object({
-      fileUri: z.string().describe("The URI of the uploaded file in Gemini (File API)"),
-      mimeType: z.string().describe("The MIME type of the video file"),
-    }),
-    outputSchema: AnalysisOutputSchema,
+    name: 'recipeGeneratorFlow',
+    inputSchema: RecipeInputSchema,
+    outputSchema: RecipeSchema,
   },
   async (input) => {
-    // ai.generate를 호출하여 실제 AI 모델과 상호작용
+    // Create a prompt based on the input
+    const prompt = `Create a recipe with the following requirements:
+      Main ingredient: ${input.ingredient}
+      Dietary restrictions: ${input.dietaryRestrictions || 'none'}`;
+
+    // Generate structured recipe data using the same schema
     const { output } = await ai.generate({
-      model: 'gemini-2.5-flash',
-      prompt: [
-        { text: "Analyze this video file comprehensively based on the provided JSON schema." },
-        { media: { url: input.fileUri, contentType: input.mimeType } }
-      ],
-      output: { schema: AnalysisOutputSchema },
+      prompt,
+      output: { schema: RecipeSchema },
     });
 
-    if (!output) {
-      throw new Error("AI analysis failed to produce a valid output.");
-    }
+    if (!output) throw new Error('Failed to generate recipe');
+
     return output;
-  }
+  },
 );
 
+// Run the flow
+async function main() {
+  const recipe = await recipeGeneratorFlow({
+    ingredient: 'avocado',
+    dietaryRestrictions: 'vegetarian',
+  });
 
-// ==========================================
-// [Trigger] 파일 처리 및 Flow 실행
-// ==========================================
-
-// [Helper] MIME Type 도구
-function getMimeType(filePath: string): string {
-  const extension = path.extname(filePath).toLowerCase();
-  switch (extension) {
-    case ".mp4": return "video/mp4";
-    case ".mov": return "video/quicktime";
-    case ".avi": return "video/x-msvideo";
-    case ".wmv": return "video/x-ms-wmv";
-    case ".webm": return "video/webm";
-    case ".mkv": return "video/x-matroska";
-    default: return "video/mp4";
-  }
+  console.log(recipe);
 }
 
-export const analyzeVideoOnWrite = onDocumentWritten(
-  {
-    document: "episodes/{episodeId}",
-    region: "asia-northeast3",
-    secrets: [apiKey],
-    timeoutSeconds: 3600, // 1시간
-    memory: "2GiB",
-  },
-  async (event: FirestoreEvent<Change<DocumentSnapshot> | undefined, { episodeId: string }>) => {
-    const change = event.data;
-    if (!change) return;
-
-    const beforeData = change.before.data();
-    const afterData = change.after.data();
-    if (!afterData) return;
-
-    // 상태 관리: Pending -> Processing
-    if (afterData.aiProcessingStatus === "pending") {
-      console.log(`✨ New upload detected [${event.params.episodeId}]. Auto-starting...`);
-      await change.after.ref.update({ aiProcessingStatus: "processing" });
-      return;
-    }
-
-    // 이미 처리 중이거나 완료된 경우 스킵
-    if (afterData.aiProcessingStatus !== "processing" || beforeData?.aiProcessingStatus === "processing") {
-        return;
-    }
-
-    const filePath = afterData.filePath;
-    if (!filePath) {
-      await change.after.ref.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath found" });
-      return;
-    }
-
-    console.log("🚀 Starting Video Processing:", event.params.episodeId);
-
-    const fileManager = new GoogleAIFileManager(apiKey.value());
-    const tempFilePath = path.join(os.tmpdir(), `video_${event.params.episodeId}${path.extname(filePath)}`);
-    let uploadedFileId = "";
-
-    try {
-      // 1. Storage에서 다운로드
-      console.log(`📥 Downloading from Firebase Storage...`);
-      await getStorage().bucket().file(filePath).download({ destination: tempFilePath });
-
-      // 2. Gemini File API 업로드
-      const mimeType = getMimeType(filePath);
-      console.log(`📡 Uploading to Gemini File API... (${mimeType})`);
-      const uploadResult = await fileManager.uploadFile(tempFilePath, {
-        mimeType: mimeType,
-        displayName: `Episode ${event.params.episodeId}`,
-      });
-
-      const file = uploadResult.file;
-      uploadedFileId = file.name;
-
-      // 3. Gemini 측 처리 대기 (Polling)
-      let state = file.state;
-      console.log(`⏳ Waiting for Gemini processing... Initial state: ${state}`);
-      while (state === FileState.PROCESSING) {
-        await new Promise((r) => setTimeout(r, 5000));
-        const freshFile = await fileManager.getFile(file.name);
-        state = freshFile.state;
-        console.log(`... Gemini processing state: ${state}`);
-      }
-
-      if (state === FileState.FAILED) {
-          throw new Error("Video processing failed on Gemini's side.");
-      }
-      console.log(`✅ Gemini processing complete. File URI: ${file.uri}`);
-
-      // 4. ★ Genkit Flow 호출
-      console.log(`🧠 Calling 'videoAnalysisFlow' Genkit Flow...`);
-      const result = await videoAnalysisFlow({
-        fileUri: file.uri,
-        mimeType: mimeType
-      });
-
-      // 5. 결과 저장
-      const combinedContent = `
-Summary: ${result.summary}\n
-Timeline:
-${result.timeline.map(t => `- [${t.timestamp}] ${t.event} (Visual: ${t.visualDetail})`).join('\n')}\n
-Visual Cues: ${result.visualCues.join(', ')}\n
-Keywords: ${result.keywords.join(', ')}
-      `.trim();
-
-      await change.after.ref.update({
-        aiProcessingStatus: "completed",
-        transcript: result.transcript,
-        aiGeneratedContent: combinedContent,
-        aiProcessingError: null,
-        updatedAt: new Date()
-      });
-      console.log("✅ Analysis Success! Results saved to Firestore.");
-
-    } catch (error) {
-      console.error("❌ An error occurred during the process:", error);
-      await change.after.ref.update({
-        aiProcessingStatus: "failed",
-        aiProcessingError: String(error)
-      });
-    } finally {
-      // 6. 리소스 정리 (Cleanup)
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      if (uploadedFileId) {
-        try { await fileManager.deleteFile(uploadedFileId); } catch (e) { console.log("⚠️ Cleanup warning: Could not delete file from Gemini."); }
-      }
-    }
-  }
-);
-
-// ==========================================
-// 기능 2: 문서 삭제 시 파일 자동 청소 (기존 유지)
-// ==========================================
-export const deleteFilesOnEpisodeDelete = onDocumentDeleted(
-  {
-    document: "episodes/{episodeId}",
-    region: "asia-northeast3",
-  },
-  async (event) => {
-    const data = event.data?.data();
-    if (!data) return;
-
-    const bucket = getStorage().bucket();
-    const paths = [data.filePath, data.defaultThumbnailPath, data.customThumbnailPath, data.vttPath];
-    
-    await Promise.all(
-      paths.filter(p => p).map(p => bucket.file(p).delete().catch(() => {}))
-    );
-    console.log(`✅ Cleanup finished for deleted episode: ${event.params.episodeId}`);
-  }
-);
+main().catch(console.error);
