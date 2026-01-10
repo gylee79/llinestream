@@ -132,7 +132,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       console.log(`🎥 Analyzing...`);
       
       const llmResponse = await ai.generate({
-        model: 'gemini-1.5-flash',
+        model: googleAI.model('gemini-2.5-flash'),
         prompt: [
           { text: "Analyze this video file comprehensively based on the provided JSON schema." },
           { media: { url: file.uri, contentType: file.mimeType } }
