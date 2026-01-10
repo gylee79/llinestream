@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { useFirebase } from '@/firebase/provider'; 
+import { useAuth } from '@/firebase/hooks';
 
 /** Utility type to add an 'id' field to a given type T. */
 type WithId<T> = T & { id: string };
@@ -44,7 +44,7 @@ export function useDoc<T = any>(
   docRef: DocumentReference<DocumentData> | null | undefined,
 ): UseDocResult<T> {
   type StateDataType = WithId<T> | null;
-  const { authUser } = useFirebase();
+  const auth = useAuth(); // Use the auth instance directly
 
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -65,7 +65,7 @@ export function useDoc<T = any>(
       const contextualError = new FirestorePermissionError({
         operation: 'get',
         path: docRef.path,
-      }, authUser);
+      }, auth.currentUser); // Get the currentUser at the moment of error
       setError(contextualError);
       errorEmitter.emit('permission-error', contextualError);
     } else {
@@ -73,7 +73,7 @@ export function useDoc<T = any>(
     }
     setData(null);
     setIsLoading(false);
-  }, [docRef, authUser]);
+  }, [docRef, auth]);
 
   useEffect(() => {
     // If the ref is not ready, reset the state and wait.
