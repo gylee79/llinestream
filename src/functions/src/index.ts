@@ -1,3 +1,4 @@
+
 import { onDocumentWritten, onDocumentDeleted, Change, FirestoreEvent } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import { genkit, z } from "genkit";
@@ -18,22 +19,12 @@ if (!getApps().length) {
 // 1. API Key 비밀 설정
 const apiKey = defineSecret("GOOGLE_GENAI_API_KEY");
 
-// 2. Genkit 초기화 (gemini-2.5-flash 기본 설정)
+// 2. Genkit 초기화 (플러그인만 등록)
 const ai = genkit({
   plugins: [googleAI()],
-  model: googleAI.model("gemini-2.5-flash"), // 여기서 모델을 고정합니다.
 });
 
-// ==========================================
-// [Genkit Flow] AI 로직 정의 (Brain)
-// ==========================================
-
-// 3. 입/출력 스키마 정의
-const VideoAnalysisInputSchema = z.object({
-  fileUri: z.string().describe("Gemini File API URI"),
-  mimeType: z.string().describe("Video MIME type"),
-});
-
+// 3. AI 분석 결과에 대한 Zod 스키마 정의 (재사용을 위해 유지)
 const AnalysisOutputSchema = z.object({
   transcript: z.string().describe('The full and accurate audio transcript of the video.'),
   summary: z.string().describe('A concise summary of the entire video content.'),
@@ -46,31 +37,9 @@ const AnalysisOutputSchema = z.object({
   keywords: z.array(z.string()).describe('An array of relevant keywords for searching and tagging.'),
 });
 
-// 4. Flow 정의 (여기가 핵심!)
-export const videoAnalysisFlow = ai.defineFlow(
-  {
-    name: 'videoAnalysisFlow',
-    inputSchema: VideoAnalysisInputSchema,
-    outputSchema: AnalysisOutputSchema,
-  },
-  async (input) => {
-    // 프롬프트와 미디어를 결합하여 AI에게 요청
-    const { output } = await ai.generate({
-      prompt: "Analyze this video file comprehensively based on the provided JSON schema.",
-      docs: [
-        { media: { url: input.fileUri, contentType: input.mimeType } }
-      ],
-      output: { schema: AnalysisOutputSchema }, // 출력 포맷 강제
-    });
-
-    if (!output) throw new Error("AI analysis failed to produce output.");
-    return output;
-  }
-);
-
 
 // ==========================================
-// [Trigger] 파일 처리 및 Flow 실행 (Hand)
+// [Trigger] 파일 처리 및 AI 분석 실행
 // ==========================================
 
 // [Helper] MIME Type 도구
@@ -152,12 +121,19 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       if (state === FileState.FAILED) throw new Error("Gemini File Processing Failed.");
 
-      // 4. ★ Genkit Flow 호출 (리팩토링된 부분)
-      console.log(`🎥 Calling Genkit Flow...`);
-      const result = await videoAnalysisFlow({
-        fileUri: file.uri,
-        mimeType: mimeType
+      // 4. ★ AI 분석 직접 호출 (Genkit 1.0 공식 가이드 방식)
+      console.log(`🎥 Calling ai.generate...`);
+      const { output } = await ai.generate({
+        model: 'gemini-2.5-flash',
+        prompt: [
+          { text: "Analyze this video file comprehensively based on the provided JSON schema." },
+          { media: { url: file.uri, contentType: file.mimeType } }
+        ],
+        output: { schema: AnalysisOutputSchema },
       });
+
+      if (!output) throw new Error("AI analysis failed to produce output.");
+      const result = output; // 이제 result는 이미 스키마에 맞는 객체입니다.
 
       // 5. 결과 저장
       const combinedContent = `
@@ -214,3 +190,5 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted(
     console.log(`✅ Cleanup finished: ${event.params.episodeId}`);
   }
 );
+
+    
