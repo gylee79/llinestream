@@ -209,15 +209,15 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             브라우저가 비디오 태그를 지원하지 않습니다.
           </video>
         </div>
-        <DialogHeader className="px-4 py-0 border-b flex-shrink-0">
-            <div className="flex justify-between items-center py-0">
+        <DialogHeader className="px-4 border-b flex-shrink-0">
+            <div className="flex justify-between items-center">
                 <DialogTitle className="text-base font-bold truncate pr-4">{activeView === 'chat' ? episode.title : '과거 채팅 기록'}</DialogTitle>
                 <div className="flex flex-col items-end flex-shrink-0">
-                    {instructor && <p className="text-xs text-muted-foreground my-0">강사: {instructor.name}</p>}
+                    {instructor && <p className="text-xs text-muted-foreground">강사: {instructor.name}</p>}
                      <Button 
                         variant="outline" 
                         size="sm" 
-                        className="h-7 mt-0" 
+                        className="h-7" 
                         onClick={() => setActiveView(prev => prev === 'chat' ? 'history' : 'chat')}
                      >
                         <History className="h-3 w-3 mr-1.5" />
