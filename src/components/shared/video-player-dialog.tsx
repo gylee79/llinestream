@@ -209,7 +209,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             브라우저가 비디오 태그를 지원하지 않습니다.
           </video>
         </div>
-        <DialogHeader className="px-4 py-2 border-b flex-shrink-0">
+        <DialogHeader className="px-4 pt-2 pb-2 border-b flex-shrink-0">
             <div className="flex justify-between items-center">
                 <DialogTitle className="text-base font-bold truncate pr-4">{activeView === 'chat' ? episode.title : '과거 채팅 기록'}</DialogTitle>
                 <div className="flex flex-col items-end flex-shrink-0">
@@ -227,7 +227,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             </div>
         </DialogHeader>
         
-         <div className="flex-grow p-4 pt-0 flex flex-col gap-4 min-h-0">
+         <div className="flex-grow p-4 pt-2 flex flex-col gap-4 min-h-0">
             {activeView === 'chat' ? (
                 <>
                     <ScrollArea className="flex-grow bg-muted rounded-md p-4" viewportRef={chatScrollAreaRef}>
@@ -301,3 +301,5 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
+
+    
