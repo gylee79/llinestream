@@ -6,7 +6,7 @@ import { googleAI } from "@genkit-ai/google-genai";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
-import { GoogleAIFileManager, FileState } from "@google/generative-ai/files";
+import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
 import { DocumentSnapshot } from "firebase-admin/firestore";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
