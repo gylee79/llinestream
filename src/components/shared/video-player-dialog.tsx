@@ -185,16 +185,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <DialogContent className="max-w-4xl p-0 border-0 flex flex-col h-[90vh]">
-         <DialogClose asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-3 top-3 z-10 bg-black/50 hover:bg-black/70 text-white hover:text-white rounded-full"
-          >
-            <X className="h-5 w-5" />
-            <span className="sr-only">닫기</span>
-          </Button>
-        </DialogClose>
+         
         <div className="aspect-video w-full bg-black flex-shrink-0">
           <video
             id={`video-${videoKey}`}
