@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -43,7 +44,7 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
       <div className="flex justify-between items-center mb-4">
         {title && (
             <h2 className="font-headline text-2xl font-semibold tracking-tight">
-              {title}
+              {title} <span className="text-muted-foreground text-xl">({items.length})</span>
             </h2>
         )}
       </div>
