@@ -38,21 +38,23 @@ const firestore_1 = require("firebase-functions/v2/firestore");
 const params_1 = require("firebase-functions/params");
 const genkit_1 = require("genkit");
 const google_genai_1 = require("@genkit-ai/google-genai");
+const path = __importStar(require("path"));
+const os = __importStar(require("os"));
+const fs = __importStar(require("fs"));
+const server_1 = require("@google/generative-ai/server");
 const app_1 = require("firebase-admin/app");
 const storage_1 = require("firebase-admin/storage");
-const path = __importStar(require("path"));
-// 0. Firebase Admin 초기화 (한 번만 실행)
+// 0. Firebase Admin 초기화
 if (!(0, app_1.getApps)().length) {
     (0, app_1.initializeApp)();
 }
 // 1. API Key 비밀 설정
 const apiKey = (0, params_1.defineSecret)("GOOGLE_GENAI_API_KEY");
-// 2. Genkit 초기화 (별도 파일 없이 여기서 바로 설정)
+// 2. Genkit 초기화 (최신 가이드에 따라 apiVersion 제거)
 const ai = (0, genkit_1.genkit)({
     plugins: [(0, google_genai_1.googleAI)()],
-    model: google_genai_1.googleAI.model("gemini-2.5-flash"),
 });
-// 3. 정밀 분석 스키마 정의
+// 3. AI 분석 결과에 대한 Zod 스키마 정의
 const AnalysisOutputSchema = genkit_1.z.object({
     transcript: genkit_1.z.string().describe('The full and accurate audio transcript of the video.'),
     summary: genkit_1.z.string().describe('A concise summary of the entire video content.'),
@@ -64,7 +66,10 @@ const AnalysisOutputSchema = genkit_1.z.object({
     visualCues: genkit_1.z.array(genkit_1.z.string()).describe('A list of important on-screen text (OCR) or significant visual objects.'),
     keywords: genkit_1.z.array(genkit_1.z.string()).describe('An array of relevant keywords for searching and tagging.'),
 });
-// [Helper] 파일 확장자에 따라 MIME Type을 찾아주는 도구 (AI 분석 실패 해결!)
+// ==========================================
+// [Trigger] 파일 처리 및 AI 분석 실행
+// ==========================================
+// [Helper] MIME Type 도구
 function getMimeType(filePath) {
     const extension = path.extname(filePath).toLowerCase();
     switch (extension) {
@@ -72,69 +77,82 @@ function getMimeType(filePath) {
         case ".mov": return "video/quicktime";
         case ".avi": return "video/x-msvideo";
         case ".wmv": return "video/x-ms-wmv";
-        case ".flv": return "video/x-flv";
         case ".webm": return "video/webm";
         case ".mkv": return "video/x-matroska";
-        case ".3gp": return "video/3gpp";
-        case ".mpg":
-        case ".mpeg": return "video/mpeg";
-        default: return "video/mp4"; // 모르면 mp4로 간주
+        default: return "video/mp4";
     }
 }
-// ==========================================
-// 기능 1: 비디오 업로드 시 AI 분석 (자동 시작 + 최적화)
-// ==========================================
 exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)({
     document: "episodes/{episodeId}",
     region: "asia-northeast3",
     secrets: [apiKey],
-    timeoutSeconds: 540, // 9분 타임아웃
-    memory: "1GiB",
+    timeoutSeconds: 3600, // 1시간
+    memory: "2GiB",
 }, async (event) => {
-    const snapshot = event.data?.after;
-    if (!snapshot)
+    const change = event.data;
+    if (!change)
         return;
-    const data = snapshot.data();
-    if (!data)
-        return; // 데이터가 없으면 종료
-    const currentStatus = data.aiProcessingStatus;
-    // [핵심 1] 'pending'이면 자동으로 'processing'으로 바꿔서 스스로를 다시 호출함
-    if (currentStatus === "pending") {
-        console.log(`✨ New upload detected [${event.params.episodeId}]. Auto-starting analysis...`);
-        await snapshot.ref.update({ aiProcessingStatus: "processing" });
+    const beforeData = change.before.data();
+    const afterData = change.after.data();
+    if (!afterData)
         return;
-    }
-    // [핵심 2] 'processing' 상태가 아니면 무시 (중복 방지)
-    if (currentStatus !== "processing") {
+    // 상태 관리: Pending -> Processing
+    if (afterData.aiProcessingStatus === "pending") {
+        console.log(`✨ New upload detected [${event.params.episodeId}]. Auto-starting...`);
+        await change.after.ref.update({ aiProcessingStatus: "processing" });
         return;
     }
-    const filePath = data.filePath;
+    // 이미 처리 중이거나 완료된 경우 스킵
+    if (afterData.aiProcessingStatus !== "processing")
+        return;
+    if (beforeData?.aiProcessingStatus === "processing")
+        return;
+    const filePath = afterData.filePath;
     if (!filePath) {
-        console.error("No filePath found");
-        await snapshot.ref.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath found" });
+        await change.after.ref.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath found" });
         return;
     }
-    console.log("🚀 Gemini 2.5 Video Analysis Started:", event.params.episodeId);
+    console.log("🚀 Starting Video Processing:", event.params.episodeId);
+    const fileManager = new server_1.GoogleAIFileManager(apiKey.value());
+    const tempFilePath = path.join(os.tmpdir(), `video_${event.params.episodeId}${path.extname(filePath)}`);
+    let uploadedFileId = "";
     try {
-        const bucketName = (0, storage_1.getStorage)().bucket().name;
-        const gsUrl = `gs://${bucketName}/${filePath}`;
-        // [핵심 3] 파일 타입 자동 감지 (에러 해결의 열쇠)
+        // 1. Storage에서 다운로드
+        console.log(`📥 Downloading...`);
+        await (0, storage_1.getStorage)().bucket().file(filePath).download({ destination: tempFilePath });
+        // 2. Gemini File API 업로드
         const mimeType = getMimeType(filePath);
-        console.log(`🎥 Analyzing Video via URL: ${gsUrl} (Type: ${mimeType})`);
-        // [핵심 4] 다운로드 없이 URL만 전달 (가성비 최고)
-        const llmResponse = await ai.generate({
-            prompt: [
-                { text: "Analyze this video file comprehensively based on the provided schema." },
-                { media: { url: gsUrl, contentType: mimeType } }
-            ],
-            output: {
-                format: "json",
-                schema: AnalysisOutputSchema,
-            },
+        console.log(`📡 Uploading to Gemini... (${mimeType})`);
+        const uploadResult = await fileManager.uploadFile(tempFilePath, {
+            mimeType: mimeType,
+            displayName: `Episode ${event.params.episodeId}`,
         });
-        const result = llmResponse.output;
-        if (!result)
-            throw new Error("No output from AI");
+        const file = uploadResult.file;
+        uploadedFileId = file.name;
+        // 3. 처리 대기 (Polling)
+        let state = file.state;
+        console.log(`⏳ Waiting for Gemini processing...`);
+        while (state === server_1.FileState.PROCESSING) {
+            await new Promise((r) => setTimeout(r, 5000));
+            const freshFile = await fileManager.getFile(file.name);
+            state = freshFile.state;
+        }
+        if (state === server_1.FileState.FAILED)
+            throw new Error("Gemini File Processing Failed.");
+        // 4. ★ AI 분석 직접 호출 (Zod 스키마 적용)
+        console.log(`🎥 Calling ai.generate with correct file URI: ${file.uri}`);
+        const { output } = await ai.generate({
+            model: 'gemini-2.5-pro',
+            prompt: [
+                { text: "Analyze this video file comprehensively based on the provided JSON schema." },
+                { media: { url: file.uri, contentType: file.mimeType } }
+            ],
+            output: { schema: AnalysisOutputSchema },
+        });
+        if (!output)
+            throw new Error("AI analysis failed to produce output.");
+        const result = output;
+        // 5. 결과 저장
         const combinedContent = `
 Summary: ${result.summary}\n
 Timeline:
@@ -142,51 +160,49 @@ ${result.timeline.map(t => `- [${t.timestamp}] ${t.event} (Visual: ${t.visualDet
 Visual Cues: ${result.visualCues.join(', ')}\n
 Keywords: ${result.keywords.join(', ')}
       `.trim();
-        await snapshot.ref.update({
+        await change.after.ref.update({
             aiProcessingStatus: "completed",
             transcript: result.transcript,
             aiGeneratedContent: combinedContent,
             aiProcessingError: null,
             updatedAt: new Date()
         });
-        console.log("✅ Analysis Finished & Data Saved!");
+        console.log("✅ Analysis Success!");
     }
     catch (error) {
         console.error("❌ Error:", error);
-        await snapshot.ref.update({
+        await change.after.ref.update({
             aiProcessingStatus: "failed",
             aiProcessingError: String(error)
         });
     }
+    finally {
+        // 6. 청소 (Cleanup)
+        if (fs.existsSync(tempFilePath))
+            fs.unlinkSync(tempFilePath);
+        if (uploadedFileId) {
+            try {
+                await fileManager.deleteFile(uploadedFileId);
+            }
+            catch (e) {
+                console.log("⚠️ Cleanup warning");
+            }
+        }
+    }
 });
 // ==========================================
-// 기능 2: 문서 삭제 시 파일 자동 청소
+// 기능 2: 문서 삭제 시 파일 자동 청소 (기존 유지)
 // ==========================================
 exports.deleteFilesOnEpisodeDelete = (0, firestore_1.onDocumentDeleted)({
     document: "episodes/{episodeId}",
     region: "asia-northeast3",
 }, async (event) => {
-    const snap = event.data;
-    if (!snap)
-        return;
-    const data = snap.data();
+    const data = event.data?.data();
     if (!data)
         return;
     const bucket = (0, storage_1.getStorage)().bucket();
-    const cleanupPromises = [];
-    if (data.filePath) {
-        console.log(`🗑️ Deleting video file: ${data.filePath}`);
-        cleanupPromises.push(bucket.file(data.filePath).delete().catch(err => {
-            console.log(`⚠️ Video delete skipped: ${err.message}`);
-        }));
-    }
-    if (data.thumbnailPath) {
-        console.log(`🗑️ Deleting thumbnail file: ${data.thumbnailPath}`);
-        cleanupPromises.push(bucket.file(data.thumbnailPath).delete().catch(err => {
-            console.log(`⚠️ Thumbnail delete skipped: ${err.message}`);
-        }));
-    }
-    await Promise.all(cleanupPromises);
-    console.log(`✅ Cleanup finished for episode: ${event.params.episodeId}`);
+    const paths = [data.filePath, data.defaultThumbnailPath, data.customThumbnailPath, data.vttPath];
+    await Promise.all(paths.filter(p => p).map(p => bucket.file(p).delete().catch(() => { })));
+    console.log(`✅ Cleanup finished: ${event.params.episodeId}`);
 });
 //# sourceMappingURL=index.js.map
