@@ -1,29 +1,5 @@
 
 {
-  "indexes": [
-    {
-      "collectionGroup": "chats",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "episodeId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "chats",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "subscriptions",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "purchasedAt", "order": "DESCENDING" }
-      ]
-    }
-  ],
+  "indexes": [],
   "fieldOverrides": []
 }
