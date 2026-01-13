@@ -16,8 +16,8 @@ type LogViewPayload = Omit<EpisodeViewLog, 'id' | 'endedAt' | 'duration' | 'star
 export async function logEpisodeView(payload: LogViewPayload): Promise<{ success: boolean, message: string }> {
   const { userId, userName, userEmail, episodeId, episodeTitle, courseId, startedAt, endedAt } = payload;
   
-  if (!userId || !episodeId) {
-    return { success: false, message: '사용자 ID와 에피소드 ID는 필수입니다.' };
+  if (!userId || !episodeId || !courseId) {
+    return { success: false, message: '사용자 ID, 에피소드 ID, 강좌 ID는 필수입니다.' };
   }
 
   try {
@@ -47,3 +47,5 @@ export async function logEpisodeView(payload: LogViewPayload): Promise<{ success
     return { success: false, message: `시청 기록 저장 실패: ${errorMessage}` };
   }
 }
+
+    
