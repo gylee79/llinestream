@@ -18,13 +18,6 @@
       ]
     },
     {
-      "collectionGroup": "viewHistory",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "endedAt", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "subscriptions",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
