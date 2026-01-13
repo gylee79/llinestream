@@ -67,7 +67,7 @@ export default function Footer() {
           <div className="grid grid-cols-3 gap-8">
             <div>
               <h3 className="font-semibold text-foreground">사업자 정보</h3>
-              <div className="mt-4 space-y-2 text-[11px] sm:text-sm text-muted-foreground">
+              <div className="mt-4 space-y-1 text-[11px] sm:text-sm text-muted-foreground">
                 <p>
                   <span>{settings.companyName}</span>
                   <span className="mx-1">|</span>
@@ -80,7 +80,7 @@ export default function Footer() {
 
             <div>
               <h3 className="font-semibold text-foreground">고객센터</h3>
-              <div className="mt-4 space-y-20 text-[11px] sm:text-sm text-muted-foreground">
+              <div className="mt-4 space-y-2 text-[11px] sm:text-sm text-muted-foreground">
                 <p>전화번호: {settings.supportPhone}</p>
                 <p>상담시간: {settings.supportHours}</p>
                 {settings.kakaoTalkUrl && (
@@ -96,7 +96,7 @@ export default function Footer() {
 
             <div>
               <h3 className="font-semibold text-foreground">정책</h3>
-              <nav className="mt-4 flex flex-col space-y-20 text-[11px] sm:text-sm">
+              <nav className="mt-4 flex flex-col space-y-2 text-[11px] sm:text-sm">
                 <Link href="/policies/terms" className="text-muted-foreground hover:text-foreground">
                   서비스 이용약관
                 </Link>
