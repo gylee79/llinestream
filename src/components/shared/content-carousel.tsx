@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -31,15 +30,19 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
   const isContinueWatching = title === '시청 기록';
   
   const getItemBasisClass = () => {
-    if (itemType === 'classification') {
-      return 'basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6';
-    }
     // For "Continue Watching" on mobile, show 2.5 items.
     if (isContinueWatching && isMobile) {
       return 'basis-[40%]';
     }
-    // For other carousels, use the default behavior.
-    return 'basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5';
+    // For other carousels on mobile, show 2 items.
+    if (isMobile) {
+        return 'basis-1/2';
+    }
+    // Default for desktop
+    if (itemType === 'classification') {
+      return 'sm:basis-1/4 md:basis-1/5 lg:basis-1/6';
+    }
+    return 'sm:basis-1/3 md:basis-1/4 lg:basis-1/5';
   };
 
   return (
