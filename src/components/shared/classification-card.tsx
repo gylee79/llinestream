@@ -12,10 +12,10 @@ interface ClassificationCardProps {
 export default function ClassificationCard({ classification }: ClassificationCardProps) {
   return (
     <Link href={`/classifications/${classification.id}`} className="block h-full group">
-      <Card className="relative h-full overflow-hidden transition-transform duration-300 ease-in-out hover:scale-105 bg-card border-0">
-        <div className="relative aspect-video overflow-hidden">
+      <Card className="relative h-full overflow-hidden transition-transform duration-300 ease-in-out hover:scale-105 bg-card border-0 rounded-lg">
+        <div className="relative aspect-square overflow-hidden">
           <Image
-            src={classification.thumbnailUrl || 'https://picsum.photos/seed/placeholder/600/400'}
+            src={classification.thumbnailUrl || 'https://picsum.photos/seed/placeholder/600/600'}
             alt={classification.name}
             fill
             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
