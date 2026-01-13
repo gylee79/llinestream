@@ -282,7 +282,7 @@ export default function VideoManager() {
                   episodes?.map((episode) => (
                     <TableRow key={episode.id}>
                       <TableCell>
-                          <div className="relative aspect-video w-20 rounded-md overflow-hidden bg-muted border">
+                          <div className="relative aspect-video w-20 rounded-lg overflow-hidden bg-muted border">
                               {episode.thumbnailUrl ? (
                                   <Image
                                       src={episode.thumbnailUrl}

@@ -1,3 +1,4 @@
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,7 +19,7 @@ export default function CourseCard({ course, instructor, field, rank }: CourseCa
 
   return (
     <Link href={`/courses/${course.id}`} className="block h-full group">
-      <Card className="h-full flex flex-col border-transparent shadow-none hover:bg-card transition-colors duration-300 bg-transparent rounded-xl">
+      <Card className="h-full flex flex-col border-transparent shadow-none hover:bg-card transition-colors duration-300 bg-transparent rounded-lg">
         <CardContent className="p-0">
           <div className="aspect-video overflow-hidden relative rounded-lg shadow-md group-hover:shadow-xl transition-shadow duration-300">
             {course.thumbnailUrl ? (
@@ -30,7 +31,7 @@ export default function CourseCard({ course, instructor, field, rank }: CourseCa
                 className="h-full w-full object-cover transition-transform duration-500 ease-in-out group-hover:scale-105"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-muted">
+              <div className="flex h-full w-full items-center justify-center bg-muted rounded-lg">
                 <ImageIcon className="h-10 w-10 text-muted-foreground" />
               </div>
             )}

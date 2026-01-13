@@ -13,14 +13,14 @@ export default function EpisodeCard({ episode }: EpisodeCardProps) {
   return (
     <Link href={`/courses/${episode.courseId}?episode=${episode.id}`} className="block h-full">
       <Card className="h-full overflow-hidden transition-all duration-300 hover:shadow-lg bg-transparent border-none shadow-none rounded-lg">
-        <div className="aspect-video overflow-hidden relative">
+        <div className="aspect-video overflow-hidden relative rounded-lg">
           {episode.thumbnailUrl ? (
             <Image
               src={episode.thumbnailUrl}
               alt={episode.title}
               width={600}
               height={400}
-              className="h-full w-full object-cover transition-transform duration-300 hover:scale-105 rounded-lg"
+              className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-muted rounded-lg">
