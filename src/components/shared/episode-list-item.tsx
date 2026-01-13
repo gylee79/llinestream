@@ -62,7 +62,7 @@ export default function EpisodeListItem({ episode, instructor, user, comments, h
     
     return (
         <>
-            <Card className="overflow-hidden border-primary/50 shadow-md transition-shadow hover:shadow-lg">
+            <Card className="overflow-hidden border-primary/50 shadow-md transition-shadow hover:shadow-lg rounded-lg">
                 <CardContent className="p-3">
                      <div className="flex gap-3">
                         {/* Left Column */}

@@ -1,3 +1,4 @@
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,8 +12,8 @@ interface ClassificationCardProps {
 export default function ClassificationCard({ classification }: ClassificationCardProps) {
   return (
     <Link href={`/classifications/${classification.id}`} className="block h-full group">
-      <Card className="relative h-full overflow-hidden transition-transform duration-300 ease-in-out hover:scale-105 bg-card">
-        <div className="relative aspect-[4/3] overflow-hidden">
+      <Card className="relative h-full overflow-hidden transition-transform duration-300 ease-in-out hover:scale-105 bg-card rounded-lg">
+        <div className="relative aspect-[4/3] overflow-hidden rounded-lg">
           <Image
             src={classification.thumbnailUrl || 'https://picsum.photos/seed/placeholder/600/400'}
             alt={classification.name}
