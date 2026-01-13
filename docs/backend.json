@@ -323,6 +323,7 @@
         "id": { "type": "string", "description": "Unique identifier for the chat log." },
         "userId": { "type": "string", "description": "Reference to the user who asked the question." },
         "episodeId": { "type": "string", "description": "Reference to the episode the chat is about." },
+        "courseId": { "type": "string", "description": "Reference to the course the episode belongs to." },
         "question": { "type": "string", "description": "The user's question." },
         "answer": { "type": "string", "description": "The AI's generated answer." },
         "contextReferences": { "type": "array", "items": { "type": "string" }, "description": "The text chunks used as context for the answer." },
@@ -526,3 +527,5 @@
     "reasoning": "The Firestore data structure is designed to support LlineStream's video streaming and subscription model, focusing on secure and efficient data access. It incorporates key strategies like Authorization Independence through denormalization, Structural Segregation for homogeneous security postures, and Access Modeling using path-based ownership and membership maps.\\n\\n**Authorization Independence (Denormalization):** The structure avoids `get()` calls in security rules by denormalizing authorization data. For instance, the `Classification` entity's `id` is copied into the `Subscription` to allow rules on `subscriptions` collection to operate without reading the `classifications` document. A user's viewing history and chat logs are now stored in subcollections under their own user document, making security rules trivial.\\n\\n**Structural Segregation (Homogeneous Security Posture):** Each collection is designed to contain documents with the same security requirements. User-specific data is segregated under `/users/{userId}` paths (e.g., `subscriptions`, `viewHistory`, `chats`), while global content like `fields`, `classifications`, `courses`, `episodes` and `policies` reside in root-level collections.\\n\\n**Access Modeling:**\\n*   **Path-Based Ownership:** User-owned data such as subscriptions, view history, and chat logs are located under `/users/{userId}/...`, providing clear ownership and simplifying security rules. A user can only read their own subcollections.\\n*   **DBAC via Existence:** Admin roles are managed through the existence of documents in dedicated collections like `/roles_admin/{userId}`. This allows verifying admin status without reading user documents.\\n\\n**QAPs (Rules are not Filters):**\\n*   Secure `list` operations are ensured by the structural segregation. Listing a user's own `viewHistory`, `subscriptions`, or `chats` is secure and efficient because the query path itself is scoped to the authenticated user's ID."
   }
 }
+
+    
