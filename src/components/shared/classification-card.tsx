@@ -13,7 +13,7 @@ export default function ClassificationCard({ classification }: ClassificationCar
   return (
     <Link href={`/classifications/${classification.id}`} className="block h-full group">
       <Card className="relative h-full overflow-hidden transition-transform duration-300 ease-in-out hover:scale-105 bg-card border-0 rounded-lg">
-        <div className="relative aspect-square overflow-hidden">
+        <div className="relative aspect-square overflow-hidden rounded-lg">
           <Image
             src={classification.thumbnailUrl || 'https://picsum.photos/seed/placeholder/600/600'}
             alt={classification.name}
@@ -22,7 +22,7 @@ export default function ClassificationCard({ classification }: ClassificationCar
             className="object-cover transition-transform duration-500 ease-in-out"
           />
         </div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-lg" />
         <CardHeader className="absolute bottom-0 left-0 right-0 p-4 z-10">
           <CardTitle className="font-headline text-base md:text-lg tracking-tight text-white">
             {classification.name}
