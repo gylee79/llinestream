@@ -106,7 +106,7 @@ export const analyzeVideoOnWrite = functions.region("asia-northeast3")
       functions.logger.log(`🎥 Calling ai.generate with URL: ${videoUrl}`);
       
       const { output } = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash'),
+        model: 'gemini-2.5-flash',
         prompt: [
           { text: "Analyze this video file comprehensively based on the provided JSON schema." },
           { media: { url: videoUrl, contentType: mimeType } }
