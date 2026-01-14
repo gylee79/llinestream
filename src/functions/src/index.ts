@@ -3,13 +3,10 @@ import { onDocumentWritten, onDocumentDeleted, Change, FirestoreEvent } from "fi
 import { defineSecret } from "firebase-functions/params";
 import { genkit, z } from "genkit";
 import { googleAI } from "@genkit-ai/google-genai";
-import * as path from "path";
-import * as os from "os";
-import * as fs from "fs";
-import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
 import { DocumentSnapshot } from "firebase-admin/firestore";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
+import { getPublicUrl } from '../../lib/utils'; // Assuming utils is accessible
 
 // 0. Firebase Admin 초기화
 if (!getApps().length) {
@@ -91,50 +88,33 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
     console.log("🚀 Starting Video Processing:", event.params.episodeId);
 
-    const fileManager = new GoogleAIFileManager(apiKey.value());
-    const tempFilePath = path.join(os.tmpdir(), `video_${event.params.episodeId}${path.extname(filePath)}`);
-    let uploadedFileId = "";
-
     try {
-      // 1. Storage에서 다운로드
-      console.log(`📥 Downloading...`);
-      await getStorage().bucket().file(filePath).download({ destination: tempFilePath });
+      const bucket = getStorage().bucket();
+      const file = bucket.file(filePath);
+      
+      // Make the file public to get a URL, or sign it
+      // For simplicity, we'll use a public URL. Ensure your Storage Rules allow this.
+      await file.makePublic();
+      const publicUrl = file.publicUrl();
 
-      // 2. Gemini File API 업로드
+      console.log(`🎥 Calling ai.generate with public URL: ${publicUrl}`);
       const mimeType = getMimeType(filePath);
-      console.log(`📡 Uploading to Gemini... (${mimeType})`);
-      const uploadResult = await fileManager.uploadFile(tempFilePath, {
-        mimeType: mimeType,
-        displayName: `Episode ${event.params.episodeId}`,
-      });
 
-      const file = uploadResult.file;
-      uploadedFileId = file.name;
-
-      // 3. 처리 대기 (Polling)
-      let state = file.state;
-      console.log(`⏳ Waiting for Gemini processing...`);
-      while (state === FileState.PROCESSING) {
-        await new Promise((r) => setTimeout(r, 5000));
-        const freshFile = await fileManager.getFile(file.name);
-        state = freshFile.state;
-      }
-
-      if (state === FileState.FAILED) throw new Error("Gemini File Processing Failed.");
-
-      // 4. ★ AI 분석 직접 호출 (Zod 스키마 적용)
-      console.log(`🎥 Calling ai.generate with correct file URI: ${file.uri}`);
       const { output } = await ai.generate({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-pro-vision', // Use gemini-pro-vision as it's stable
         prompt: [
-          { text: "Analyze this video file comprehensively based on the provided JSON schema." },
-          { media: { url: file.uri, contentType: file.mimeType } }
+          { text: "Analyze this video file comprehensively based on the provided JSON schema. Ensure the output is a valid JSON object matching the schema." },
+          { media: { url: publicUrl, contentType: mimeType } }
         ],
-        output: { schema: AnalysisOutputSchema },
+        output: {
+          format: "json", // Request JSON output
+        },
       });
 
       if (!output) throw new Error("AI analysis failed to produce output.");
-      const result = output;
+      
+      // Since we can't enforce schema in older versions, we parse it manually
+      const result = AnalysisOutputSchema.parse(output);
 
       // 5. 결과 저장
       const combinedContent = `
@@ -160,12 +140,6 @@ Keywords: ${result.keywords.join(', ')}
         aiProcessingStatus: "failed",
         aiProcessingError: String(error)
       });
-    } finally {
-      // 6. 청소 (Cleanup)
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      if (uploadedFileId) {
-        try { await fileManager.deleteFile(uploadedFileId); } catch (e) { console.log("⚠️ Cleanup warning"); }
-      }
     }
   }
 );
@@ -191,3 +165,5 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted(
     console.log(`✅ Cleanup finished: ${event.params.episodeId}`);
   }
 );
+
+    
