@@ -125,7 +125,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       // 4. ★ AI 분석 직접 호출 (Zod 스키마 적용)
       console.log(`🎥 Calling ai.generate with correct file URI: ${file.uri}`);
       const { output } = await ai.generate({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-2.5-flash',
         prompt: [
           { text: "Analyze this video file comprehensively based on the provided JSON schema." },
           { media: { url: file.uri, contentType: file.mimeType } }

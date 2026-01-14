@@ -70,9 +70,9 @@ export default function ProfileDialog({ user, open, onOpenChange }: ProfileDialo
       const result = await updateUserProfileAndLog({
         userId: user.id,
         currentData: {
-          name: user.name,
-          phone: user.phone,
-          dob: user.dob,
+          name: user.name || '',
+          phone: user.phone || '',
+          dob: user.dob || '',
         },
         newData: data,
       });
