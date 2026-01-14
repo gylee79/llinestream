@@ -14,18 +14,17 @@ type UpdateResult = {
   message: string;
 };
 
+// Allow for potentially undefined fields coming from the user object
+type ProfileDataType = {
+    name?: string;
+    phone?: string;
+    dob?: string;
+}
+
 type UpdateProfilePayload = {
     userId: string;
-    currentData: {
-        name: string;
-        phone: string;
-        dob: string;
-    };
-    newData: {
-        name: string;
-        phone: string;
-        dob: string;
-    }
+    currentData: ProfileDataType;
+    newData: ProfileDataType;
 }
 
 export async function updateUserProfileAndLog(payload: UpdateProfilePayload): Promise<UpdateResult> {
@@ -51,11 +50,6 @@ export async function updateUserProfileAndLog(payload: UpdateProfilePayload): Pr
         // Compare fields and log changes
         (Object.keys(newData) as Array<keyof typeof newData>).forEach(key => {
             if (currentData[key] !== newData[key]) {
-                changedFields[key] = {
-                    oldValue: currentData[key],
-                    newValue: newData[key]
-                };
-                
                 const logRef = db.collection('user_audit_logs').doc();
                 const logEntry: Omit<UserAuditLog, 'id'> = {
                     userId: userId,
@@ -63,14 +57,14 @@ export async function updateUserProfileAndLog(payload: UpdateProfilePayload): Pr
                     userEmail: user.email,
                     changedAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
                     fieldName: key,
-                    oldValue: currentData[key],
-                    newValue: newData[key]
+                    oldValue: currentData[key] || '',
+                    newValue: newData[key] || ''
                 };
                 batch.set(logRef, logEntry);
             }
         });
 
-        if (Object.keys(changedFields).length > 0) {
+        if (Object.keys(newData).length > 0) {
             batch.update(userRef, newData);
             await batch.commit();
 
