@@ -1,4 +1,6 @@
 
+'use server';
+
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { genkit, z } from "genkit";
@@ -10,7 +12,7 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-// 1. Genkit 초기화
+// 1. Genkit 초기화 (API Key는 Secret Manager를 통해 주입됨)
 const ai = genkit({
   plugins: [googleAI({ apiKey: process.env.GOOGLE_GENAI_API_KEY })],
 });
@@ -43,7 +45,7 @@ function getMimeType(filePath: string): string {
 }
 
 // ==========================================
-// [Trigger] 파일 처리 및 AI 분석 실행 (v1 API 사용)
+// [Trigger] 파일 처리 및 AI 분석 실행 (v1 API 구문)
 // ==========================================
 export const analyzeVideoOnWrite = functions.region("asia-northeast3")
   .runWith({
@@ -56,6 +58,7 @@ export const analyzeVideoOnWrite = functions.region("asia-northeast3")
     
     // 문서가 삭제되었거나 데이터가 없는 경우 종료
     if (!change.after.exists) {
+      functions.logger.log(`[${context.params.episodeId}] Document deleted. Skipping.`);
       return null;
     }
     const afterData = change.after.data();
@@ -66,7 +69,7 @@ export const analyzeVideoOnWrite = functions.region("asia-northeast3")
 
     // 상태 관리: 'pending' -> 'processing'
     if (afterData.aiProcessingStatus === "pending") {
-      console.log(`✨ New upload detected [${episodeId}]. Auto-starting...`);
+      functions.logger.log(`✨ New upload detected [${episodeId}]. Setting status to 'processing'.`);
       return change.after.ref.update({ aiProcessingStatus: "processing" });
     }
 
@@ -76,30 +79,33 @@ export const analyzeVideoOnWrite = functions.region("asia-northeast3")
 
     const filePath = afterData.filePath;
     if (!filePath) {
-      console.error(`[${episodeId}] No filePath found.`);
+      functions.logger.error(`[${episodeId}] No filePath found.`);
       return change.after.ref.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath found" });
     }
 
-    console.log(`🚀 Starting Video Processing: ${episodeId}`);
+    functions.logger.log(`🚀 Starting Video Processing: ${episodeId}`);
 
     try {
       let videoUrl = afterData.videoUrl;
-      // videoUrl이 없는 경우, 공개 URL 생성
+
+      // videoUrl이 없는 경우, 공개 URL을 생성합니다.
       if (!videoUrl) {
-          console.log(`[Info] No videoUrl found for ${filePath}. Generating public URL.`);
+          functions.logger.info(`[${episodeId}] No videoUrl found for ${filePath}. Generating public URL.`);
           const bucket = admin.storage().bucket();
           const file = bucket.file(filePath);
           const [exists] = await file.exists();
-          if (!exists) throw new Error("File does not exist in Storage.");
+          if (!exists) throw new Error("File does not exist in Firebase Storage.");
           
+          // 파일을 공개로 설정합니다. (Storage 규칙에서 공개 접근이 허용되어야 함)
           await file.makePublic();
           videoUrl = file.publicUrl();
-          console.log(`[Info] Generated public URL: ${videoUrl}`);
+          functions.logger.info(`[${episodeId}] Generated public URL: ${videoUrl}`);
       }
 
       const mimeType = getMimeType(filePath);
 
-      console.log(`🎥 Calling ai.generate with URL: ${videoUrl}`);
+      functions.logger.log(`🎥 Calling ai.generate with URL: ${videoUrl}`);
+      
       const { output } = await ai.generate({
         model: googleAI.model('gemini-2.5-flash'),
         prompt: [
@@ -110,6 +116,7 @@ export const analyzeVideoOnWrite = functions.region("asia-northeast3")
       });
 
       if (!output) throw new Error("AI analysis failed to produce output.");
+      
       const result = output;
 
       const combinedContent = `
@@ -125,14 +132,14 @@ Keywords: ${result.keywords.join(', ')}
         transcript: result.transcript,
         aiGeneratedContent: combinedContent,
         aiProcessingError: null,
-        updatedAt: new Date()
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      console.log(`✅ [${episodeId}] Analysis Success!`);
+      functions.logger.log(`✅ [${episodeId}] Analysis Success!`);
       return null;
 
     } catch (error) {
-      console.error(`❌ [${episodeId}] Error:`, error);
       const errorMessage = error instanceof Error ? error.message : String(error);
+      functions.logger.error(`❌ [${episodeId}] Error during AI processing:`, error);
       return change.after.ref.update({
         aiProcessingStatus: "failed",
         aiProcessingError: errorMessage
@@ -142,7 +149,7 @@ Keywords: ${result.keywords.join(', ')}
 
 
 // ==========================================
-// [Trigger] 문서 삭제 시 파일 자동 청소 (v1 API 사용)
+// [Trigger] 문서 삭제 시 파일 자동 청소 (v1 API 구문)
 // ==========================================
 export const deleteFilesOnEpisodeDelete = functions.region("asia-northeast3")
   .firestore.document("episodes/{episodeId}")
@@ -155,10 +162,10 @@ export const deleteFilesOnEpisodeDelete = functions.region("asia-northeast3")
     const paths = [data.filePath, data.defaultThumbnailPath, data.customThumbnailPath, data.vttPath];
     
     const deletePromises = paths
-        .filter(p => p) //
-        .map(p => bucket.file(p).delete().catch(err => console.error(`Failed to delete ${p}:`, err.message)));
+        .filter(p => p) // 경로가 있는 항목만 필터링
+        .map(p => bucket.file(p).delete().catch(err => functions.logger.warn(`Failed to delete ${p}:`, err.message)));
     
     await Promise.all(deletePromises);
-    console.log(`✅ Cleanup finished for deleted episode: ${episodeId}`);
+    functions.logger.log(`✅ Cleanup finished for deleted episode: ${episodeId}`);
     return null;
   });
