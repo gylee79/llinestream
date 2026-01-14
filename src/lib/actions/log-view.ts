@@ -23,6 +23,7 @@ export async function logEpisodeView(payload: LogViewPayload): Promise<{ success
   try {
     const adminApp = initializeAdminApp();
     const db = admin.firestore(adminApp);
+    const batch = db.batch();
 
     const logEntry: Omit<EpisodeViewLog, 'id'> = {
       userId,
@@ -36,9 +37,15 @@ export async function logEpisodeView(payload: LogViewPayload): Promise<{ success
       duration: Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000), // duration in seconds
     };
     
-    // Store log only in the user's subcollection
+    // 1. Store log in the user's subcollection for their personal history
     const userLogRef = db.collection('users').doc(userId).collection('viewHistory').doc();
-    await userLogRef.set(logEntry);
+    batch.set(userLogRef, logEntry);
+
+    // 2. Store log in the global collection for admin auditing
+    const adminLogRef = db.collection('episode_view_logs').doc();
+    batch.set(adminLogRef, logEntry);
+    
+    await batch.commit();
 
     return { success: true, message: '시청 기록이 성공적으로 저장되었습니다.' };
   } catch (error) {
