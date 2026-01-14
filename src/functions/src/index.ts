@@ -7,6 +7,7 @@ import { DocumentSnapshot } from "firebase-admin/firestore";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { getPublicUrl } from '../../lib/utils'; // Assuming utils is accessible
+import * as path from "path";
 
 // 0. Firebase Admin 초기화
 if (!getApps().length) {
