@@ -179,7 +179,12 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         }
 
         const oldCustomThumbnailPath = extractPathFromUrl(oldCustomThumbnailUrl);
-        if (newCustomThumbnailData && oldCustomThumbnailPath && newCustomThumbnailData.filePath !== oldCustomThumbnailPath) {
+        // Handle deletion of custom thumbnail
+        if (newCustomThumbnailData?.filePath === null && oldCustomThumbnailPath) {
+            await deleteStorageFileByPath(storage, oldCustomThumbnailPath);
+        } 
+        // Handle replacement of custom thumbnail
+        else if (newCustomThumbnailData?.filePath && oldCustomThumbnailPath && newCustomThumbnailData.filePath !== oldCustomThumbnailPath) {
            await deleteStorageFileByPath(storage, oldCustomThumbnailPath);
         }
 

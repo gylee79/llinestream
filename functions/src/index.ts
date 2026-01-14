@@ -19,7 +19,7 @@ if (!getApps().length) {
 // 1. API Key 비밀 설정
 const apiKey = defineSecret("GOOGLE_GENAI_API_KEY");
 
-// 2. Genkit 초기화 (최신 가이드에 따라 apiVersion 제거)
+// 2. Genkit 초기화 (최신 가이드에 따라)
 const ai = genkit({
   plugins: [googleAI()],
 });
@@ -88,47 +88,43 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       await change.after.ref.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath found" });
       return;
     }
+    
+    // videoUrl이 있는지 확인. 없다면 publicUrl을 생성합니다.
+    let videoUrl = afterData.videoUrl;
+    if (!videoUrl) {
+        console.log(`[Info] No videoUrl found for ${filePath}. Generating public URL.`);
+        try {
+            const bucket = getStorage().bucket();
+            const file = bucket.file(filePath);
+            const [exists] = await file.exists();
+            if (!exists) throw new Error("File does not exist in Storage.");
+            
+            // 파일을 공개로 설정합니다. (Storage 규칙에서 공개 읽기를 허용해야 합니다)
+            await file.makePublic();
+            videoUrl = file.publicUrl();
+            console.log(`[Info] Generated public URL: ${videoUrl}`);
+        } catch(urlError) {
+             console.error("❌ Error generating public URL:", urlError);
+             await change.after.ref.update({
+                aiProcessingStatus: "failed",
+                aiProcessingError: "Failed to get video URL for analysis."
+            });
+            return;
+        }
+    }
+
 
     console.log("🚀 Starting Video Processing:", event.params.episodeId);
 
-    const fileManager = new GoogleAIFileManager(apiKey.value());
-    const tempFilePath = path.join(os.tmpdir(), `video_${event.params.episodeId}${path.extname(filePath)}`);
-    let uploadedFileId = "";
-
     try {
-      // 1. Storage에서 다운로드
-      console.log(`📥 Downloading...`);
-      await getStorage().bucket().file(filePath).download({ destination: tempFilePath });
-
-      // 2. Gemini File API 업로드
       const mimeType = getMimeType(filePath);
-      console.log(`📡 Uploading to Gemini... (${mimeType})`);
-      const uploadResult = await fileManager.uploadFile(tempFilePath, {
-        mimeType: mimeType,
-        displayName: `Episode ${event.params.episodeId}`,
-      });
 
-      const file = uploadResult.file;
-      uploadedFileId = file.name;
-
-      // 3. 처리 대기 (Polling)
-      let state = file.state;
-      console.log(`⏳ Waiting for Gemini processing...`);
-      while (state === FileState.PROCESSING) {
-        await new Promise((r) => setTimeout(r, 5000));
-        const freshFile = await fileManager.getFile(file.name);
-        state = freshFile.state;
-      }
-
-      if (state === FileState.FAILED) throw new Error("Gemini File Processing Failed.");
-
-      // 4. ★ AI 분석 직접 호출 (Zod 스키마 적용)
-      console.log(`🎥 Calling ai.generate with correct file URI: ${file.uri}`);
+      console.log(`🎥 Calling ai.generate with URL: ${videoUrl}`);
       const { output } = await ai.generate({
-        model: 'gemini-2.5-pro',
+        model: googleAI.model('gemini-2.5-flash'),
         prompt: [
           { text: "Analyze this video file comprehensively based on the provided JSON schema." },
-          { media: { url: file.uri, contentType: file.mimeType } }
+          { media: { url: videoUrl, contentType: mimeType } }
         ],
         output: { schema: AnalysisOutputSchema },
       });
@@ -136,7 +132,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       if (!output) throw new Error("AI analysis failed to produce output.");
       const result = output;
 
-      // 5. 결과 저장
+      // 결과 저장
       const combinedContent = `
 Summary: ${result.summary}\n
 Timeline:
@@ -160,12 +156,6 @@ Keywords: ${result.keywords.join(', ')}
         aiProcessingStatus: "failed",
         aiProcessingError: String(error)
       });
-    } finally {
-      // 6. 청소 (Cleanup)
-      if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-      if (uploadedFileId) {
-        try { await fileManager.deleteFile(uploadedFileId); } catch (e) { console.log("⚠️ Cleanup warning"); }
-      }
     }
   }
 );
@@ -191,6 +181,3 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted(
     console.log(`✅ Cleanup finished: ${event.params.episodeId}`);
   }
 );
-
-
-
