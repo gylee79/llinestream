@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -91,37 +90,15 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const chatScrollAreaRef = useRef<HTMLDivElement>(null);
 
 
-  // This key forces remounting of the video element when the episode changes
   const videoKey = episode.id; 
 
-  const handleClose = async () => {
+  const handleClose = () => {
     const videoElement = document.getElementById(`video-${videoKey}`) as HTMLVideoElement;
     if (videoElement) {
         videoElement.pause();
-        videoElement.src = ''; // This forces the browser to stop downloading/buffering
-    }
-
-    if (user && startTimeRef.current) {
-        const endTime = new Date();
-        const durationWatched = (endTime.getTime() - startTimeRef.current.getTime()) / 1000; // in seconds
-        
-        if (durationWatched > 1) { // Only log if watched for more than 1 second
-            const payload = {
-                userId: user.id,
-                userName: user.name,
-                userEmail: user.email,
-                episodeId: episode.id,
-                episodeTitle: episode.title,
-                courseId: episode.courseId,
-                startedAt: startTimeRef.current,
-                endedAt: endTime,
-            };
-            await logEpisodeView(payload);
-        }
-        startTimeRef.current = null; // Reset start time
+        videoElement.src = ''; 
     }
     onOpenChange(false);
-    // Reset state for next time
     setChatMessages([]);
     setUserQuestion('');
     setActiveView('chat');
@@ -131,7 +108,34 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     if (isOpen && user) {
         startTimeRef.current = new Date();
     }
-  }, [isOpen, user]);
+    
+    // Cleanup function: This runs when the component unmounts or dependencies change.
+    return () => {
+        if (user && startTimeRef.current) {
+            const endTime = new Date();
+            const durationWatched = (endTime.getTime() - startTimeRef.current.getTime()) / 1000;
+
+            if (durationWatched > 1) {
+                const payload = {
+                    userId: user.id,
+                    userName: user.name,
+                    userEmail: user.email,
+                    episodeId: episode.id,
+                    episodeTitle: episode.title,
+                    courseId: episode.courseId,
+                    startedAt: startTimeRef.current,
+                    endedAt: endTime,
+                };
+                // We call the server action directly here. 
+                // Note: In complex scenarios with many state dependencies, this might need debouncing.
+                logEpisodeView(payload);
+            }
+        }
+        // Reset start time for the next session.
+        startTimeRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, user, episode.id]);
   
   useEffect(() => {
     // Scroll to bottom when new messages are added
@@ -301,7 +305,3 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
-
-    
-
-    
