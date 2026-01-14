@@ -1,4 +1,3 @@
-
 'use server';
 
 import * as functions from "firebase-functions";
