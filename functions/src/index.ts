@@ -1,27 +1,21 @@
 
-import { onDocumentWritten, onDocumentDeleted, Change, FirestoreEvent } from "firebase-functions/v2/firestore";
-import { defineSecret } from "firebase-functions/params";
+import * as functions from "firebase-functions";
+import * as admin from "firebase-admin";
 import { genkit, z } from "genkit";
 import { googleAI } from "@genkit-ai/google-genai";
 import * as path from "path";
-import { DocumentSnapshot } from "firebase-admin/firestore";
-import { initializeApp, getApps } from "firebase-admin/app";
-import { getStorage } from "firebase-admin/storage";
 
 // 0. Firebase Admin 초기화
-if (!getApps().length) {
-  initializeApp();
+if (!admin.apps.length) {
+  admin.initializeApp();
 }
 
-// 1. API Key 비밀 설정
-const apiKey = defineSecret("GOOGLE_GENAI_API_KEY");
-
-// 2. Genkit 초기화 (최신 가이드에 따라)
+// 1. Genkit 초기화
 const ai = genkit({
-  plugins: [googleAI()],
+  plugins: [googleAI({ apiKey: process.env.GOOGLE_GENAI_API_KEY })],
 });
 
-// 3. AI 분석 결과에 대한 Zod 스키마 정의
+// 2. AI 분석 결과에 대한 Zod 스키마 정의
 const AnalysisOutputSchema = z.object({
   transcript: z.string().describe('The full and accurate audio transcript of the video.'),
   summary: z.string().describe('A concise summary of the entire video content.'),
@@ -34,12 +28,7 @@ const AnalysisOutputSchema = z.object({
   keywords: z.array(z.string()).describe('An array of relevant keywords for searching and tagging.'),
 });
 
-
-// ==========================================
-// [Trigger] 파일 처리 및 AI 분석 실행
-// ==========================================
-
-// [Helper] MIME Type 도구
+// 3. MIME Type 도우미 함수
 function getMimeType(filePath: string): string {
   const extension = path.extname(filePath).toLowerCase();
   switch (extension) {
@@ -53,67 +42,61 @@ function getMimeType(filePath: string): string {
   }
 }
 
-export const analyzeVideoOnWrite = onDocumentWritten(
-  {
-    document: "episodes/{episodeId}",
-    region: "asia-northeast3",
-    secrets: [apiKey],
-    timeoutSeconds: 3600, // 1시간
+// ==========================================
+// [Trigger] 파일 처리 및 AI 분석 실행 (v1 API 사용)
+// ==========================================
+export const analyzeVideoOnWrite = functions.region("asia-northeast3")
+  .runWith({
+    timeoutSeconds: 540,
     memory: "2GiB",
-  },
-  async (event: FirestoreEvent<Change<DocumentSnapshot> | undefined, { episodeId: string }>) => {
-    const change = event.data;
-    if (!change) return;
-
-    const beforeData = change.before.data();
+    secrets: ["GOOGLE_GENAI_API_KEY"],
+  })
+  .firestore.document("episodes/{episodeId}")
+  .onWrite(async (change, context) => {
+    
+    // 문서가 삭제되었거나 데이터가 없는 경우 종료
+    if (!change.after.exists) {
+      return null;
+    }
     const afterData = change.after.data();
-    if (!afterData) return;
+    if (!afterData) return null;
 
-    // 상태 관리: Pending -> Processing
+    const beforeData = change.before.exists ? change.before.data() : null;
+    const { episodeId } = context.params;
+
+    // 상태 관리: 'pending' -> 'processing'
     if (afterData.aiProcessingStatus === "pending") {
-      console.log(`✨ New upload detected [${event.params.episodeId}]. Auto-starting...`);
-      await change.after.ref.update({ aiProcessingStatus: "processing" });
-      return;
+      console.log(`✨ New upload detected [${episodeId}]. Auto-starting...`);
+      return change.after.ref.update({ aiProcessingStatus: "processing" });
     }
 
-    // 이미 처리 중이거나 완료된 경우 스킵
-    if (afterData.aiProcessingStatus !== "processing") return;
-    if (beforeData?.aiProcessingStatus === "processing") return;
+    // 이미 처리 중이거나 완료된 경우, 또는 상태가 'processing'으로 변경된 직후의 호출인 경우 스킵
+    if (afterData.aiProcessingStatus !== "processing") return null;
+    if (beforeData?.aiProcessingStatus === "processing") return null;
 
     const filePath = afterData.filePath;
     if (!filePath) {
-      await change.after.ref.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath found" });
-      return;
-    }
-    
-    // videoUrl이 있는지 확인. 없다면 publicUrl을 생성합니다.
-    let videoUrl = afterData.videoUrl;
-    if (!videoUrl) {
-        console.log(`[Info] No videoUrl found for ${filePath}. Generating public URL.`);
-        try {
-            const bucket = getStorage().bucket();
-            const file = bucket.file(filePath);
-            const [exists] = await file.exists();
-            if (!exists) throw new Error("File does not exist in Storage.");
-            
-            // 파일을 공개로 설정합니다. (Storage 규칙에서 공개 읽기를 허용해야 합니다)
-            await file.makePublic();
-            videoUrl = file.publicUrl();
-            console.log(`[Info] Generated public URL: ${videoUrl}`);
-        } catch(urlError) {
-             console.error("❌ Error generating public URL:", urlError);
-             await change.after.ref.update({
-                aiProcessingStatus: "failed",
-                aiProcessingError: "Failed to get video URL for analysis."
-            });
-            return;
-        }
+      console.error(`[${episodeId}] No filePath found.`);
+      return change.after.ref.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath found" });
     }
 
-
-    console.log("🚀 Starting Video Processing:", event.params.episodeId);
+    console.log(`🚀 Starting Video Processing: ${episodeId}`);
 
     try {
+      let videoUrl = afterData.videoUrl;
+      // videoUrl이 없는 경우, 공개 URL 생성
+      if (!videoUrl) {
+          console.log(`[Info] No videoUrl found for ${filePath}. Generating public URL.`);
+          const bucket = admin.storage().bucket();
+          const file = bucket.file(filePath);
+          const [exists] = await file.exists();
+          if (!exists) throw new Error("File does not exist in Storage.");
+          
+          await file.makePublic();
+          videoUrl = file.publicUrl();
+          console.log(`[Info] Generated public URL: ${videoUrl}`);
+      }
+
       const mimeType = getMimeType(filePath);
 
       console.log(`🎥 Calling ai.generate with URL: ${videoUrl}`);
@@ -129,7 +112,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       if (!output) throw new Error("AI analysis failed to produce output.");
       const result = output;
 
-      // 결과 저장
       const combinedContent = `
 Summary: ${result.summary}\n
 Timeline:
@@ -145,36 +127,38 @@ Keywords: ${result.keywords.join(', ')}
         aiProcessingError: null,
         updatedAt: new Date()
       });
-      console.log("✅ Analysis Success!");
+      console.log(`✅ [${episodeId}] Analysis Success!`);
+      return null;
 
     } catch (error) {
-      console.error("❌ Error:", error);
-      await change.after.ref.update({
+      console.error(`❌ [${episodeId}] Error:`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return change.after.ref.update({
         aiProcessingStatus: "failed",
-        aiProcessingError: String(error)
+        aiProcessingError: errorMessage
       });
     }
-  }
-);
+  });
+
 
 // ==========================================
-// 기능 2: 문서 삭제 시 파일 자동 청소 (기존 유지)
+// [Trigger] 문서 삭제 시 파일 자동 청소 (v1 API 사용)
 // ==========================================
-export const deleteFilesOnEpisodeDelete = onDocumentDeleted(
-  {
-    document: "episodes/{episodeId}",
-    region: "asia-northeast3",
-  },
-  async (event) => {
-    const data = event.data?.data();
-    if (!data) return;
+export const deleteFilesOnEpisodeDelete = functions.region("asia-northeast3")
+  .firestore.document("episodes/{episodeId}")
+  .onDelete(async (snap, context) => {
+    const data = snap.data();
+    if (!data) return null;
 
-    const bucket = getStorage().bucket();
+    const { episodeId } = context.params;
+    const bucket = admin.storage().bucket();
     const paths = [data.filePath, data.defaultThumbnailPath, data.customThumbnailPath, data.vttPath];
     
-    await Promise.all(
-      paths.filter(p => p).map(p => bucket.file(p).delete().catch(() => {}))
-    );
-    console.log(`✅ Cleanup finished: ${event.params.episodeId}`);
-  }
-);
+    const deletePromises = paths
+        .filter(p => p) //
+        .map(p => bucket.file(p).delete().catch(err => console.error(`Failed to delete ${p}:`, err.message)));
+    
+    await Promise.all(deletePromises);
+    console.log(`✅ Cleanup finished for deleted episode: ${episodeId}`);
+    return null;
+  });
