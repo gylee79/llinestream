@@ -105,17 +105,17 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   }
   
   useEffect(() => {
+    let startTime: Date | null = null;
     if (isOpen && user) {
-        startTimeRef.current = new Date();
+        startTime = new Date();
     }
     
-    // Cleanup function: This runs when the component unmounts or dependencies change.
     return () => {
-        if (user && startTimeRef.current) {
+        if (user && startTime) {
             const endTime = new Date();
-            const durationWatched = (endTime.getTime() - startTimeRef.current.getTime()) / 1000;
+            const durationWatched = (endTime.getTime() - startTime.getTime()) / 1000;
 
-            if (durationWatched > 1) {
+            if (durationWatched > 1) { // 1초 이상 시청한 경우에만 기록
                 const payload = {
                     userId: user.id,
                     userName: user.name,
@@ -123,19 +123,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     episodeId: episode.id,
                     episodeTitle: episode.title,
                     courseId: episode.courseId,
-                    startedAt: startTimeRef.current,
+                    startedAt: startTime,
                     endedAt: endTime,
                 };
-                // We call the server action directly here. 
-                // Note: In complex scenarios with many state dependencies, this might need debouncing.
                 logEpisodeView(payload);
             }
         }
-        // Reset start time for the next session.
-        startTimeRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, user, episode.id]);
+  }, [isOpen, user, episode.id, episode.title, episode.courseId]);
   
   useEffect(() => {
     // Scroll to bottom when new messages are added
