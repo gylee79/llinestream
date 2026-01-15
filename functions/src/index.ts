@@ -127,7 +127,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       while (state === FileState.PROCESSING) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
         const freshFile = await fileManager.getFile(uploadedFile.name);
-        state = freshFile.file.state;
+        state = freshFile.state;
         console.log(`... status: ${state}`);
       }
 
@@ -204,5 +204,3 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
     await Promise.all(paths.filter(p => p).map(p => bucket.file(p).delete().catch(() => {})));
     console.log(`✅ Cleanup finished for: ${episodeId}`);
 });
-
-    
