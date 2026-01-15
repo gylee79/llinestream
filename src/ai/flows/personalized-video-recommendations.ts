@@ -11,7 +11,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'zod';
+import { z } from 'genkit';
 
 const VideoRecommendationInputSchema = z.object({
   userId: z.string().describe('The ID of the user for whom to generate recommendations.'),
