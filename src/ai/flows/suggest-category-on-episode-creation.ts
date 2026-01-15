@@ -8,7 +8,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 
 const SuggestCategoriesInputSchema = z.object({
   title: z.string().describe('The title of the video episode.'),
