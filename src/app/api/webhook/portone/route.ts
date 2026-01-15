@@ -5,7 +5,7 @@ config();
 import { Timestamp } from 'firebase-admin/firestore';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
-import { initializeAdminApp } from '@/lib/firebase-admin';
+import { initializeAdminApp } from '../../../../lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
