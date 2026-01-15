@@ -46,7 +46,7 @@ function getMimeType(filePath: string): string {
 // ==========================================
 // [Trigger] 파일 처리 및 AI 분석 실행 (v1 API 구문)
 // ==========================================
-export const analyzeVideoOnWrite = functions.region("asia-northeast3")
+exports.analyzeVideoOnWrite = functions.region("asia-northeast3")
   .runWith({
     timeoutSeconds: 540,
     memory: "2GiB",
@@ -150,7 +150,7 @@ Keywords: ${result.keywords.join(', ')}
 // ==========================================
 // [Trigger] 문서 삭제 시 파일 자동 청소 (v1 API 구문)
 // ==========================================
-export const deleteFilesOnEpisodeDelete = functions.region("asia-northeast3")
+exports.deleteFilesOnEpisodeDelete = functions.region("asia-northeast3")
   .firestore.document("episodes/{episodeId}")
   .onDelete(async (snap, context) => {
     const data = snap.data();
