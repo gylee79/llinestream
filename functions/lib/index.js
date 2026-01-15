@@ -40,7 +40,6 @@ const v2_1 = require("firebase-functions/v2");
 const admin = __importStar(require("firebase-admin"));
 const genkit_1 = require("genkit");
 const google_genai_1 = require("@genkit-ai/google-genai");
-const zod_1 = require("zod");
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const fs = __importStar(require("fs"));
@@ -55,26 +54,26 @@ const ai = (0, genkit_1.genkit)({
     plugins: [(0, google_genai_1.googleAI)({ apiKey })],
 });
 const fileManager = new server_1.GoogleAIFileManager(apiKey);
-// 2. 전역 옵션 설정 (v2 방식) - 타임아웃 540초로 수정
+// 2. 전역 옵션 설정
 (0, v2_1.setGlobalOptions)({
     region: "asia-northeast3",
     secrets: ["GOOGLE_GENAI_API_KEY"],
     timeoutSeconds: 540,
     memory: "2GiB",
 });
-// 3. AI 분석 결과에 대한 Zod 스키마 정의
-const AnalysisOutputSchema = zod_1.z.object({
-    transcript: zod_1.z.string().describe('The full and accurate audio transcript of the video.'),
-    summary: zod_1.z.string().describe('A concise summary of the entire video content.'),
-    timeline: zod_1.z.array(zod_1.z.object({
-        timestamp: zod_1.z.string().describe('The timestamp of the event in HH:MM:SS format.'),
-        event: zod_1.z.string().describe('A description of what is happening at this timestamp.'),
-        visualDetail: zod_1.z.string().describe('Notable visual details, like objects or character appearances.'),
+// 3. Zod 스키마 정의
+const AnalysisOutputSchema = genkit_1.z.object({
+    transcript: genkit_1.z.string().describe('The full and accurate audio transcript of the video.'),
+    summary: genkit_1.z.string().describe('A concise summary of the entire video content.'),
+    timeline: genkit_1.z.array(genkit_1.z.object({
+        timestamp: genkit_1.z.string().describe('The timestamp of the event in HH:MM:SS format.'),
+        event: genkit_1.z.string().describe('A description of what is happening at this timestamp.'),
+        visualDetail: genkit_1.z.string().describe('Notable visual details, like objects or character appearances.'),
     })).describe('An array of time-stamped logs detailing events throughout the video.'),
-    visualCues: zod_1.z.array(zod_1.z.string()).describe('A list of important on-screen text (OCR) or significant visual objects.'),
-    keywords: zod_1.z.array(zod_1.z.string()).describe('An array of relevant keywords for searching and tagging.'),
+    visualCues: genkit_1.z.array(genkit_1.z.string()).describe('A list of important on-screen text (OCR) or significant visual objects.'),
+    keywords: genkit_1.z.array(genkit_1.z.string()).describe('An array of relevant keywords for searching and tagging.'),
 });
-// 4. MIME Type 도우미 함수
+// 4. MIME Type 도우미
 function getMimeType(filePath) {
     const extension = path.extname(filePath).toLowerCase();
     switch (extension) {
@@ -82,15 +81,21 @@ function getMimeType(filePath) {
         case ".mov": return "video/quicktime";
         case ".avi": return "video/x-msvideo";
         case ".wmv": return "video/x-ms-wmv";
-        case ".webm": "video/webm";
-        case ".mkv": "video/x-matroska";
+        case ".webm": return "video/webm";
+        case ".mkv": return "video/x-matroska";
         default: return "video/mp4";
     }
 }
 // ==========================================
-// [Trigger] 파일 처리 및 AI 분석 실행 (v2 API)
+// [Trigger] 파일 처리 및 AI 분석 실행
 // ==========================================
-exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)("episodes/{episodeId}", async (event) => {
+exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)({
+    document: "episodes/{episodeId}",
+    timeoutSeconds: 540,
+    memory: "2GiB",
+    region: "asia-northeast3",
+    secrets: ["GOOGLE_GENAI_API_KEY"],
+}, async (event) => {
     const change = event.data;
     if (!change)
         return;
@@ -119,27 +124,39 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)("episodes/{epis
     }
     console.log(`🚀 [${episodeId}] Starting secure video processing...`);
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
-    let uploadedFile;
+    let uploadedFile = null;
     try {
-        // 1. Download file from Storage to a temporary directory
+        // 1. Download
         console.log(`[${episodeId}] Downloading from Storage: ${filePath}`);
         const bucket = admin.storage().bucket();
         await bucket.file(filePath).download({ destination: tempFilePath });
-        console.log(`[${episodeId}] Download complete. File at: ${tempFilePath}`);
-        // 2. Upload file to Google AI File Manager
+        // 2. Upload to Google AI
         console.log(`[${episodeId}] Uploading to Google AI File Manager...`);
-        uploadedFile = await fileManager.uploadFile(tempFilePath, {
+        const uploadResponse = await fileManager.uploadFile(tempFilePath, {
             mimeType: getMimeType(filePath),
             displayName: episodeId,
         });
-        console.log(`[${episodeId}] Upload to AI Manager complete. URI: ${uploadedFile.uri}`);
-        // 3. Call Gemini with the file URI (schema is enforced)
-        console.log(`[${episodeId}] Calling Gemini 2.5 Flash for analysis...`);
+        uploadedFile = uploadResponse.file;
+        console.log(`[${episodeId}] Upload complete. Name: ${uploadedFile.name}, URI: ${uploadedFile.uri}`);
+        // 3. Polling (대기)
+        let state = uploadedFile.state;
+        console.log(`⏳ [${episodeId}] Waiting for Gemini processing...`);
+        while (state === server_1.FileState.PROCESSING) {
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+            const freshFile = await fileManager.getFile(uploadedFile.name);
+            state = freshFile.file.state;
+            console.log(`... status: ${state}`);
+        }
+        if (state === server_1.FileState.FAILED) {
+            throw new Error("Video processing failed by Google AI.");
+        }
+        // 4. Call Gemini
+        console.log(`[${episodeId}] Calling Gemini 2.5 Flash...`);
         const { output } = await ai.generate({
             model: 'gemini-2.5-flash',
             prompt: [
                 { text: "Analyze this video file comprehensively based on the provided JSON schema." },
-                { media: { uri: uploadedFile.uri } }
+                { media: { url: uploadedFile.uri, contentType: uploadedFile.mimeType } }
             ],
             output: { schema: AnalysisOutputSchema },
         });
@@ -149,11 +166,11 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)("episodes/{epis
         const combinedContent = `
 Summary: ${result.summary}\n
 Timeline:
-${result.timeline.map(t => `- [${t.timestamp}] ${t.event} (Visual: ${t.visualDetail})`).join('\n')}\n
+${result.timeline.map((t) => `- [${t.timestamp}] ${t.event} (Visual: ${t.visualDetail})`).join('\n')}\n
 Visual Cues: ${result.visualCues.join(', ')}\n
 Keywords: ${result.keywords.join(', ')}
       `.trim();
-        // 4. Update Firestore with the results
+        // 5. Update Firestore
         await change.after.ref.update({
             aiProcessingStatus: "completed",
             transcript: result.transcript,
@@ -161,30 +178,35 @@ Keywords: ${result.keywords.join(', ')}
             aiProcessingError: null,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        console.log(`✅ [${episodeId}] Analysis Success! Firestore updated.`);
+        console.log(`✅ [${episodeId}] Analysis Success!`);
     }
     catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error(`❌ [${episodeId}] Error during AI processing:`, error);
+        console.error(`❌ [${episodeId}] Error:`, error);
         await change.after.ref.update({
             aiProcessingStatus: "failed",
-            aiProcessingError: errorMessage
+            aiProcessingError: error.message || String(error)
         });
     }
     finally {
-        // 5. Clean up local and remote AI files
+        // 6. Cleanup
         if (fs.existsSync(tempFilePath)) {
-            fs.unlinkSync(tempFilePath);
-            console.log(`[${episodeId}] Cleaned up temporary local file.`);
+            try {
+                fs.unlinkSync(tempFilePath);
+            }
+            catch (e) { /* 무시 */ }
         }
         if (uploadedFile) {
-            await fileManager.deleteFile(uploadedFile.name);
-            console.log(`[${episodeId}] Cleaned up remote file from AI Manager.`);
+            try {
+                await fileManager.deleteFile(uploadedFile.name);
+            }
+            catch (e) {
+                console.warn("Remote cleanup failed", e);
+            }
         }
     }
 });
 // ==========================================
-// [Trigger] 문서 삭제 시 파일 자동 청소 (v2 API)
+// [Trigger] 삭제 시 청소
 // ==========================================
 exports.deleteFilesOnEpisodeDelete = (0, firestore_1.onDocumentDeleted)("episodes/{episodeId}", async (event) => {
     const snap = event.data;
@@ -196,10 +218,7 @@ exports.deleteFilesOnEpisodeDelete = (0, firestore_1.onDocumentDeleted)("episode
     const { episodeId } = event.params;
     const bucket = admin.storage().bucket();
     const paths = [data.filePath, data.defaultThumbnailPath, data.customThumbnailPath, data.vttPath];
-    const deletePromises = paths
-        .filter(p => p) // 경로가 있는 항목만 필터링
-        .map(p => bucket.file(p).delete().catch(err => console.warn(`Failed to delete ${p}:`, err.message)));
-    await Promise.all(deletePromises);
-    console.log(`✅ Cleanup finished for deleted episode: ${episodeId}`);
+    await Promise.all(paths.filter(p => p).map(p => bucket.file(p).delete().catch(() => { })));
+    console.log(`✅ Cleanup finished for: ${episodeId}`);
 });
 //# sourceMappingURL=index.js.map
