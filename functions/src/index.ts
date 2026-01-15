@@ -118,15 +118,15 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         displayName: episodeId,
       });
       
-      uploadedFile = uploadResponse.file;
-      console.log(`[${episodeId}] Upload complete. Name: ${uploadedFile.name}, URI: ${uploadedFile.uri}`);
+      uploadedFile = uploadResponse;
+      console.log(`[${episodeId}] Upload complete. Name: ${uploadedFile.file.name}, URI: ${uploadedFile.file.uri}`);
 
       // 3. Polling (대기)
-      let state = uploadedFile.state;
+      let state = uploadedFile.file.state;
       console.log(`⏳ [${episodeId}] Waiting for Gemini processing...`);
       while (state === FileState.PROCESSING) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
-        const freshFile = await fileManager.getFile(uploadedFile.name);
+        const freshFile = await fileManager.getFile(uploadedFile.file.name);
         state = freshFile.state;
         console.log(`... status: ${state}`);
       }
@@ -141,7 +141,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         model: 'gemini-2.5-flash',
         prompt: [
           { text: "Analyze this video file comprehensively based on the provided JSON schema." },
-          { media: { url: uploadedFile.uri, contentType: uploadedFile.mimeType } } 
+          { media: { url: uploadedFile.file.uri, contentType: uploadedFile.file.mimeType } } 
         ],
         output: { schema: AnalysisOutputSchema },
       });
@@ -180,9 +180,9 @@ Keywords: ${result.keywords.join(', ')}
         try { fs.unlinkSync(tempFilePath); } catch (e) { /* 무시 */ }
       }
       
-      if (uploadedFile) {
+      if (uploadedFile?.file?.name) {
         try { 
-            await fileManager.deleteFile(uploadedFile.name); 
+            await fileManager.deleteFile(uploadedFile.file.name); 
         } catch (e) { 
             console.warn("Remote cleanup failed", e); 
         }
@@ -204,3 +204,5 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
     await Promise.all(paths.filter(p => p).map(p => bucket.file(p).delete().catch(() => {})));
     console.log(`✅ Cleanup finished for: ${episodeId}`);
 });
+
+    
