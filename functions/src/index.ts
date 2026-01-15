@@ -1,3 +1,4 @@
+
 'use server';
 
 import * as functions from "firebase-functions";
@@ -46,14 +47,15 @@ function getMimeType(filePath: string): string {
 // ==========================================
 // [Trigger] 파일 처리 및 AI 분석 실행 (v1 API 구문)
 // ==========================================
-exports.analyzeVideoOnWrite = functions.region("asia-northeast3")
+exports.analyzeVideoOnWrite = functions
   .runWith({
     timeoutSeconds: 540,
     memory: "2GiB",
     secrets: ["GOOGLE_GENAI_API_KEY"],
   })
+  .region("asia-northeast3")
   .firestore.document("episodes/{episodeId}")
-  .onWrite(async (change, context) => {
+  .onWrite(async (change: functions.Change<functions.firestore.DocumentSnapshot>, context: functions.EventContext) => {
     
     // 문서가 삭제되었거나 데이터가 없는 경우 종료
     if (!change.after.exists) {
@@ -152,7 +154,7 @@ Keywords: ${result.keywords.join(', ')}
 // ==========================================
 exports.deleteFilesOnEpisodeDelete = functions.region("asia-northeast3")
   .firestore.document("episodes/{episodeId}")
-  .onDelete(async (snap, context) => {
+  .onDelete(async (snap: functions.firestore.DocumentSnapshot, context: functions.EventContext) => {
     const data = snap.data();
     if (!data) return null;
 
@@ -168,3 +170,4 @@ exports.deleteFilesOnEpisodeDelete = functions.region("asia-northeast3")
     functions.logger.log(`✅ Cleanup finished for deleted episode: ${episodeId}`);
     return null;
   });
+
