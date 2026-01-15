@@ -144,7 +144,7 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)({
         while (state === server_1.FileState.PROCESSING) {
             await new Promise((resolve) => setTimeout(resolve, 5000));
             const freshFile = await fileManager.getFile(uploadedFile.name);
-            state = freshFile.file.state;
+            state = freshFile.state;
             console.log(`... status: ${state}`);
         }
         if (state === server_1.FileState.FAILED) {
