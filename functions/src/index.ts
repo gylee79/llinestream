@@ -19,7 +19,7 @@ const ai = genkit({
   plugins: [googleAI({ apiKey: process.env.GOOGLE_GENAI_API_KEY })],
 });
 
-// 2. 전역 옵션 설정 (v2 방식)
+// 2. 전역 옵션 설정 (v2 방식) - 타임아웃을 540초로 수정
 setGlobalOptions({
   region: "asia-northeast3",
   secrets: ["GOOGLE_GENAI_API_KEY"],
