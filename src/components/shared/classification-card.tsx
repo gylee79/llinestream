@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle } from '../ui/card';
-import type { Classification } from '../../../lib/types';
+import type { Classification } from '../../lib/types';
 import { ArrowRight } from 'lucide-react';
 
 interface ClassificationCardProps {
