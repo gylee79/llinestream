@@ -59,7 +59,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     document: "episodes/{episodeId}",
     region: "asia-northeast3",
     secrets: [apiKey],
-    timeoutSeconds: 3600, // 1시간
+    timeoutSeconds: 540, // 1시간
     memory: "2GiB",
   },
   async (event: FirestoreEvent<Change<DocumentSnapshot> | undefined, { episodeId: string }>) => {
