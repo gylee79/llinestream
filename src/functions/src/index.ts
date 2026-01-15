@@ -1,28 +1,37 @@
+'use server';
 
-import { onDocumentWritten, onDocumentDeleted, Change, FirestoreEvent } from "firebase-functions/v2/firestore";
-import { defineSecret } from "firebase-functions/params";
-import { genkit, z } from "genkit";
+import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
+import { setGlobalOptions } from "firebase-functions/v2";
+import * as admin from "firebase-admin";
+import { genkit } from "genkit";
 import { googleAI } from "@genkit-ai/google-genai";
-import { DocumentSnapshot } from "firebase-admin/firestore";
-import { initializeApp, getApps } from "firebase-admin/app";
-import { getStorage } from "firebase-admin/storage";
-import { getPublicUrl } from '../../lib/utils'; // Assuming utils is accessible
+import { z } from "zod";
 import * as path from "path";
+import * as os from "os";
+import * as fs from "fs";
+import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
 
 // 0. Firebase Admin 초기화
-if (!getApps().length) {
-  initializeApp();
+if (!admin.apps.length) {
+  admin.initializeApp();
 }
 
-// 1. API Key 비밀 설정
-const apiKey = defineSecret("GOOGLE_GENAI_API_KEY");
-
-// 2. Genkit 초기화 (최신 가이드에 따라 apiVersion 제거)
+// 1. Genkit 및 GoogleAIFileManager 초기화
+const apiKey = process.env.GOOGLE_GENAI_API_KEY || '';
 const ai = genkit({
-  plugins: [googleAI()],
+  plugins: [googleAI({ apiKey })],
+});
+const fileManager = new GoogleAIFileManager(apiKey);
+
+// 2. 전역 옵션 설정
+setGlobalOptions({
+  region: "asia-northeast3",
+  secrets: ["GOOGLE_GENAI_API_KEY"],
+  timeoutSeconds: 540,
+  memory: "2GiB",
 });
 
-// 3. AI 분석 결과에 대한 Zod 스키마 정의
+// 3. Zod 스키마 정의
 const AnalysisOutputSchema = z.object({
   transcript: z.string().describe('The full and accurate audio transcript of the video.'),
   summary: z.string().describe('A concise summary of the entire video content.'),
@@ -35,12 +44,7 @@ const AnalysisOutputSchema = z.object({
   keywords: z.array(z.string()).describe('An array of relevant keywords for searching and tagging.'),
 });
 
-
-// ==========================================
-// [Trigger] 파일 처리 및 AI 분석 실행
-// ==========================================
-
-// [Helper] MIME Type 도구
+// 4. MIME Type 도우미
 function getMimeType(filePath: string): string {
   const extension = path.extname(filePath).toLowerCase();
   switch (extension) {
@@ -54,117 +58,155 @@ function getMimeType(filePath: string): string {
   }
 }
 
+// ==========================================
+// [Trigger] 파일 처리 및 AI 분석 실행
+// ==========================================
 export const analyzeVideoOnWrite = onDocumentWritten(
   {
     document: "episodes/{episodeId}",
-    region: "asia-northeast3",
-    secrets: [apiKey],
-    timeoutSeconds: 540, // 1시간
+    timeoutSeconds: 540,
     memory: "2GiB",
-  },
-  async (event: FirestoreEvent<Change<DocumentSnapshot> | undefined, { episodeId: string }>) => {
+    region: "asia-northeast3",
+    secrets: ["GOOGLE_GENAI_API_KEY"],
+  }, 
+  async (event) => {
     const change = event.data;
     if (!change) return;
-
-    const beforeData = change.before.data();
+    
+    if (!change.after.exists) {
+      console.log(`[${event.params.episodeId}] Document deleted. Skipping analysis.`);
+      return;
+    }
     const afterData = change.after.data();
     if (!afterData) return;
 
-    // 상태 관리: Pending -> Processing
+    const beforeData = change.before.exists ? change.before.data() : null;
+    const { episodeId } = event.params;
+
     if (afterData.aiProcessingStatus === "pending") {
-      console.log(`✨ New upload detected [${event.params.episodeId}]. Auto-starting...`);
+      console.log(`✨ New upload detected [${episodeId}]. Setting status to 'processing'.`);
       await change.after.ref.update({ aiProcessingStatus: "processing" });
       return;
     }
 
-    // 이미 처리 중이거나 완료된 경우 스킵
-    if (afterData.aiProcessingStatus !== "processing") return;
-    if (beforeData?.aiProcessingStatus === "processing") return;
+    if (afterData.aiProcessingStatus !== "processing" || beforeData?.aiProcessingStatus === "processing") {
+        return;
+    }
 
     const filePath = afterData.filePath;
     if (!filePath) {
+      console.error(`[${episodeId}] No filePath found.`);
       await change.after.ref.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath found" });
       return;
     }
-
-    console.log("🚀 Starting Video Processing:", event.params.episodeId);
+    
+    console.log(`🚀 [${episodeId}] Starting secure video processing...`);
+    const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
+    
+    // [수정 핵심] 실제 파일 정보를 담을 변수
+    let uploadedFile: any = null;
 
     try {
-      const bucket = getStorage().bucket();
-      const file = bucket.file(filePath);
+      // 1. Download
+      console.log(`[${episodeId}] Downloading from Storage: ${filePath}`);
+      const bucket = admin.storage().bucket();
+      await bucket.file(filePath).download({ destination: tempFilePath });
       
-      // Make the file public to get a URL, or sign it
-      // For simplicity, we'll use a public URL. Ensure your Storage Rules allow this.
-      await file.makePublic();
-      const publicUrl = file.publicUrl();
+      // 2. Upload to Google AI
+      console.log(`[${episodeId}] Uploading to Google AI File Manager...`);
+      const uploadResponse = await fileManager.uploadFile(tempFilePath, {
+        mimeType: getMimeType(filePath),
+        displayName: episodeId,
+      });
+      
+      // [수정 포인트 1] 상자를 열어서 실제 'file' 객체를 꺼냅니다.
+      uploadedFile = uploadResponse.file;
+      console.log(`[${episodeId}] Upload complete. Name: ${uploadedFile.name}, URI: ${uploadedFile.uri}`);
 
-      console.log(`🎥 Calling ai.generate with public URL: ${publicUrl}`);
-      const mimeType = getMimeType(filePath);
+      // 3. Polling (대기)
+      let state = uploadedFile.state;
+      console.log(`⏳ [${episodeId}] Waiting for Gemini processing...`);
+      while (state === FileState.PROCESSING) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        // getFile로 상태 갱신할 때도 .name을 씁니다
+        const freshFile = await fileManager.getFile(uploadedFile.name);
+        state = freshFile.state;
+        console.log(`... status: ${state}`);
+      }
 
+      if (state === FileState.FAILED) {
+        throw new Error("Video processing failed by Google AI.");
+      }
+
+      // 4. Call Gemini
+      console.log(`[${episodeId}] Calling Gemini 2.5 Flash...`);
       const { output } = await ai.generate({
-        model: 'gemini-pro-vision', // Use gemini-pro-vision as it's stable
+        model: 'gemini-2.5-flash',
         prompt: [
-          { text: "Analyze this video file comprehensively based on the provided JSON schema. Ensure the output is a valid JSON object matching the schema." },
-          { media: { url: publicUrl, contentType: mimeType } }
+          { text: "Analyze this video file comprehensively based on the provided JSON schema." },
+          // [수정 포인트 2] uri -> url 변경
+          { media: { url: uploadedFile.uri, contentType: uploadedFile.mimeType } } 
         ],
-        output: {
-          format: "json", // Request JSON output
-        },
+        output: { schema: AnalysisOutputSchema },
       });
 
-      if (!output) throw new Error("AI analysis failed to produce output.");
+      if (!output) throw new Error("AI analysis failed to produce structured output.");
       
-      // Since we can't enforce schema in older versions, we parse it manually
-      const result = AnalysisOutputSchema.parse(output);
+      const result = output;
 
-      // 5. 결과 저장
+      // [수정 포인트 3] map(t)에 (t: any) 타입 추가하여 에러 방지
       const combinedContent = `
 Summary: ${result.summary}\n
 Timeline:
-${result.timeline.map(t => `- [${t.timestamp}] ${t.event} (Visual: ${t.visualDetail})`).join('\n')}\n
+${result.timeline.map((t: any) => `- [${t.timestamp}] ${t.event} (Visual: ${t.visualDetail})`).join('\n')}\n
 Visual Cues: ${result.visualCues.join(', ')}\n
 Keywords: ${result.keywords.join(', ')}
       `.trim();
 
+      // 5. Update Firestore
       await change.after.ref.update({
         aiProcessingStatus: "completed",
         transcript: result.transcript,
         aiGeneratedContent: combinedContent,
         aiProcessingError: null,
-        updatedAt: new Date()
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      console.log("✅ Analysis Success!");
+      console.log(`✅ [${episodeId}] Analysis Success!`);
 
-    } catch (error) {
-      console.error("❌ Error:", error);
+    } catch (error: any) {
+      console.error(`❌ [${episodeId}] Error:`, error);
       await change.after.ref.update({
         aiProcessingStatus: "failed",
-        aiProcessingError: String(error)
+        aiProcessingError: error.message || String(error)
       });
+    } finally {
+      // 6. Cleanup
+      if (fs.existsSync(tempFilePath)) {
+        try { fs.unlinkSync(tempFilePath); } catch (e) { /* 무시 */ }
+      }
+      
+      if (uploadedFile) {
+        try { 
+            // [수정 포인트 4] uploadedFile.name이 존재할 때만 삭제
+            await fileManager.deleteFile(uploadedFile.name); 
+        } catch (e) { 
+            console.warn("Remote cleanup failed", e); 
+        }
+      }
     }
-  }
-);
+});
 
 // ==========================================
-// 기능 2: 문서 삭제 시 파일 자동 청소 (기존 유지)
+// [Trigger] 삭제 시 청소
 // ==========================================
-export const deleteFilesOnEpisodeDelete = onDocumentDeleted(
-  {
-    document: "episodes/{episodeId}",
-    region: "asia-northeast3",
-  },
-  async (event) => {
-    const data = event.data?.data();
+export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+    const data = snap.data();
     if (!data) return;
-
-    const bucket = getStorage().bucket();
+    const { episodeId } = event.params;
+    const bucket = admin.storage().bucket();
     const paths = [data.filePath, data.defaultThumbnailPath, data.customThumbnailPath, data.vttPath];
-    
-    await Promise.all(
-      paths.filter(p => p).map(p => bucket.file(p).delete().catch(() => {}))
-    );
-    console.log(`✅ Cleanup finished: ${event.params.episodeId}`);
-  }
-);
-
-    
+    await Promise.all(paths.filter(p => p).map(p => bucket.file(p).delete().catch(() => {})));
+    console.log(`✅ Cleanup finished for: ${episodeId}`);
+});
