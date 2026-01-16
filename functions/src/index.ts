@@ -1,6 +1,3 @@
-
-'use server';
-
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
@@ -9,7 +6,7 @@ import { googleAI } from "@genkit-ai/google-genai";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
-import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
+import { GoogleAIFileManager, FileState, FileMetadataResponse } from "@google/generative-ai/server";
 
 // 0. Firebase Admin 초기화
 if (!admin.apps.length) {
@@ -103,7 +100,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     console.log(`🚀 [${episodeId}] Starting secure video processing...`);
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
     
-    let uploadedFile: any = null;
+    let uploadedFile: FileMetadataResponse | null = null;
 
     try {
       // 1. Download
@@ -118,15 +115,15 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         displayName: episodeId,
       });
       
-      uploadedFile = uploadResponse;
-      console.log(`[${episodeId}] Upload complete. Name: ${uploadedFile.file.name}, URI: ${uploadedFile.file.uri}`);
+      uploadedFile = uploadResponse.file;
+      console.log(`[${episodeId}] Upload complete. Name: ${uploadedFile.name}, URI: ${uploadedFile.uri}`);
 
       // 3. Polling (대기)
-      let state = uploadedFile.file.state;
+      let state = uploadedFile.state;
       console.log(`⏳ [${episodeId}] Waiting for Gemini processing...`);
       while (state === FileState.PROCESSING) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
-        const freshFile = await fileManager.getFile(uploadedFile.file.name);
+        const freshFile = await fileManager.getFile(uploadedFile.name);
         state = freshFile.state;
         console.log(`... status: ${state}`);
       }
@@ -141,7 +138,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         model: 'gemini-2.5-flash',
         prompt: [
           { text: "Analyze this video file comprehensively based on the provided JSON schema." },
-          { media: { url: uploadedFile.file.uri, contentType: uploadedFile.file.mimeType } } 
+          { media: { url: uploadedFile.uri, contentType: uploadedFile.mimeType } } 
         ],
         output: { schema: AnalysisOutputSchema },
       });
@@ -180,9 +177,9 @@ Keywords: ${result.keywords.join(', ')}
         try { fs.unlinkSync(tempFilePath); } catch (e) { /* 무시 */ }
       }
       
-      if (uploadedFile?.file?.name) {
+      if (uploadedFile?.name) {
         try { 
-            await fileManager.deleteFile(uploadedFile.file.name); 
+            await fileManager.deleteFile(uploadedFile.name); 
         } catch (e) { 
             console.warn("Remote cleanup failed", e); 
         }
@@ -204,5 +201,3 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
     await Promise.all(paths.filter(p => p).map(p => bucket.file(p).delete().catch(() => {})));
     console.log(`✅ Cleanup finished for: ${episodeId}`);
 });
-
-    
