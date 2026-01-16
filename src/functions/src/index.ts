@@ -1,37 +1,30 @@
-'use server';
+
+/**
+ * @fileoverview Firebase Cloud Functions for LlineStream video processing.
+ *
+ * This file contains Cloud Functions triggered by Firestore events.
+ * It uses dynamic imports and lazy initialization to ensure fast cold starts
+ * and avoid deployment timeouts in a Cloud Run (2nd Gen) environment.
+ */
 
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
-import * as admin from "firebase-admin";
-import { genkit } from "genkit";
-import { googleAI } from "@genkit-ai/google-genai";
-import { z } from "zod";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
-import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
+import { z } from "zod";
 
-// 0. Firebase Admin 초기화
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
+// ✅ 가볍거나 내장된 모듈은 최상단에 유지합니다.
 
-// 1. Genkit 및 GoogleAIFileManager 초기화
-const apiKey = process.env.GOOGLE_GENAI_API_KEY || '';
-const ai = genkit({
-  plugins: [googleAI({ apiKey })],
-});
-const fileManager = new GoogleAIFileManager(apiKey);
-
-// 2. 전역 옵션 설정
+// 전역 옵션 설정: 모든 함수에 일괄 적용됩니다.
 setGlobalOptions({
-  region: "asia-northeast3",
+  region: "us-central1", // App Hosting 리전과 일치시킴
   secrets: ["GOOGLE_GENAI_API_KEY"],
   timeoutSeconds: 540,
   memory: "2GiB",
 });
 
-// 3. Zod 스키마 정의
+// Zod 스키마 정의 (가벼우므로 전역에 두어도 괜찮습니다)
 const AnalysisOutputSchema = z.object({
   transcript: z.string().describe('The full and accurate audio transcript of the video.'),
   summary: z.string().describe('A concise summary of the entire video content.'),
@@ -44,7 +37,7 @@ const AnalysisOutputSchema = z.object({
   keywords: z.array(z.string()).describe('An array of relevant keywords for searching and tagging.'),
 });
 
-// 4. MIME Type 도우미
+// MIME Type 도우미
 function getMimeType(filePath: string): string {
   const extension = path.extname(filePath).toLowerCase();
   switch (extension) {
@@ -62,14 +55,26 @@ function getMimeType(filePath: string): string {
 // [Trigger] 파일 처리 및 AI 분석 실행
 // ==========================================
 export const analyzeVideoOnWrite = onDocumentWritten(
-  {
-    document: "episodes/{episodeId}",
-    timeoutSeconds: 540,
-    memory: "2GiB",
-    region: "asia-northeast3",
-    secrets: ["GOOGLE_GENAI_API_KEY"],
-  }, 
+  "episodes/{episodeId}", // ✅ 전역 설정이 적용되도록 개별 옵션 제거
   async (event) => {
+    // ✅ 함수 실행 시점에 무거운 모듈을 동적으로 가져옵니다.
+    const { admin } = await import("./firebase-admin-init.js");
+    const { genkit } = (await import("genkit"));
+    const { googleAI } = (await import("@genkit-ai/google-genai"));
+    const { GoogleAIFileManager, FileState } = (await import("@google/generative-ai/server"));
+    
+    // ✅ 앱 초기화 확인 및 수행
+    if (admin.apps.length === 0) {
+      admin.initializeApp();
+    }
+    
+    // Genkit 및 GoogleAIFileManager 지연 초기화 (Lazy Initialization)
+    const apiKey = process.env.GOOGLE_GENAI_API_KEY || '';
+    const ai = genkit({
+      plugins: [googleAI({ apiKey })],
+    });
+    const fileManager = new GoogleAIFileManager(apiKey);
+    
     const change = event.data;
     if (!change) return;
     
@@ -103,32 +108,26 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     console.log(`🚀 [${episodeId}] Starting secure video processing...`);
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
     
-    // [수정 핵심] 실제 파일 정보를 담을 변수
     let uploadedFile: any = null;
 
     try {
-      // 1. Download
       console.log(`[${episodeId}] Downloading from Storage: ${filePath}`);
       const bucket = admin.storage().bucket();
       await bucket.file(filePath).download({ destination: tempFilePath });
       
-      // 2. Upload to Google AI
       console.log(`[${episodeId}] Uploading to Google AI File Manager...`);
       const uploadResponse = await fileManager.uploadFile(tempFilePath, {
         mimeType: getMimeType(filePath),
         displayName: episodeId,
       });
       
-      // [수정 포인트 1] 상자를 열어서 실제 'file' 객체를 꺼냅니다.
       uploadedFile = uploadResponse.file;
       console.log(`[${episodeId}] Upload complete. Name: ${uploadedFile.name}, URI: ${uploadedFile.uri}`);
 
-      // 3. Polling (대기)
       let state = uploadedFile.state;
       console.log(`⏳ [${episodeId}] Waiting for Gemini processing...`);
       while (state === FileState.PROCESSING) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
-        // getFile로 상태 갱신할 때도 .name을 씁니다
         const freshFile = await fileManager.getFile(uploadedFile.name);
         state = freshFile.state;
         console.log(`... status: ${state}`);
@@ -138,13 +137,11 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         throw new Error("Video processing failed by Google AI.");
       }
 
-      // 4. Call Gemini
       console.log(`[${episodeId}] Calling Gemini 2.5 Flash...`);
       const { output } = await ai.generate({
         model: 'gemini-2.5-flash',
         prompt: [
           { text: "Analyze this video file comprehensively based on the provided JSON schema." },
-          // [수정 포인트 2] uri -> url 변경
           { media: { url: uploadedFile.uri, contentType: uploadedFile.mimeType } } 
         ],
         output: { schema: AnalysisOutputSchema },
@@ -154,7 +151,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       
       const result = output;
 
-      // [수정 포인트 3] map(t)에 (t: any) 타입 추가하여 에러 방지
       const combinedContent = `
 Summary: ${result.summary}\n
 Timeline:
@@ -163,7 +159,6 @@ Visual Cues: ${result.visualCues.join(', ')}\n
 Keywords: ${result.keywords.join(', ')}
       `.trim();
 
-      // 5. Update Firestore
       await change.after.ref.update({
         aiProcessingStatus: "completed",
         transcript: result.transcript,
@@ -180,14 +175,12 @@ Keywords: ${result.keywords.join(', ')}
         aiProcessingError: error.message || String(error)
       });
     } finally {
-      // 6. Cleanup
       if (fs.existsSync(tempFilePath)) {
         try { fs.unlinkSync(tempFilePath); } catch (e) { /* 무시 */ }
       }
       
-      if (uploadedFile) {
+      if (uploadedFile?.name) {
         try { 
-            // [수정 포인트 4] uploadedFile.name이 존재할 때만 삭제
             await fileManager.deleteFile(uploadedFile.name); 
         } catch (e) { 
             console.warn("Remote cleanup failed", e); 
@@ -200,6 +193,14 @@ Keywords: ${result.keywords.join(', ')}
 // [Trigger] 삭제 시 청소
 // ==========================================
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
+    // ✅ 함수 실행 시점에 admin SDK를 가져옵니다.
+    const { admin } = await import("./firebase-admin-init.js");
+    
+    // ✅ 앱 초기화 확인 및 수행
+    if (admin.apps.length === 0) {
+      admin.initializeApp();
+    }
+
     const snap = event.data;
     if (!snap) return;
     const data = snap.data();
