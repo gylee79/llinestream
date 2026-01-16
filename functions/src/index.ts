@@ -1,19 +1,13 @@
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
-import * as admin from "firebase-admin";
-import { genkit, z } from "genkit";
-import { googleAI } from "@genkit-ai/google-genai";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
-import { GoogleAIFileManager, FileState, FileMetadataResponse } from "@google/generative-ai/server";
+import { z } from "zod";
 
-// 0. Firebase Admin 초기화
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
+// ✅ 가볍거나 내장된 모듈은 최상단에 유지합니다.
 
-// 2. 전역 옵션 설정
+// 전역 옵션 설정
 setGlobalOptions({
   region: "asia-northeast3",
   secrets: ["GOOGLE_GENAI_API_KEY"],
@@ -21,7 +15,7 @@ setGlobalOptions({
   memory: "2GiB",
 });
 
-// 3. Zod 스키마 정의 (스키마는 전역에 두어도 괜찮습니다)
+// Zod 스키마 정의 (가벼우므로 전역에 두어도 괜찮습니다)
 const AnalysisOutputSchema = z.object({
   transcript: z.string().describe('The full and accurate audio transcript of the video.'),
   summary: z.string().describe('A concise summary of the entire video content.'),
@@ -34,7 +28,7 @@ const AnalysisOutputSchema = z.object({
   keywords: z.array(z.string()).describe('An array of relevant keywords for searching and tagging.'),
 });
 
-// 4. MIME Type 도우미
+// MIME Type 도우미
 function getMimeType(filePath: string): string {
   const extension = path.extname(filePath).toLowerCase();
   switch (extension) {
@@ -60,7 +54,18 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     secrets: ["GOOGLE_GENAI_API_KEY"],
   }, 
   async (event) => {
-    // ✨ 1. Genkit 및 GoogleAIFileManager 지연 초기화 (Lazy Initialization)
+    // ✅ 함수 실행 시점에 무거운 모듈을 동적으로 가져옵니다.
+    const admin = (await import("firebase-admin"));
+    const { genkit } = (await import("genkit"));
+    const { googleAI } = (await import("@genkit-ai/google-genai"));
+    const { GoogleAIFileManager, FileState } = (await import("@google/generative-ai/server"));
+
+    // Firebase Admin 앱이 초기화되지 않았다면 초기화합니다.
+    if (admin.apps.length === 0) {
+      admin.initializeApp();
+    }
+    
+    // Genkit 및 GoogleAIFileManager 지연 초기화 (Lazy Initialization)
     const apiKey = process.env.GOOGLE_GENAI_API_KEY || '';
     const ai = genkit({
       plugins: [googleAI({ apiKey })],
@@ -100,7 +105,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     console.log(`🚀 [${episodeId}] Starting secure video processing...`);
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
     
-    let uploadedFile: FileMetadataResponse | null = null;
+    let uploadedFile: any = null;
 
     try {
       console.log(`[${episodeId}] Downloading from Storage: ${filePath}`);
@@ -185,6 +190,13 @@ Keywords: ${result.keywords.join(', ')}
 // [Trigger] 삭제 시 청소
 // ==========================================
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
+    // ✅ 함수 실행 시점에 필요한 모듈을 동적으로 가져옵니다.
+    const admin = await import("firebase-admin");
+
+    if (admin.apps.length === 0) {
+      admin.initializeApp();
+    }
+
     const snap = event.data;
     if (!snap) return;
     const data = snap.data();
