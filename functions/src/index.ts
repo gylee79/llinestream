@@ -1,3 +1,4 @@
+
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as path from "path";
@@ -55,7 +56,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
   }, 
   async (event) => {
     // ✅ 함수 실행 시점에 무거운 모듈을 동적으로 가져옵니다.
-    const { admin } = await import("./firebase-admin-init");
+    const { admin } = await import("./firebase-admin-init.js");
     const { genkit } = (await import("genkit"));
     const { googleAI } = (await import("@genkit-ai/google-genai"));
     const { GoogleAIFileManager, FileState } = (await import("@google/generative-ai/server"));
@@ -191,7 +192,7 @@ Keywords: ${result.keywords.join(', ')}
 // ==========================================
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
     // ✅ 함수 실행 시점에 admin SDK를 가져옵니다.
-    const { admin } = await import("./firebase-admin-init");
+    const { admin } = await import("./firebase-admin-init.js");
     
     // ✅ 앱 초기화 확인 및 수행
     if (admin.apps.length === 0) {
