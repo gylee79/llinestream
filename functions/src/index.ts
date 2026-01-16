@@ -60,6 +60,11 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     const { googleAI } = (await import("@genkit-ai/google-genai"));
     const { GoogleAIFileManager, FileState } = (await import("@google/generative-ai/server"));
     
+    // ✅ 앱 초기화 확인 및 수행
+    if (admin.apps.length === 0) {
+      admin.initializeApp();
+    }
+    
     // Genkit 및 GoogleAIFileManager 지연 초기화 (Lazy Initialization)
     const apiKey = process.env.GOOGLE_GENAI_API_KEY || '';
     const ai = genkit({
@@ -187,6 +192,11 @@ Keywords: ${result.keywords.join(', ')}
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
     // ✅ 함수 실행 시점에 admin SDK를 가져옵니다.
     const { admin } = await import("./firebase-admin-init");
+    
+    // ✅ 앱 초기화 확인 및 수행
+    if (admin.apps.length === 0) {
+      admin.initializeApp();
+    }
 
     const snap = event.data;
     if (!snap) return;
