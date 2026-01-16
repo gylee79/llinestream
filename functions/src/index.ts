@@ -4,6 +4,7 @@ import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
 import { z } from "zod";
+import { admin } from "./firebase-admin-init"; // ✅ 서버 전용 초기화 파일 import
 
 // ✅ 가볍거나 내장된 모듈은 최상단에 유지합니다.
 
@@ -55,15 +56,11 @@ export const analyzeVideoOnWrite = onDocumentWritten(
   }, 
   async (event) => {
     // ✅ 함수 실행 시점에 무거운 모듈을 동적으로 가져옵니다.
-    const admin = (await import("firebase-admin"));
     const { genkit } = (await import("genkit"));
     const { googleAI } = (await import("@genkit-ai/google-genai"));
     const { GoogleAIFileManager, FileState } = (await import("@google/generative-ai/server"));
 
-    // Firebase Admin 앱이 초기화되지 않았다면 초기화합니다.
-    if (admin.apps.length === 0) {
-      admin.initializeApp();
-    }
+    // ❌ 더 이상 여기서 admin을 초기화할 필요가 없습니다.
     
     // Genkit 및 GoogleAIFileManager 지연 초기화 (Lazy Initialization)
     const apiKey = process.env.GOOGLE_GENAI_API_KEY || '';
@@ -190,12 +187,7 @@ Keywords: ${result.keywords.join(', ')}
 // [Trigger] 삭제 시 청소
 // ==========================================
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
-    // ✅ 함수 실행 시점에 필요한 모듈을 동적으로 가져옵니다.
-    const admin = await import("firebase-admin");
-
-    if (admin.apps.length === 0) {
-      admin.initializeApp();
-    }
+    // ❌ 더 이상 여기서 admin을 초기화할 필요가 없습니다.
 
     const snap = event.data;
     if (!snap) return;
