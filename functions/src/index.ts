@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Firebase Cloud Functions for LlineStream video processing.
+ *
+ * This file contains Cloud Functions triggered by Firestore events.
+ * It uses dynamic imports and lazy initialization to ensure fast cold starts
+ * and avoid deployment timeouts in a Cloud Run (2nd Gen) environment.
+ */
 
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
@@ -8,7 +15,7 @@ import { z } from "zod";
 
 // ✅ 가볍거나 내장된 모듈은 최상단에 유지합니다.
 
-// 전역 옵션 설정
+// 전역 옵션 설정: 모든 함수에 일괄 적용됩니다.
 setGlobalOptions({
   region: "asia-northeast3",
   secrets: ["GOOGLE_GENAI_API_KEY"],
@@ -49,9 +56,8 @@ function getMimeType(filePath: string): string {
 export const analyzeVideoOnWrite = onDocumentWritten(
   {
     document: "episodes/{episodeId}",
-    timeoutSeconds: 540,
-    memory: "2GiB",
-    region: "asia-northeast3",
+    timeoutSeconds: 540, // 개별 함수에서 더 긴 타임아웃이 필요할 경우 유지
+    memory: "2GiB",      // 개별 함수에서 더 많은 메모리가 필요할 경우 유지
     secrets: ["GOOGLE_GENAI_API_KEY"],
   }, 
   async (event) => {
