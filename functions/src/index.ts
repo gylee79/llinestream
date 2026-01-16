@@ -54,12 +54,7 @@ function getMimeType(filePath: string): string {
 // [Trigger] 파일 처리 및 AI 분석 실행
 // ==========================================
 export const analyzeVideoOnWrite = onDocumentWritten(
-  {
-    document: "episodes/{episodeId}",
-    timeoutSeconds: 540, // 개별 함수에서 더 긴 타임아웃이 필요할 경우 유지
-    memory: "2GiB",      // 개별 함수에서 더 많은 메모리가 필요할 경우 유지
-    secrets: ["GOOGLE_GENAI_API_KEY"],
-  }, 
+  "episodes/{episodeId}", // ✅ 전역 설정이 적용되도록 개별 옵션 제거
   async (event) => {
     // ✅ 함수 실행 시점에 무거운 모듈을 동적으로 가져옵니다.
     const { admin } = await import("./firebase-admin-init.js");
