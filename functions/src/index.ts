@@ -13,11 +13,11 @@ import * as os from "os";
 import * as fs from "fs";
 import { z } from "zod";
 
-// ✅ 가볍거나 내장된 모듈은 최상단에 유지합니다.
+// ✅ 가볍거나 내장된 모듈만 최상단에 유지합니다.
 
 // 전역 옵션 설정: 모든 함수에 일괄 적용됩니다.
 setGlobalOptions({
-  region: "us-central1", // App Hosting 리전과 일치시킴
+  region: "us-central1", // App Hosting 백엔드와 리전 일치
   secrets: ["GOOGLE_GENAI_API_KEY"],
   timeoutSeconds: 540,
   memory: "2GiB",
@@ -192,7 +192,7 @@ Keywords: ${result.keywords.join(', ')}
 // [Trigger] 삭제 시 청소
 // ==========================================
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
-    // ✅ 함수 실행 시점에 admin SDK를 가져옵니다.
+    // ✅ 함수 실행 시점에 admin SDK를 동적으로 가져옵니다.
     const { admin } = await import("./firebase-admin-init");
     
     // ✅ 앱 초기화 확인 및 수행
