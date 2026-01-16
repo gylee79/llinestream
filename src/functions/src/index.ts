@@ -1,4 +1,3 @@
-
 /**
  * @fileoverview Firebase Cloud Functions for LlineStream video processing.
  *
