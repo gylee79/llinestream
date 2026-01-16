@@ -1,3 +1,4 @@
+
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
@@ -13,13 +14,6 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-// 1. Genkit 및 GoogleAIFileManager 초기화
-const apiKey = process.env.GOOGLE_GENAI_API_KEY || '';
-const ai = genkit({
-  plugins: [googleAI({ apiKey })],
-});
-const fileManager = new GoogleAIFileManager(apiKey);
-
 // 2. 전역 옵션 설정
 setGlobalOptions({
   region: "asia-northeast3",
@@ -28,7 +22,7 @@ setGlobalOptions({
   memory: "2GiB",
 });
 
-// 3. Zod 스키마 정의
+// 3. Zod 스키마 정의 (스키마는 전역에 두어도 괜찮습니다)
 const AnalysisOutputSchema = z.object({
   transcript: z.string().describe('The full and accurate audio transcript of the video.'),
   summary: z.string().describe('A concise summary of the entire video content.'),
@@ -67,6 +61,13 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     secrets: ["GOOGLE_GENAI_API_KEY"],
   }, 
   async (event) => {
+    // ✨ 1. Genkit 및 GoogleAIFileManager 지연 초기화 (Lazy Initialization)
+    const apiKey = process.env.GOOGLE_GENAI_API_KEY || '';
+    const ai = genkit({
+      plugins: [googleAI({ apiKey })],
+    });
+    const fileManager = new GoogleAIFileManager(apiKey);
+    
     const change = event.data;
     if (!change) return;
     
@@ -103,12 +104,10 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     let uploadedFile: FileMetadataResponse | null = null;
 
     try {
-      // 1. Download
       console.log(`[${episodeId}] Downloading from Storage: ${filePath}`);
       const bucket = admin.storage().bucket();
       await bucket.file(filePath).download({ destination: tempFilePath });
       
-      // 2. Upload to Google AI
       console.log(`[${episodeId}] Uploading to Google AI File Manager...`);
       const uploadResponse = await fileManager.uploadFile(tempFilePath, {
         mimeType: getMimeType(filePath),
@@ -118,7 +117,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       uploadedFile = uploadResponse.file;
       console.log(`[${episodeId}] Upload complete. Name: ${uploadedFile.name}, URI: ${uploadedFile.uri}`);
 
-      // 3. Polling (대기)
       let state = uploadedFile.state;
       console.log(`⏳ [${episodeId}] Waiting for Gemini processing...`);
       while (state === FileState.PROCESSING) {
@@ -132,7 +130,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         throw new Error("Video processing failed by Google AI.");
       }
 
-      // 4. Call Gemini
       console.log(`[${episodeId}] Calling Gemini 2.5 Flash...`);
       const { output } = await ai.generate({
         model: 'gemini-2.5-flash',
@@ -155,7 +152,6 @@ Visual Cues: ${result.visualCues.join(', ')}\n
 Keywords: ${result.keywords.join(', ')}
       `.trim();
 
-      // 5. Update Firestore
       await change.after.ref.update({
         aiProcessingStatus: "completed",
         transcript: result.transcript,
@@ -172,7 +168,6 @@ Keywords: ${result.keywords.join(', ')}
         aiProcessingError: error.message || String(error)
       });
     } finally {
-      // 6. Cleanup
       if (fs.existsSync(tempFilePath)) {
         try { fs.unlinkSync(tempFilePath); } catch (e) { /* 무시 */ }
       }
