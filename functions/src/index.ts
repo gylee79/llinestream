@@ -87,6 +87,8 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     const beforeData = change.before.exists ? change.before.data() : null;
     const { episodeId } = event.params;
 
+    // 'pending' 상태는 이제 트리거되지 않으므로 이 로직은 유지해도 괜찮습니다.
+    // 만약 수동으로 pending을 넣는 경우가 있다면 유효합니다.
     if (afterData.aiProcessingStatus === "pending") {
       console.log(`✨ New upload detected [${episodeId}]. Setting status to 'processing'.`);
       await change.after.ref.update({ aiProcessingStatus: "processing" });
