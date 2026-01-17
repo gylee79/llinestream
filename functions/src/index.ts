@@ -1,54 +1,20 @@
 /**
  * @fileoverview Firebase Cloud Functions for LlineStream video processing.
- *
- * This file contains Cloud Functions triggered by Firestore events.
- * It uses dynamic imports and lazy initialization to ensure fast cold starts
- * and avoid deployment timeouts in a Cloud Run (2nd Gen) environment.
+ * This version uses aggressive lazy-loading of all modules to prevent deployment timeouts.
  */
-
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
-import { z } from "zod";
 
-// ✅ 가볍거나 내장된 모듈만 최상단에 유지합니다.
-
-// 전역 옵션 설정: 모든 함수에 일괄 적용됩니다.
+// Set global options at the top level. This is lightweight.
 setGlobalOptions({
-  region: "us-central1", // App Hosting 백엔드와 리전 일치
+  region: "us-central1",
   secrets: ["GOOGLE_GENAI_API_KEY"],
   timeoutSeconds: 540,
   memory: "2GiB",
 });
-
-// Zod 스키마 정의 (가벼우므로 전역에 두어도 괜찮습니다)
-const AnalysisOutputSchema = z.object({
-  transcript: z.string().describe('The full and accurate audio transcript of the video.'),
-  summary: z.string().describe('A concise summary of the entire video content.'),
-  timeline: z.array(z.object({
-    timestamp: z.string().describe('The timestamp of the event in HH:MM:SS format.'),
-    event: z.string().describe('A description of what is happening at this timestamp.'),
-    visualDetail: z.string().describe('Notable visual details, like objects or character appearances.'),
-  })).describe('An array of time-stamped logs detailing events throughout the video.'),
-  visualCues: z.array(z.string()).describe('A list of important on-screen text (OCR) or significant visual objects.'),
-  keywords: z.array(z.string()).describe('An array of relevant keywords for searching and tagging.'),
-});
-
-// MIME Type 도우미
-function getMimeType(filePath: string): string {
-  const extension = path.extname(filePath).toLowerCase();
-  switch (extension) {
-    case ".mp4": return "video/mp4";
-    case ".mov": return "video/quicktime";
-    case ".avi": return "video/x-msvideo";
-    case ".wmv": return "video/x-ms-wmv";
-    case ".webm": return "video/webm";
-    case ".mkv": return "video/x-matroska";
-    default: return "video/mp4";
-  }
-}
 
 // ==========================================
 // [Trigger] 파일 처리 및 AI 분석 실행
@@ -56,24 +22,55 @@ function getMimeType(filePath: string): string {
 export const analyzeVideoOnWrite = onDocumentWritten(
   "episodes/{episodeId}",
   async (event) => {
-    // ✅ 함수 실행 시점에 무거운 모듈을 동적으로 가져옵니다.
+    // === LAZY LOAD ALL MODULES ===
+    const { z } = await import("zod");
     const { admin } = await import("./firebase-admin-init");
-    const { genkit } = (await import("genkit"));
-    const { googleAI } = (await import("@genkit-ai/google-genai"));
-    const { GoogleAIFileManager, FileState } = (await import("@google/generative-ai/server"));
+    const { genkit } = await import("genkit");
+    const { googleAI } = await import("@genkit-ai/google-genai");
+    const { GoogleAIFileManager, FileState } = await import("@google/generative-ai/server");
+    // ============================
+
+    // Zod schema must be defined *after* zod is imported.
+    const AnalysisOutputSchema = z.object({
+      transcript: z.string().describe('The full and accurate audio transcript of the video.'),
+      summary: z.string().describe('A concise summary of the entire video content.'),
+      timeline: z.array(z.object({
+        timestamp: z.string().describe('The timestamp of the event in HH:MM:SS format.'),
+        event: z.string().describe('A description of what is happening at this timestamp.'),
+        visualDetail: z.string().describe('Notable visual details, like objects or character appearances.'),
+      })).describe('An array of time-stamped logs detailing events throughout the video.'),
+      visualCues: z.array(z.string()).describe('A list of important on-screen text (OCR) or significant visual objects.'),
+      keywords: z.array(z.string()).describe('An array of relevant keywords for searching and tagging.'),
+    });
+
+    const getMimeType = (filePath: string): string => {
+        const extension = path.extname(filePath).toLowerCase();
+        switch (extension) {
+            case ".mp4": return "video/mp4";
+            case ".mov": return "video/quicktime";
+            case ".avi": return "video/x-msvideo";
+            case ".wmv": return "video/x-ms-wmv";
+            case ".webm": return "video/webm";
+            case ".mkv": return "video/x-matroska";
+            default: return "video/mp4";
+        }
+    }
     
-    // ✅ 앱 초기화 확인 및 수행
+    // Initialize admin app if not already initialized.
     if (admin.apps.length === 0) {
       admin.initializeApp();
     }
     
-    // Genkit 및 GoogleAIFileManager 지연 초기화 (Lazy Initialization)
+    // Initialize Genkit and Google AI File Manager
     const apiKey = process.env.GOOGLE_GENAI_API_KEY || '';
-    const ai = genkit({
-      plugins: [googleAI({ apiKey })],
-    });
+    if (!apiKey) {
+        console.error("GOOGLE_GENAI_API_KEY secret is not available.");
+        return;
+    }
+    const ai = genkit({ plugins: [googleAI({ apiKey })] });
     const fileManager = new GoogleAIFileManager(apiKey);
     
+    // Function logic starts here...
     const change = event.data;
     if (!change) return;
     
@@ -87,8 +84,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     const beforeData = change.before.exists ? change.before.data() : null;
     const { episodeId } = event.params;
 
-    // 'pending' 상태는 이제 트리거되지 않으므로 이 로직은 유지해도 괜찮습니다.
-    // 만약 수동으로 pending을 넣는 경우가 있다면 유효합니다.
     if (afterData.aiProcessingStatus === "pending") {
       console.log(`✨ New upload detected [${episodeId}]. Setting status to 'processing'.`);
       await change.after.ref.update({ aiProcessingStatus: "processing" });
