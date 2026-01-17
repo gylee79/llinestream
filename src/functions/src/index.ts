@@ -5,19 +5,23 @@
  * It uses dynamic imports and lazy initialization to ensure fast cold starts
  * and avoid deployment timeouts in a Cloud Run (2nd Gen) environment.
  */
-
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
 import { z } from "zod";
+import { admin } from "./firebase-admin-init";
+import { genkit } from "genkit";
+import { googleAI } from "@genkit-ai/google-genai";
+import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
 
-// ✅ 가볍거나 내장된 모듈은 최상단에 유지합니다.
+
+// ✅ 가볍거나 내장된 모듈만 최상단에 유지합니다.
 
 // 전역 옵션 설정: 모든 함수에 일괄 적용됩니다.
 setGlobalOptions({
-  region: "us-central1", // App Hosting 리전과 일치시킴
+  region: "us-central1", // App Hosting 백엔드와 리전 일치
   secrets: ["GOOGLE_GENAI_API_KEY"],
   timeoutSeconds: 540,
   memory: "2GiB",
@@ -54,14 +58,8 @@ function getMimeType(filePath: string): string {
 // [Trigger] 파일 처리 및 AI 분석 실행
 // ==========================================
 export const analyzeVideoOnWrite = onDocumentWritten(
-  "episodes/{episodeId}", // ✅ 전역 설정이 적용되도록 개별 옵션 제거
+  "episodes/{episodeId}",
   async (event) => {
-    // ✅ 함수 실행 시점에 무거운 모듈을 동적으로 가져옵니다.
-    const { admin } = await import("./firebase-admin-init.js");
-    const { genkit } = (await import("genkit"));
-    const { googleAI } = (await import("@genkit-ai/google-genai"));
-    const { GoogleAIFileManager, FileState } = (await import("@google/generative-ai/server"));
-    
     // ✅ 앱 초기화 확인 및 수행
     if (admin.apps.length === 0) {
       admin.initializeApp();
@@ -192,9 +190,6 @@ Keywords: ${result.keywords.join(', ')}
 // [Trigger] 삭제 시 청소
 // ==========================================
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
-    // ✅ 함수 실행 시점에 admin SDK를 가져옵니다.
-    const { admin } = await import("./firebase-admin-init.js");
-    
     // ✅ 앱 초기화 확인 및 수행
     if (admin.apps.length === 0) {
       admin.initializeApp();
