@@ -120,7 +120,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       console.log(`[${episodeId}] Calling Gemini 2.5 Pro in JSON mode...`);
       
       const model = genAI!.getGenerativeModel({ 
-        model: "gemini-1.5-pro",
+        model: "gemini-2.5-pro",
         systemInstruction: "You are a video analysis expert. All of your text output, including summaries, transcripts, and keywords, must be in Korean. Do not use any other language under any circumstances. Provide the output as a valid JSON object only.",
         generationConfig: {
           responseMimeType: "application/json",
