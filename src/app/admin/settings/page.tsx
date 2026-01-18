@@ -1,8 +1,7 @@
-
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +11,7 @@ import type { Policy, FooterSettings, HeroImageSettings } from '@/lib/types';
 import { useCollection, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useTransition } from 'react';
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
@@ -28,7 +27,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Trash2, Download } from "lucide-react";
+import { createFullBackup } from '@/lib/actions/backup-actions';
 
 
 function HeroImageManager() {
@@ -458,6 +458,55 @@ function PolicySettingsManager() {
   );
 }
 
+function BackupManager() {
+    const { toast } = useToast();
+    const [isPending, startTransition] = useTransition();
+
+    const handleCreateBackup = () => {
+        startTransition(async () => {
+            toast({ title: "백업 생성 중...", description: "데이터를 취합하고 있습니다. 잠시만 기다려주세요.", duration: 10000 });
+            
+            const result = await createFullBackup();
+
+            if (result.success && result.data) {
+                try {
+                    const blob = new Blob([result.data], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    link.href = url;
+                    link.download = `llinestream-backup-${timestamp}.json`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    toast({ title: "백업 파일 다운로드 시작", description: "백업 파일이 생성되어 다운로드가 시작됩니다." });
+                } catch (e) {
+                     toast({ variant: 'destructive', title: "다운로드 실패", description: "백업 파일은 생성되었으나 다운로드에 실패했습니다." });
+                }
+            } else {
+                toast({ variant: 'destructive', title: "백업 생성 실패", description: result.message });
+            }
+        });
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>전체 데이터 백업</CardTitle>
+                <CardDescription>
+                    Firestore에 저장된 모든 주요 데이터를 하나의 JSON 파일로 다운로드합니다. 이 작업은 데이터 양에 따라 시간이 걸릴 수 있습니다.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button onClick={handleCreateBackup} disabled={isPending}>
+                    <Download className="mr-2 h-4 w-4" />
+                    {isPending ? "백업 파일 생성 중..." : "백업 파일 다운로드"}
+                </Button>
+            </CardContent>
+        </Card>
+    );
+}
 
 export default function AdminSettingsPage() {
   return (
@@ -470,6 +519,7 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="general">일반</TabsTrigger>
           <TabsTrigger value="footer">푸터</TabsTrigger>
           <TabsTrigger value="policies">약관 및 정책</TabsTrigger>
+          <TabsTrigger value="backup">백업</TabsTrigger>
         </TabsList>
         <TabsContent value="general" className="mt-4">
             <Card>
@@ -506,6 +556,9 @@ export default function AdminSettingsPage() {
             <CardHeader><CardTitle>약관 및 정책 수정</CardTitle></CardHeader>
             <PolicySettingsManager />
           </Card>
+        </TabsContent>
+        <TabsContent value="backup" className="mt-4">
+            <BackupManager />
         </TabsContent>
       </Tabs>
     </div>
