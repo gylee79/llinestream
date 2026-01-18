@@ -230,8 +230,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-grow md:grid md:grid-cols-3 min-h-0">
-            <div className="md:col-span-2 h-full flex flex-col bg-black">
+        <div className="flex-grow flex flex-col md:grid md:grid-cols-3 min-h-0">
+            
+            <div className="w-full aspect-video bg-black md:col-span-2 md:aspect-auto md:h-full flex flex-col">
                 <div className="w-full flex-grow relative">
                     <video
                         id={`video-${videoKey}`}
@@ -257,7 +258,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 </div>
             </div>
             
-            <div className="md:col-span-1 flex flex-col border-l min-h-0 h-full">
+            <div className="flex-grow flex flex-col md:col-span-1 border-l min-h-0 md:h-full">
                 <div className="flex items-center gap-1 p-1 border-b flex-shrink-0">
                     <Button variant={activeView === 'summary' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-3 text-sm" onClick={() => setActiveView('summary')}>
                         강의 요약
