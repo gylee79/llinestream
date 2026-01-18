@@ -121,13 +121,16 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       
       const model = genAI!.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
-      const prompt = `Analyze this video file comprehensively and generate a valid JSON object. The entire JSON output, including all text fields, MUST be in Korean.
-The JSON object must have the following fields:
-- "transcript": The full and accurate audio transcript of the video, in Korean.
-- "summary": A concise summary of the content, in Korean.
-- "timeline": An array of subtitle objects. Each object must have "startTime" (in HH:MM:SS.mmm format), "endTime" (in HH:MM:SS.mmm format), and "subtitle" (the Korean text for that time range). This timeline should cover the entire video and be suitable for creating a VTT subtitle file.
-- "visualCues": A list of important on-screen text or objects, described in Korean.
-- "keywords": An array of relevant keywords, in Korean.`;
+      const prompt = `이 비디오 파일을 종합적으로 분석하여 유효한 JSON 객체를 생성해주세요. 생성되는 JSON 객체의 모든 텍스트 필드(transcript, summary, subtitle, visualCues, keywords 등)는 반드시 한국어로 작성되어야 합니다.
+
+JSON 객체는 다음 필드를 포함해야 합니다:
+- "transcript": 영상의 전체 음성 대본을 정확하게 한국어로 작성합니다.
+- "summary": 영상 콘텐츠에 대한 간결한 요약을 한국어로 작성합니다.
+- "timeline": 자막 객체의 배열입니다. 각 객체는 "startTime"(HH:MM:SS.mmm 형식), "endTime"(HH:MM:SS.mmm 형식), 그리고 해당 시간 범위의 "subtitle"(한국어 자막 텍스트)을 포함해야 합니다. 이 타임라인은 전체 비디오를 커버해야 하며, VTT 자막 파일을 만들기에 적합해야 합니다.
+- "visualCues": 화면에 나타나는 중요한 텍스트(OCR)나 객체 목록을 한국어로 설명합니다.
+- "keywords": 관련성 높은 핵심 키워드를 한국어 배열로 작성합니다.
+
+절대로 영어나 다른 언어를 사용하지 마세요. 모든 결과는 반드시 한국어여야 합니다.`;
       
       const result = await model.generateContent([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
