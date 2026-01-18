@@ -141,6 +141,11 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       
       // JSON 파싱 (보강된 로직)
       let cleanedText = responseText.replace(/^```json|```$/g, "").trim();
+
+      // AI가 불필요한 제어 문자를 포함하는 경우를 대비한 추가 정리
+      // JSON 문자열에서 허용되지 않는 제어 문자(U+0000-U+001F)를 제거합니다.
+      cleanedText = cleanedText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+      
       if (cleanedText.includes('}\n{')) {
           // AI가 여러 JSON 객체를 반환한 경우, 첫 번째 것만 사용
           cleanedText = cleanedText.substring(0, cleanedText.indexOf('}\n{') + 1);
