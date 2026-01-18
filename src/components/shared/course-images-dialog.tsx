@@ -5,6 +5,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogClose,
 } from '@/components/ui/dialog';
 import Image from 'next/image';
@@ -50,6 +51,9 @@ export default function CourseImagesDialog({ isOpen, onOpenChange, images, cours
       <DialogContent className="max-w-[90vw] md:max-w-4xl h-[90vh] flex flex-col p-0 bg-muted/80 backdrop-blur-sm">
         <DialogHeader className="p-4 border-b flex-shrink-0 bg-background z-10 flex flex-row justify-between items-center">
           <DialogTitle>{courseName} 상세 정보</DialogTitle>
+          <DialogDescription className="sr-only">
+            {courseName}의 전체 상세 정보 이미지입니다.
+          </DialogDescription>
           <DialogClose className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
