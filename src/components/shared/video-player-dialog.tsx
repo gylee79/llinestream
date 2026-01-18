@@ -222,7 +222,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+      <DialogContent className="w-full h-full p-0 flex flex-col top-0 translate-y-0 rounded-none md:max-w-7xl md:h-[90vh] md:rounded-lg md:top-1/2 md:-translate-y-1/2">
         <DialogHeader className="hidden md:flex px-4 py-2 border-b flex-shrink-0">
             <DialogTitle className="text-lg font-bold truncate pr-4">{episode.title}</DialogTitle>
             <DialogDescription className="sr-only">
