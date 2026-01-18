@@ -223,7 +223,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
-        <DialogHeader className="px-4 py-2 border-b flex-shrink-0">
+        <DialogHeader className="hidden md:flex px-4 py-2 border-b flex-shrink-0">
             <DialogTitle className="text-lg font-bold truncate pr-4">{episode.title}</DialogTitle>
             <DialogDescription className="sr-only">
               {instructor?.name} 강사의 {episode.title} 비디오 플레이어.
@@ -232,8 +232,13 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
         <div className="flex-grow flex flex-col md:grid md:grid-cols-3 min-h-0">
             
-            <div className="w-full aspect-video bg-black md:col-span-2 md:aspect-auto md:h-full flex flex-col">
+            <div className="w-full aspect-video bg-black md:col-span-2 md:h-full flex flex-col">
                 <div className="w-full flex-grow relative">
+                    <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black/50 to-transparent pointer-events-none md:hidden">
+                        <DialogTitle className="text-white text-lg font-bold truncate pr-8">
+                            {episode.title}
+                        </DialogTitle>
+                    </div>
                     <video
                         id={`video-${videoKey}`}
                         key={videoKey}
