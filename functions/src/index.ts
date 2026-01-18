@@ -85,7 +85,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       return;
     }
 
-    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-flash).`);
+    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-3-pro-preview).`);
     
     // 도구 초기화
     const { genAI, fileManager } = initializeTools();
@@ -117,10 +117,10 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       if (state === FileState.FAILED) throw new Error("Google AI processing failed.");
 
       // 4. AI 분석 (JSON 모드 활성화)
-      console.log(`[${episodeId}] Calling Gemini 2.5 Flash in JSON mode...`);
+      console.log(`[${episodeId}] Calling Gemini 3 Pro Preview in JSON mode...`);
       
       const model = genAI!.getGenerativeModel({ 
-        model: "gemini-2.5-flash",
+        model: "gemini-3-pro-preview",
         systemInstruction: "You are a video analysis expert. All of your text output, including summaries, transcripts, and keywords, must be in Korean. Do not use any other language under any circumstances. Provide the output as a valid JSON object only.",
         generationConfig: {
           responseMimeType: "application/json",
@@ -142,12 +142,20 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       const responseText = result.response.text();
       
-      // JSON 파싱 (단순화)
       let output;
+      const jsonStart = responseText.indexOf('{');
+      const jsonEnd = responseText.lastIndexOf('}');
+      
+      if (jsonStart === -1 || jsonEnd === -1) {
+          throw new Error("AI가 생성한 응답에서 유효한 JSON 객체를 찾을 수 없습니다.");
+      }
+
+      const jsonString = responseText.substring(jsonStart, jsonEnd + 1);
+
       try {
-          output = JSON.parse(responseText);
+          output = JSON.parse(jsonString);
       } catch (parseError) {
-          console.error("Final JSON parsing failed despite using JSON mode. String that was parsed:", responseText);
+          console.error("Final JSON parsing failed. String that was parsed:", jsonString);
           if (parseError instanceof Error) {
             throw new Error(`AI가 생성한 JSON 형식이 올바르지 않습니다: ${parseError.message}`);
           }
