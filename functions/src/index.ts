@@ -163,8 +163,6 @@ The JSON object must have the following fields:
 
       const combinedContent = `
 요약: ${output.summary}\n
-타임라인:
-${output.timeline?.map((t: any) => `- [${t.startTime}] ${t.subtitle}`).join('\n') || ''}\n
 키워드: ${output.keywords?.join(', ') || ''}
       `.trim();
 
