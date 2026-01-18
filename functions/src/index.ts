@@ -139,8 +139,12 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       const responseText = result.response.text();
       
-      // JSON 파싱
-      const cleanedText = responseText.replace(/```json|```/g, "").trim();
+      // JSON 파싱 (보강된 로직)
+      let cleanedText = responseText.replace(/^```json|```$/g, "").trim();
+      if (cleanedText.includes('}\n{')) {
+          // AI가 여러 JSON 객체를 반환한 경우, 첫 번째 것만 사용
+          cleanedText = cleanedText.substring(0, cleanedText.indexOf('}\n{') + 1);
+      }
       const output = JSON.parse(cleanedText);
 
       // 5. VTT 자막 파일 생성 및 업로드
