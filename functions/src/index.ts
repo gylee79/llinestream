@@ -121,12 +121,13 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       
       const model = genAI!.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
-      const prompt = `Analyze this video file comprehensively. Return a valid JSON object with the following fields:
-- "transcript": The full and accurate audio transcript of the video.
-- "summary": A concise summary of the content.
-- "timeline": An array of subtitle objects. Each object must have "startTime" (in HH:MM:SS.mmm format), "endTime" (in HH:MM:SS.mmm format), and "subtitle" (the text for that time range). This timeline should cover the entire video and be suitable for creating a VTT subtitle file.
-- "visualCues": A list of important on-screen text or objects.
-- "keywords": An array of relevant keywords.`;
+      const prompt = `Analyze this video file comprehensively and generate a valid JSON object. The entire JSON output, including all text fields, MUST be in Korean.
+The JSON object must have the following fields:
+- "transcript": The full and accurate audio transcript of the video, in Korean.
+- "summary": A concise summary of the content, in Korean.
+- "timeline": An array of subtitle objects. Each object must have "startTime" (in HH:MM:SS.mmm format), "endTime" (in HH:MM:SS.mmm format), and "subtitle" (the Korean text for that time range). This timeline should cover the entire video and be suitable for creating a VTT subtitle file.
+- "visualCues": A list of important on-screen text or objects, described in Korean.
+- "keywords": An array of relevant keywords, in Korean.`;
       
       const result = await model.generateContent([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
@@ -161,10 +162,10 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       }
 
       const combinedContent = `
-Summary: ${output.summary}\n
-Timeline:
+요약: ${output.summary}\n
+타임라인:
 ${output.timeline?.map((t: any) => `- [${t.startTime}] ${t.subtitle}`).join('\n') || ''}\n
-Keywords: ${output.keywords?.join(', ') || ''}
+키워드: ${output.keywords?.join(', ') || ''}
       `.trim();
 
       await change.after.ref.update({
