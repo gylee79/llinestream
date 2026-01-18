@@ -1,64 +1,89 @@
-# 비디오 AI 분석 워크플로우 (v2 - 자동화)
+# 비디오 AI 분석 및 채팅 워크플로우 (현재 코드 기준)
 
-**목표:** 비디오가 Firestore에 등록되는 순간, Firebase Cloud Functions와 Genkit을 사용하여 백그라운드에서 자동으로 AI 분석을 수행하고 결과를 저장하는 서버리스 파이프라인.
+**목표:** 비디오가 등록되는 순간, Firebase Cloud Functions와 Genkit을 사용하여 백그라운드에서 자동으로 AI 분석을 수행하고, 사용자는 분석된 데이터를 기반으로 AI와 대화하는 서버리스 파이프라인.
 
 **기술 스택:**
-- **프레임워크:** Genkit 1.0 (Node.js)
 - **AI 모델:** Google Gemini 2.5 Flash
-- **실행 환경:** Firebase Cloud Functions (2nd Gen)
-- **트리거:** Firestore Trigger (`onDocumentCreated`)
-- **스토리지:** Firebase Storage
+- **AI 프레임워크:** Genkit
+- **실행 환경:** Firebase Cloud Functions (v2)
+- **트리거:** Firestore `onDocumentWritten`
+- **데이터베이스:** Firestore
+- **파일 저장소:** Firebase Storage
 
 ---
 
-### Step 1: 영상 업로드 및 메타데이터 저장 (클라이언트)
+## Part 1. 비디오 등록 및 자동 AI 분석 (관리자)
 
-1.  **파일 선택 (관리자 페이지):**
-    *   관리자가 '비디오 업로드' 대화상자에서 비디오 파일, 썸네일, 제목, 설명 등의 정보를 입력합니다.
+관리자가 비디오를 업로드하면, 사용자의 개입 없이 다음 과정이 자동으로 진행됩니다.
 
-2.  **Storage에 직접 업로드:**
-    *   '저장' 버튼을 클릭하면, 브라우저(클라이언트)가 Firebase 클라이언트 SDK를 사용해 비디오와 썸네일 파일을 **직접 Firebase Storage에 업로드**합니다.
-    *   이 방식은 Next.js 서버 메모리를 전혀 사용하지 않아 안전합니다.
-
-3.  **서버 액션 호출:**
-    *   파일 업로드가 완료되면, 클라이언트는 Storage로부터 받은 파일의 공개 `downloadUrl`과 `filePath`를 포함한 모든 메타데이터를 가지고 `saveEpisodeMetadata` 서버 액션을 호출합니다.
-
-4.  **Firestore 문서 생성:**
-    *   `saveEpisodeMetadata` 액션은 전달받은 모든 정보와 함께 **`aiProcessingStatus: 'pending'`** 상태를 포함하여 Firestore의 `episodes` 컬렉션에 새 문서를 생성합니다.
-    *   **핵심:** 이 단계에서 서버 액션의 역할은 데이터를 저장하는 것으로 끝나며, 무거운 AI 분석 작업은 시작하지 않습니다.
-
----
+### Step 1: 업로드 및 메타데이터 저장 (클라이언트 → 서버)
+1.  **파일 업로드 (관리자 페이지):** 관리자가 '비디오 업로드' 대화상자에서 비디오 파일, 썸네일, 제목, 설명 등의 정보를 입력하고 저장합니다.
+2.  **Storage에 직접 업로드:** 브라우저(클라이언트)가 Firebase 클라이언트 SDK를 사용해 비디오와 썸네일 파일을 **직접 Firebase Storage에 업로드**합니다. 이 방식은 서버 리소스를 사용하지 않아 효율적입니다.
+3.  **메타데이터 저장 (서버 액션):** 파일 업로드 완료 후, 클라이언트는 파일의 공개 URL 및 경로를 포함한 모든 메타데이터를 `saveEpisodeMetadata` 서버 액션으로 전달합니다.
+4.  **Firestore 문서 생성 및 "방아쇠"**: 서버 액션은 전달받은 정보를 Firestore의 `episodes` 컬렉션에 새 문서로 생성합니다. 이때 **`aiProcessingStatus: 'pending'`** 상태가 함께 저장됩니다. 이것이 전체 AI 분석 워크플로우를 시작하는 신호입니다.
 
 ### Step 2: Cloud Function 트리거 및 실행 (백엔드)
-
-1.  **자동 트리거 (`functions/src/index.ts`):**
-    *   `episodes` 컬렉션에 `aiProcessingStatus: 'pending'` 상태의 새 문서가 생성되는 이벤트를 감지하는 **Firestore 트리거(`onDocumentCreated`)**가 자동으로 실행됩니다.
-
-2.  **상태 업데이트:**
-    *   Cloud Function이 시작되면, 즉시 해당 에피소드 문서의 `aiProcessingStatus`를 `'processing'`으로 변경하여 중복 실행을 방지하고 현재 상태를 명확히 합니다.
-
----
+1.  **자동 트리거 (`functions/src/index.ts`):** `episodes` 컬렉션에 `aiProcessingStatus: 'pending'` 상태의 새 문서가 생성되면, 이를 감지하는 **Firestore `onDocumentWritten` 트리거**가 Cloud Function을 자동으로 실행합니다.
+2.  **상태 업데이트 (중복 실행 방지):** 함수가 시작되면, 즉시 해당 에피소드 문서의 `aiProcessingStatus`를 `'processing'`으로 변경하여 다른 함수가 중복으로 작업하는 것을 막고 현재 상태를 명확히 합니다.
 
 ### Step 3: Genkit을 이용한 AI 분석 (백엔드 - Cloud Function 내부)
+1.  **파일 준비:** Cloud Function은 Storage에 저장된 비디오 파일을 Google AI가 분석할 수 있도록 **Google AI 파일 시스템으로 안전하게 전달**합니다.
+2.  **AI 분석 요청:** Genkit 프레임워크를 통해 **`gemini-2.5-flash`** 모델에게 비디오 분석을 요청합니다. 이때, 미리 정의된 스키마(Zod)를 함께 보내 AI가 다음과 같은 **구조화된 JSON 데이터**를 반환하도록 합니다.
+    *   `transcript`: 영상의 전체 음성 대본
+    *   `summary`: 영상 콘텐츠에 대한 간결한 요약
+    *   `timeline`: 시간대별 주요 이벤트 및 시각적 상세 설명
+    *   `visualCues`: 화면에 나타나는 중요한 텍스트(OCR) 또는 객체 목록
+    *   `keywords`: 검색 및 태깅을 위한 핵심 키워드 배열
 
-1.  **파일 스트리밍 다운로드:**
-    *   메모리 폭발을 방지하기 위해, 에피소드 문서에 저장된 `filePath`를 이용해 Firebase Storage에서 비디오 파일을 Cloud Function의 **임시 로컬 디렉토리로 스트리밍하여 다운로드**합니다.
-
-2.  **Genkit으로 AI 분석 요청:**
-    *   다운로드된 임시 파일을 Genkit의 `ai.generate()` 함수에 입력으로 전달합니다.
-    *   **`gemini-2.5-flash`** 모델이 비디오를 분석하고, 미리 정의된 Zod 스키마에 따라 **구조화된 JSON 데이터** (`transcript`, `visualSummary`, `keywords`)를 반환합니다.
+### Step 4: 결과 저장 및 정리
+1.  **분석 데이터 저장:** AI가 반환한 `transcript` (음성 대본)와 나머지 분석 데이터를 조합한 `aiGeneratedContent` (종합 분석 내용)를 Firestore의 해당 에피소드 문서에 업데이트합니다.
+2.  **상태 완료 처리:** `aiProcessingStatus`를 **`completed`**로 변경하여 분석이 성공적으로 완료되었음을 표시합니다. (실패 시 `'failed'`와 오류 메시지 기록)
+3.  **임시 파일 삭제:** 분석에 사용된 임시 파일들은 자동으로 삭제되어 리소스를 깨끗하게 유지합니다.
 
 ---
 
-### Step 4: 결과 저장 및 정리 (백엔드)
+## Part 2. AI 채팅 (사용자)
 
-1.  **결과 저장:**
-    *   AI가 반환한 `transcript`, `visualSummary`, `keywords`를 조합하여 Firestore 문서의 `transcript`, `aiGeneratedContent` 필드를 업데이트합니다.
-    *   `aiProcessingStatus`를 **`completed`**로 변경하여 분석이 성공적으로 완료되었음을 표시합니다.
+사용자가 영상을 보면서 질문하면, 위에서 분석된 데이터를 기반으로 답변합니다.
 
-2.  **에러 처리:**
-    *   분석 과정 중 에러가 발생하면, `aiProcessingStatus`를 `'failed'`로, `aiProcessingError`에 오류 메시지를 기록합니다.
+### Step 1: 질문하기 (클라이언트)
+1.  **질문 입력:** 사용자가 영상 플레이어의 채팅창에 궁금한 점을 입력하고 '전송' 버튼을 누릅니다.
+2.  **서버로 전송:** 현재 시청 중인 에피소드의 ID(`episodeId`), 사용자 ID(`userId`), 그리고 질문 내용이 서버의 `askVideoTutor` AI 플로우로 전달됩니다.
 
-3.  **리소스 정리:**
-    *   성공/실패 여부와 관계없이, Cloud Function의 임시 디렉토리에 다운로드했던 비디오 파일을 삭제하여 리소스를 깨끗하게 정리합니다.
+### Step 2: 컨텍스트 기반 답변 생성 (백엔드 - Genkit 플로우)
+1.  **분석 데이터 조회:** `askVideoTutor` 플로우는 전달받은 `episodeId`를 사용하여 Firestore에서 해당 에피소드의 **`aiGeneratedContent` 필드 값(Part 1에서 저장한 분석 데이터)**을 가져옵니다.
+2.  **답변 범위 제한:** AI 튜터는 **오직 이 영상 분석 데이터 안에서만** 답변의 근거를 찾습니다. 외부 인터넷 검색이나 다른 지식을 사용하지 않으므로, 영상 내용과 직접적으로 관련된 정확한 정보만 제공할 수 있습니다.
+3.  **답변 생성:** 조회한 분석 데이터와 사용자 질문을 **`gemini-2.5-flash`** 모델에 함께 전달하여, 컨텍스트에 기반한 자연스러운 한국어 답변을 생성합니다.
 
+### Step 3: 응답 및 기록 저장
+1.  **답변 표시:** 생성된 답변은 사용자 화면의 채팅창에 즉시 나타납니다.
+2.  **채팅 기록 저장 (개인정보 보호):** 질문과 답변 내용은 **사용자 개인의 채팅 기록 컬렉션(`users/{userId}/chats/{chatId}`)에 안전하게 저장됩니다.** 이를 통해 개인 정보가 보호되며, 사용자는 나중에 '기록 보기' 기능으로 과거 대화 내역을 다시 확인할 수 있습니다.
+
+---
+
+## 데이터 저장 위치 요약
+
+- **비디오 분석 자료 (대본, 요약 등)**: 각각의 에피소드 문서 내의 `transcript`와 `aiGeneratedContent` 필드에 직접 저장됩니다. (`episodes/{episodeId}`)
+- **채팅 기록**: 각 사용자 문서 아래의 하위 컬렉션에 분리되어 안전하게 저장됩니다. (`users/{userId}/chats/{chatId}`)
+
+---
+
+## 예상 비용 및 자원 점검
+
+#### 1. Cloud Functions (백엔드 실행 환경)
+- **메모리**: `2GiB`로 설정되어 있습니다. 비디오 파일을 다운로드하고 처리하는 작업은 메모리를 많이 사용하므로, 이 설정은 안정적인 실행을 위해 적절합니다.
+- **타임아웃**: `540초(9분)`으로 설정되어 있습니다. 긴 비디오 분석에도 충분한 시간입니다.
+- **비용 요인**: 함수 호출 횟수(비디오 업로드 당 1회)와 함수의 실행 시간(CPU 점유 시간)에 따라 비용이 발생합니다.
+
+#### 2. Gemini API (AI 모델 사용 비용)
+- **비디오 분석 (`gemini-2.5-flash`)**: 비용은 **처리된 비디오의 시간(초) 당**으로 계산됩니다. 비디오가 길수록 비용이 증가합니다.
+- **AI 채팅 (`gemini-2.5-flash`)**: 비용은 **입력/출력된 텍스트의 글자 수**에 따라 계산됩니다. 사용자 질문과 영상 분석 데이터(`aiGeneratedContent`)가 입력으로, AI의 답변이 출력으로 계산됩니다.
+- **참고**: Google Cloud는 매월 무료 제공량을 제공하므로, 초기 사용량이나 테스트 단계에서는 비용이 발생하지 않을 수 있습니다.
+
+#### 3. Firebase 서비스
+- **Storage**: 업로드된 비디오 원본 파일, 썸네일 파일들의 총 저장 용량과, 함수가 파일을 다운로드할 때 발생하는 네트워크 트래픽(Egress)에 따라 비용이 발생합니다.
+- **Firestore**: 데이터 저장 용량, 그리고 문서를 읽고 쓰는 횟수에 따라 비용이 발생합니다.
+    - **쓰기**: 비디오 메타데이터 저장(1회), 상태 업데이트(최소 1회), 분석 결과 저장(1회), 채팅 기록 저장(1회)
+    - **읽기**: AI 채팅 시 영상 분석 데이터 읽기(1회)
+
+**결론적으로, 현재 시스템은 비용 효율적인 `gemini-2.5-flash` 모델을 사용하고 있으며, 서버리스 구조로 설계되어 사용량이 적을 때는 비용이 거의 발생하지 않습니다. 주된 비용은 비디오 분석 시 사용되는 Gemini API와 Cloud Function 실행 시간에 따라 결정될 것입니다.**
