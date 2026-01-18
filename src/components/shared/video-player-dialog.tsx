@@ -194,12 +194,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 <DialogTitle className="text-base font-bold truncate pr-4">{episode.title}</DialogTitle>
                 <div className="flex items-center gap-1 rounded-md bg-muted p-1">
                     <Button variant={activeView === 'summary' ? 'secondary' : 'ghost'} size="sm" className="h-7 px-2 text-xs" onClick={() => setActiveView('summary')}>
-                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
                         강의 요약
                     </Button>
                     <Button variant={activeView === 'chat' ? 'secondary' : 'ghost'} size="sm" className="h-7 px-2 text-xs" onClick={() => setActiveView('chat')}>
-                        <Bot className="mr-1.5 h-3.5 w-3.5" />
-                        AI 채팅
+                        AI 검색
                     </Button>
                 </div>
             </div>
@@ -216,7 +214,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <div className="flex flex-col items-center justify-center h-full text-center">
                             <Bot className="h-12 w-12 text-muted-foreground" />
                             <p className="text-sm text-muted-foreground mt-2">
-                                AI 튜터에게 비디오 내용에 대해 궁금한 점을 물어보세요.
+                                AI 튜터에게 비디오 내용에 대해 궁금한 점을 검색해보세요.
                             </p>
                         </div>
                         ) : (
@@ -256,7 +254,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     </ScrollArea>
                     <div className="flex-shrink-0 flex gap-2 items-center">
                         <Textarea 
-                            placeholder={!isAIAvailable ? "AI 분석이 아직 완료되지 않았습니다." : "AI에게 질문할 내용을 입력하세요..."}
+                            placeholder={!isAIAvailable ? "AI 분석이 아직 완료되지 않았습니다." : "AI에게 검색할 내용을 입력하세요..."}
                             className="flex-grow resize-none h-10 min-h-0" 
                             rows={1}
                             value={userQuestion}
