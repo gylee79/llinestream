@@ -219,7 +219,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         className="h-7" 
                         onClick={() => setActiveView(prev => prev === 'chat' ? 'history' : 'chat')}
                      >
-                        <History className="h-3 w-3 mr-1.5" />
                         {activeView === 'chat' ? '기록 보기' : '채팅 하기'}
                     </Button>
                 </div>
