@@ -77,16 +77,44 @@ const ChatHistory = ({ episode, user }: { episode: Episode, user: User | null })
     );
 };
 
+const SummaryView = ({ episode }: { episode: Episode }) => {
+    const isAIAvailable = episode.aiProcessingStatus === 'completed' && episode.aiGeneratedContent;
+
+    if (!isAIAvailable) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
+                <Sparkles className="h-10 w-10 mb-4" />
+                <p className="text-sm font-semibold">
+                    {episode.aiProcessingStatus === 'pending' || episode.aiProcessingStatus === 'processing'
+                        ? 'AI 요약을 생성하는 중입니다.'
+                        : '아직 이 영상에 대한 AI 요약이 없습니다.'}
+                </p>
+                 <p className="text-xs text-muted-foreground mt-1">잠시 후 다시 시도해주세요.</p>
+            </div>
+        );
+    }
+
+    return (
+        <ScrollArea className="h-full">
+            <div className="p-4 bg-muted/50 rounded-md">
+                <h4 className="font-semibold mb-2 text-primary">AI 생성 강의 요약</h4>
+                <p className="text-sm whitespace-pre-wrap font-body leading-relaxed">
+                    {episode.aiGeneratedContent}
+                </p>
+            </div>
+        </ScrollArea>
+    );
+};
+
 
 export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
   const { user } = useUser();
   const { toast } = useToast();
-  const startTimeRef = useRef<Date | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [userQuestion, setUserQuestion] = useState('');
-  const [activeView, setActiveView] = useState<'chat' | 'history'>('chat');
+  const [activeView, setActiveView] = useState<'summary' | 'chat' | 'history'>('summary');
   const chatScrollAreaRef = useRef<HTMLDivElement>(null);
 
 
@@ -101,7 +129,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     onOpenChange(false);
     setChatMessages([]);
     setUserQuestion('');
-    setActiveView('chat');
+    setActiveView('summary');
   }
   
   useEffect(() => {
@@ -179,7 +207,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     });
   }
 
-  const isAIAvailable = episode.transcript !== undefined && episode.transcript !== null;
+  const isAIAvailable = episode.aiProcessingStatus === 'completed';
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
@@ -210,23 +238,29 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         </div>
         <DialogHeader className="px-4 py-0 border-b flex-shrink-0">
             <div className="flex justify-between items-center py-1">
-                <DialogTitle className="text-base font-bold truncate pr-4">{activeView === 'chat' ? episode.title : '과거 채팅 기록'}</DialogTitle>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    {instructor && <p className="text-xs text-muted-foreground">강사: {instructor.name}</p>}
-                     <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-7" 
-                        onClick={() => setActiveView(prev => prev === 'chat' ? 'history' : 'chat')}
-                     >
-                        {activeView === 'chat' ? '기록 보기' : '채팅 하기'}
+                <DialogTitle className="text-base font-bold truncate pr-4">{episode.title}</DialogTitle>
+                <div className="flex items-center gap-1 rounded-md bg-muted p-1">
+                    <Button variant={activeView === 'summary' ? 'secondary' : 'ghost'} size="sm" className="h-7 px-2 text-xs" onClick={() => setActiveView('summary')}>
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                        강의 요약
+                    </Button>
+                    <Button variant={activeView === 'chat' ? 'secondary' : 'ghost'} size="sm" className="h-7 px-2 text-xs" onClick={() => setActiveView('chat')}>
+                        <Bot className="mr-1.5 h-3.5 w-3.5" />
+                        AI 채팅
+                    </Button>
+                    <Button variant={activeView === 'history' ? 'secondary' : 'ghost'} size="sm" className="h-7 px-2 text-xs" onClick={() => setActiveView('history')}>
+                       <History className="mr-1.5 h-3.5 w-3.5" />
+                        기록 보기
                     </Button>
                 </div>
             </div>
         </DialogHeader>
         
          <div className="flex-grow p-4 pt-2 flex flex-col gap-4 min-h-0">
-            {activeView === 'chat' ? (
+            {activeView === 'summary' && (
+                <SummaryView episode={episode} />
+            )}
+            {activeView === 'chat' && (
                 <>
                     <ScrollArea className="flex-grow bg-muted rounded-md p-4" viewportRef={chatScrollAreaRef}>
                         {chatMessages.length === 0 ? (
@@ -291,7 +325,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         </Button>
                     </div>
                 </>
-            ) : (
+            )}
+            {activeView === 'history' && (
                 <ChatHistory episode={episode} user={user} />
             )}
         </div>
