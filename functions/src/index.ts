@@ -139,18 +139,33 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       const responseText = result.response.text();
       
-      // JSON 파싱 (보강된 로직)
-      let cleanedText = responseText.replace(/^```json|```$/g, "").trim();
-
-      // AI가 불필요한 제어 문자를 포함하는 경우를 대비한 추가 정리
-      // JSON 문자열에서 허용되지 않는 제어 문자(U+0000-U+001F)를 제거합니다.
-      cleanedText = cleanedText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+      // JSON 파싱 (강화된 추출 로직)
+      let jsonString = '';
+      const markdownMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
       
-      if (cleanedText.includes('}\n{')) {
-          // AI가 여러 JSON 객체를 반환한 경우, 첫 번째 것만 사용
-          cleanedText = cleanedText.substring(0, cleanedText.indexOf('}\n{') + 1);
+      if (markdownMatch && markdownMatch[1]) {
+          jsonString = markdownMatch[1];
+      } else {
+          const firstBrace = responseText.indexOf('{');
+          const lastBrace = responseText.lastIndexOf('}');
+          if (firstBrace !== -1 && lastBrace > firstBrace) {
+              jsonString = responseText.substring(firstBrace, lastBrace + 1);
+          } else {
+              console.error("Could not find a valid JSON object in the AI response.", responseText);
+              throw new Error("AI 응답에서 JSON 객체를 찾을 수 없습니다.");
+          }
       }
-      const output = JSON.parse(cleanedText);
+
+      let output;
+      try {
+          output = JSON.parse(jsonString);
+      } catch (parseError) {
+          console.error("Final JSON parsing failed. String that was parsed:", jsonString);
+          if (parseError instanceof Error) {
+            throw new Error(`AI가 생성한 JSON 형식이 올바르지 않습니다: ${parseError.message}`);
+          }
+          throw new Error("AI가 생성한 JSON 형식이 올바르지 않습니다.");
+      }
 
       // 5. VTT 자막 파일 생성 및 업로드
       let vttUrl = null;
