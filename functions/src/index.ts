@@ -91,10 +91,10 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     const { genAI, fileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
     let uploadedFile: any = null;
+    const bucket = admin.storage().bucket();
 
     try {
       // 1. 다운로드
-      const bucket = admin.storage().bucket();
       await bucket.file(filePath).download({ destination: tempFilePath });
       
       // 2. 업로드 (Google AI)
@@ -119,10 +119,14 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       // 4. AI 분석
       console.log(`[${episodeId}] Calling Gemini 2.5 Flash...`);
       
-      // [요청하신 부분 수정 완료] gemini-2.5-flash 적용
       const model = genAI!.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
-      const prompt = "Analyze this video file comprehensively. Return a valid JSON object with fields: transcript, summary, timeline (array of timestamp, event, visualDetail), visualCues (array), keywords (array).";
+      const prompt = `Analyze this video file comprehensively. Return a valid JSON object with the following fields:
+- "transcript": The full and accurate audio transcript of the video.
+- "summary": A concise summary of the content.
+- "timeline": An array of subtitle objects. Each object must have "startTime" (in HH:MM:SS.mmm format), "endTime" (in HH:MM:SS.mmm format), and "subtitle" (the text for that time range). This timeline should cover the entire video and be suitable for creating a VTT subtitle file.
+- "visualCues": A list of important on-screen text or objects.
+- "keywords": An array of relevant keywords.`;
       
       const result = await model.generateContent([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
@@ -135,10 +139,31 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       const cleanedText = responseText.replace(/```json|```/g, "").trim();
       const output = JSON.parse(cleanedText);
 
+      // 5. VTT 자막 파일 생성 및 업로드
+      let vttUrl = null;
+      let vttPath = null;
+      if (output.timeline && Array.isArray(output.timeline)) {
+        const vttContent = `WEBVTT\n\n${output.timeline
+          .map((item: any) => `${item.startTime} --> ${item.endTime}\n${item.subtitle}`)
+          .join('\n\n')}`;
+        
+        const vttTempPath = path.join(os.tmpdir(), `${episodeId}.vtt`);
+        fs.writeFileSync(vttTempPath, vttContent);
+        
+        vttPath = `episodes/${episodeId}/subtitles/${episodeId}.vtt`;
+        await bucket.file(vttPath).upload(vttTempPath, {
+          metadata: { contentType: 'text/vtt' },
+        });
+
+        vttUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(vttPath)}?alt=media`;
+        fs.unlinkSync(vttTempPath); // 임시 파일 삭제
+        console.log(`[${episodeId}] VTT subtitle file created and uploaded.`);
+      }
+
       const combinedContent = `
 Summary: ${output.summary}\n
 Timeline:
-${output.timeline?.map((t: any) => `- [${t.timestamp}] ${t.event}`).join('\n') || ''}\n
+${output.timeline?.map((t: any) => `- [${t.startTime}] ${t.subtitle}`).join('\n') || ''}\n
 Keywords: ${output.keywords?.join(', ') || ''}
       `.trim();
 
@@ -146,6 +171,8 @@ Keywords: ${output.keywords?.join(', ') || ''}
         aiProcessingStatus: "completed",
         transcript: output.transcript || "",
         aiGeneratedContent: combinedContent,
+        vttUrl: vttUrl,
+        vttPath: vttPath,
         aiProcessingError: null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
