@@ -116,12 +116,15 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       if (state === FileState.FAILED) throw new Error("Google AI processing failed.");
 
-      // 4. AI 분석
-      console.log(`[${episodeId}] Calling Gemini 2.5 Flash...`);
+      // 4. AI 분석 (JSON 모드 활성화)
+      console.log(`[${episodeId}] Calling Gemini 2.5 Flash in JSON mode...`);
       
       const model = genAI!.getGenerativeModel({ 
         model: "gemini-2.5-flash",
-        systemInstruction: "You are a video analysis expert. All of your text output, including summaries, transcripts, and keywords, must be in Korean. Do not use any other language under any circumstances. Provide the output as a valid JSON object only."
+        systemInstruction: "You are a video analysis expert. All of your text output, including summaries, transcripts, and keywords, must be in Korean. Do not use any other language under any circumstances. Provide the output as a valid JSON object only.",
+        generationConfig: {
+          responseMimeType: "application/json",
+        }
       }); 
 
       const prompt = `이 비디오 파일을 분석하여 다음 필드를 포함하는 유효한 JSON 객체를 생성해주세요. 모든 텍스트는 반드시 한국어로 작성되어야 합니다.
@@ -139,28 +142,12 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       const responseText = result.response.text();
       
-      // JSON 파싱 (강화된 추출 로직)
-      let jsonString = '';
-      const markdownMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
-      
-      if (markdownMatch && markdownMatch[1]) {
-          jsonString = markdownMatch[1];
-      } else {
-          const firstBrace = responseText.indexOf('{');
-          const lastBrace = responseText.lastIndexOf('}');
-          if (firstBrace !== -1 && lastBrace > firstBrace) {
-              jsonString = responseText.substring(firstBrace, lastBrace + 1);
-          } else {
-              console.error("Could not find a valid JSON object in the AI response.", responseText);
-              throw new Error("AI 응답에서 JSON 객체를 찾을 수 없습니다.");
-          }
-      }
-
+      // JSON 파싱 (단순화)
       let output;
       try {
-          output = JSON.parse(jsonString);
+          output = JSON.parse(responseText);
       } catch (parseError) {
-          console.error("Final JSON parsing failed. String that was parsed:", jsonString);
+          console.error("Final JSON parsing failed despite using JSON mode. String that was parsed:", responseText);
           if (parseError instanceof Error) {
             throw new Error(`AI가 생성한 JSON 형식이 올바르지 않습니다: ${parseError.message}`);
           }
