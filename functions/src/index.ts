@@ -119,18 +119,18 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       // 4. AI 분석
       console.log(`[${episodeId}] Calling Gemini 2.5 Flash...`);
       
-      const model = genAI!.getGenerativeModel({ model: "gemini-2.5-flash" }); 
+      const model = genAI!.getGenerativeModel({ 
+        model: "gemini-2.5-flash",
+        systemInstruction: "You are a video analysis expert. All of your text output, including summaries, transcripts, and keywords, must be in Korean. Do not use any other language under any circumstances. Provide the output as a valid JSON object only."
+      }); 
 
-      const prompt = `이 비디오 파일을 종합적으로 분석하여 유효한 JSON 객체를 생성해주세요. 생성되는 JSON 객체의 모든 텍스트 필드(transcript, summary, subtitle, visualCues, keywords 등)는 반드시 한국어로 작성되어야 합니다.
-
-JSON 객체는 다음 필드를 포함해야 합니다:
-- "transcript": 영상의 전체 음성 대본을 정확하게 한국어로 작성합니다.
-- "summary": 영상 콘텐츠에 대한 간결한 요약을 한국어로 작성합니다.
-- "timeline": 자막 객체의 배열입니다. 각 객체는 "startTime"(HH:MM:SS.mmm 형식), "endTime"(HH:MM:SS.mmm 형식), 그리고 해당 시간 범위의 "subtitle"(한국어 자막 텍스트)을 포함해야 합니다. 이 타임라인은 전체 비디오를 커버해야 하며, VTT 자막 파일을 만들기에 적합해야 합니다.
-- "visualCues": 화면에 나타나는 중요한 텍스트(OCR)나 객체 목록을 한국어로 설명합니다.
-- "keywords": 관련성 높은 핵심 키워드를 한국어 배열로 작성합니다.
-
-절대로 영어나 다른 언어를 사용하지 마세요. 모든 결과는 반드시 한국어여야 합니다.`;
+      const prompt = `이 비디오 파일을 분석하여 다음 필드를 포함하는 유효한 JSON 객체를 생성해주세요. 모든 텍스트는 반드시 한국어로 작성되어야 합니다.
+- "transcript": 영상의 전체 음성 대본.
+- "summary": 영상 콘텐츠에 대한 간결한 요약.
+- "timeline": VTT 자막 생성을 위한 시간대별 자막 배열. 각 객체는 "startTime"(HH:MM:SS.mmm), "endTime"(HH:MM:SS.mmm), "subtitle"(한국어 자막)을 포함해야 합니다.
+- "visualCues": 화면의 중요한 텍스트(OCR)나 객체 목록.
+- "keywords": 관련성 높은 핵심 키워드 배열.
+`;
       
       const result = await model.generateContent([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
@@ -155,7 +155,7 @@ JSON 객체는 다음 필드를 포함해야 합니다:
         fs.writeFileSync(vttTempPath, vttContent);
         
         vttPath = `episodes/${episodeId}/subtitles/${episodeId}.vtt`;
-        await (bucket.file(vttPath) as any).upload(vttTempPath, {
+        await bucket.file(vttPath).upload(vttTempPath, {
           metadata: { contentType: 'text/vtt' },
         });
 
