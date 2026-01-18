@@ -13,7 +13,7 @@ import { Button } from '../ui/button';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
-import { Send, Sparkles, Bot, User as UserIcon, History, X } from 'lucide-react';
+import { Send, Sparkles, Bot, User as UserIcon } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { useToast } from '@/hooks/use-toast';
@@ -29,53 +29,6 @@ interface VideoPlayerDialogProps {
   episode: Episode;
   instructor: Instructor | null;
 }
-
-const ChatHistory = ({ episode, user }: { episode: Episode, user: User | null }) => {
-    const firestore = useFirestore();
-    const chatHistoryQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return query(
-            collection(firestore, 'users', user.id, 'chats'),
-            where('episodeId', '==', episode.id),
-            orderBy('createdAt', 'desc')
-        );
-    }, [firestore, user, episode.id]);
-    
-    const { data: pastChats, isLoading } = useCollection<ChatLog>(chatHistoryQuery);
-
-    if (isLoading) {
-        return (
-            <div className="space-y-4 p-4">
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-            </div>
-        );
-    }
-    
-    if (!pastChats || pastChats.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
-                <History className="h-10 w-10 mb-2" />
-                <p className="text-sm">이 에피소드에 대한 채팅 기록이 없습니다.</p>
-            </div>
-        );
-    }
-    
-    return (
-        <ScrollArea className="h-full">
-            <div className="space-y-4 p-4">
-                {pastChats.map(log => (
-                    <div key={log.id} className="text-xs border-b pb-2">
-                        <p className="font-semibold text-primary mb-1">Q: {log.question}</p>
-                        <p className="text-muted-foreground mb-2">A: {log.answer}</p>
-                        <p className="text-right text-muted-foreground/80">{toDisplayDateTime(log.createdAt)}</p>
-                    </div>
-                ))}
-            </div>
-        </ScrollArea>
-    );
-};
 
 const SummaryView = ({ episode }: { episode: Episode }) => {
     const isAIAvailable = episode.aiProcessingStatus === 'completed' && episode.aiGeneratedContent;
@@ -114,7 +67,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [userQuestion, setUserQuestion] = useState('');
-  const [activeView, setActiveView] = useState<'summary' | 'chat' | 'history'>('summary');
+  const [activeView, setActiveView] = useState<'summary' | 'chat'>('summary');
   const chatScrollAreaRef = useRef<HTMLDivElement>(null);
 
 
@@ -248,10 +201,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <Bot className="mr-1.5 h-3.5 w-3.5" />
                         AI 채팅
                     </Button>
-                    <Button variant={activeView === 'history' ? 'secondary' : 'ghost'} size="sm" className="h-7 px-2 text-xs" onClick={() => setActiveView('history')}>
-                       <History className="mr-1.5 h-3.5 w-3.5" />
-                        기록 보기
-                    </Button>
                 </div>
             </div>
         </DialogHeader>
@@ -325,9 +274,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         </Button>
                     </div>
                 </>
-            )}
-            {activeView === 'history' && (
-                <ChatHistory episode={episode} user={user} />
             )}
         </div>
       </DialogContent>
