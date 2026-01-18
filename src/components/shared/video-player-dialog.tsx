@@ -13,7 +13,7 @@ import { Button } from '../ui/button';
 import { useUser } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
-import { Send, Sparkles, Bot, User as UserIcon } from 'lucide-react';
+import { Send, Sparkles, Bot, User as UserIcon, X } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { cn } from '@/lib/utils';
@@ -223,11 +223,15 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <DialogContent className="w-full h-full p-0 flex flex-col top-0 translate-y-0 rounded-none md:max-w-7xl md:h-[90vh] md:rounded-lg md:top-1/2 md:-translate-y-1/2">
-        <DialogHeader className="hidden md:flex px-4 py-2 border-b flex-shrink-0">
+        <DialogHeader className="p-4 border-b flex-shrink-0 bg-background z-10 hidden md:flex flex-row justify-between items-center">
             <DialogTitle className="text-lg font-bold truncate pr-4">{episode.title}</DialogTitle>
             <DialogDescription className="sr-only">
               {instructor?.name} 강사의 {episode.title} 비디오 플레이어.
             </DialogDescription>
+            <button onClick={handleClose} className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+            </button>
         </DialogHeader>
 
         <div className="flex-grow flex flex-col md:grid md:grid-cols-3 min-h-0">
@@ -264,13 +268,16 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             </div>
             
             <div className="flex-grow flex flex-col md:col-span-1 border-l min-h-0 md:h-full">
-                <div className="flex items-center gap-1 p-1 border-b flex-shrink-0">
-                    <Button variant={activeView === 'summary' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-3 text-sm" onClick={() => setActiveView('summary')}>
-                        강의 요약
-                    </Button>
-                    <Button variant={activeView === 'chat' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-3 text-sm" onClick={() => setActiveView('chat')}>
-                        AI 검색
-                    </Button>
+                <div className="flex items-center justify-between p-2 border-b flex-shrink-0">
+                    <h4 className="font-semibold truncate text-base pr-2">{episode.title}</h4>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button variant={activeView === 'summary' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-3 text-sm" onClick={() => setActiveView('summary')}>
+                            강의 요약
+                        </Button>
+                        <Button variant={activeView === 'chat' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-3 text-sm" onClick={() => setActiveView('chat')}>
+                            AI 검색
+                        </Button>
+                    </div>
                 </div>
                 <div className="flex-grow p-4 pt-2 flex flex-col gap-4 min-h-0">
                     {activeView === 'summary' && <SummaryView episode={episode} />}
