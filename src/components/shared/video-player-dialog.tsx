@@ -3,6 +3,7 @@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -224,6 +225,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
       <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
         <DialogHeader className="px-4 py-2 border-b flex-shrink-0">
             <DialogTitle className="text-lg font-bold truncate pr-4">{episode.title}</DialogTitle>
+            <DialogDescription className="sr-only">
+              {instructor?.name} 강사의 {episode.title} 비디오 플레이어.
+            </DialogDescription>
         </DialogHeader>
 
         <div className="flex-grow md:grid md:grid-cols-3 min-h-0">

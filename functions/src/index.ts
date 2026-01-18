@@ -155,7 +155,7 @@ JSON 객체는 다음 필드를 포함해야 합니다:
         fs.writeFileSync(vttTempPath, vttContent);
         
         vttPath = `episodes/${episodeId}/subtitles/${episodeId}.vtt`;
-        await bucket.file(vttPath).upload(vttTempPath, {
+        await (bucket.file(vttPath) as any).upload(vttTempPath, {
           metadata: { contentType: 'text/vtt' },
         });
 
