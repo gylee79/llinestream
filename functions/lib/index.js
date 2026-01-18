@@ -112,14 +112,14 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)({
         await change.after.ref.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath" });
         return;
     }
-    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-flash).`);
+    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-3-pro-preview).`);
     // 도구 초기화
     const { genAI, fileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
     let uploadedFile = null;
+    const bucket = admin.storage().bucket();
     try {
         // 1. 다운로드
-        const bucket = admin.storage().bucket();
         await bucket.file(filePath).download({ destination: tempFilePath });
         // 2. 업로드 (Google AI)
         const uploadResponse = await fileManager.uploadFile(tempFilePath, {
@@ -138,29 +138,72 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)({
         }
         if (state === server_1.FileState.FAILED)
             throw new Error("Google AI processing failed.");
-        // 4. AI 분석
-        console.log(`[${episodeId}] Calling Gemini 2.5 Flash...`);
-        // [요청하신 부분 수정 완료] gemini-2.5-flash 적용
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-        const prompt = "Analyze this video file comprehensively. Return a valid JSON object with fields: transcript, summary, timeline (array of timestamp, event, visualDetail), visualCues (array), keywords (array).";
+        // 4. AI 분석 (JSON 모드 활성화)
+        console.log(`[${episodeId}] Calling Gemini 3 Pro Preview in JSON mode...`);
+        const model = genAI.getGenerativeModel({
+            model: "gemini-3-pro-preview",
+            systemInstruction: "You are a video analysis expert. All of your text output, including summaries, transcripts, and keywords, must be in Korean. Do not use any other language under any circumstances. Provide the output as a valid JSON object only.",
+            generationConfig: {
+                responseMimeType: "application/json",
+            }
+        });
+        const prompt = `이 비디오 파일을 분석하여 다음 필드를 포함하는 유효한 JSON 객체를 생성해주세요. 모든 텍스트는 반드시 한국어로 작성되어야 합니다.
+- "transcript": 영상의 전체 음성 대본.
+- "summary": 영상 콘텐츠에 대한 간결한 요약.
+- "timeline": VTT 자막 생성을 위한 시간대별 자막 배열. 각 객체는 "startTime"(HH:MM:SS.mmm), "endTime"(HH:MM:SS.mmm), "subtitle"(한국어 자막)을 포함해야 합니다.
+- "visualCues": 화면의 중요한 텍스트(OCR)나 객체 목록.
+- "keywords": 관련성 높은 핵심 키워드 배열.
+`;
         const result = await model.generateContent([
             { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
             { text: prompt }
         ]);
         const responseText = result.response.text();
-        // JSON 파싱
-        const cleanedText = responseText.replace(/```json|```/g, "").trim();
-        const output = JSON.parse(cleanedText);
+        let output;
+        const jsonStart = responseText.indexOf('{');
+        const jsonEnd = responseText.lastIndexOf('}');
+        if (jsonStart === -1 || jsonEnd === -1) {
+            throw new Error("AI가 생성한 응답에서 유효한 JSON 객체를 찾을 수 없습니다.");
+        }
+        const jsonString = responseText.substring(jsonStart, jsonEnd + 1);
+        try {
+            output = JSON.parse(jsonString);
+        }
+        catch (parseError) {
+            console.error("Final JSON parsing failed. String that was parsed:", jsonString);
+            if (parseError instanceof Error) {
+                throw new Error(`AI가 생성한 JSON 형식이 올바르지 않습니다: ${parseError.message}`);
+            }
+            throw new Error("AI가 생성한 JSON 형식이 올바르지 않습니다.");
+        }
+        // 5. VTT 자막 파일 생성 및 업로드
+        let vttUrl = null;
+        let vttPath = null;
+        if (output.timeline && Array.isArray(output.timeline)) {
+            const vttContent = `WEBVTT\n\n${output.timeline
+                .map((item) => `${item.startTime} --> ${item.endTime}\n${item.subtitle}`)
+                .join('\n\n')}`;
+            const vttTempPath = path.join(os.tmpdir(), `${episodeId}.vtt`);
+            fs.writeFileSync(vttTempPath, vttContent);
+            vttPath = `episodes/${episodeId}/subtitles/${episodeId}.vtt`;
+            await bucket.upload(vttTempPath, {
+                destination: vttPath,
+                metadata: { contentType: 'text/vtt' },
+            });
+            vttUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(vttPath)}?alt=media`;
+            fs.unlinkSync(vttTempPath); // 임시 파일 삭제
+            console.log(`[${episodeId}] VTT subtitle file created and uploaded.`);
+        }
         const combinedContent = `
-Summary: ${output.summary}\n
-Timeline:
-${output.timeline?.map((t) => `- [${t.timestamp}] ${t.event}`).join('\n') || ''}\n
-Keywords: ${output.keywords?.join(', ') || ''}
+요약: ${output.summary}\n
+키워드: ${output.keywords?.join(', ') || ''}
       `.trim();
         await change.after.ref.update({
             aiProcessingStatus: "completed",
             transcript: output.transcript || "",
             aiGeneratedContent: combinedContent,
+            vttUrl: vttUrl,
+            vttPath: vttPath,
             aiProcessingError: null,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });

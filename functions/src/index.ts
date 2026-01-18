@@ -1,5 +1,5 @@
 /**
- * @fileoverview Lightweight Video Analysis (Fixed: gemini-2.5-flash)
+ * @fileoverview Lightweight Video Analysis (Fixed: gemini-1.5-flash)
  */
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
@@ -85,7 +85,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       return;
     }
 
-    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-3-pro-preview).`);
+    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-1.5-flash).`);
     
     // 도구 초기화
     const { genAI, fileManager } = initializeTools();
@@ -117,10 +117,10 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       if (state === FileState.FAILED) throw new Error("Google AI processing failed.");
 
       // 4. AI 분석 (JSON 모드 활성화)
-      console.log(`[${episodeId}] Calling Gemini 3 Pro Preview in JSON mode...`);
+      console.log(`[${episodeId}] Calling Gemini 1.5 Flash in JSON mode...`);
       
       const model = genAI!.getGenerativeModel({ 
-        model: "gemini-3-pro-preview",
+        model: "gemini-1.5-flash",
         systemInstruction: "You are a video analysis expert. All of your text output, including summaries, transcripts, and keywords, must be in Korean. Do not use any other language under any circumstances. Provide the output as a valid JSON object only.",
         generationConfig: {
           responseMimeType: "application/json",
