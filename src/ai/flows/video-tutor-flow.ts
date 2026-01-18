@@ -97,6 +97,7 @@ const videoTutorFlow = ai.defineFlow(
       const chatLogData = {
           userId,
           episodeId,
+          courseId: episodeData.courseId,
           question,
           answer,
           contextReferences: [context.substring(0, 500)], // Save first 500 chars of context for reference
