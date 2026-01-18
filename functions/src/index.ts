@@ -159,7 +159,9 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         fs.writeFileSync(vttTempPath, vttContent);
         
         vttPath = `episodes/${episodeId}/subtitles/${episodeId}.vtt`;
-        await bucket.file(vttPath).upload(vttTempPath, {
+        
+        await bucket.upload(vttTempPath, {
+          destination: vttPath,
           metadata: { contentType: 'text/vtt' },
         });
 
