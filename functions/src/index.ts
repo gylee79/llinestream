@@ -1,5 +1,5 @@
 /**
- * @fileoverview Lightweight Video Analysis (Fixed: gemini-1.5-pro)
+ * @fileoverview Lightweight Video Analysis (Fixed: gemini-2.5-pro)
  */
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
@@ -85,7 +85,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       return;
     }
 
-    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-1.5-pro).`);
+    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-pro).`);
     
     // 도구 초기화
     const { genAI, fileManager } = initializeTools();
@@ -117,7 +117,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       if (state === FileState.FAILED) throw new Error("Google AI processing failed.");
 
       // 4. AI 분석 (JSON 모드 활성화)
-      console.log(`[${episodeId}] Calling Gemini 1.5 Pro in JSON mode...`);
+      console.log(`[${episodeId}] Calling Gemini 2.5 Pro in JSON mode...`);
       
       const model = genAI!.getGenerativeModel({ 
         model: "gemini-1.5-pro",

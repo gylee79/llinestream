@@ -7,7 +7,7 @@
  * searches for relevant context within the video's transcribed text chunks,
  * and generates a helpful answer based on that context.
  *
- * - askVideoTutor - A function that handles the question-answering process.
+ * - askVideoTutor - a function that handles the question-answering process.
  * - VideoTutorInput - The input type for the askVideoTutor function.
  * - VideoTutorOutput - The return type for the askVideoTutor function.
  */
