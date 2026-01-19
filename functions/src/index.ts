@@ -1,10 +1,8 @@
-
 /**
- * @fileoverview Video Analysis with Gemini
+ * @fileoverview Video Analysis with Gemini using Firebase Cloud Functions v1.
  * Model: gemini-3-flash-preview
  */
-import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
-import { setGlobalOptions } from "firebase-functions/v2";
+import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
@@ -17,25 +15,7 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-// 1. 전역 옵션 설정
-setGlobalOptions({
-  region: "us-central1",
-  secrets: ["GOOGLE_GENAI_API_KEY"],
-  timeoutSeconds: 540,
-  memory: "2GiB",
-});
-
-interface EpisodeData {
-  filePath: string;
-  courseId: string;
-  aiProcessingStatus?: string;
-  defaultThumbnailPath?: string;
-  customThumbnailPath?: string;
-  vttPath?: string;
-  [key: string]: any;
-}
-
-// 2. MIME Type 도우미
+// 1. MIME Type 도우미
 function getMimeType(filePath: string): string {
   const extension = path.extname(filePath).toLowerCase();
   switch (extension) {
@@ -49,9 +29,9 @@ function getMimeType(filePath: string): string {
   }
 }
 
-// 3. 지연 초기화
+// 2. 지연 초기화 (Lazy Initialization)
 let genAI: GoogleGenerativeAI | null = null;
-let fileManager: any = null;
+let fileManager: GoogleAIFileManager | null = null;
 
 function initializeTools() {
   if (genAI && fileManager) return { genAI, fileManager };
@@ -65,35 +45,38 @@ function initializeTools() {
 }
 
 // ==========================================
-// [Trigger] 메인 분석 함수
+// [Trigger] 메인 분석 함수 (v1 onWrite)
 // ==========================================
-export const analyzeVideoOnWrite = onDocumentWritten(
-  {
-    document: "episodes/{episodeId}",
-  }, 
-  async (event) => {
-    const change = event.data;
-    if (!change || !change.after.exists) {
-      console.log(`[${event.params.episodeId}] Document deleted, skipping.`);
-      return;
+export const analyzeVideoOnWrite = functions.runWith({
+    secrets: ["GOOGLE_GENAI_API_KEY"],
+    timeoutSeconds: 540,
+    memory: "2GiB",
+  })
+  .region("us-central1")
+  .firestore.document("episodes/{episodeId}")
+  .onWrite(async (change, context) => {
+    
+    // 문서가 삭제되었거나, 데이터가 없는 경우는 무시
+    if (!change.after.exists) {
+      console.log(`[${context.params.episodeId}] Document deleted, skipping.`);
+      return null;
     }
     
     const afterData = change.after.data() as EpisodeData;
-    const beforeData = change.before.exists ? change.before.data() : null;
+    const beforeData = change.before.exists ? change.before.data() as EpisodeData : null;
 
-    // === NEW TRIGGER LOGIC ===
-    // Only proceed if the status has just been set to 'pending'.
-    if (afterData.aiProcessingStatus !== 'pending' || beforeData?.aiProcessingStatus === 'pending') {
-      return;
+    // === 트리거 로직: 'pending' 상태일 때만 실행 ===
+    if (afterData.aiProcessingStatus !== 'pending' || (beforeData && beforeData.aiProcessingStatus === 'pending')) {
+      return null;
     }
 
-    const { episodeId } = event.params;
+    const { episodeId } = context.params;
     const docRef = change.after.ref;
     const db = admin.firestore();
 
     console.log(`✨ [${episodeId}] New analysis job detected. Starting...`);
 
-    // Immediately set status to 'processing' to prevent re-triggering.
+    // 즉시 'processing'으로 상태 변경하여 중복 실행 방지
     await docRef.update({ aiProcessingStatus: "processing" });
     
     const filePath = afterData.filePath;
@@ -104,7 +87,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
     console.log(`🚀 [${episodeId}] Processing started (Target: gemini-3-flash-preview).`);
     
-    const { genAI, fileManager } = initializeTools();
+    const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
     let uploadedFile: any = null;
     const bucket = admin.storage().bucket();
@@ -112,7 +95,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     try {
       await bucket.file(filePath).download({ destination: tempFilePath });
       
-      const uploadResponse = await fileManager.uploadFile(tempFilePath, {
+      const uploadResponse = await localFileManager.uploadFile(tempFilePath, {
         mimeType: getMimeType(filePath),
         displayName: episodeId,
       });
@@ -122,7 +105,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       let state = uploadedFile.state;
       while (state === FileState.PROCESSING) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
-        const freshFile = await fileManager.getFile(uploadedFile.name);
+        const freshFile = await localFileManager.getFile(uploadedFile.name);
         state = freshFile.state;
         console.log(`... processing status: ${state}`);
       }
@@ -131,7 +114,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       console.log(`[${episodeId}] Calling Gemini 3 Flash Preview...`);
       
-      const model = genAI!.getGenerativeModel({ 
+      const model = localGenAI.getGenerativeModel({ 
         model: "gemini-3-flash-preview", 
         generationConfig: {
           responseMimeType: "application/json",
@@ -160,11 +143,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         }
       }); 
 
-      const prompt = `
-      Analyze this video deeply. 
-      Even if the video is in English, you MUST OUTPUT EVERYTHING IN KOREAN.
-      Translate the context naturally.
-      `;
+      const prompt = `Analyze this video deeply. Even if the video is in English, you MUST OUTPUT EVERYTHING IN KOREAN. Translate the context naturally.`;
       
       const result = await model.generateContent([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
@@ -173,7 +152,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       const output = JSON.parse(result.response.text());
 
-      // VTT 자막 생성
       let vttUrl = null;
       let vttPath = null;
       if (output.timeline && Array.isArray(output.timeline)) {
@@ -196,12 +174,8 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         console.log(`[${episodeId}] VTT subtitle file created.`);
       }
 
-      const combinedContent = `
-요약: ${output.summary}\n
-키워드: ${output.keywords?.join(', ') || ''}
-      `.trim();
+      const combinedContent = `요약: ${output.summary}\n키워드: ${output.keywords?.join(', ') || ''}`.trim();
 
-      // Get Field ID for context storage
       const courseDoc = await db.collection('courses').doc(afterData.courseId).get();
       if (!courseDoc.exists) throw new Error(`Course not found for episode ${episodeId}`);
       const classificationDoc = await db.collection('classifications').doc(courseDoc.data()!.classificationId).get();
@@ -219,7 +193,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       const batch = db.batch();
       
-      // 1. Update the original episode document
       batch.update(docRef, {
         aiProcessingStatus: "completed",
         transcript: output.transcript || "",
@@ -230,7 +203,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // 2. Set the centralized AI context chunk
       const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
       batch.set(aiChunkRef, aiChunkData);
 
@@ -239,7 +211,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       console.log(`✅ [${episodeId}] Success!`);
 
     } catch (error: any) {
-      // ===== NEW ERROR HANDLING (NO MORE THROWING) =====
       const detailedError = JSON.stringify(error, Object.getOwnPropertyNames(error), 2);
       console.error(`❌ [${episodeId}] Analysis failed. Detailed error:`, detailedError);
       
@@ -250,29 +221,39 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
     } finally {
       if (fs.existsSync(tempFilePath)) { try { fs.unlinkSync(tempFilePath); } catch (e) {} }
-      if (uploadedFile) { try { await fileManager.deleteFile(uploadedFile.name); } catch (e) {} }
+      if (uploadedFile) { try { await localFileManager.deleteFile(uploadedFile.name); } catch (e) {} }
     }
-  }
-);
+});
 
-export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
-    const { episodeId } = event.params;
-    const snap = event.data;
-    if (!snap) return;
+// ==========================================
+// [Trigger] 파일 삭제 함수 (v1 onDelete)
+// ==========================================
+export const deleteFilesOnEpisodeDelete = functions.region("us-central1")
+    .firestore.document("episodes/{episodeId}")
+    .onDelete(async (snap, context) => {
+    
+    const { episodeId } = context.params;
     const data = snap.data() as EpisodeData;
     if (!data) return;
 
-    // Initialize services
     const db = admin.firestore();
     const bucket = admin.storage().bucket();
     
-    // Delete files from storage
     const paths = [data.filePath, data.defaultThumbnailPath, data.customThumbnailPath, data.vttPath];
     await Promise.all(paths.filter(Boolean).map(p => bucket.file(p!).delete().catch(() => {})));
     
-    // Delete from centralized AI chunks collection
     const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
     await aiChunkRef.delete().catch(() => {});
+
+    console.log(`[DELETE SUCCESS] Cleaned up files and AI chunk for deleted episode ${episodeId}`);
 });
 
-    
+interface EpisodeData {
+  filePath: string;
+  courseId: string;
+  aiProcessingStatus?: string;
+  defaultThumbnailPath?: string;
+  customThumbnailPath?: string;
+  vttPath?: string;
+  [key: string]: any;
+}
