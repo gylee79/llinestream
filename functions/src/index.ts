@@ -50,7 +50,7 @@ function initializeTools() {
 export const analyzeVideoOnWrite = functions.runWith({
     secrets: ["GOOGLE_GENAI_API_KEY"],
     timeoutSeconds: 540,
-    memory: "2GiB",
+    memory: "2GB", // "2GiB" -> "2GB"로 수정
   })
   .region("us-central1")
   .firestore.document("episodes/{episodeId}")
@@ -82,7 +82,7 @@ export const analyzeVideoOnWrite = functions.runWith({
     const filePath = afterData.filePath;
     if (!filePath) {
       await docRef.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath" });
-      return;
+      return null;
     }
 
     console.log(`🚀 [${episodeId}] Processing started (Target: gemini-3-flash-preview).`);
@@ -223,6 +223,7 @@ export const analyzeVideoOnWrite = functions.runWith({
       if (fs.existsSync(tempFilePath)) { try { fs.unlinkSync(tempFilePath); } catch (e) {} }
       if (uploadedFile) { try { await localFileManager.deleteFile(uploadedFile.name); } catch (e) {} }
     }
+    return null; // 모든 경로가 값을 반환하도록 명시
 });
 
 // ==========================================
@@ -234,7 +235,7 @@ export const deleteFilesOnEpisodeDelete = functions.region("us-central1")
     
     const { episodeId } = context.params;
     const data = snap.data() as EpisodeData;
-    if (!data) return;
+    if (!data) return null;
 
     const db = admin.firestore();
     const bucket = admin.storage().bucket();
@@ -246,6 +247,7 @@ export const deleteFilesOnEpisodeDelete = functions.region("us-central1")
     await aiChunkRef.delete().catch(() => {});
 
     console.log(`[DELETE SUCCESS] Cleaned up files and AI chunk for deleted episode ${episodeId}`);
+    return null; // 모든 경로가 값을 반환하도록 명시
 });
 
 interface EpisodeData {
