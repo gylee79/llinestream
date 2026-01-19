@@ -133,9 +133,9 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         throw new Error("Video processing failed by Google AI.");
       }
 
-      console.log(`[${episodeId}] Calling Gemini 3 Pro Preview...`);
+      console.log(`[${episodeId}] Calling Gemini 2.5 Pro...`);
       const { output } = await ai.generate({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-2.5-pro',
         prompt: [
           { text: "Analyze this video file comprehensively based on the provided JSON schema." },
           { media: { url: uploadedFile.uri, contentType: uploadedFile.mimeType } } 
