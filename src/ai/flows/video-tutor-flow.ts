@@ -91,11 +91,13 @@ const videoTutorFlow = ai.defineFlow(
       const answer = llmResponse.text;
       console.log(`[Tutor-Flow] Generated answer.`);
 
-      // 3. Save the chat interaction only to the user's sub-collection
-      const newChatId = db.collection('users').doc(userId).collection('chats').doc().id;
+      // 3. Save the chat interaction to both user-specific and global collections
+      const newChatId = db.collection('users').doc().id; // Generate one ID for both
       const userChatRef = db.collection('users').doc(userId).collection('chats').doc(newChatId);
+      const globalChatRef = db.collection('chat_logs').doc(newChatId);
 
       const chatLogData = {
+          id: newChatId, // Add the ID to the data itself
           userId,
           episodeId,
           courseId: episodeData.courseId,
@@ -105,8 +107,13 @@ const videoTutorFlow = ai.defineFlow(
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
       };
       
-      await userChatRef.set(chatLogData);
-      console.log(`[Tutor-Flow] Saved chat interaction to user-specific collection.`);
+      // Use a batch to write to both locations atomically
+      const batch = db.batch();
+      batch.set(userChatRef, chatLogData);
+      batch.set(globalChatRef, chatLogData);
+      await batch.commit();
+      
+      console.log(`[Tutor-Flow] Saved chat interaction to user-specific and global collections.`);
 
       return { answer };
 
@@ -117,3 +124,5 @@ const videoTutorFlow = ai.defineFlow(
     }
   }
 );
+
+    
