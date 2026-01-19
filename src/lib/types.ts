@@ -214,7 +214,6 @@ export interface ChatLog {
 }
 
 export interface EpisodeAiChunk {
-  id: string;
   episodeId: string;
   courseId: string;
   classificationId: string;

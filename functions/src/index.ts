@@ -256,11 +256,21 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 );
 
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
+    const { episodeId } = event.params;
     const snap = event.data;
     if (!snap) return;
     const data = snap.data() as EpisodeData;
     if (!data) return;
+
+    // Initialize services
+    const db = admin.firestore();
     const bucket = admin.storage().bucket();
+    
+    // Delete files from storage
     const paths = [data.filePath, data.defaultThumbnailPath, data.customThumbnailPath, data.vttPath];
     await Promise.all(paths.filter(Boolean).map(p => bucket.file(p!).delete().catch(() => {})));
+    
+    // Delete from centralized AI chunks collection
+    const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
+    await aiChunkRef.delete().catch(() => {});
 });
