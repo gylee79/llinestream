@@ -35,8 +35,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteFilesOnEpisodeDelete = exports.analyzeVideoOnWrite = void 0;
 /**
- * @fileoverview Video Analysis with Gemini 2.5 Pro
- * Model: gemini-2.5-pro (User Requested)
+ * @fileoverview Video Analysis with Gemini
+ * Model: gemini-2.5-flash (User Requested)
  */
 const firestore_1 = require("firebase-functions/v2/firestore");
 const v2_1 = require("firebase-functions/v2");
@@ -113,7 +113,7 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)({
         return;
     }
     // [요청하신 모델명 로그]
-    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-pro).`);
+    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-flash).`);
     const { genAI, fileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
     let uploadedFile = null;
@@ -135,13 +135,12 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)({
         }
         if (state === server_1.FileState.FAILED)
             throw new Error("Google AI processing failed.");
-        console.log(`[${episodeId}] Calling Gemini 2.5 Pro...`);
-        // [요청하신 모델명 적용] gemini-2.5-pro
+        console.log(`[${episodeId}] Calling Gemini 2.5 Flash...`);
+        // [요청하신 모델명 적용] gemini-2.5-flash
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.5-pro",
+            model: "gemini-2.5-flash",
             generationConfig: {
                 responseMimeType: "application/json",
-                // JSON 에러 방지용 스키마 (모델명은 2.5지만 출력은 안전하게)
                 responseSchema: {
                     type: generative_ai_1.SchemaType.OBJECT,
                     properties: {
@@ -211,19 +210,23 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)({
         console.log(`✅ [${episodeId}] Success!`);
     }
     catch (error) {
+        // ===== 진단 로그 시작 =====
+        // 이것이 가장 중요한 로그입니다. 전체 오류 객체를 보여줍니다.
+        console.error(`[${episodeId}] DETAILED ERROR OBJECT:`, JSON.stringify(error, null, 2));
+        // ===== 진단 로그 끝 =====
         console.error(`❌ [${episodeId}] Error:`, error);
-        if (error.message?.includes("429")) {
-            await change.after.ref.update({
-                aiProcessingStatus: "failed",
-                aiProcessingError: "사용량 초과(Quota Exceeded). 잠시 후 다시 시도하세요."
-            });
+        // Quota 에러 감지 조건을 더 넓게 설정합니다.
+        const errorMessage = String(error.message || '').toLowerCase();
+        if (errorMessage.includes("429") || errorMessage.includes("quota")) {
+            console.log(`[${episodeId}] Quota exceeded. Re-throwing error to trigger automatic retry.`);
+            // 의도적으로 에러를 다시 던져서 Cloud Functions의 자동 재시도 기능을 활성화합니다.
+            throw new Error(`Quota exceeded for ${episodeId}, triggering automated retry.`);
         }
-        else {
-            await change.after.ref.update({
-                aiProcessingStatus: "failed",
-                aiProcessingError: error.message || String(error)
-            });
-        }
+        // Quota가 아닌 다른 에러의 경우, 상태를 'failed'로 기록하고 함수를 정상 종료합니다.
+        await change.after.ref.update({
+            aiProcessingStatus: "failed",
+            aiProcessingError: error.message || String(error)
+        });
     }
     finally {
         if (fs.existsSync(tempFilePath)) {
