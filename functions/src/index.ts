@@ -1,6 +1,6 @@
 /**
  * @fileoverview Video Analysis with Gemini
- * Model: gemini-2.5-pro
+ * Model: gemini-3-flash-preview
  */
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
@@ -99,7 +99,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       return;
     }
 
-    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-pro).`);
+    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-3-flash-preview).`);
     
     const { genAI, fileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
@@ -126,10 +126,10 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       if (state === FileState.FAILED) throw new Error("Google AI processing failed.");
 
-      console.log(`[${episodeId}] Calling Gemini 2.5 Pro...`);
+      console.log(`[${episodeId}] Calling Gemini 3 Flash Preview...`);
       
       const model = genAI!.getGenerativeModel({ 
-        model: "gemini-2.5-pro", 
+        model: "gemini-3-flash-preview", 
         generationConfig: {
           responseMimeType: "application/json",
           responseSchema: {
