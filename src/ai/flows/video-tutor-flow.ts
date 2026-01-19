@@ -65,7 +65,7 @@ const videoTutorFlow = ai.defineFlow(
 
       // 2. Generate the answer using Gemini with the provided context (Context Caching applied)
       const llmResponse = await ai.generate({
-        model: googleAI.model('gemini-2.5-pro'),
+        model: googleAI.model('gemini-3-pro-preview'),
         system: `You are a friendly and helpful Korean tutor. You MUST answer all questions in Korean.
         Based ONLY on the following video content analysis, answer the user's question.
         The context includes a summary and a description of visual elements from the video.

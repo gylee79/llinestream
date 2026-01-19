@@ -1,6 +1,6 @@
 /**
- * @fileoverview Video Analysis with Gemini 2.5 Pro
- * Model: gemini-2.5-pro (User Requested)
+ * @fileoverview Video Analysis with Gemini
+ * Model: gemini-3-pro-preview (User Requested)
  */
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
@@ -96,7 +96,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     }
 
     // [요청하신 모델명 로그]
-    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-pro).`);
+    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-3-pro-preview).`);
     
     const { genAI, fileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
@@ -123,14 +123,14 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       if (state === FileState.FAILED) throw new Error("Google AI processing failed.");
 
-      console.log(`[${episodeId}] Calling Gemini 2.5 Pro...`);
+      console.log(`[${episodeId}] Calling Gemini 3 Pro Preview...`);
       
-      // [요청하신 모델명 적용] gemini-2.5-pro
+      // [요청하신 모델명 적용] gemini-3-pro-preview
       const model = genAI!.getGenerativeModel({ 
-        model: "gemini-2.5-pro", 
+        model: "gemini-3-pro-preview", 
         generationConfig: {
           responseMimeType: "application/json",
-          // JSON 에러 방지용 스키마 (모델명은 2.5지만 출력은 안전하게)
+          // JSON 에러 방지용 스키마 (모델명은 3.0이지만 출력은 안전하게)
           responseSchema: {
             type: SchemaType.OBJECT,
             properties: {
