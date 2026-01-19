@@ -211,14 +211,15 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     } catch (error: any) {
       console.error(`❌ [${episodeId}] Error:`, error);
       
-      // 429 (Too Many Requests) 에러인 경우, 함수를 재실행하도록 의도적으로 에러를 다시 던집니다.
-      // Cloud Functions는 실패한 함수를 자동으로 재시도합니다.
-      if (error.message?.includes("429")) {
+      // Quota 에러 감지 조건을 더 넓게 설정합니다.
+      const errorMessage = String(error.message || '').toLowerCase();
+      if (errorMessage.includes("429") || errorMessage.includes("quota")) {
          console.log(`[${episodeId}] Quota exceeded. Re-throwing error to trigger automatic retry.`);
+         // 의도적으로 에러를 다시 던져서 Cloud Functions의 자동 재시도 기능을 활성화합니다.
          throw new Error(`Quota exceeded for ${episodeId}, triggering automated retry.`);
       }
       
-      // 429가 아닌 다른 에러의 경우, 상태를 'failed'로 기록하고 함수를 정상 종료합니다.
+      // Quota가 아닌 다른 에러의 경우, 상태를 'failed'로 기록하고 함수를 정상 종료합니다.
       await change.after.ref.update({
         aiProcessingStatus: "failed",
         aiProcessingError: error.message || String(error)
