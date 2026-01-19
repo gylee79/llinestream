@@ -96,7 +96,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
     }
 
     // [요청하신 모델명 로그]
-    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-flash).`);
+    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-pro).`);
     
     const { genAI, fileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
@@ -123,11 +123,11 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       if (state === FileState.FAILED) throw new Error("Google AI processing failed.");
 
-      console.log(`[${episodeId}] Calling Gemini 2.5 Flash...`);
+      console.log(`[${episodeId}] Calling Gemini 2.5 Pro...`);
       
-      // [요청하신 모델명 적용] gemini-2.5-flash
+      // [요청하신 모델명 적용] gemini-2.5-pro
       const model = genAI!.getGenerativeModel({ 
-        model: "gemini-2.5-flash", 
+        model: "gemini-2.5-pro", 
         generationConfig: {
           responseMimeType: "application/json",
           responseSchema: {
