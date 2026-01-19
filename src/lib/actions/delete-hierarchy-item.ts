@@ -10,6 +10,9 @@ import * as admin from 'firebase-admin';
 import { Firestore } from 'firebase-admin/firestore';
 import { Storage } from 'firebase-admin/storage';
 import { revalidatePath } from 'next/cache';
+import { sanitize } from '@/lib/utils';
+import { extractPathFromUrl } from '@/lib/utils';
+
 
 type DeletionResult = {
   success: boolean;
@@ -128,7 +131,6 @@ export async function deleteHierarchyItem(
         if (episode.vttPath) {
           await deleteStorageFileByPath(storage, episode.vttPath);
         }
-        await deleteChunksSubcollection(db, id);
         // Also delete from the centralized AI chunks collection
         await db.collection('episode_ai_chunks').doc(id).delete();
     } else if (collectionName === 'courses') {
