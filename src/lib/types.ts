@@ -212,3 +212,13 @@ export interface ChatLog {
     contextReferences: string[];
     createdAt: Timestamp;
 }
+
+export interface EpisodeAiChunk {
+  id: string;
+  episodeId: string;
+  courseId: string;
+  classificationId: string;
+  fieldId: string;
+  content: string;
+  createdAt: Timestamp;
+}

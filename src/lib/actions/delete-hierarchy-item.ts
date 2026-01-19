@@ -129,6 +129,8 @@ export async function deleteHierarchyItem(
           await deleteStorageFileByPath(storage, episode.vttPath);
         }
         await deleteChunksSubcollection(db, id);
+        // Also delete from the centralized AI chunks collection
+        await db.collection('episode_ai_chunks').doc(id).delete();
     } else if (collectionName === 'courses') {
         const course = item as Course;
         if (course.thumbnailPath) await deleteStorageFileByPath(storage, course.thumbnailPath);
