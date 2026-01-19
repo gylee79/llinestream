@@ -1,10 +1,11 @@
 /**
- * @fileoverview Lightweight Video Analysis (Fixed: gemini-2.5-pro)
+ * @fileoverview Video Analysis with Gemini 2.5 Pro
+ * Model: gemini-2.5-pro (User Requested)
  */
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
 import * as path from "path";
 import * as os from "os";
@@ -15,13 +16,22 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-// 1. 전역 옵션 설정 (미국 리전 통일)
+// 1. 전역 옵션 설정
 setGlobalOptions({
   region: "us-central1",
   secrets: ["GOOGLE_GENAI_API_KEY"],
   timeoutSeconds: 540,
   memory: "2GiB",
 });
+
+interface EpisodeData {
+  filePath: string;
+  aiProcessingStatus?: string;
+  defaultThumbnailPath?: string;
+  customThumbnailPath?: string;
+  vttPath?: string;
+  [key: string]: any;
+}
 
 // 2. MIME Type 도우미
 function getMimeType(filePath: string): string {
@@ -37,7 +47,7 @@ function getMimeType(filePath: string): string {
   }
 }
 
-// 3. 지연 초기화 (SDK)
+// 3. 지연 초기화
 let genAI: GoogleGenerativeAI | null = null;
 let fileManager: any = null;
 
@@ -67,11 +77,11 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       console.log(`[${event.params.episodeId}] Document deleted.`);
       return;
     }
-    const afterData = change.after.data();
+    
+    const afterData = change.after.data() as EpisodeData;
     if (!afterData) return;
     const { episodeId } = event.params;
 
-    // 상태 체크
     if (afterData.aiProcessingStatus === "pending") {
       console.log(`✨ New upload detected [${episodeId}]. Starting...`);
       await change.after.ref.update({ aiProcessingStatus: "processing" });
@@ -85,19 +95,17 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       return;
     }
 
+    // [요청하신 모델명 로그]
     console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-pro).`);
     
-    // 도구 초기화
     const { genAI, fileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
     let uploadedFile: any = null;
     const bucket = admin.storage().bucket();
 
     try {
-      // 1. 다운로드
       await bucket.file(filePath).download({ destination: tempFilePath });
       
-      // 2. 업로드 (Google AI)
       const uploadResponse = await fileManager.uploadFile(tempFilePath, {
         mimeType: getMimeType(filePath),
         displayName: episodeId,
@@ -105,7 +113,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       uploadedFile = uploadResponse.file;
       console.log(`[${episodeId}] Uploaded: ${uploadedFile.uri}`);
 
-      // 3. 대기 (Polling)
       let state = uploadedFile.state;
       while (state === FileState.PROCESSING) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -116,53 +123,53 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       if (state === FileState.FAILED) throw new Error("Google AI processing failed.");
 
-      // 4. AI 분석 (JSON 모드 활성화)
-      console.log(`[${episodeId}] Calling Gemini 2.5 Pro in JSON mode...`);
+      console.log(`[${episodeId}] Calling Gemini 2.5 Pro...`);
       
+      // [요청하신 모델명 적용] gemini-2.5-pro
       const model = genAI!.getGenerativeModel({ 
-        model: "gemini-2.5-pro",
-        systemInstruction: "You are a video analysis expert. All of your text output, including summaries, transcripts, and keywords, must be in Korean. Do not use any other language under any circumstances. Provide the output as a valid JSON object only.",
+        model: "gemini-2.5-pro", 
         generationConfig: {
           responseMimeType: "application/json",
+          // JSON 에러 방지용 스키마 (모델명은 2.5지만 출력은 안전하게)
+          responseSchema: {
+            type: SchemaType.OBJECT,
+            properties: {
+              transcript: { type: SchemaType.STRING, description: "영상의 전체 내용을 한국어로 번역한 대본" },
+              summary: { type: SchemaType.STRING, description: "영상 내용에 대한 상세한 한국어 요약문" },
+              timeline: {
+                type: SchemaType.ARRAY,
+                items: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    startTime: { type: SchemaType.STRING },
+                    endTime: { type: SchemaType.STRING },
+                    subtitle: { type: SchemaType.STRING, description: "한국어로 번역된 자막" }
+                  },
+                  required: ["startTime", "endTime", "subtitle"]
+                }
+              },
+              visualCues: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+              keywords: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
+            },
+            required: ["transcript", "summary", "timeline", "visualCues", "keywords"]
+          }
         }
       }); 
 
-      const prompt = `이 비디오 파일을 분석하여 다음 필드를 포함하는 유효한 JSON 객체를 생성해주세요. 모든 텍스트는 반드시 한국어로 작성되어야 합니다.
-- "transcript": 영상의 전체 음성 대본.
-- "summary": 영상 콘텐츠에 대한 간결한 요약.
-- "timeline": VTT 자막 생성을 위한 시간대별 자막 배열. 각 객체는 "startTime"(HH:MM:SS.mmm), "endTime"(HH:MM:SS.mmm), "subtitle"(한국어 자막)을 포함해야 합니다.
-- "visualCues": 화면의 중요한 텍스트(OCR)나 객체 목록.
-- "keywords": 관련성 높은 핵심 키워드 배열.
-`;
+      const prompt = `
+      Analyze this video deeply. 
+      Even if the video is in English, you MUST OUTPUT EVERYTHING IN KOREAN.
+      Translate the context naturally.
+      `;
       
       const result = await model.generateContent([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
         { text: prompt }
       ]);
 
-      const responseText = result.response.text();
-      
-      let output;
-      const jsonStart = responseText.indexOf('{');
-      const jsonEnd = responseText.lastIndexOf('}');
-      
-      if (jsonStart === -1 || jsonEnd === -1) {
-          throw new Error("AI가 생성한 응답에서 유효한 JSON 객체를 찾을 수 없습니다.");
-      }
+      const output = JSON.parse(result.response.text());
 
-      const jsonString = responseText.substring(jsonStart, jsonEnd + 1);
-
-      try {
-          output = JSON.parse(jsonString);
-      } catch (parseError) {
-          console.error("Final JSON parsing failed. String that was parsed:", jsonString);
-          if (parseError instanceof Error) {
-            throw new Error(`AI가 생성한 JSON 형식이 올바르지 않습니다: ${parseError.message}`);
-          }
-          throw new Error("AI가 생성한 JSON 형식이 올바르지 않습니다.");
-      }
-
-      // 5. VTT 자막 파일 생성 및 업로드
+      // VTT 자막 생성
       let vttUrl = null;
       let vttPath = null;
       if (output.timeline && Array.isArray(output.timeline)) {
@@ -181,8 +188,8 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         });
 
         vttUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(vttPath)}?alt=media`;
-        fs.unlinkSync(vttTempPath); // 임시 파일 삭제
-        console.log(`[${episodeId}] VTT subtitle file created and uploaded.`);
+        if (fs.existsSync(vttTempPath)) fs.unlinkSync(vttTempPath);
+        console.log(`[${episodeId}] VTT subtitle file created.`);
       }
 
       const combinedContent = `
@@ -203,18 +210,23 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
     } catch (error: any) {
       console.error(`❌ [${episodeId}] Error:`, error);
+      
+      // 429 (Too Many Requests) 에러인 경우, 함수를 재실행하도록 의도적으로 에러를 다시 던집니다.
+      // Cloud Functions는 실패한 함수를 자동으로 재시도합니다.
+      if (error.message?.includes("429")) {
+         console.log(`[${episodeId}] Quota exceeded. Re-throwing error to trigger automatic retry.`);
+         throw new Error(`Quota exceeded for ${episodeId}, triggering automated retry.`);
+      }
+      
+      // 429가 아닌 다른 에러의 경우, 상태를 'failed'로 기록하고 함수를 정상 종료합니다.
       await change.after.ref.update({
         aiProcessingStatus: "failed",
         aiProcessingError: error.message || String(error)
       });
+
     } finally {
-      // 6. 청소
-      if (fs.existsSync(tempFilePath)) {
-        try { fs.unlinkSync(tempFilePath); } catch (e) { /* 무시 */ }
-      }
-      if (uploadedFile) {
-        try { await fileManager.deleteFile(uploadedFile.name); } catch (e) { console.warn("Cleanup warning:", e); }
-      }
+      if (fs.existsSync(tempFilePath)) { try { fs.unlinkSync(tempFilePath); } catch (e) {} }
+      if (uploadedFile) { try { await fileManager.deleteFile(uploadedFile.name); } catch (e) {} }
     }
   }
 );
@@ -222,9 +234,9 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
     const snap = event.data;
     if (!snap) return;
-    const data = snap.data();
+    const data = snap.data() as EpisodeData;
     if (!data) return;
     const bucket = admin.storage().bucket();
     const paths = [data.filePath, data.defaultThumbnailPath, data.customThumbnailPath, data.vttPath];
-    await Promise.all(paths.filter(p => p).map(p => bucket.file(p).delete().catch(() => {})));
+    await Promise.all(paths.filter(Boolean).map(p => bucket.file(p!).delete().catch(() => {})));
 });
