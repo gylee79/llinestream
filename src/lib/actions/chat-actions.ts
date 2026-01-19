@@ -16,7 +16,18 @@ export async function deleteChatLog(userId: string, chatId: string): Promise<{ s
     const adminApp = initializeAdminApp();
     const db = admin.firestore(adminApp);
     
-    await db.collection('users').doc(userId).collection('chats').doc(chatId).delete();
+    // Create a batch to delete from both locations atomically
+    const batch = db.batch();
+
+    // Reference to the log in the user's private subcollection
+    const userChatRef = db.collection('users').doc(userId).collection('chats').doc(chatId);
+    batch.delete(userChatRef);
+
+    // Reference to the log in the global collection
+    const globalChatRef = db.collection('chat_logs').doc(chatId);
+    batch.delete(globalChatRef);
+    
+    await batch.commit();
     
     // Revalidate the admin chats page to reflect the deletion
     revalidatePath('/admin/chats');
@@ -29,3 +40,5 @@ export async function deleteChatLog(userId: string, chatId: string): Promise<{ s
     return { success: false, message: `채팅 기록 삭제 실패: ${errorMessage}` };
   }
 }
+
+    

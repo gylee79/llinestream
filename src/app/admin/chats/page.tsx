@@ -19,7 +19,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ChatLog, Episode, User } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase/hooks';
-import { collection, query, orderBy, where, collectionGroup } from 'firebase/firestore';
+import { collection, query, orderBy, where } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toDisplayDateTime } from '@/lib/date-helpers';
 import { Button } from '@/components/ui/button';
@@ -55,7 +55,7 @@ function ChatLogViewer() {
   
   const chatsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    let q: any = query(collectionGroup(firestore, 'chats'), orderBy('createdAt', 'desc'));
+    let q: any = query(collection(firestore, 'chat_logs'), orderBy('createdAt', 'desc'));
     if (filterEpisode !== 'all') {
       q = query(q, where('episodeId', '==', filterEpisode));
     }
@@ -199,3 +199,5 @@ export default function AdminChatsPage() {
     </div>
   );
 }
+
+    

@@ -2,31 +2,31 @@
 {
   "indexes": [
     {
-      "collectionGroup": "chats",
-      "queryScope": "COLLECTION_GROUP",
+      "collectionGroup": "chat_logs",
+      "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
-      "collectionGroup": "chats",
-      "queryScope": "COLLECTION_GROUP",
+      "collectionGroup": "chat_logs",
+      "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "episodeId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
-      "collectionGroup": "chats",
-      "queryScope": "COLLECTION_GROUP",
+      "collectionGroup": "chat_logs",
+      "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
-      "collectionGroup": "chats",
-      "queryScope": "COLLECTION_GROUP",
+      "collectionGroup": "chat_logs",
+      "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "episodeId", "order": "ASCENDING" },
@@ -36,3 +36,5 @@
   ],
   "fieldOverrides": []
 }
+
+    
