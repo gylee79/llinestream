@@ -208,6 +208,11 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       console.log(`✅ [${episodeId}] Success!`);
 
     } catch (error: any) {
+      // ===== 진단 로그 시작 =====
+      // 이것이 가장 중요한 로그입니다. 전체 오류 객체를 보여줍니다.
+      console.error(`[${episodeId}] DETAILED ERROR OBJECT:`, JSON.stringify(error, null, 2));
+      // ===== 진단 로그 끝 =====
+
       console.error(`❌ [${episodeId}] Error:`, error);
       
       // Quota 에러 감지 조건을 더 넓게 설정합니다.
