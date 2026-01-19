@@ -71,27 +71,31 @@ export const analyzeVideoOnWrite = onDocumentWritten(
   }, 
   async (event) => {
     const change = event.data;
-    if (!change) return;
-
-    if (!change.after.exists) {
-      console.log(`[${event.params.episodeId}] Document deleted.`);
+    if (!change || !change.after.exists) {
+      console.log(`[${event.params.episodeId}] Document deleted, skipping.`);
       return;
     }
     
     const afterData = change.after.data() as EpisodeData;
-    if (!afterData) return;
-    const { episodeId } = event.params;
+    const beforeData = change.before.exists ? change.before.data() : null;
 
-    if (afterData.aiProcessingStatus === "pending") {
-      console.log(`✨ New upload detected [${episodeId}]. Starting...`);
-      await change.after.ref.update({ aiProcessingStatus: "processing" });
+    // === NEW TRIGGER LOGIC ===
+    // Only proceed if the status has just been set to 'pending'.
+    if (afterData.aiProcessingStatus !== 'pending' || beforeData?.aiProcessingStatus === 'pending') {
       return;
     }
-    if (afterData.aiProcessingStatus !== "processing") return;
 
+    const { episodeId } = event.params;
+    const docRef = change.after.ref;
+
+    console.log(`✨ [${episodeId}] New analysis job detected. Starting...`);
+
+    // Immediately set status to 'processing' to prevent re-triggering.
+    await docRef.update({ aiProcessingStatus: "processing" });
+    
     const filePath = afterData.filePath;
     if (!filePath) {
-      await change.after.ref.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath" });
+      await docRef.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath" });
       return;
     }
 
@@ -194,7 +198,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 키워드: ${output.keywords?.join(', ') || ''}
       `.trim();
 
-      await change.after.ref.update({
+      await docRef.update({
         aiProcessingStatus: "completed",
         transcript: output.transcript || "",
         aiGeneratedContent: combinedContent,
@@ -206,23 +210,11 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       console.log(`✅ [${episodeId}] Success!`);
 
     } catch (error: any) {
-      // ===== 진단 로그 시작 =====
-      // 이것이 가장 중요한 로그입니다. 전체 오류 객체를 보여줍니다.
-      console.error(`[${episodeId}] DETAILED ERROR OBJECT:`, JSON.stringify(error, null, 2));
-      // ===== 진단 로그 끝 =====
-
-      console.error(`❌ [${episodeId}] Error:`, error);
+      // ===== NEW ERROR HANDLING (NO MORE THROWING) =====
+      const detailedError = JSON.stringify(error, Object.getOwnPropertyNames(error), 2);
+      console.error(`❌ [${episodeId}] Analysis failed. Detailed error:`, detailedError);
       
-      // Quota 에러 감지 조건을 더 넓게 설정합니다.
-      const errorMessage = String(error.message || '').toLowerCase();
-      if (errorMessage.includes("429") || errorMessage.includes("quota")) {
-         console.log(`[${episodeId}] Quota exceeded. Re-throwing error to trigger automatic retry.`);
-         // 의도적으로 에러를 다시 던져서 Cloud Functions의 자동 재시도 기능을 활성화합니다.
-         throw new Error(`Quota exceeded for ${episodeId}, triggering automated retry.`);
-      }
-      
-      // Quota가 아닌 다른 에러의 경우, 상태를 'failed'로 기록하고 함수를 정상 종료합니다.
-      await change.after.ref.update({
+      await docRef.update({
         aiProcessingStatus: "failed",
         aiProcessingError: error.message || String(error)
       });

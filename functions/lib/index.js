@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteFilesOnEpisodeDelete = exports.analyzeVideoOnWrite = void 0;
 /**
  * @fileoverview Video Analysis with Gemini
- * Model: gemini-2.5-flash (User Requested)
+ * Model: gemini-2.5-pro
  */
 const firestore_1 = require("firebase-functions/v2/firestore");
 const v2_1 = require("firebase-functions/v2");
@@ -112,8 +112,7 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)({
         await change.after.ref.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath" });
         return;
     }
-    // [요청하신 모델명 로그]
-    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-flash).`);
+    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-pro).`);
     const { genAI, fileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
     let uploadedFile = null;
@@ -135,10 +134,9 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)({
         }
         if (state === server_1.FileState.FAILED)
             throw new Error("Google AI processing failed.");
-        console.log(`[${episodeId}] Calling Gemini 2.5 Flash...`);
-        // [요청하신 모델명 적용] gemini-2.5-flash
+        console.log(`[${episodeId}] Calling Gemini 2.5 Pro...`);
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.5-pro",
             generationConfig: {
                 responseMimeType: "application/json",
                 responseSchema: {
