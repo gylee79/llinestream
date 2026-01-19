@@ -166,7 +166,22 @@ Keywords: ${result.keywords.join(', ')}
       console.log(`✅ [${episodeId}] Analysis Success!`);
 
     } catch (error: any) {
+      // ===== 진단 로그 시작 =====
+      // 이것이 가장 중요한 로그입니다. 전체 오류 객체를 보여줍니다.
+      console.error(`[${episodeId}] DETAILED ERROR OBJECT:`, JSON.stringify(error, null, 2));
+      // ===== 진단 로그 끝 =====
+
       console.error(`❌ [${episodeId}] Error:`, error);
+      
+      // Quota 에러 감지 조건을 더 넓게 설정합니다.
+      const errorMessage = String(error.message || '').toLowerCase();
+      if (errorMessage.includes("429") || errorMessage.includes("quota")) {
+         console.log(`[${episodeId}] Quota exceeded. Re-throwing error to trigger automatic retry.`);
+         // 의도적으로 에러를 다시 던져서 Cloud Functions의 자동 재시도 기능을 활성화합니다.
+         throw new Error(`Quota exceeded for ${episodeId}, triggering automated retry.`);
+      }
+      
+      // Quota가 아닌 다른 에러의 경우, 상태를 'failed'로 기록하고 함수를 정상 종료합니다.
       await change.after.ref.update({
         aiProcessingStatus: "failed",
         aiProcessingError: error.message || String(error)
