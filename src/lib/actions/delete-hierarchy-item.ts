@@ -132,7 +132,7 @@ export async function deleteHierarchyItem(
           await deleteStorageFileByPath(storage, episode.vttPath);
         }
         // Also delete from the centralized AI chunks collection
-        await db.collection('episode_ai_chunks').doc(id).delete();
+        await db.collection('episode_ai_chunks').doc(id).delete().catch(() => {});
     } else if (collectionName === 'courses') {
         const course = item as Course;
         if (course.thumbnailPath) await deleteStorageFileByPath(storage, course.thumbnailPath);
@@ -160,3 +160,5 @@ export async function deleteHierarchyItem(
     return { success: false, message: `삭제 실패: ${errorMessage}` };
   }
 }
+
+    
