@@ -330,6 +330,21 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of the interaction." }
       },
       "required": ["userId", "episodeId", "question", "answer", "createdAt"]
+    },
+    "EpisodeAiChunk": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Episode AI Chunk",
+      "type": "object",
+      "description": "Stores AI-generated analysis for a single episode, categorized by field for broad context searching.",
+      "properties": {
+        "episodeId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "classificationId": { "type": "string" },
+        "fieldId": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["episodeId", "courseId", "classificationId", "fieldId", "content", "createdAt"]
     }
   },
   "auth": {
@@ -542,6 +557,17 @@
           "description": "A global collection of all user-AI chat interactions for admin auditing. Writable by the video-tutor flow, readable only by admins.",
            "params": [
             { "name": "chatId", "description": "The unique identifier of the chat interaction." }
+          ]
+        }
+      },
+      {
+        "path": "/episode_ai_chunks/{episodeId}",
+        "definition": {
+          "entityName": "EpisodeAiChunk",
+          "schema": { "$ref": "#/backend/entities/EpisodeAiChunk" },
+          "description": "Centralized storage for AI-generated episode content, queryable by fieldId. Doc ID is the same as Episode ID.",
+          "params": [
+            { "name": "episodeId", "description": "The unique identifier of the episode." }
           ]
         }
       }

@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Video Analysis with Gemini
  * Model: gemini-3-flash-preview
@@ -26,6 +27,7 @@ setGlobalOptions({
 
 interface EpisodeData {
   filePath: string;
+  courseId: string;
   aiProcessingStatus?: string;
   defaultThumbnailPath?: string;
   customThumbnailPath?: string;
@@ -87,6 +89,7 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
     const { episodeId } = event.params;
     const docRef = change.after.ref;
+    const db = admin.firestore();
 
     console.log(`✨ [${episodeId}] New analysis job detected. Starting...`);
 
@@ -198,7 +201,26 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 키워드: ${output.keywords?.join(', ') || ''}
       `.trim();
 
-      await docRef.update({
+      // Get Field ID for context storage
+      const courseDoc = await db.collection('courses').doc(afterData.courseId).get();
+      if (!courseDoc.exists) throw new Error(`Course not found for episode ${episodeId}`);
+      const classificationDoc = await db.collection('classifications').doc(courseDoc.data()!.classificationId).get();
+      if (!classificationDoc.exists) throw new Error(`Classification not found for course ${courseDoc.id}`);
+      const fieldId = classificationDoc.data()!.fieldId;
+      
+      const aiChunkData = {
+          episodeId,
+          courseId: afterData.courseId,
+          classificationId: courseDoc.data()!.classificationId,
+          fieldId,
+          content: combinedContent,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      const batch = db.batch();
+      
+      // 1. Update the original episode document
+      batch.update(docRef, {
         aiProcessingStatus: "completed",
         transcript: output.transcript || "",
         aiGeneratedContent: combinedContent,
@@ -207,6 +229,13 @@ export const analyzeVideoOnWrite = onDocumentWritten(
         aiProcessingError: null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      // 2. Set the centralized AI context chunk
+      const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
+      batch.set(aiChunkRef, aiChunkData);
+
+      await batch.commit();
+
       console.log(`✅ [${episodeId}] Success!`);
 
     } catch (error: any) {
