@@ -205,6 +205,7 @@ export interface ChatLog {
     id: string;
     userId: string;
     episodeId: string;
+    courseId: string;
     question: string;
     answer: string;
     contextReferences: string[];
