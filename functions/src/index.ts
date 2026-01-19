@@ -1,6 +1,6 @@
 /**
  * @fileoverview Video Analysis with Gemini
- * Model: gemini-2.5-flash (User Requested)
+ * Model: gemini-2.5-pro
  */
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
@@ -95,7 +95,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
       return;
     }
 
-    // [요청하신 모델명 로그]
     console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-pro).`);
     
     const { genAI, fileManager } = initializeTools();
@@ -125,7 +124,6 @@ export const analyzeVideoOnWrite = onDocumentWritten(
 
       console.log(`[${episodeId}] Calling Gemini 2.5 Pro...`);
       
-      // [요청하신 모델명 적용] gemini-2.5-pro
       const model = genAI!.getGenerativeModel({ 
         model: "gemini-2.5-pro", 
         generationConfig: {

@@ -3,7 +3,7 @@
 **목표:** 비디오가 등록되는 순간, Firebase Cloud Functions와 Genkit을 사용하여 백그라운드에서 자동으로 AI 분석을 수행하고, 사용자는 분석된 데이터를 기반으로 AI와 대화하는 서버리스 파이프라인.
 
 **기술 스택:**
-- **AI 모델:** Google Gemini 2.5 Flash (분석), Gemini 2.5 Pro (채팅)
+- **AI 모델:** Google Gemini 2.5 Pro
 - **AI 프레임워크:** Genkit
 - **실행 환경:** Firebase Cloud Functions (v1)
 - **트리거:** Firestore `onWrite`
@@ -28,7 +28,7 @@
 
 ### Step 3: Genkit을 이용한 AI 분석 (백엔드 - Cloud Function 내부)
 1.  **공개 URL 가져오기:** 함수는 에피소드 문서에 저장된 `videoUrl` (공개 URL)을 확보합니다. 만약 URL이 없다면, Storage 파일 경로(`filePath`)를 이용해 직접 공개 URL을 생성합니다.
-2.  **구조화된 데이터 요청:** Genkit의 `ai.generate()` 함수를 호출하여 **`gemini-2.5-flash`** 모델에 비디오 분석을 요청합니다. 이때, 미리 정의된 Zod 스키마(`AnalysisOutputSchema`)를 함께 전달하여 AI가 다음과 같은 **구조화된 JSON 데이터**를 반환하도록 합니다.
+2.  **구조화된 데이터 요청:** Genkit의 `ai.generate()` 함수를 호출하여 **`gemini-2.5-pro`** 모델에 비디오 분석을 요청합니다. 이때, 미리 정의된 Zod 스키마(`AnalysisOutputSchema`)를 함께 전달하여 AI가 다음과 같은 **구조화된 JSON 데이터**를 반환하도록 합니다.
     *   `transcript`: 영상의 전체 음성 대본
     *   `summary`: 영상 콘텐츠에 대한 간결한 요약
     *   `timeline`: 시간대별 주요 이벤트 및 시각적 상세 설명
