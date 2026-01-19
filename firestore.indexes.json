@@ -2,14 +2,7 @@
 {
   "indexes": [
     {
-      "collectionGroup": "chat_logs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "chat_logs",
+      "collectionId": "chat_logs",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "episodeId", "order": "ASCENDING" },
@@ -17,7 +10,7 @@
       ]
     },
     {
-      "collectionGroup": "chat_logs",
+      "collectionId": "chat_logs",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "userId", "order": "ASCENDING" },
@@ -25,7 +18,7 @@
       ]
     },
     {
-      "collectionGroup": "chat_logs",
+      "collectionId": "chat_logs",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "userId", "order": "ASCENDING" },
