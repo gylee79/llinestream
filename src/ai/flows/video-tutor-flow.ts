@@ -92,11 +92,11 @@ const videoTutorFlow = ai.defineFlow(
       const llmResponse = await ai.generate({
         model: googleAI.model('gemini-3-flash-preview'),
         system: `You are a friendly and helpful Korean tutor. You MUST answer all questions in Korean.
-        Based ONLY on the following collection of video content analyses, answer the user's question.
-        Each section of the context is from a different video but they are all related to the same general field.
+        Based ONLY on the following collection of video analyses from the same category, answer the user's question.
+        Each section of the context, separated by '---', is from a different video but they are all related to the same general field.
         If the context doesn't contain the answer, you MUST state that the information is not in the provided videos and you cannot answer in Korean. Do not use outside knowledge.
 
-        Context from the video collection:
+        Context from video analyses in the same category:
         ---
         ${context}
         ---`,
