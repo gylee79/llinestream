@@ -1,30 +1,30 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import HierarchyManager from "@/components/admin/content/hierarchy-manager";
-import PricingManager from "@/components/admin/content/pricing-manager";
-import VideoManager from "@/app/admin/content/video-manager";
-import InstructorManager from "@/components/admin/content/instructor-manager";
 import { Skeleton } from '@/components/ui/skeleton';
 
+const TabSkeleton = () => (
+    <div className="mt-4">
+        <Skeleton className="h-[70vh] w-full" />
+    </div>
+);
+
+const HierarchyManager = dynamic(() => import('@/components/admin/content/hierarchy-manager'), { 
+    loading: () => <TabSkeleton />,
+});
+const PricingManager = dynamic(() => import('@/components/admin/content/pricing-manager'), { 
+    loading: () => <TabSkeleton />,
+});
+const VideoManager = dynamic(() => import('@/components/admin/content/video-manager'), {
+    loading: () => <TabSkeleton />,
+});
+const InstructorManager = dynamic(() => import('@/components/admin/content/instructor-manager'), { 
+    loading: () => <TabSkeleton />,
+});
+
+
 export default function ContentTabs() {
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  if (!isClient) {
-    return (
-        <div className="mt-6">
-            <Skeleton className="h-10 w-96" />
-            <Skeleton className="mt-4 h-64 w-full" />
-        </div>
-    );
-  }
-
   return (
     <Tabs defaultValue="hierarchy" className="mt-6">
       <TabsList>
@@ -34,16 +34,16 @@ export default function ContentTabs() {
         <TabsTrigger value="videos">비디오 관리</TabsTrigger>
       </TabsList>
       <TabsContent value="hierarchy" className="mt-4">
-        <HierarchyManager />
+          <HierarchyManager />
       </TabsContent>
       <TabsContent value="pricing" className="mt-4">
-        <PricingManager />
+          <PricingManager />
       </TabsContent>
       <TabsContent value="instructor" className="mt-4">
-        <InstructorManager />
+          <InstructorManager />
       </TabsContent>
       <TabsContent value="videos" className="mt-4">
-        <VideoManager />
+          <VideoManager />
       </TabsContent>
     </Tabs>
   );
