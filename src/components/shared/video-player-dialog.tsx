@@ -182,6 +182,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const { user } = useUser();
   const [activeView, setActiveView] = useState<'summary' | 'chat'>('summary');
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [vttSrc, setVttSrc] = useState<string | null>(null);
   const [isLoadingSrc, setIsLoadingSrc] = useState(true);
   const [srcError, setSrcError] = useState<string | null>(null);
   const videoKey = episode.id; 
@@ -195,6 +196,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     }
     onOpenChange(false);
     setVideoSrc(null);
+    setVttSrc(null);
+    setIsLoadingSrc(true);
+    setSrcError(null);
     setActiveView('summary');
   }
   
@@ -204,9 +208,13 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         if (user) {
             startTime = new Date();
         }
+
+        setIsLoadingSrc(true);
+        setSrcError(null);
+        setVideoSrc(null);
+        setVttSrc(null);
+
         if (episode.filePath) {
-            setIsLoadingSrc(true);
-            setSrcError(null);
             getSignedUrl(episode.filePath)
                 .then(result => {
                     if ('signedURL' in result) {
@@ -216,15 +224,32 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     }
                 })
                 .catch(err => {
-                    console.error("Failed to get signed URL:", err);
+                    console.error("Failed to get video signed URL:", err);
                     setSrcError('비디오 주소를 가져오는 데 실패했습니다.');
                 })
                 .finally(() => {
-                    setIsLoadingSrc(false);
+                    if (!episode.vttPath) {
+                        setIsLoadingSrc(false);
+                    }
                 });
         } else {
              setSrcError('비디오 파일 경로를 찾을 수 없습니다.');
              setIsLoadingSrc(false);
+        }
+        
+        if (episode.vttPath) {
+            getSignedUrl(episode.vttPath)
+                .then(result => {
+                    if ('signedURL' in result) {
+                        setVttSrc(result.signedURL);
+                    }
+                })
+                .catch(err => {
+                     console.warn("Failed to get VTT signed URL:", err);
+                })
+                .finally(() => {
+                    setIsLoadingSrc(false);
+                });
         }
     }
     
@@ -248,7 +273,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             }
         }
     };
-  }, [isOpen, user, episode.id, episode.title, episode.courseId, episode.filePath]);
+  }, [isOpen, user, episode.id, episode.title, episode.courseId, episode.filePath, episode.vttPath]);
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
@@ -297,9 +322,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                             crossOrigin="anonymous"
                         >
                             <source src={videoSrc} type="video/mp4" />
-                            {episode.vttUrl && (
+                            {vttSrc && (
                                 <track 
-                                    src={episode.vttUrl} 
+                                    src={vttSrc} 
                                     kind="subtitles" 
                                     srcLang="ko" 
                                     label="한국어" 
