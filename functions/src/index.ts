@@ -50,7 +50,7 @@ function initializeTools() {
 export const analyzeVideoOnWrite = functions.runWith({
     secrets: ["GOOGLE_GENAI_API_KEY"],
     timeoutSeconds: 540,
-    memory: "2GB", // "2GiB" -> "2GB"로 수정
+    memory: "2GB",
   })
   .region("us-central1")
   .firestore.document("episodes/{episodeId}")
@@ -152,7 +152,6 @@ export const analyzeVideoOnWrite = functions.runWith({
 
       const output = JSON.parse(result.response.text());
 
-      let vttUrl = null;
       let vttPath = null;
       if (output.timeline && Array.isArray(output.timeline)) {
         const vttContent = `WEBVTT\n\n${output.timeline
@@ -169,7 +168,6 @@ export const analyzeVideoOnWrite = functions.runWith({
           metadata: { contentType: 'text/vtt' },
         });
 
-        vttUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(vttPath)}?alt=media`;
         if (fs.existsSync(vttTempPath)) fs.unlinkSync(vttTempPath);
         console.log(`[${episodeId}] VTT subtitle file created.`);
       }
@@ -197,7 +195,6 @@ export const analyzeVideoOnWrite = functions.runWith({
         aiProcessingStatus: "completed",
         transcript: output.transcript || "",
         aiGeneratedContent: combinedContent,
-        vttUrl: vttUrl,
         vttPath: vttPath,
         aiProcessingError: null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -223,7 +220,7 @@ export const analyzeVideoOnWrite = functions.runWith({
       if (fs.existsSync(tempFilePath)) { try { fs.unlinkSync(tempFilePath); } catch (e) {} }
       if (uploadedFile) { try { await localFileManager.deleteFile(uploadedFile.name); } catch (e) {} }
     }
-    return null; // 모든 경로가 값을 반환하도록 명시
+    return null;
 });
 
 // ==========================================
@@ -247,7 +244,7 @@ export const deleteFilesOnEpisodeDelete = functions.region("us-central1")
     await aiChunkRef.delete().catch(() => {});
 
     console.log(`[DELETE SUCCESS] Cleaned up files and AI chunk for deleted episode ${episodeId}`);
-    return null; // 모든 경로가 값을 반환하도록 명시
+    return null;
 });
 
 interface EpisodeData {

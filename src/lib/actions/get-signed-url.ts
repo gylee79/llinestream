@@ -19,6 +19,6 @@ export async function getSignedUrl(filePath: string): Promise<{ signedURL: strin
         return { signedURL };
     } catch (error) {
         console.error('Error generating signed URL:', error);
-        return { error: '비디오 주소를 가져올 수 없습니다.' };
+        return { error: '보안 링크를 생성할 수 없습니다.' };
     }
 }
