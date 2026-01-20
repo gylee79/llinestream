@@ -13,11 +13,12 @@ import { Button } from '../ui/button';
 import { useUser } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
-import { Send, Sparkles, Bot, User as UserIcon, X } from 'lucide-react';
+import { Send, Sparkles, Bot, User as UserIcon, X, Loader } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
+import { getSignedUrl } from '@/lib/actions/get-signed-url';
 
 interface VideoPlayerDialogProps {
   isOpen: boolean;
@@ -180,22 +181,51 @@ const ChatView = ({ episode, user }: { episode: Episode, user: any }) => {
 export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
   const { user } = useUser();
   const [activeView, setActiveView] = useState<'summary' | 'chat'>('summary');
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [isLoadingSrc, setIsLoadingSrc] = useState(true);
+  const [srcError, setSrcError] = useState<string | null>(null);
   const videoKey = episode.id; 
 
   const handleClose = () => {
     const videoElement = document.getElementById(`video-${videoKey}`) as HTMLVideoElement;
     if (videoElement) {
         videoElement.pause();
-        videoElement.src = ''; 
+        videoElement.removeAttribute('src'); 
+        videoElement.load();
     }
     onOpenChange(false);
+    setVideoSrc(null);
     setActiveView('summary');
   }
   
   useEffect(() => {
     let startTime: Date | null = null;
-    if (isOpen && user) {
-        startTime = new Date();
+    if (isOpen) {
+        if (user) {
+            startTime = new Date();
+        }
+        if (episode.filePath) {
+            setIsLoadingSrc(true);
+            setSrcError(null);
+            getSignedUrl(episode.filePath)
+                .then(result => {
+                    if ('signedURL' in result) {
+                        setVideoSrc(result.signedURL);
+                    } else {
+                        setSrcError(result.error);
+                    }
+                })
+                .catch(err => {
+                    console.error("Failed to get signed URL:", err);
+                    setSrcError('비디오 주소를 가져오는 데 실패했습니다.');
+                })
+                .finally(() => {
+                    setIsLoadingSrc(false);
+                });
+        } else {
+             setSrcError('비디오 파일 경로를 찾을 수 없습니다.');
+             setIsLoadingSrc(false);
+        }
     }
     
     return () => {
@@ -218,7 +248,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             }
         }
     };
-  }, [isOpen, user, episode.id, episode.title, episode.courseId]);
+  }, [isOpen, user, episode.id, episode.title, episode.courseId, episode.filePath]);
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
@@ -238,32 +268,47 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             
             <div className="w-full aspect-video bg-black md:col-span-2 md:h-full flex flex-col">
                 <div className="w-full flex-grow relative">
-                    <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black/50 to-transparent pointer-events-none md:hidden">
+                    <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/50 to-transparent pointer-events-none md:hidden">
                         <DialogTitle className="text-white text-lg font-bold truncate pr-8">
                             {episode.title}
                         </DialogTitle>
                     </div>
-                    <video
-                        id={`video-${videoKey}`}
-                        key={videoKey}
-                        controls
-                        autoPlay
-                        className="w-full h-full object-contain"
-                        poster={episode.thumbnailUrl}
-                        crossOrigin="anonymous"
-                    >
-                        <source src={episode.videoUrl} type="video/mp4" />
-                        {episode.vttUrl && (
-                            <track 
-                                src={episode.vttUrl} 
-                                kind="subtitles" 
-                                srcLang="ko" 
-                                label="한국어" 
-                                default 
-                            />
+
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
+                        {srcError && !isLoadingSrc && (
+                            <div className="text-white bg-red-900/80 p-4 rounded-lg text-center">
+                                <p className="font-semibold">비디오를 불러올 수 없습니다</p>
+                                <p className="text-sm mt-1">{srcError}</p>
+                            </div>
                         )}
-                        브라우저가 비디오 태그를 지원하지 않습니다.
-                    </video>
+                    </div>
+                    
+                    {videoSrc && !isLoadingSrc && !srcError && (
+                        <video
+                            id={`video-${videoKey}`}
+                            key={videoSrc}
+                            controls
+                            controlsList="nodownload"
+                            onContextMenu={(e) => e.preventDefault()}
+                            autoPlay
+                            className="w-full h-full object-contain z-10 relative"
+                            poster={episode.thumbnailUrl}
+                            crossOrigin="anonymous"
+                        >
+                            <source src={videoSrc} type="video/mp4" />
+                            {episode.vttUrl && (
+                                <track 
+                                    src={episode.vttUrl} 
+                                    kind="subtitles" 
+                                    srcLang="ko" 
+                                    label="한국어" 
+                                    default 
+                                />
+                            )}
+                            브라우저가 비디오 태그를 지원하지 않습니다.
+                        </video>
+                    )}
                 </div>
             </div>
             
