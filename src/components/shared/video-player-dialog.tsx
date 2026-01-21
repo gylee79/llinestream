@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import type { Episode, Instructor, ChatMessage } from '@/lib/types';
+import type { Episode, Instructor, ChatMessage, AiSearchScope } from '@/lib/types';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { Button } from '../ui/button';
 import { useUser } from '@/firebase';
@@ -61,8 +61,16 @@ const ChatView = ({ episode, user }: { episode: Episode, user: any }) => {
     const [isPending, startTransition] = useTransition();
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [userQuestion, setUserQuestion] = useState('');
+    const [searchScope, setSearchScope] = useState<AiSearchScope>('field'); // Default scope
     const chatScrollAreaRef = useRef<HTMLDivElement>(null);
     const isAIAvailable = episode.aiProcessingStatus === 'completed';
+
+    const scopeOptions: { value: AiSearchScope; label: string }[] = [
+        { value: 'episode', label: '이 영상만' },
+        { value: 'course', label: '현재 강좌' },
+        { value: 'classification', label: '같은 분류' },
+        { value: 'field', label: '같은 분야' },
+    ];
 
     useEffect(() => {
         if (chatScrollAreaRef.current) {
@@ -89,6 +97,7 @@ const ChatView = ({ episode, user }: { episode: Episode, user: any }) => {
                     episodeId: episode.id,
                     question: newQuestion.content,
                     userId: user.id,
+                    scope: searchScope,
                 });
                 const newAnswer: ChatMessage = {
                     id: uuidv4(),
@@ -155,24 +164,40 @@ const ChatView = ({ episode, user }: { episode: Episode, user: any }) => {
                     </div>
                 )}
             </ScrollArea>
-            <div className="flex-shrink-0 flex gap-2 items-center border-t pt-4">
-                <Textarea 
-                    placeholder={!isAIAvailable ? "AI 분석이 아직 완료되지 않았습니다." : "AI에게 검색할 내용을 입력하세요..."}
-                    className="flex-grow resize-none h-10 min-h-0" 
-                    rows={1}
-                    value={userQuestion}
-                    onChange={(e) => setUserQuestion(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleAskQuestion();
-                        }
-                    }}
-                    disabled={isPending || !isAIAvailable}
-                />
-                <Button onClick={handleAskQuestion} disabled={isPending || !userQuestion.trim() || !isAIAvailable}>
-                    <Send className="h-4 w-4" />
-                </Button>
+             <div className="flex-shrink-0 pt-4 space-y-2">
+                <div className="flex items-center justify-center gap-1">
+                    <span className="text-xs text-muted-foreground mr-2">검색 범위:</span>
+                    {scopeOptions.map(option => (
+                        <Button
+                            key={option.value}
+                            variant={searchScope === option.value ? 'secondary' : 'ghost'}
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => setSearchScope(option.value)}
+                        >
+                            {option.label}
+                        </Button>
+                    ))}
+                </div>
+                <div className="flex gap-2 items-center">
+                    <Textarea 
+                        placeholder={!isAIAvailable ? "AI 분석이 아직 완료되지 않았습니다." : "AI에게 검색할 내용을 입력하세요..."}
+                        className="flex-grow resize-none h-10 min-h-0" 
+                        rows={1}
+                        value={userQuestion}
+                        onChange={(e) => setUserQuestion(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleAskQuestion();
+                            }
+                        }}
+                        disabled={isPending || !isAIAvailable}
+                    />
+                    <Button onClick={handleAskQuestion} disabled={isPending || !userQuestion.trim() || !isAIAvailable}>
+                        <Send className="h-4 w-4" />
+                    </Button>
+                </div>
             </div>
         </>
     );
@@ -206,9 +231,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   useEffect(() => {
     let startTime: Date | null = null;
     if (isOpen) {
-        if (user) {
-            startTime = new Date();
-        }
+        // Start timer immediately when dialog opens
+        startTime = new Date();
 
         setIsLoadingSrc(true);
         setSrcError(null);
@@ -255,6 +279,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     }
     
     return () => {
+        // Log view only if a user is present when the dialog closes
         if (user && startTime) {
             const endTime = new Date();
             const durationWatched = (endTime.getTime() - startTime.getTime()) / 1000;
