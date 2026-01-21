@@ -364,7 +364,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                             playsInline
                             className="w-full h-full object-contain z-10 relative"
                             poster={episode.thumbnailUrl}
-                            allowFullScreen
                         >
                             <source src={videoSrc} type="video/mp4" />
                             {vttSrc && (
@@ -402,5 +401,3 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
-
-    
