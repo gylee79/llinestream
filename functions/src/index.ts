@@ -1,8 +1,9 @@
 /**
- * @fileoverview Video Analysis with Gemini using Firebase Cloud Functions v1.
+ * @fileoverview Video Analysis with Gemini using Firebase Cloud Functions v2.
  * Model: gemini-2.5-pro
  */
-import * as functions from "firebase-functions";
+import { setGlobalOptions } from "firebase-functions/v2";
+import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
@@ -10,10 +11,18 @@ import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
 
-// 0. Firebase Admin 초기화
+// 0. Firebase Admin & Global Options 초기화
 if (!admin.apps.length) {
   admin.initializeApp();
 }
+
+setGlobalOptions({
+  region: "us-central1",
+  secrets: ["GOOGLE_GENAI_API_KEY"],
+  timeoutSeconds: 540,
+  memory: "2GiB", // Gen 2 uses GiB
+});
+
 
 // 1. MIME Type 도우미
 function getMimeType(filePath: string): string {
@@ -45,21 +54,16 @@ function initializeTools() {
 }
 
 // ==========================================
-// [Trigger] 메인 분석 함수 (v1 onWrite)
+// [Trigger] 메인 분석 함수 (v2 onDocumentWritten)
 // ==========================================
-export const analyzeVideoOnWrite = functions.runWith({
-    secrets: ["GOOGLE_GENAI_API_KEY"],
-    timeoutSeconds: 540,
-    memory: "2GB",
-  })
-  .region("us-central1")
-  .firestore.document("episodes/{episodeId}")
-  .onWrite(async (change, context) => {
-    
+export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", async (event) => {
+    const change = event.data;
+    if (!change) return;
+
     // 문서가 삭제되었거나, 데이터가 없는 경우는 무시
     if (!change.after.exists) {
-      console.log(`[${context.params.episodeId}] Document deleted, skipping.`);
-      return null;
+      console.log(`[${event.params.episodeId}] Document deleted, skipping.`);
+      return;
     }
     
     const afterData = change.after.data() as EpisodeData;
@@ -67,10 +71,10 @@ export const analyzeVideoOnWrite = functions.runWith({
 
     // === 트리거 로직: 'pending' 상태일 때만 실행 ===
     if (afterData.aiProcessingStatus !== 'pending' || (beforeData && beforeData.aiProcessingStatus === 'pending')) {
-      return null;
+      return;
     }
 
-    const { episodeId } = context.params;
+    const { episodeId } = event.params;
     const docRef = change.after.ref;
     const db = admin.firestore();
 
@@ -82,7 +86,7 @@ export const analyzeVideoOnWrite = functions.runWith({
     const filePath = afterData.filePath;
     if (!filePath) {
       await docRef.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath" });
-      return null;
+      return;
     }
 
     console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-pro).`);
@@ -221,19 +225,18 @@ export const analyzeVideoOnWrite = functions.runWith({
       if (fs.existsSync(tempFilePath)) { try { fs.unlinkSync(tempFilePath); } catch (e) {} }
       if (uploadedFile) { try { await localFileManager.deleteFile(uploadedFile.name); } catch (e) {} }
     }
-    return null;
 });
 
 // ==========================================
-// [Trigger] 파일 삭제 함수 (v1 onDelete)
+// [Trigger] 파일 삭제 함수 (v2 onDocumentDeleted)
 // ==========================================
-export const deleteFilesOnEpisodeDelete = functions.region("us-central1")
-    .firestore.document("episodes/{episodeId}")
-    .onDelete(async (snap, context) => {
-    
-    const { episodeId } = context.params;
+export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const { episodeId } = event.params;
     const data = snap.data() as EpisodeData;
-    if (!data) return null;
+    if (!data) return;
 
     const db = admin.firestore();
     const bucket = admin.storage().bucket();
@@ -245,7 +248,6 @@ export const deleteFilesOnEpisodeDelete = functions.region("us-central1")
     await aiChunkRef.delete().catch(() => {});
 
     console.log(`[DELETE SUCCESS] Cleaned up files and AI chunk for deleted episode ${episodeId}`);
-    return null;
 });
 
 interface EpisodeData {
