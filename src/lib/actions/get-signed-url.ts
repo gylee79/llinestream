@@ -10,10 +10,10 @@ export async function getSignedUrl(filePath: string): Promise<{ signedURL: strin
         const storage = adminApp.storage();
         const bucket = storage.bucket();
 
-        // Create a signed URL that expires in 15 minutes.
+        // Create a signed URL that expires in 1 hour.
         const [signedURL] = await bucket.file(filePath).getSignedUrl({
             action: 'read',
-            expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+            expires: Date.now() + 60 * 60 * 1000, // 1 hour
         });
 
         return { signedURL };

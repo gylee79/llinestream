@@ -128,8 +128,8 @@ export const analyzeVideoOnWrite = functions.runWith({
                 items: {
                   type: SchemaType.OBJECT,
                   properties: {
-                    startTime: { type: SchemaType.STRING },
-                    endTime: { type: SchemaType.STRING },
+                    startTime: { type: SchemaType.STRING, description: "자막의 시작 시간, 반드시 HH:MM:SS.mmm 형식이어야 합니다." },
+                    endTime: { type: SchemaType.STRING, description: "자막의 종료 시간, 반드시 HH:MM:SS.mmm 형식이어야 합니다." },
                     subtitle: { type: SchemaType.STRING, description: "한국어로 번역된 자막" }
                   },
                   required: ["startTime", "endTime", "subtitle"]
