@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -325,6 +326,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                             브라우저가 비디오 태그를 지원하지 않습니다.
                         </video>
                     )}
+                    </div>
                 </div>
             </div>
             
