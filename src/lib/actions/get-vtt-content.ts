@@ -1,13 +1,14 @@
 'use server';
 import { initializeAdminApp } from '@/lib/firebase-admin';
+import * as admin from 'firebase-admin';
 
 export async function getVttContent(filePath: string): Promise<{ content?: string; error?: string }> {
     if (!filePath) {
         return { error: '파일 경로가 필요합니다.' };
     }
     try {
-        const adminApp = initializeAdminApp();
-        const storage = adminApp.storage();
+        initializeAdminApp();
+        const storage = admin.storage();
         const bucket = storage.bucket();
 
         const file = bucket.file(filePath);

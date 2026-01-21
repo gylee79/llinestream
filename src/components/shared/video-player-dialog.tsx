@@ -272,7 +272,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         setVttSrc(null);
 
         const videoUrlPromise = episode.filePath ? getSignedUrl(episode.filePath) : Promise.resolve({ error: '비디오 파일 경로를 찾을 수 없습니다.' });
-        const vttContentPromise = episode.vttPath ? getVttContent(episode.vttPath) : Promise.resolve({});
+        const vttContentPromise = episode.vttPath ? getVttContent(episode.vttPath) : Promise.resolve({ content: undefined, error: 'No VTT path provided' });
 
         try {
             const [videoResult, vttResult] = await Promise.all([videoUrlPromise, vttContentPromise]);
@@ -364,7 +364,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             )}
           </div>
           {videoSrc && !isLoadingSrc && !srcError && (
-            <video ref={videoRef} key={videoSrc} {...videoProps}>
+            <video ref={videoRef} key={videoKey} {...videoProps}>
               <source src={videoSrc} type="video/mp4" />
               {vttSrc && (
                 <track src={vttSrc} kind="subtitles" srcLang="ko" label="한국어" />
@@ -414,7 +414,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader className="p-4 border-b flex-shrink-0 bg-background z-10 hidden md:flex flex-row justify-between items-center">
-            <DialogTitle className="text-lg font-bold truncate pr-4">{episode.title}</DialogTitle>
+            <h2 className="text-lg font-bold truncate pr-4">{episode.title}</h2>
             <DialogDescription className="sr-only">
               {instructor?.name} 강사의 {episode.title} 비디오 플레이어.
             </DialogDescription>

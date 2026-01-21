@@ -1,13 +1,14 @@
 'use server';
 import { initializeAdminApp } from '@/lib/firebase-admin';
+import * as admin from 'firebase-admin';
 
 export async function getSignedUrl(filePath: string): Promise<{ signedURL: string } | { error: string }> {
     if (!filePath) {
         return { error: '파일 경로가 필요합니다.' };
     }
     try {
-        const adminApp = initializeAdminApp();
-        const storage = adminApp.storage();
+        initializeAdminApp();
+        const storage = admin.storage();
         const bucket = storage.bucket();
 
         // Create a signed URL that expires in 1 hour.
