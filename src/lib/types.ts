@@ -222,4 +222,9 @@ export interface EpisodeAiChunk {
   createdAt: Timestamp;
 }
 
+export type AiSearchScope = 'episode' | 'course' | 'classification' | 'field';
+
+export interface AITutorSettings {
+  defaultSearchScope: AiSearchScope;
+}
     
