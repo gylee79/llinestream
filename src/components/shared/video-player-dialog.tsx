@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -306,7 +305,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, episode.id, episode.filePath, episode.vttPath]);
   
-  const videoProps: React.VideoHTMLAttributes<HTMLVideoElement> = {
+  const videoProps: Omit<React.VideoHTMLAttributes<HTMLVideoElement>, 'key'> = {
     id: `video-${videoKey}`,
     crossOrigin: "anonymous",
     controls: true,
