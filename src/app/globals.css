@@ -73,6 +73,12 @@ body {
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline;
   }
+  
+  video::cue {
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  }
 }
 
 @layer components {

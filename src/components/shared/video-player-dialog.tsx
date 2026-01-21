@@ -14,12 +14,13 @@ import { Button } from '../ui/button';
 import { useUser } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
-import { Send, Sparkles, Bot, User as UserIcon, X, Loader } from 'lucide-react';
+import { Send, Bot, User as UserIcon, X, Loader, FileText } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { getSignedUrl } from '@/lib/actions/get-signed-url';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface VideoPlayerDialogProps {
   isOpen: boolean;
@@ -151,6 +152,24 @@ const ChatView = ({ episode, user }: { episode: Episode, user: any }) => {
     );
 };
 
+const SummaryView = ({ episode }: { episode: Episode }) => {
+    return (
+        <ScrollArea className="flex-grow bg-muted rounded-md p-4 h-full">
+            {episode.aiGeneratedContent ? (
+                <p className="text-sm whitespace-pre-wrap">{episode.aiGeneratedContent}</p>
+            ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                    <FileText className="h-12 w-12 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground mt-2">
+                        {episode.aiProcessingStatus === 'completed' 
+                            ? '요약 내용이 없습니다.' 
+                            : 'AI 분석이 완료되면 강의 요약이 여기에 표시됩니다.'}
+                    </p>
+                </div>
+            )}
+        </ScrollArea>
+    )
+}
 
 export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
   const { user } = useUser();
@@ -244,12 +263,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         }
     }
     
-    return () => {
-        // Cleanup function handles logging when dialog is unmounted while open
-        if (isOpen) {
-            handleClose();
-        }
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, episode.id, episode.filePath, episode.vttPath]);
   
   return (
@@ -315,12 +329,18 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             </div>
             
             <div className="flex-grow flex flex-col md:col-span-1 border-l min-h-0 md:h-full">
-                <div className="flex items-center justify-between p-2 border-b flex-shrink-0">
-                    <h4 className="font-semibold truncate text-base pr-2">AI 튜터</h4>
-                </div>
-                <div className="flex-grow p-4 pt-2 flex flex-col gap-4 min-h-0">
-                    {user && <ChatView episode={episode} user={user} />}
-                </div>
+                <Tabs defaultValue="tutor" className="flex-grow flex flex-col min-h-0">
+                    <TabsList className="grid w-full grid-cols-2 flex-shrink-0 rounded-none border-b">
+                        <TabsTrigger value="tutor">AI 튜터</TabsTrigger>
+                        <TabsTrigger value="summary">강의 요약</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="tutor" className="flex-grow p-4 pt-2 flex flex-col gap-4 min-h-0 mt-0">
+                        {user ? <ChatView episode={episode} user={user} /> : <p className="text-center text-muted-foreground p-8">AI 튜터 기능은 로그인 후 사용 가능합니다.</p>}
+                    </TabsContent>
+                    <TabsContent value="summary" className="flex-grow min-h-0 mt-0">
+                        <SummaryView episode={episode} />
+                    </TabsContent>
+                </Tabs>
             </div>
         </div>
       </DialogContent>
