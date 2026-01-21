@@ -185,7 +185,7 @@ const AnalysisView = ({ episode }: { episode: Episode }) => {
                                         <AccordionTrigger className="text-sm hover:no-underline">
                                             <div className="flex items-center gap-2">
                                                 <span>{item.startTime.split('.')[0]}</span>
-                                                <span className="truncate">{item.description}</span>
+                                                <span className="truncate">{item.subtitle}</span>
                                             </div>
                                         </AccordionTrigger>
                                         <AccordionContent className="text-xs text-muted-foreground px-4">
@@ -306,9 +306,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, episode.id, episode.filePath, episode.vttPath]);
   
-  const videoProps: React.VideoHTMLAttributes<HTMLVideoElement> & { allowFullScreen?: boolean } = {
+  const videoProps: React.VideoHTMLAttributes<HTMLVideoElement> = {
     id: `video-${videoKey}`,
-    key: videoSrc,
     crossOrigin: "anonymous",
     controls: true,
     controlsList: "nodownload",
@@ -317,7 +316,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     playsInline: true,
     className: "w-full h-full object-contain z-10 relative",
     poster: episode.thumbnailUrl,
-    allowFullScreen: true,
   };
   
   return (
@@ -359,7 +357,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     </div>
                     
                     {videoSrc && !isLoadingSrc && !srcError && (
-                        <video {...videoProps}>
+                        <video key={videoSrc} {...videoProps}>
                             <source src={videoSrc} type="video/mp4" />
                             {vttSrc && (
                                 <track 
@@ -396,5 +394,3 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
-
-    
