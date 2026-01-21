@@ -19,7 +19,7 @@ import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import type { Course, Classification, Episode } from '@/lib/types';
 
-export const AiSearchScopeSchema = z.enum(['episode', 'course', 'classification', 'field']);
+const AiSearchScopeSchema = z.enum(['episode', 'course', 'classification', 'field']);
 export type AiSearchScope = z.infer<typeof AiSearchScopeSchema>;
 
 const VideoTutorInputSchema = z.object({
