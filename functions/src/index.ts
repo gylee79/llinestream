@@ -1,6 +1,6 @@
 /**
  * @fileoverview Video Analysis with Gemini using Firebase Cloud Functions v1.
- * Model: gemini-3-flash-preview
+ * Model: gemini-1.5-flash-latest
  */
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
@@ -85,7 +85,7 @@ export const analyzeVideoOnWrite = functions.runWith({
       return null;
     }
 
-    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-3-flash-preview).`);
+    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-1.5-flash-latest).`);
     
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
@@ -112,10 +112,10 @@ export const analyzeVideoOnWrite = functions.runWith({
 
       if (state === FileState.FAILED) throw new Error("Google AI processing failed.");
 
-      console.log(`[${episodeId}] Calling Gemini 3 Flash Preview...`);
+      console.log(`[${episodeId}] Calling Gemini model...`);
       
       const model = localGenAI.getGenerativeModel({ 
-        model: "gemini-3-flash-preview", 
+        model: "gemini-1.5-flash-latest", 
         generationConfig: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -257,5 +257,3 @@ interface EpisodeData {
   vttPath?: string;
   [key: string]: any;
 }
-
-    
