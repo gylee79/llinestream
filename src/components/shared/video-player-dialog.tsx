@@ -13,13 +13,15 @@ import { Button } from '../ui/button';
 import { useUser } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
-import { Send, Bot, User as UserIcon, X, Loader, FileText } from 'lucide-react';
+import { Send, Bot, User as UserIcon, X, Loader, FileText, ChevronDown, Clock, Tag } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { getSignedUrl } from '@/lib/actions/get-signed-url';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
+import { Badge } from '../ui/badge';
 
 interface VideoPlayerDialogProps {
   isOpen: boolean;
@@ -151,24 +153,71 @@ const ChatView = ({ episode, user }: { episode: Episode, user: any }) => {
     );
 };
 
-const SummaryView = ({ episode }: { episode: Episode }) => {
-    return (
-        <ScrollArea className="flex-grow bg-muted rounded-md p-4 h-full">
-            {episode.aiGeneratedContent ? (
-                <p className="text-sm whitespace-pre-wrap">{episode.aiGeneratedContent}</p>
-            ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center">
-                    <FileText className="h-12 w-12 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground mt-2">
-                        {episode.aiProcessingStatus === 'completed' 
-                            ? '요약 내용이 없습니다.' 
-                            : 'AI 분석이 완료되면 강의 요약이 여기에 표시됩니다.'}
-                    </p>
+const AnalysisView = ({ episode }: { episode: Episode }) => {
+    if (!episode.aiGeneratedContent) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                <FileText className="h-12 w-12 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mt-2">
+                    {episode.aiProcessingStatus === 'completed'
+                        ? '분석된 내용이 없습니다.'
+                        : 'AI 분석이 완료되면 강의 분석 내용이 여기에 표시됩니다.'}
+                </p>
+            </div>
+        );
+    }
+    
+    try {
+        const data = JSON.parse(episode.aiGeneratedContent);
+        return (
+            <ScrollArea className="h-full">
+                <div className="p-4 space-y-4">
+                    <div className="space-y-1">
+                        <h4 className="font-semibold">강의 요약</h4>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{data.summary || '요약이 없습니다.'}</p>
+                    </div>
+                     {data.keywords && data.keywords.length > 0 && (
+                        <div className="space-y-2">
+                            <h4 className="font-semibold flex items-center gap-2"><Tag className="w-4 h-4"/>키워드</h4>
+                            <div className="flex flex-wrap gap-2">
+                                {data.keywords.map((kw: string, i: number) => <Badge key={i} variant="secondary">{kw}</Badge>)}
+                            </div>
+                        </div>
+                    )}
+                    {data.timeline && data.timeline.length > 0 && (
+                        <div className="space-y-2">
+                             <h4 className="font-semibold flex items-center gap-2"><Clock className="w-4 h-4" />타임라인</h4>
+                            <Accordion type="single" collapsible className="w-full">
+                                {data.timeline.map((item: any, i: number) => (
+                                    <AccordionItem value={`item-${i}`} key={i}>
+                                        <AccordionTrigger className="text-sm hover:no-underline">
+                                            <div className="flex items-center gap-2">
+                                                <span>{item.startTime}</span>
+                                                <span className="truncate">{item.subtitle}</span>
+                                            </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="text-xs text-muted-foreground px-4">
+                                            {item.description}
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                ))}
+                            </Accordion>
+                        </div>
+                    )}
                 </div>
-            )}
-        </ScrollArea>
-    )
-}
+            </ScrollArea>
+        )
+    } catch(e) {
+        // Fallback for old plain-text content
+        return (
+            <ScrollArea className="h-full">
+                <div className="p-4">
+                     <p className="text-sm whitespace-pre-wrap">{episode.aiGeneratedContent}</p>
+                </div>
+            </ScrollArea>
+        )
+    }
+};
 
 export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
   const { user } = useUser();
@@ -315,6 +364,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                             playsInline
                             className="w-full h-full object-contain z-10 relative"
                             poster={episode.thumbnailUrl}
+                            allowFullScreen
                         >
                             <source src={videoSrc} type="video/mp4" />
                             {vttSrc && (
@@ -336,13 +386,13 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 <Tabs defaultValue="tutor" className="flex-grow flex flex-col min-h-0">
                     <TabsList className="grid w-full grid-cols-2 flex-shrink-0 rounded-none border-b">
                         <TabsTrigger value="tutor">AI 튜터</TabsTrigger>
-                        <TabsTrigger value="summary">강의 요약</TabsTrigger>
+                        <TabsTrigger value="summary">강의 분석</TabsTrigger>
                     </TabsList>
                     <TabsContent value="tutor" className="flex-grow p-4 pt-2 flex flex-col gap-4 min-h-0 mt-0">
                         {user ? <ChatView episode={episode} user={user} /> : <p className="text-center text-muted-foreground p-8">AI 튜터 기능은 로그인 후 사용 가능합니다.</p>}
                     </TabsContent>
                     <TabsContent value="summary" className="flex-grow min-h-0 mt-0">
-                        <SummaryView episode={episode} />
+                        <AnalysisView episode={episode} />
                     </TabsContent>
                 </Tabs>
             </div>
@@ -352,3 +402,5 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
+
+    

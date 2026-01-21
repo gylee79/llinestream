@@ -121,24 +121,25 @@ export const analyzeVideoOnWrite = functions.runWith({
           responseSchema: {
             type: SchemaType.OBJECT,
             properties: {
-              transcript: { type: SchemaType.STRING, description: "영상의 전체 내용을 한국어로 번역한 대본" },
-              summary: { type: SchemaType.STRING, description: "영상 내용에 대한 상세한 한국어 요약문" },
+              transcript: { type: SchemaType.STRING, description: "영상의 전체 내용을 한국어로 번역한 대본입니다. 영상이 영어라도 반드시 한국어로 번역해주세요." },
+              summary: { type: SchemaType.STRING, description: "영상 전체 내용에 대한 상세하고 구조화된 한국어 요약문입니다." },
               timeline: {
                 type: SchemaType.ARRAY,
+                description: "시간대별 주요 이벤트 및 화면에 대한 상세 설명입니다.",
                 items: {
                   type: SchemaType.OBJECT,
                   properties: {
-                    startTime: { type: SchemaType.STRING, description: "자막의 시작 시간, 반드시 HH:MM:SS.mmm 형식이어야 합니다." },
-                    endTime: { type: SchemaType.STRING, description: "자막의 종료 시간, 반드시 HH:MM:SS.mmm 형식이어야 합니다." },
-                    subtitle: { type: SchemaType.STRING, description: "한국어로 번역된 자막" }
+                    startTime: { type: SchemaType.STRING, description: "이벤트 시작 시간. 반드시 HH:MM:SS.mmm 형식이어야 합니다." },
+                    endTime: { type: SchemaType.STRING, description: "이벤트 종료 시간. 반드시 HH:MM:SS.mmm 형식이어야 합니다." },
+                    subtitle: { type: SchemaType.STRING, description: "해당 시간대의 핵심 대사 또는 자막입니다. (한국어)" },
+                    description: { type: SchemaType.STRING, description: "해당 시간대에 화면에 나타나는 시각적 요소(인물, 사물, 텍스트, 슬라이드 내용 등)와 상황에 대한 상세한 설명입니다. (한국어)" }
                   },
-                  required: ["startTime", "endTime", "subtitle"]
+                  required: ["startTime", "endTime", "subtitle", "description"]
                 }
               },
-              visualCues: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-              keywords: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
+              keywords: { type: SchemaType.ARRAY, description: "영상 콘텐츠의 핵심 키워드 목록입니다. (한국어)", items: { type: SchemaType.STRING } }
             },
-            required: ["transcript", "summary", "timeline", "visualCues", "keywords"]
+            required: ["transcript", "summary", "timeline", "keywords"]
           }
         }
       }); 
@@ -172,7 +173,7 @@ export const analyzeVideoOnWrite = functions.runWith({
         console.log(`[${episodeId}] VTT subtitle file created.`);
       }
 
-      const combinedContent = `요약: ${output.summary}\n키워드: ${output.keywords?.join(', ') || ''}`.trim();
+      const analysisJsonString = JSON.stringify(output);
 
       const courseDoc = await db.collection('courses').doc(afterData.courseId).get();
       if (!courseDoc.exists) throw new Error(`Course not found for episode ${episodeId}`);
@@ -185,7 +186,7 @@ export const analyzeVideoOnWrite = functions.runWith({
           courseId: afterData.courseId,
           classificationId: courseDoc.data()!.classificationId,
           fieldId,
-          content: combinedContent,
+          content: analysisJsonString, // Store full analysis as JSON string
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
@@ -194,7 +195,7 @@ export const analyzeVideoOnWrite = functions.runWith({
       batch.update(docRef, {
         aiProcessingStatus: "completed",
         transcript: output.transcript || "",
-        aiGeneratedContent: combinedContent,
+        aiGeneratedContent: analysisJsonString, // Store full analysis as JSON string
         vttPath: vttPath,
         aiProcessingError: null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -256,3 +257,5 @@ interface EpisodeData {
   vttPath?: string;
   [key: string]: any;
 }
+
+    

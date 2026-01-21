@@ -100,12 +100,24 @@ const videoTutorFlow = ai.defineFlow(
         const querySnapshot = await query.get();
         console.log(`[Tutor-Flow] Scope: ${scope}. Found ${querySnapshot.size} chunks.`);
         if (!querySnapshot.empty) {
-            context = querySnapshot.docs
-                .map(doc => {
-                    const chunkData = doc.data();
-                    return `--- Video Content from Episode ID: ${chunkData.episodeId} ---\n${chunkData.content}`;
-                })
-                .join('\n\n');
+            const chunks = querySnapshot.docs.map(doc => {
+                const chunkData = doc.data();
+                try {
+                    // The content is a JSON string, so we parse it to use as a structured object.
+                    return {
+                        episodeId: chunkData.episodeId,
+                        analysis: JSON.parse(chunkData.content)
+                    };
+                } catch (e) {
+                    // Fallback for old plain-text data or if parsing fails
+                    return {
+                        episodeId: chunkData.episodeId,
+                        analysis: { summary: chunkData.content }
+                    };
+                }
+            });
+            // Pass the array of structured objects as a JSON string to the model.
+            context = JSON.stringify(chunks, null, 2);
         }
       }
 
@@ -118,8 +130,9 @@ const videoTutorFlow = ai.defineFlow(
       // 3. Generate the answer using Gemini with the constructed context
       const llmResponse = await ai.generate({
         model: googleAI.model('gemini-1.5-flash-latest'),
-        system: `You are a friendly and helpful Korean tutor. You MUST answer all questions in Korean.
-        Based ONLY on the following context, which is composed of ${scopeDescriptionForPrompt}, answer the user's question.
+        system: `You are a friendly and helpful Korean AI Tutor. You MUST answer all questions in Korean.
+        You will be given a JSON object or an array of JSON objects as context. Each object represents the detailed analysis of a video, including a transcript, summary, timeline, and keywords.
+        Based ONLY on the provided JSON context, answer the user's question. Analyze the structured data, especially the 'timeline' for time-specific events and descriptions.
         If the context doesn't contain the answer, you MUST state that the information is not in the provided videos and you cannot answer in Korean. Do not use outside knowledge.
 
         Context:
@@ -164,3 +177,5 @@ const videoTutorFlow = ai.defineFlow(
     }
   }
 );
+
+    
