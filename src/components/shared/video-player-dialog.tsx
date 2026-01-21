@@ -277,7 +277,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     
     return () => {
         // Cleanup function handles logging when dialog is unmounted while open
-        if (isOpen && user && startTimeRef.current) {
+        if (isOpen) {
             handleClose();
         }
     };
