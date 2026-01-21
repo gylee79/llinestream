@@ -176,14 +176,6 @@ const AnalysisView = ({ episode }: { episode: Episode }) => {
                         <h4 className="font-semibold">강의 요약</h4>
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap">{data.summary || '요약이 없습니다.'}</p>
                     </div>
-                     {data.keywords && data.keywords.length > 0 && (
-                        <div className="space-y-2">
-                            <h4 className="font-semibold flex items-center gap-2"><Tag className="w-4 h-4"/>키워드</h4>
-                            <div className="flex flex-wrap gap-2">
-                                {data.keywords.map((kw: string, i: number) => <Badge key={i} variant="secondary">{kw}</Badge>)}
-                            </div>
-                        </div>
-                    )}
                     {data.timeline && data.timeline.length > 0 && (
                         <div className="space-y-2">
                              <h4 className="font-semibold flex items-center gap-2"><Clock className="w-4 h-4" />타임라인</h4>
@@ -192,7 +184,7 @@ const AnalysisView = ({ episode }: { episode: Episode }) => {
                                     <AccordionItem value={`item-${i}`} key={i}>
                                         <AccordionTrigger className="text-sm hover:no-underline">
                                             <div className="flex items-center gap-2">
-                                                <span>{item.startTime}</span>
+                                                <span>{item.startTime.split('.')[0]}</span>
                                                 <span className="truncate">{item.subtitle}</span>
                                             </div>
                                         </AccordionTrigger>
