@@ -9,10 +9,8 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import Image from 'next/image';
-import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { X } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 interface CourseImagesDialogProps {
   isOpen: boolean;
@@ -22,8 +20,6 @@ interface CourseImagesDialogProps {
 }
 
 export default function CourseImagesDialog({ isOpen, onOpenChange, images, courseName }: CourseImagesDialogProps) {
-  const isMobile = useIsMobile();
-
   if (!images || images.length === 0) {
     return null;
   }
@@ -61,22 +57,9 @@ export default function CourseImagesDialog({ isOpen, onOpenChange, images, cours
         </DialogHeader>
         
         <div className="flex-grow min-h-0 w-full h-full">
-          {isMobile ? (
-            <TransformWrapper initialScale={1} minScale={1} maxScale={4}>
-              <TransformComponent
-                wrapperStyle={{ width: '100%', height: '100%' }}
-                contentStyle={{ width: '100%', height: 'auto' }}
-              >
-                <ScrollArea className="w-full h-full">
-                  {imageContent}
-                </ScrollArea>
-              </TransformComponent>
-            </TransformWrapper>
-          ) : (
             <ScrollArea className="w-full h-full">
               {imageContent}
             </ScrollArea>
-          )}
         </div>
       </DialogContent>
     </Dialog>
