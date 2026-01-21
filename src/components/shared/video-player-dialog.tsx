@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -351,9 +350,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
       <div className="w-full aspect-video bg-black md:col-span-2 md:h-full flex flex-col">
         <div className="w-full flex-grow relative">
           <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/50 to-transparent pointer-events-none md:hidden">
-            <DialogTitle className="text-white text-lg font-bold truncate pr-8">
+            <h2 className="text-white text-lg font-bold truncate pr-8">
               {episode.title}
-            </DialogTitle>
+            </h2>
           </div>
           <div className="absolute inset-0 flex items-center justify-center">
             {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
