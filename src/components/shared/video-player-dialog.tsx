@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -22,6 +23,7 @@ import { getSignedUrl } from '@/lib/actions/get-signed-url';
 import { getVttContent } from '@/lib/actions/get-vtt-content';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface VideoPlayerDialogProps {
   isOpen: boolean;
@@ -213,6 +215,7 @@ const AnalysisView = ({ episode }: { episode: Episode }) => {
 
 export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
   const { user } = useUser();
+  const isMobile = useIsMobile();
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [vttSrc, setVttSrc] = useState<string | null>(null);
   const [isLoadingSrc, setIsLoadingSrc] = useState(true);
@@ -343,6 +346,67 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     poster: episode.thumbnailUrl,
   };
   
+  const playerContent = (
+    <>
+      <div className="w-full aspect-video bg-black md:col-span-2 md:h-full flex flex-col">
+        <div className="w-full flex-grow relative">
+          <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/50 to-transparent pointer-events-none md:hidden">
+            <DialogTitle className="text-white text-lg font-bold truncate pr-8">
+              {episode.title}
+            </DialogTitle>
+          </div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
+            {srcError && !isLoadingSrc && (
+              <div className="text-white bg-red-900/80 p-4 rounded-lg text-center">
+                <p className="font-semibold">비디오를 불러올 수 없습니다</p>
+                <p className="text-sm mt-1">{srcError}</p>
+              </div>
+            )}
+          </div>
+          {videoSrc && !isLoadingSrc && !srcError && (
+            <video ref={videoRef} key={videoSrc} {...videoProps}>
+              <source src={videoSrc} type="video/mp4" />
+              {vttSrc && (
+                <track src={vttSrc} kind="subtitles" srcLang="ko" label="한국어" />
+              )}
+              브라우저가 비디오 태그를 지원하지 않습니다.
+            </video>
+          )}
+        </div>
+      </div>
+      <div className="flex-grow flex flex-col md:col-span-1 border-l min-h-0 md:h-full">
+        <Tabs defaultValue="tutor" className="flex-grow flex flex-col min-h-0">
+          <TabsList className="grid w-full grid-cols-2 flex-shrink-0 rounded-none border-b">
+            <TabsTrigger value="tutor">AI 튜터</TabsTrigger>
+            <TabsTrigger value="summary">강의 분석</TabsTrigger>
+          </TabsList>
+          <TabsContent value="tutor" className="flex-grow p-4 pt-2 flex flex-col gap-4 min-h-0 mt-0">
+            {user ? <ChatView episode={episode} user={user} /> : <p className="text-center text-muted-foreground p-8">AI 튜터 기능은 로그인 후 사용 가능합니다.</p>}
+          </TabsContent>
+          <TabsContent value="summary" className="flex-grow min-h-0 mt-0">
+            <AnalysisView episode={episode} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    if (!isOpen) return null;
+    return (
+      <div className="fixed inset-0 bg-black z-[100] flex flex-col">
+        <div className="flex-grow flex flex-col min-h-0">
+          {playerContent}
+        </div>
+        <button onClick={handleClose} className="absolute top-2 right-2 z-50 p-2 rounded-full bg-black/50 text-white">
+          <X className="h-6 w-6" />
+          <span className="sr-only">Close</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <DialogContent 
@@ -362,57 +426,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         </DialogHeader>
 
         <div className="flex-grow flex flex-col md:grid md:grid-cols-3 min-h-0">
-            
-            <div className="w-full aspect-video bg-black md:col-span-2 md:h-full flex flex-col">
-                <div className="w-full flex-grow relative">
-                    <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/50 to-transparent pointer-events-none md:hidden">
-                        <DialogTitle className="text-white text-lg font-bold truncate pr-8">
-                            {episode.title}
-                        </DialogTitle>
-                    </div>
-
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
-                        {srcError && !isLoadingSrc && (
-                            <div className="text-white bg-red-900/80 p-4 rounded-lg text-center">
-                                <p className="font-semibold">비디오를 불러올 수 없습니다</p>
-                                <p className="text-sm mt-1">{srcError}</p>
-                            </div>
-                        )}
-                    </div>
-                    
-                    {videoSrc && !isLoadingSrc && !srcError && (
-                        <video ref={videoRef} key={videoSrc} {...videoProps}>
-                            <source src={videoSrc} type="video/mp4" />
-                            {vttSrc && (
-                                <track
-                                    src={vttSrc} 
-                                    kind="subtitles" 
-                                    srcLang="ko" 
-                                    label="한국어" 
-                                />
-                            )}
-                            브라우저가 비디오 태그를 지원하지 않습니다.
-                        </video>
-                    )}
-                </div>
-            </div> 
-            
-            <div className="flex-grow flex flex-col md:col-span-1 border-l min-h-0 md:h-full">
-                <Tabs defaultValue="tutor" className="flex-grow flex flex-col min-h-0">
-                    <TabsList className="grid w-full grid-cols-2 flex-shrink-0 rounded-none border-b">
-                        <TabsTrigger value="tutor">AI 튜터</TabsTrigger>
-                        <TabsTrigger value="summary">강의 분석</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="tutor" className="flex-grow p-4 pt-2 flex flex-col gap-4 min-h-0 mt-0">
-                        {user ? <ChatView episode={episode} user={user} /> : <p className="text-center text-muted-foreground p-8">AI 튜터 기능은 로그인 후 사용 가능합니다.</p>}
-                    </TabsContent>
-                    <TabsContent value="summary" className="flex-grow min-h-0 mt-0">
-                        <AnalysisView episode={episode} />
-                    </TabsContent>
-                </Tabs>
-            </div>
-
+            {playerContent}
         </div> 
       </DialogContent>
     </Dialog>
