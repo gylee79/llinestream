@@ -184,7 +184,7 @@ const AnalysisView = ({ episode }: { episode: Episode }) => {
                                         <AccordionTrigger className="text-sm hover:no-underline">
                                             <div className="flex items-center gap-2">
                                                 <span>{item.startTime.split('.')[0]}</span>
-                                                <span className="truncate">{item.subtitle}</span>
+                                                <span className="truncate">{item.description}</span>
                                             </div>
                                         </AccordionTrigger>
                                         <AccordionContent className="text-xs text-muted-foreground px-4">
@@ -305,12 +305,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, episode.id, episode.filePath, episode.vttPath]);
   
-  const videoProps: Omit<React.VideoHTMLAttributes<HTMLVideoElement>, 'key'> = {
+  const videoProps = {
     id: `video-${videoKey}`,
-    crossOrigin: "anonymous",
+    crossOrigin: "anonymous" as const,
     controls: true,
     controlsList: "nodownload",
-    onContextMenu: (e) => e.preventDefault(),
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
     autoPlay: true,
     playsInline: true,
     className: "w-full h-full object-contain z-10 relative",
