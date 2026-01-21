@@ -1,6 +1,6 @@
 /**
  * @fileoverview Video Analysis with Gemini using Firebase Cloud Functions v2.
- * Model: gemini-2.5-flash
+ * Model: gemini-1.5-flash-latest
  */
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
@@ -89,7 +89,7 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
       return;
     }
 
-    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-flash).`);
+    console.log(`🚀 [${episodeId}] Processing started (Target: gemini-1.5-flash-latest).`);
     
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
@@ -119,7 +119,7 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
       console.log(`[${episodeId}] Calling Gemini model...`);
       
       const model = localGenAI.getGenerativeModel({ 
-        model: "gemini-2.5-flash", 
+        model: "gemini-1.5-flash-latest", 
         generationConfig: {
           responseMimeType: "application/json",
           responseSchema: {
