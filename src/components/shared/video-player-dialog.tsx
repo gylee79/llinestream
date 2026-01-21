@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -303,6 +302,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <video
                             id={`video-${videoKey}`}
                             key={videoSrc}
+                            crossOrigin="anonymous"
                             controls
                             controlsList="nodownload"
                             onContextMenu={(e) => e.preventDefault()}
@@ -311,7 +311,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                             allowFullScreen
                             className="w-full h-full object-contain z-10 relative"
                             poster={episode.thumbnailUrl}
-                            crossOrigin="anonymous"
                         >
                             <source src={videoSrc} type="video/mp4" />
                             {vttSrc && (
