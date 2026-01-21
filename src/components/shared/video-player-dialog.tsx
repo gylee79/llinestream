@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -298,7 +297,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                                 <p className="text-sm mt-1">{srcError}</p>
                             </div>
                         )}
-                    </div>
                     
                     {videoSrc && !isLoadingSrc && !srcError && (
                         <video
@@ -308,6 +306,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                             controlsList="nodownload"
                             onContextMenu={(e) => e.preventDefault()}
                             autoPlay
+                            playsInline
+                            allowFullScreen
                             className="w-full h-full object-contain z-10 relative"
                             poster={episode.thumbnailUrl}
                             crossOrigin="anonymous"
