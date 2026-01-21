@@ -267,7 +267,11 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <DialogContent className="w-full h-full p-0 flex flex-col top-0 translate-y-0 rounded-none md:max-w-7xl md:h-[90vh] md:rounded-lg md:top-1/2 md:-translate-y-1/2">
+      <DialogContent 
+        className="w-full h-full p-0 flex flex-col top-0 translate-y-0 rounded-none md:max-w-7xl md:h-[90vh] md:rounded-lg md:top-1/2 md:-translate-y-1/2"
+        onInteractOutside={(e) => e.preventDefault()}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader className="p-4 border-b flex-shrink-0 bg-background z-10 hidden md:flex flex-row justify-between items-center">
             <DialogTitle className="text-lg font-bold truncate pr-4">{episode.title}</DialogTitle>
             <DialogDescription className="sr-only">
@@ -297,6 +301,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                                 <p className="text-sm mt-1">{srcError}</p>
                             </div>
                         )}
+                    </div>
                     
                     {videoSrc && !isLoadingSrc && !srcError && (
                         <video
@@ -308,7 +313,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                             onContextMenu={(e) => e.preventDefault()}
                             autoPlay
                             playsInline
-                            allowFullScreen
                             className="w-full h-full object-contain z-10 relative"
                             poster={episode.thumbnailUrl}
                         >
@@ -325,9 +329,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                             브라우저가 비디오 태그를 지원하지 않습니다.
                         </video>
                     )}
-                    </div>
                 </div>
-            </div>
+            </div> 
             
             <div className="flex-grow flex flex-col md:col-span-1 border-l min-h-0 md:h-full">
                 <Tabs defaultValue="tutor" className="flex-grow flex flex-col min-h-0">
@@ -343,7 +346,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     </TabsContent>
                 </Tabs>
             </div>
-        </div>
+
+        </div> 
       </DialogContent>
     </Dialog>
   );
