@@ -19,6 +19,7 @@ import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { getSignedUrl } from '@/lib/actions/get-signed-url';
+import { getVttContent } from '@/lib/actions/get-vtt-content';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 
@@ -183,7 +184,7 @@ const AnalysisView = ({ episode }: { episode: Episode }) => {
                                     <AccordionItem value={`item-${i}`} key={i}>
                                         <AccordionTrigger className="text-sm hover:no-underline">
                                             <div className="flex items-center gap-2">
-                                                <span>{item.startTime.split('.')[0]}</span>
+                                                <span>{item.startTime}</span>
                                                 <span className="truncate">{item.subtitle}</span>
                                             </div>
                                         </AccordionTrigger>
@@ -228,6 +229,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         videoElement.load();
     }
     
+    if (vttSrc && vttSrc.startsWith('blob:')) {
+      URL.revokeObjectURL(vttSrc);
+    }
+    
     if (user && startTimeRef.current) {
         const endTime = new Date();
         const durationWatched = (endTime.getTime() - startTimeRef.current.getTime()) / 1000;
@@ -256,69 +261,70 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   }
   
   useEffect(() => {
-    if (isOpen) {
-        startTimeRef.current = new Date();
-
+    let localVttSrc: string | null = null;
+    
+    const fetchSources = async () => {
         setIsLoadingSrc(true);
         setSrcError(null);
         setVideoSrc(null);
         setVttSrc(null);
 
-        if (episode.filePath) {
-            getSignedUrl(episode.filePath)
-                .then(result => {
-                    if ('signedURL' in result) {
-                        setVideoSrc(result.signedURL);
-                    } else {
-                        setSrcError(result.error);
-                    }
-                })
-                .catch(err => {
-                    console.error("Failed to get video signed URL:", err);
-                    setSrcError('비디오 주소를 가져오는 데 실패했습니다.');
-                })
-                .finally(() => {
-                    if (!episode.vttPath) {
-                        setIsLoadingSrc(false);
-                    }
-                });
-        } else {
-             setSrcError('비디오 파일 경로를 찾을 수 없습니다.');
-             setIsLoadingSrc(false);
+        const videoUrlPromise = episode.filePath ? getSignedUrl(episode.filePath) : Promise.resolve({ error: '비디오 파일 경로를 찾을 수 없습니다.' });
+        const vttContentPromise = episode.vttPath ? getVttContent(episode.vttPath) : Promise.resolve({});
+
+        try {
+            const [videoResult, vttResult] = await Promise.all([videoUrlPromise, vttContentPromise]);
+
+            if ('signedURL' in videoResult) {
+                setVideoSrc(videoResult.signedURL);
+            } else {
+                setSrcError(videoResult.error || '비디오 주소를 가져오는 데 실패했습니다.');
+            }
+
+            if (vttResult.content) {
+                const blob = new Blob([vttResult.content], { type: 'text/vtt' });
+                localVttSrc = URL.createObjectURL(blob);
+                setVttSrc(localVttSrc);
+            } else if (vttResult.error) {
+                console.warn("Could not fetch VTT content:", vttResult.error);
+            }
+        } catch (err) {
+            console.error("Failed to fetch video sources:", err);
+            setSrcError('비디오 또는 자막 소스를 불러오는 데 실패했습니다.');
+        } finally {
+            setIsLoadingSrc(false);
         }
-        
-        if (episode.vttPath) {
-            getSignedUrl(episode.vttPath)
-                .then(result => {
-                    if ('signedURL' in result) {
-                        setVttSrc(result.signedURL);
-                    }
-                })
-                .catch(err => {
-                     console.warn("Failed to get VTT signed URL:", err);
-                })
-                .finally(() => {
-                    setIsLoadingSrc(false);
-                });
-        }
+    };
+
+    if (isOpen) {
+        startTimeRef.current = new Date();
+        fetchSources();
     }
-    
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    return () => {
+      // Cleanup function to revoke the blob URL on unmount or when dependencies change
+      if (localVttSrc) {
+        URL.revokeObjectURL(localVttSrc);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, episode.id, episode.filePath, episode.vttPath]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !vttSrc) return;
 
-    // 비디오 메타데이터가 로드될 때 자막 트랙을 활성화하는 함수
     const setInitialTrackMode = () => {
         if (video.textTracks.length > 0) {
-            // 첫 번째 자막 트랙을 'showing' 모드로 설정
             video.textTracks[0].mode = 'showing';
         }
     };
 
-    video.addEventListener('loadedmetadata', setInitialTrackMode);
+    if (video.readyState >= 1) { // If metadata is already loaded
+        setInitialTrackMode();
+    } else {
+        video.addEventListener('loadedmetadata', setInitialTrackMode);
+    }
 
     return () => {
         video.removeEventListener('loadedmetadata', setInitialTrackMode);
