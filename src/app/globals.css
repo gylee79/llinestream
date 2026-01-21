@@ -75,8 +75,9 @@ body {
   }
   
   video::cue {
-    background-color: rgba(0, 0, 0, 0.7); /* 반투명 검정 배경 */
-    color: #ffffff; /* 흰색 글자 */
+    background-color: rgba(0, 0, 0, 0.7);
+    color: #ffffff;
+    font-size: 1.1rem;
   }
 }
 
