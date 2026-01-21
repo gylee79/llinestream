@@ -15,7 +15,7 @@ import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
 import { Send, Sparkles, Bot, User as UserIcon, X, Loader } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
-import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
+import { askVideoTutor, type AiSearchScope } from '@/ai/flows/video-tutor-flow';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { getSignedUrl } from '@/lib/actions/get-signed-url';
@@ -60,8 +60,16 @@ const ChatView = ({ episode, user }: { episode: Episode, user: any }) => {
     const [isPending, startTransition] = useTransition();
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [userQuestion, setUserQuestion] = useState('');
+    const [scope, setScope] = useState<AiSearchScope>('field');
     const chatScrollAreaRef = useRef<HTMLDivElement>(null);
     const isAIAvailable = episode.aiProcessingStatus === 'completed';
+
+    const scopeOptions: { value: AiSearchScope; label: string }[] = [
+        { value: 'episode', label: '이 영상만' },
+        { value: 'course', label: '현재 강좌' },
+        { value: 'classification', label: '같은 분류' },
+        { value: 'field', label: '같은 분야' },
+    ];
 
     useEffect(() => {
         if (chatScrollAreaRef.current) {
@@ -87,7 +95,8 @@ const ChatView = ({ episode, user }: { episode: Episode, user: any }) => {
                 const result = await askVideoTutor({
                     episodeId: episode.id,
                     question: newQuestion.content,
-                    userId: user.id
+                    userId: user.id,
+                    scope,
                 });
                 const newAnswer: ChatMessage = {
                     id: uuidv4(),
@@ -154,7 +163,22 @@ const ChatView = ({ episode, user }: { episode: Episode, user: any }) => {
                     </div>
                 )}
             </ScrollArea>
-            <div className="flex-shrink-0 flex gap-2 items-center">
+             <div className="flex-shrink-0 flex items-center justify-center gap-2 p-2 border-t">
+                <span className="text-xs font-semibold mr-2 text-muted-foreground">검색 범위:</span>
+                {scopeOptions.map(option => (
+                    <Button
+                        key={option.value}
+                        variant={scope === option.value ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setScope(option.value)}
+                        disabled={isPending}
+                    >
+                        {option.label}
+                    </Button>
+                ))}
+            </div>
+            <div className="flex-shrink-0 flex gap-2 items-center border-t pt-4">
                 <Textarea 
                     placeholder={!isAIAvailable ? "AI 분석이 아직 완료되지 않았습니다." : "AI에게 검색할 내용을 입력하세요..."}
                     className="flex-grow resize-none h-10 min-h-0" 
