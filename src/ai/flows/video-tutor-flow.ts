@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview AI Tutor flow for answering questions about a video episode.
@@ -9,7 +10,6 @@
  * - askVideoTutor - a function that handles the question-answering process.
  * - VideoTutorInput - The input type for the askVideoTutor function.
  * - VideoTutorOutput - The return type for the askVideoTutor function.
- * - AiSearchScope - The type for the search scope.
  */
 
 import { ai } from '@/ai/genkit';
@@ -17,16 +17,12 @@ import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
-import type { Course, Classification, Episode } from '@/lib/types';
-
-const AiSearchScopeSchema = z.enum(['episode', 'course', 'classification', 'field']);
-export type AiSearchScope = z.infer<typeof AiSearchScopeSchema>;
+import type { Course, Classification, Episode, AiSearchScope } from '@/lib/types';
 
 const VideoTutorInputSchema = z.object({
   episodeId: z.string().describe('The ID of the video episode being asked about.'),
   question: z.string().describe("The user's question about the video."),
   userId: z.string().describe('The ID of the user asking the question.'),
-  scope: AiSearchScopeSchema.default('field').describe('The search scope for the AI tutor.'),
 });
 export type VideoTutorInput = z.infer<typeof VideoTutorInputSchema>;
 
@@ -45,13 +41,18 @@ const videoTutorFlow = ai.defineFlow(
     inputSchema: VideoTutorInputSchema,
     outputSchema: VideoTutorOutputSchema,
   },
-  async ({ episodeId, question, userId, scope }) => {
-    console.log(`[Tutor-Flow] Starting for episode ${episodeId} with scope '${scope}' and question: "${question}"`);
+  async ({ episodeId, question, userId }) => {
+    console.log(`[Tutor-Flow] Starting for episode ${episodeId} with question: "${question}"`);
 
     const adminApp = initializeAdminApp();
     const db = admin.firestore(adminApp);
     
     try {
+      // Fetch AI settings to determine the scope
+      const aiSettingsDoc = await db.collection('settings').doc('aiTutor').get();
+      const scope = (aiSettingsDoc.data()?.defaultSearchScope as AiSearchScope) || 'field'; // Default to 'field'
+      console.log(`[Tutor-Flow] Using search scope: ${scope}`);
+
       // 1. Get the full hierarchy for the given episode
       const episodeDoc = await db.collection('episodes').doc(episodeId).get();
       if (!episodeDoc.exists) throw new Error(`Episode with ID ${episodeId} not found.`);

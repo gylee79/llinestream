@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import type { Policy, FooterSettings, HeroImageSettings } from '@/lib/types';
+import type { Policy, FooterSettings, HeroImageSettings, AITutorSettings, AiSearchScope } from '@/lib/types';
 import { useCollection, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2, Download } from "lucide-react";
 import { createFullBackup } from '@/lib/actions/backup-actions';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 function HeroImageManager() {
@@ -458,6 +460,84 @@ function PolicySettingsManager() {
   );
 }
 
+function AITutorSettingsManager() {
+  const firestore = useFirestore();
+  const { toast } = useToast();
+  const settingsRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'aiTutor') : null), [firestore]);
+  const { data: settingsData, isLoading } = useDoc<AITutorSettings>(settingsRef);
+  
+  const [scope, setScope] = useState<AiSearchScope>('field');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (settingsData?.defaultSearchScope) {
+      setScope(settingsData.defaultSearchScope);
+    }
+  }, [settingsData]);
+
+  const handleSave = async () => {
+    if (!firestore) return;
+    setIsSaving(true);
+    try {
+      await setDoc(doc(firestore, 'settings', 'aiTutor'), { defaultSearchScope: scope }, { merge: true });
+      toast({ title: "저장 완료", description: "AI 튜터 기본 검색 범위가 저장되었습니다." });
+    } catch (error) {
+      console.error("AI Tutor settings save error:", error);
+      toast({ variant: "destructive", title: "저장 실패", description: "AI 튜터 설정 저장 중 오류가 발생했습니다."});
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const scopeOptions: { value: AiSearchScope; label: string }[] = [
+    { value: 'episode', label: '이 영상만' },
+    { value: 'course', label: '현재 강좌 (상세분류)' },
+    { value: 'classification', label: '같은 분류 (큰분류)' },
+    { value: 'field', label: '같은 분야 (최상위)' },
+  ];
+
+  if (isLoading) {
+      return (
+        <Card>
+            <CardHeader><CardTitle>AI 튜터 설정</CardTitle></CardHeader>
+            <CardContent><Skeleton className="h-24 w-full" /></CardContent>
+        </Card>
+      )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>AI 튜터 설정</CardTitle>
+        <CardDescription>
+          사용자가 AI에게 질문할 때, 답변의 근거가 될 데이터의 기본 검색 범위를 설정합니다.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+            <Label>기본 검색 범위</Label>
+            <Select value={scope} onValueChange={(value) => setScope(value as AiSearchScope)}>
+              <SelectTrigger className="w-[280px]">
+                <SelectValue placeholder="검색 범위 선택..." />
+              </SelectTrigger>
+              <SelectContent>
+                {scopeOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+                선택한 범위가 넓을수록 더 종합적인 답변이 가능하지만, 질문과 관련성이 떨어질 수 있습니다.
+            </p>
+        </div>
+        <Button onClick={handleSave} disabled={isSaving}>{isSaving ? '저장 중...' : '저장'}</Button>
+      </CardContent>
+    </Card>
+  )
+}
+
 function BackupManager() {
     const { toast } = useToast();
     const [isPending, startTransition] = useTransition();
@@ -519,6 +599,7 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="general">일반</TabsTrigger>
           <TabsTrigger value="footer">푸터</TabsTrigger>
           <TabsTrigger value="policies">약관 및 정책</TabsTrigger>
+          <TabsTrigger value="ai">AI 설정</TabsTrigger>
           <TabsTrigger value="backup">백업</TabsTrigger>
         </TabsList>
         <TabsContent value="general" className="mt-4">
@@ -556,6 +637,9 @@ export default function AdminSettingsPage() {
             <CardHeader><CardTitle>약관 및 정책 수정</CardTitle></CardHeader>
             <PolicySettingsManager />
           </Card>
+        </TabsContent>
+        <TabsContent value="ai" className="mt-4">
+            <AITutorSettingsManager />
         </TabsContent>
         <TabsContent value="backup" className="mt-4">
             <BackupManager />
