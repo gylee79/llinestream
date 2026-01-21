@@ -11,12 +11,12 @@
 웹 브라우저에서 Storage의 파일(자막, 이미지 등)에 접근할 수 있도록 허용하는 정책입니다.
 
 ```bash
-gcloud storage buckets update gs://studio-6929130257-b96ff.appspot.com --cors-file=cors.json
+gcloud storage buckets update gs://studio-6929130257-b96ff.firebasestorage.app --cors-file=cors.json
 ```
 
 ### 명령어 설명
 *   `gcloud storage buckets update`: Google Cloud Storage 버킷의 설정을 업데이트합니다.
-*   `gs://studio-6929130257-b96ff.appspot.com`: 이 프로젝트의 Storage 버킷 주소입니다.
+*   `gs://studio-6929130257-b96ff.firebasestorage.app`: 이 프로젝트의 Storage 버킷 주소입니다.
 *   `--cors-file=cors.json`: 함께 제공된 `cors.json` 파일의 내용을 버킷의 CORS 정책으로 설정합니다.
 
 ---
@@ -26,7 +26,7 @@ gcloud storage buckets update gs://studio-6929130257-b96ff.appspot.com --cors-fi
 이미 업로드된 `.vtt` 자막 파일들이 브라우저에서 자막으로 올바르게 인식되도록 `Content-Type`을 `text/vtt`로 변경합니다.
 
 ```bash
-gsutil -m setmeta -h "Content-Type: text/vtt" "gs://studio-6929130257-b96ff.appspot.com/**/*.vtt"
+gsutil -m setmeta -h "Content-Type: text/vtt" "gs://studio-6929130257-b96ff.firebasestorage.app/**/*.vtt"
 ```
 
 ### 명령어 설명
