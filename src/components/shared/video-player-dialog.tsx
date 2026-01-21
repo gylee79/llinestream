@@ -308,7 +308,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !vttSrc) return;
 
     // 비디오 메타데이터가 로드될 때 자막 트랙을 활성화하는 함수
     const setInitialTrackMode = () => {
@@ -323,7 +323,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     return () => {
         video.removeEventListener('loadedmetadata', setInitialTrackMode);
     };
-}, [vttSrc]); // vttSrc가 변경될 때마다 이 효과를 다시 실행
+  }, [vttSrc]);
   
   const videoProps = {
     id: `video-${videoKey}`,
