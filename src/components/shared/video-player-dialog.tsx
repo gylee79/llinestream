@@ -184,7 +184,7 @@ const AnalysisView = ({ episode }: { episode: Episode }) => {
                                         <AccordionTrigger className="text-sm hover:no-underline">
                                             <div className="flex items-center gap-2">
                                                 <span>{item.startTime.split('.')[0]}</span>
-                                                <span className="truncate">{item.description}</span>
+                                                <span className="truncate">{item.subtitle}</span>
                                             </div>
                                         </AccordionTrigger>
                                         <AccordionContent className="text-xs text-muted-foreground px-4">
@@ -218,6 +218,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const [srcError, setSrcError] = useState<string | null>(null);
   const videoKey = episode.id; 
   const startTimeRef = useRef<Date | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const handleClose = () => {
     const videoElement = document.getElementById(`video-${videoKey}`) as HTMLVideoElement;
@@ -304,6 +305,25 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, episode.id, episode.filePath, episode.vttPath]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // 비디오 메타데이터가 로드될 때 자막 트랙을 활성화하는 함수
+    const setInitialTrackMode = () => {
+        if (video.textTracks.length > 0) {
+            // 첫 번째 자막 트랙을 'showing' 모드로 설정
+            video.textTracks[0].mode = 'showing';
+        }
+    };
+
+    video.addEventListener('loadedmetadata', setInitialTrackMode);
+
+    return () => {
+        video.removeEventListener('loadedmetadata', setInitialTrackMode);
+    };
+}, [vttSrc]); // vttSrc가 변경될 때마다 이 효과를 다시 실행
   
   const videoProps = {
     id: `video-${videoKey}`,
@@ -356,15 +376,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     </div>
                     
                     {videoSrc && !isLoadingSrc && !srcError && (
-                        <video key={videoSrc} {...videoProps}>
+                        <video ref={videoRef} key={videoSrc} {...videoProps}>
                             <source src={videoSrc} type="video/mp4" />
                             {vttSrc && (
-                                <track 
+                                <track
                                     src={vttSrc} 
                                     kind="subtitles" 
                                     srcLang="ko" 
                                     label="한국어" 
-                                    default 
                                 />
                             )}
                             브라우저가 비디오 태그를 지원하지 않습니다.
