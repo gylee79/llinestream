@@ -73,10 +73,10 @@ body {
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline;
   }
-  /* Style for video subtitles to ensure visibility */
   video::cue {
-    background-color: rgba(0, 0, 0, 0.6);
+    background-color: rgba(0, 0, 0, 0.7);
     color: white;
+    font-size: 1rem;
   }
 }
 

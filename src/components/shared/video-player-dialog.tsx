@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import type { Episode, Instructor, ChatMessage, AiSearchScope } from '@/lib/types';
+import type { Episode, Instructor, ChatMessage } from '@/lib/types';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { Button } from '../ui/button';
 import { useUser } from '@/firebase';
@@ -189,6 +189,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const [isLoadingSrc, setIsLoadingSrc] = useState(true);
   const [srcError, setSrcError] = useState<string | null>(null);
   const videoKey = episode.id; 
+  const startTimeRef = useRef<Date | null>(null);
 
   const handleClose = () => {
     const videoElement = document.getElementById(`video-${videoKey}`) as HTMLVideoElement;
@@ -197,18 +198,38 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         videoElement.removeAttribute('src'); 
         videoElement.load();
     }
+    
+    if (user && startTimeRef.current) {
+        const endTime = new Date();
+        const durationWatched = (endTime.getTime() - startTimeRef.current.getTime()) / 1000;
+
+        if (durationWatched > 1) {
+            const payload = {
+                userId: user.id,
+                userName: user.name,
+                userEmail: user.email,
+                episodeId: episode.id,
+                episodeTitle: episode.title,
+                courseId: episode.courseId,
+                startedAt: startTimeRef.current,
+                endedAt: endTime,
+            };
+            logEpisodeView(payload);
+        }
+    }
+    
     onOpenChange(false);
     setVideoSrc(null);
     setVttSrc(null);
     setIsLoadingSrc(true);
     setSrcError(null);
     setActiveView('summary');
+    startTimeRef.current = null;
   }
   
   useEffect(() => {
-    let startTime: Date | null = null;
     if (isOpen) {
-        startTime = new Date();
+        startTimeRef.current = new Date();
 
         setIsLoadingSrc(true);
         setSrcError(null);
@@ -255,26 +276,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     }
     
     return () => {
-        if (user && startTime) {
-            const endTime = new Date();
-            const durationWatched = (endTime.getTime() - startTime.getTime()) / 1000;
-
-            if (durationWatched > 1) {
-                const payload = {
-                    userId: user.id,
-                    userName: user.name,
-                    userEmail: user.email,
-                    episodeId: episode.id,
-                    episodeTitle: episode.title,
-                    courseId: episode.courseId,
-                    startedAt: startTime,
-                    endedAt: endTime,
-                };
-                logEpisodeView(payload);
-            }
+        // Cleanup function handles logging when dialog is unmounted while open
+        if (isOpen && user && startTimeRef.current) {
+            handleClose();
         }
     };
-  }, [isOpen, user, episode.id, episode.title, episode.courseId, episode.filePath, episode.vttPath]);
+  }, [isOpen, episode.id, episode.filePath, episode.vttPath]);
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
