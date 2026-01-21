@@ -35,20 +35,27 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteFilesOnEpisodeDelete = exports.analyzeVideoOnWrite = void 0;
 /**
- * @fileoverview Video Analysis with Gemini using Firebase Cloud Functions v1.
+ * @fileoverview Video Analysis with Gemini using Firebase Cloud Functions v2.
  * Model: gemini-2.5-pro
  */
-const functions = __importStar(require("firebase-functions"));
+const v2_1 = require("firebase-functions/v2");
+const firestore_1 = require("firebase-functions/v2/firestore");
 const admin = __importStar(require("firebase-admin"));
 const generative_ai_1 = require("@google/generative-ai");
 const server_1 = require("@google/generative-ai/server");
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const fs = __importStar(require("fs"));
-// 0. Firebase Admin 초기화
+// 0. Firebase Admin & Global Options 초기화
 if (!admin.apps.length) {
     admin.initializeApp();
 }
+(0, v2_1.setGlobalOptions)({
+    region: "us-central1",
+    secrets: ["GOOGLE_GENAI_API_KEY"],
+    timeoutSeconds: 540,
+    memory: "2GiB", // Gen 2 uses GiB
+});
 // 1. MIME Type 도우미
 function getMimeType(filePath) {
     const extension = path.extname(filePath).toLowerCase();
@@ -76,28 +83,24 @@ function initializeTools() {
     return { genAI, fileManager };
 }
 // ==========================================
-// [Trigger] 메인 분석 함수 (v1 onWrite)
+// [Trigger] 메인 분석 함수 (v2 onDocumentWritten)
 // ==========================================
-exports.analyzeVideoOnWrite = functions.runWith({
-    secrets: ["GOOGLE_GENAI_API_KEY"],
-    timeoutSeconds: 540,
-    memory: "2GB",
-})
-    .region("us-central1")
-    .firestore.document("episodes/{episodeId}")
-    .onWrite(async (change, context) => {
+exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)("episodes/{episodeId}", async (event) => {
+    const change = event.data;
+    if (!change)
+        return;
     // 문서가 삭제되었거나, 데이터가 없는 경우는 무시
     if (!change.after.exists) {
-        console.log(`[${context.params.episodeId}] Document deleted, skipping.`);
-        return null;
+        console.log(`[${event.params.episodeId}] Document deleted, skipping.`);
+        return;
     }
     const afterData = change.after.data();
     const beforeData = change.before.exists ? change.before.data() : null;
     // === 트리거 로직: 'pending' 상태일 때만 실행 ===
     if (afterData.aiProcessingStatus !== 'pending' || (beforeData && beforeData.aiProcessingStatus === 'pending')) {
-        return null;
+        return;
     }
-    const { episodeId } = context.params;
+    const { episodeId } = event.params;
     const docRef = change.after.ref;
     const db = admin.firestore();
     console.log(`✨ [${episodeId}] New analysis job detected. Starting...`);
@@ -106,7 +109,7 @@ exports.analyzeVideoOnWrite = functions.runWith({
     const filePath = afterData.filePath;
     if (!filePath) {
         await docRef.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath" });
-        return null;
+        return;
     }
     console.log(`🚀 [${episodeId}] Processing started (Target: gemini-2.5-pro).`);
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
@@ -234,18 +237,18 @@ exports.analyzeVideoOnWrite = functions.runWith({
             catch (e) { }
         }
     }
-    return null;
 });
 // ==========================================
-// [Trigger] 파일 삭제 함수 (v1 onDelete)
+// [Trigger] 파일 삭제 함수 (v2 onDocumentDeleted)
 // ==========================================
-exports.deleteFilesOnEpisodeDelete = functions.region("us-central1")
-    .firestore.document("episodes/{episodeId}")
-    .onDelete(async (snap, context) => {
-    const { episodeId } = context.params;
+exports.deleteFilesOnEpisodeDelete = (0, firestore_1.onDocumentDeleted)("episodes/{episodeId}", async (event) => {
+    const snap = event.data;
+    if (!snap)
+        return;
+    const { episodeId } = event.params;
     const data = snap.data();
     if (!data)
-        return null;
+        return;
     const db = admin.firestore();
     const bucket = admin.storage().bucket();
     const paths = [data.filePath, data.defaultThumbnailPath, data.customThumbnailPath, data.vttPath];
@@ -253,6 +256,5 @@ exports.deleteFilesOnEpisodeDelete = functions.region("us-central1")
     const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
     await aiChunkRef.delete().catch(() => { });
     console.log(`[DELETE SUCCESS] Cleaned up files and AI chunk for deleted episode ${episodeId}`);
-    return null;
 });
 //# sourceMappingURL=index.js.map
