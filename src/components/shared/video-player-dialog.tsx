@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -13,7 +14,7 @@ import { Button } from '../ui/button';
 import { useUser } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
-import { Send, Bot, User as UserIcon, X, Loader, FileText, ChevronDown, Clock, Tag } from 'lucide-react';
+import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { cn } from '@/lib/utils';
@@ -21,7 +22,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { getSignedUrl } from '@/lib/actions/get-signed-url';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
-import { Badge } from '../ui/badge';
 
 interface VideoPlayerDialogProps {
   isOpen: boolean;
@@ -185,7 +185,7 @@ const AnalysisView = ({ episode }: { episode: Episode }) => {
                                         <AccordionTrigger className="text-sm hover:no-underline">
                                             <div className="flex items-center gap-2">
                                                 <span>{item.startTime.split('.')[0]}</span>
-                                                <span className="truncate">{item.subtitle}</span>
+                                                <span className="truncate">{item.description}</span>
                                             </div>
                                         </AccordionTrigger>
                                         <AccordionContent className="text-xs text-muted-foreground px-4">
@@ -306,6 +306,20 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, episode.id, episode.filePath, episode.vttPath]);
   
+  const videoProps: React.VideoHTMLAttributes<HTMLVideoElement> & { allowFullScreen?: boolean } = {
+    id: `video-${videoKey}`,
+    key: videoSrc,
+    crossOrigin: "anonymous",
+    controls: true,
+    controlsList: "nodownload",
+    onContextMenu: (e) => e.preventDefault(),
+    autoPlay: true,
+    playsInline: true,
+    className: "w-full h-full object-contain z-10 relative",
+    poster: episode.thumbnailUrl,
+    allowFullScreen: true,
+  };
+  
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <DialogContent 
@@ -345,18 +359,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     </div>
                     
                     {videoSrc && !isLoadingSrc && !srcError && (
-                        <video
-                            id={`video-${videoKey}`}
-                            key={videoSrc}
-                            crossOrigin="anonymous"
-                            controls
-                            controlsList="nodownload"
-                            onContextMenu={(e) => e.preventDefault()}
-                            autoPlay
-                            playsInline
-                            className="w-full h-full object-contain z-10 relative"
-                            poster={episode.thumbnailUrl}
-                        >
+                        <video {...videoProps}>
                             <source src={videoSrc} type="video/mp4" />
                             {vttSrc && (
                                 <track 
@@ -393,3 +396,5 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
+
+    
