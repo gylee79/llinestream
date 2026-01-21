@@ -73,6 +73,21 @@ body {
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline;
   }
+  /* Style for video subtitles to ensure visibility */
+  video::cue {
+    /* Using a percentage to be responsive to player size */
+    bottom: 15%; 
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    font-size: 14px;
+  }
+  
+  @media (min-width: 768px) {
+    video::cue {
+      font-size: 16px;
+      bottom: 10%;
+    }
+  }
 }
 
 @layer components {
