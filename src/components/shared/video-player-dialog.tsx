@@ -28,35 +28,6 @@ interface VideoPlayerDialogProps {
   instructor: Instructor | null;
 }
 
-const SummaryView = ({ episode }: { episode: Episode }) => {
-    const isAIAvailable = episode.aiProcessingStatus === 'completed' && episode.aiGeneratedContent;
-
-    if (!isAIAvailable) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
-                <Sparkles className="h-10 w-10 mb-4" />
-                <p className="text-sm font-semibold">
-                    {episode.aiProcessingStatus === 'pending' || episode.aiProcessingStatus === 'processing'
-                        ? 'AI 요약을 생성하는 중입니다.'
-                        : '아직 이 영상에 대한 AI 요약이 없습니다.'}
-                </p>
-                 <p className="text-xs text-muted-foreground mt-1">잠시 후 다시 시도해주세요.</p>
-            </div>
-        );
-    }
-
-    return (
-        <ScrollArea className="h-full">
-            <div className="p-4 bg-muted/50 rounded-md h-full">
-                <h4 className="font-semibold mb-2 text-primary">AI 생성 강의 요약</h4>
-                <p className="text-sm whitespace-pre-wrap font-body leading-relaxed">
-                    {episode.aiGeneratedContent}
-                </p>
-            </div>
-        </ScrollArea>
-    );
-};
-
 const ChatView = ({ episode, user }: { episode: Episode, user: any }) => {
     const [isPending, startTransition] = useTransition();
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -183,7 +154,6 @@ const ChatView = ({ episode, user }: { episode: Episode, user: any }) => {
 
 export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
   const { user } = useUser();
-  const [activeView, setActiveView] = useState<'summary' | 'chat'>('summary');
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [vttSrc, setVttSrc] = useState<string | null>(null);
   const [isLoadingSrc, setIsLoadingSrc] = useState(true);
@@ -223,7 +193,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     setVttSrc(null);
     setIsLoadingSrc(true);
     setSrcError(null);
-    setActiveView('summary');
     startTimeRef.current = null;
   }
   
@@ -347,19 +316,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             
             <div className="flex-grow flex flex-col md:col-span-1 border-l min-h-0 md:h-full">
                 <div className="flex items-center justify-between p-2 border-b flex-shrink-0">
-                    <h4 className="font-semibold truncate text-base pr-2">{episode.title}</h4>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button variant={activeView === 'summary' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-3 text-sm" onClick={() => setActiveView('summary')}>
-                            강의 요약
-                        </Button>
-                        <Button variant={activeView === 'chat' ? 'secondary' : 'ghost'} size="sm" className="h-8 px-3 text-sm" onClick={() => setActiveView('chat')}>
-                            AI 검색
-                        </Button>
-                    </div>
+                    <h4 className="font-semibold truncate text-base pr-2">AI 튜터</h4>
                 </div>
                 <div className="flex-grow p-4 pt-2 flex flex-col gap-4 min-h-0">
-                    {activeView === 'summary' && <SummaryView episode={episode} />}
-                    {activeView === 'chat' && user && <ChatView episode={episode} user={user} />}
+                    {user && <ChatView episode={episode} user={user} />}
                 </div>
             </div>
         </div>
