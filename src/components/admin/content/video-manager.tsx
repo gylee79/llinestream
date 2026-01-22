@@ -41,7 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { sanitize } from '@/lib/utils';
+import { formatDuration, sanitize } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import VideoPlayerDialog from '@/components/shared/video-player-dialog';
 import { resetAIEpisodeStatus } from '@/lib/actions/process-video';
@@ -300,7 +300,7 @@ export default function VideoManager() {
                       </TableCell>
                       <TableCell className="font-medium">{episode.title}</TableCell>
                       <TableCell>{getFullCoursePath(episode.courseId)}</TableCell>
-                      <TableCell>{episode.duration}초</TableCell>
+                      <TableCell>{formatDuration(episode.duration)}</TableCell>
                       <TableCell>{formatFileSize(episode.fileSize)}</TableCell>
                       <TableCell>{getInstructorName(episode.instructorId)}</TableCell>
                       <TableCell>

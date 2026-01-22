@@ -80,6 +80,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isFree, setIsFree] = useState(false);
+  const [duration, setDuration] = useState(0);
   const [selectedFieldId, setSelectedFieldId] = useState<string>('');
   const [selectedClassificationId, setSelectedClassificationId] = useState<string>('');
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
@@ -123,6 +124,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     setTitle('');
     setDescription('');
     setIsFree(false);
+    setDuration(0);
     setSelectedFieldId('');
     setSelectedClassificationId('');
     setSelectedCourseId('');
@@ -201,6 +203,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             setTitle(episode.title);
             setDescription(episode.description || '');
             setIsFree(episode.isFree);
+            setDuration(episode.duration || 0);
             setSelectedCourseId(episode.courseId);
             setSelectedInstructorId(episode.instructorId || '');
             
@@ -247,24 +250,35 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     }
   }, [open, episode, isEditMode, firestore, toast, resetForm, generateDefaultThumbnail]);
 
-  const handleVideoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-        setIsProcessing(true);
-        setVideoFile(file);
-        setVideoPreviewUrl(URL.createObjectURL(file));
-        // When a new video is selected, clear custom thumbnail and generate new default
-        setCustomThumbnailFile(null);
-        setCustomThumbnailPreview(null);
+      setVideoFile(file);
+      const videoURL = URL.createObjectURL(file);
+      setVideoPreviewUrl(videoURL);
+      setCustomThumbnailFile(null);
+      setCustomThumbnailPreview(null);
+      setDuration(0);
+
+      const videoElement = document.createElement('video');
+      videoElement.preload = 'metadata';
+      videoElement.src = videoURL;
+      
+      videoElement.onloadedmetadata = async () => {
+        setDuration(Math.round(videoElement.duration));
         try {
-            await generateDefaultThumbnail(URL.createObjectURL(file), episode?.id || uuidv4());
+          await generateDefaultThumbnail(videoURL, episode?.id || uuidv4());
         } catch (error) {
-            console.error("Error generating thumbnail for new video:", error);
-        } finally {
-            setIsProcessing(false);
+          console.error("Error generating thumbnail for new video:", error);
         }
+      };
+      
+      videoElement.onerror = () => {
+        toast({variant: 'destructive', title: '오류', description: '비디오 파일 정보를 읽을 수 없습니다.'});
+      };
     }
   };
+
 
   const handleCustomThumbnailFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -292,6 +306,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
     if (!selectedCourseId) missingFields.push('상세분류');
     if (!selectedInstructorId) missingFields.push('강사');
     if (!isEditMode && !videoFile) missingFields.push('비디오 파일');
+    if (!isEditMode && duration === 0) missingFields.push('비디오 재생 시간');
 
     if (missingFields.length > 0) {
         toast({
@@ -335,6 +350,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
         if (isEditMode) {
             const payload = {
                 episodeId, title, description, isFree, courseId: selectedCourseId, instructorId: selectedInstructorId,
+                duration: duration,
                 newVideoData: videoFile ? { ...newVideoUploadResult!, fileSize: videoFile.size } : undefined,
                 newDefaultThumbnailData: newDefaultThumbUploadResult,
                 newCustomThumbnailData: newCustomThumbUploadResult,
@@ -352,6 +368,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             }
             const payload = {
                 episodeId, title, description, isFree, selectedCourseId, instructorId: selectedInstructorId,
+                duration: duration,
                 videoUrl: newVideoUploadResult.downloadUrl,
                 filePath: newVideoUploadResult.filePath,
                 fileSize: videoFile.size,
