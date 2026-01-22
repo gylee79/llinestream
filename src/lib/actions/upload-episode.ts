@@ -24,6 +24,7 @@ type SaveMetadataPayload = {
     isFree: boolean;
     selectedCourseId: string;
     instructorId: string;
+    duration: number;
     videoUrl: string;
     filePath: string;
     fileSize: number;
@@ -42,6 +43,7 @@ type UpdateEpisodePayload = {
     title: string;
     description: string;
     isFree: boolean;
+    duration: number;
     
     // New files data
     newVideoData?: { downloadUrl: string; filePath: string; fileSize: number; };
@@ -80,7 +82,7 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
  */
 export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise<UploadResult> {
     const { 
-        episodeId, title, description, isFree, selectedCourseId, instructorId, 
+        episodeId, title, description, isFree, selectedCourseId, instructorId, duration,
         videoUrl, filePath, fileSize, defaultThumbnailUrl, defaultThumbnailPath,
         customThumbnailUrl, customThumbnailPath
     } = payload;
@@ -93,9 +95,6 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
         const adminApp = initializeAdminApp();
         const db = admin.firestore(adminApp);
         
-        // This is a placeholder, a more accurate duration could be extracted on the client.
-        const duration = Math.floor(Math.random() * (3600 - 60 + 1)) + 60;
-        
         const episodeRef = db.collection('episodes').doc(episodeId);
         
         const newEpisode: Omit<Episode, 'id'> = {
@@ -103,7 +102,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             instructorId: instructorId || '',
             title: title || '',
             description: description || '',
-            duration,
+            duration: duration,
             isFree: isFree || false,
             videoUrl: videoUrl,
             filePath: filePath,
@@ -139,7 +138,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
  */
 export async function updateEpisode(payload: UpdateEpisodePayload): Promise<UploadResult> {
     const { 
-        episodeId, courseId, instructorId, title, description, isFree, 
+        episodeId, courseId, instructorId, title, description, isFree, duration,
         newVideoData, newDefaultThumbnailData, newCustomThumbnailData,
         oldVideoUrl, oldDefaultThumbnailUrl, oldCustomThumbnailUrl
     } = payload;
@@ -195,6 +194,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             isFree,
             courseId,
             instructorId: instructorId,
+            duration: duration,
         };
 
         if (newVideoData) {
