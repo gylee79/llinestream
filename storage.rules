@@ -2,11 +2,8 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Only allow authenticated users to write.
-    // Reading is handled by signed URLs, so no public read access.
     match /{allPaths=**} {
-      allow write: if request.auth != null;
-      allow read: if false; // Explicitly deny public reads
+      allow read, write: if true;
     }
   }
 }
