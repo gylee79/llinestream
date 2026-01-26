@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -14,7 +13,7 @@ import { Button } from '../ui/button';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
-import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock } from 'lucide-react';
+import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, MessageSquare, CornerUpLeft } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { cn } from '@/lib/utils';
@@ -24,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp } from 'firebase/firestore';
-import { toJSDate } from '@/lib/date-helpers';
+import { toDisplayTime, toJSDate } from '@/lib/date-helpers';
 import React from 'react';
 import { firebaseConfig } from '@/firebase/config';
 
@@ -64,7 +63,6 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
             return;
         }
         
-        // Query the global chat_logs collection using an existing index.
         const q = query(
             collection(firestore, 'chat_logs'), 
             where('userId', '==', user.id),
@@ -74,7 +72,6 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const logs = snapshot.docs.map(doc => doc.data() as ChatLog);
-            // Reverse the logs to get chronological order (asc) for display.
             const reversedLogs = logs.reverse(); 
 
             const newMessages = reversedLogs.flatMap(log => {
@@ -103,19 +100,18 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
     }, [messages, isPending]);
 
     const handleAskQuestion = () => {
-        if (!userQuestion.trim() || !user) return;
+        if (!userQuestion.trim() || !user || isPending) return;
 
         const questionContent = userQuestion.trim();
         
-        // Optimistic UI Update: Add user's question to the list immediately
         setMessages(prev => [...prev, {
-            id: uuidv4(), // temporary client-side ID
+            id: uuidv4(),
             role: 'user',
             content: questionContent,
             createdAt: new Date(),
         }]);
         
-        setUserQuestion(''); // Clear input after adding to list
+        setUserQuestion('');
 
         startTransition(async () => {
             try {
@@ -124,7 +120,6 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
                     question: questionContent,
                     userId: user.id,
                 });
-                // The onSnapshot listener will eventually receive the real data and update the state.
             } catch (error) {
                 console.error("Error asking video tutor:", error);
                 setMessages(prev => [...prev, {
@@ -136,8 +131,6 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
             }
         });
     }
-
-    let lastDate: string | null = null;
 
     return (
         <div className="flex flex-1 flex-col gap-2 min-h-0">
@@ -153,41 +146,31 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
                 </div>
                 ) : (
                     <div className="space-y-4">
-                        {messages.map(message => {
-                            const messageDate = toJSDate(message.createdAt)?.toLocaleDateString('ko-KR');
-                            const showSeparator = messageDate && messageDate !== lastDate;
-                            if (showSeparator) {
-                                lastDate = messageDate;
-                            }
-                            return (
-                                <React.Fragment key={message.id}>
-                                    {showSeparator && (
-                                        <div className="relative my-4 flex justify-center">
-                                            <div className="absolute inset-x-0 top-1/2 -z-10 h-px bg-border" />
-                                            <span className="bg-muted px-2 text-xs text-muted-foreground rounded-full">{lastDate}</span>
-                                        </div>
-                                    )}
-                                    <div className={cn("flex items-start gap-3", message.role === 'user' ? 'justify-end' : 'justify-start')}>
-                                        {message.role === 'model' && (
-                                            <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                                                <Bot className="h-5 w-5" />
-                                            </div>
-                                        )}
-                                        <div className={cn(
-                                            "max-w-md p-3 rounded-lg",
-                                            message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-background border'
-                                        )}>
-                                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                                        </div>
-                                        {message.role === 'user' && (
-                                            <div className="flex-shrink-0 h-8 w-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
-                                                <UserIcon className="h-5 w-5" />
-                                            </div>
-                                        )}
+                        {messages.map(message => (
+                             <div key={message.id} className={cn("flex items-end gap-3", message.role === 'user' ? 'justify-end' : 'justify-start')}>
+                                {message.role === 'model' && (
+                                    <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                                        <Bot className="h-5 w-5" />
                                     </div>
-                                </React.Fragment>
-                            )
-                        })}
+                                )}
+                                <div className="flex flex-col space-y-1">
+                                  <div className={cn(
+                                      "max-w-md p-3 rounded-lg",
+                                      message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-background border'
+                                  )}>
+                                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                                  </div>
+                                  <span className={cn("text-xs text-muted-foreground px-1", message.role === 'user' ? 'text-right' : 'text-left')}>
+                                    {toDisplayTime(message.createdAt)}
+                                  </span>
+                                </div>
+                                {message.role === 'user' && (
+                                    <div className="flex-shrink-0 h-8 w-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
+                                        <UserIcon className="h-5 w-5" />
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                         {isPending && (
                             <div className="flex items-start gap-3 justify-start pt-4">
                                 <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
@@ -210,7 +193,7 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
                         value={userQuestion}
                         onChange={(e) => setUserQuestion(e.target.value)}
                         onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
+                            if (e.key === 'Enter' && !e.shiftKey && !isPending) {
                                 e.preventDefault();
                                 handleAskQuestion();
                             }
@@ -305,7 +288,6 @@ export default function VideoPlayerDialog({
   const viewLoggedRef = useRef(false);
 
   useEffect(() => {
-    // This effect runs only on the client
     setIsMounted(true);
   }, []);
 
@@ -314,7 +296,7 @@ export default function VideoPlayerDialog({
     if (!user || !startTimeRef.current || viewLoggedRef.current) {
       return;
     }
-    viewLoggedRef.current = true; // Mark as logged to prevent re-logging
+    viewLoggedRef.current = true;
 
     const endTime = new Date();
     const durationWatched = (endTime.getTime() - startTimeRef.current.getTime()) / 1000;
@@ -398,7 +380,7 @@ export default function VideoPlayerDialog({
         }
     };
 
-    if (video.readyState >= 1) { // If metadata is already loaded
+    if (video.readyState >= 1) {
         setInitialTrackMode();
     } else {
         video.addEventListener('loadedmetadata', setInitialTrackMode);
@@ -412,7 +394,7 @@ export default function VideoPlayerDialog({
   }, [vttSrc]);
   
   if (!isMounted) {
-    return null; // Don't render anything on the server or before hydration
+    return null;
   }
   
   const videoProps = {
@@ -428,7 +410,7 @@ export default function VideoPlayerDialog({
   };
   
   const playerAndTabsContent = (
-    <div className="flex-grow flex flex-col md:grid md:grid-cols-5 min-w-0 min-h-0">
+    <div className="flex-grow flex flex-col md:grid md:grid-cols-5 min-h-0">
         <div className="w-full aspect-video bg-black md:col-span-3 md:h-full flex flex-col min-w-0">
             <div className="w-full flex-grow relative">
             <div className="absolute inset-0 flex items-center justify-center">
@@ -452,7 +434,7 @@ export default function VideoPlayerDialog({
             </div>
         </div>
         <div className="flex-grow flex flex-col md:col-span-2 border-l min-h-0 md:h-full min-w-0">
-            <TabsContent value="summary" className="flex-grow p-4 flex flex-col min-h-0 mt-0">
+            <TabsContent value="summary" className="flex-grow p-0 flex flex-col min-h-0 mt-0">
                 <AnalysisView episode={episode} />
             </TabsContent>
             <TabsContent value="tutor" className="flex-grow p-4 flex flex-col min-h-0 mt-0">
@@ -495,12 +477,12 @@ export default function VideoPlayerDialog({
 
         {/* Tabs Part */}
         <div className="flex-grow flex flex-col border-t min-h-0">
-            <Tabs defaultValue="summary" className="flex-grow flex flex-col min-h-0">
+            <Tabs defaultValue="tutor" className="flex-grow flex flex-col min-h-0">
                 <TabsList className="grid w-full grid-cols-2 flex-shrink-0 rounded-none border-b">
-                    <TabsTrigger value="summary">강의 분석</TabsTrigger>
+                    <TabsTrigger value="summary">비디오 분석</TabsTrigger>
                     <TabsTrigger value="tutor">AI 튜터</TabsTrigger>
                 </TabsList>
-                <TabsContent value="summary" className="flex-grow p-4 flex flex-col min-h-0 mt-0">
+                <TabsContent value="summary" className="flex-grow p-0 flex flex-col min-h-0 mt-0">
                     <AnalysisView episode={episode} />
                 </TabsContent>
                 <TabsContent value="tutor" className="flex-grow p-4 flex flex-col min-h-0 mt-0">
@@ -522,30 +504,26 @@ export default function VideoPlayerDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
-        <Tabs defaultValue="summary">
+        <Tabs defaultValue="tutor">
             <DialogContent 
                 className="w-full h-full p-0 flex flex-col top-0 translate-y-0 rounded-none md:max-w-[90vw] md:h-[90vh] md:rounded-lg md:top-1/2 md:-translate-y-1/2"
                 onInteractOutside={(e) => e.preventDefault()}
                 onOpenAutoFocus={(e) => e.preventDefault()}
             >
                  <DialogHeader className="p-4 border-b flex-shrink-0 bg-background z-10 hidden md:flex flex-row justify-between items-center space-x-4 min-w-0">
-                    <h2 className="text-lg font-bold truncate pr-4 flex-1 text-left">{episode.title}</h2>
-                    <div className="flex-none">
+                    <DialogTitle className="text-lg font-bold">{episode.title}</DialogTitle>
+                    <div className="flex items-center gap-4 ml-auto">
                         <TabsList className="grid grid-cols-2 rounded-md h-9 max-w-fit">
-                            <TabsTrigger value="summary" className="rounded-l-md rounded-r-none h-full">강의 분석</TabsTrigger>
+                            <TabsTrigger value="summary" className="rounded-l-md rounded-r-none h-full">비디오 분석</TabsTrigger>
                             <TabsTrigger value="tutor" className="rounded-r-md rounded-l-none h-full">AI 튜터</TabsTrigger>
                         </TabsList>
-                    </div>
-                    <div className="flex-1 flex justify-end">
                         <button onClick={handleClose} className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
                             <X className="h-4 w-4" />
                             <span className="sr-only">Close</span>
                         </button>
                     </div>
-                    <DialogTitle className="sr-only">{episode.title}</DialogTitle>
                     <DialogDescription className="sr-only">{episode.description || `비디오 플레이어: ${episode.title}`}</DialogDescription>
                 </DialogHeader>
-
                 {playerAndTabsContent}
             </DialogContent>
         </Tabs>
