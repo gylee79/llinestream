@@ -10,6 +10,7 @@ import { revalidatePath } from 'next/cache';
 import type { Course } from '@/lib/types';
 import { getPublicUrl, extractPathFromUrl } from '@/lib/utils';
 import { Storage } from 'firebase-admin/storage';
+import { firebaseConfig } from '@/firebase/config';
 
 type UpdateResult = {
   success: boolean;
@@ -44,7 +45,7 @@ const processImages = async (
     newFiles: File[],
     currentPaths: string[]
 ) => {
-    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+    const bucketName = firebaseConfig.storageBucket;
     if (!bucketName) {
         throw new Error('Firebase Storage bucket name is not configured in environment variables.');
     }

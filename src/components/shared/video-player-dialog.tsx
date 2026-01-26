@@ -25,6 +25,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp } from 'firebase/firestore';
 import { toJSDate } from '@/lib/date-helpers';
 import React from 'react';
+import { firebaseConfig } from '@/firebase/config';
 
 interface VideoPlayerDialogProps {
   isOpen: boolean;
@@ -295,7 +296,9 @@ export default function VideoPlayerDialog({
   const viewLoggedRef = useRef(false);
 
   useEffect(() => {
-    setIsMounted(true);
+    if (typeof window !== 'undefined') {
+      setIsMounted(true);
+    }
   }, []);
 
   const logView = useCallback(() => {
@@ -345,7 +348,7 @@ export default function VideoPlayerDialog({
         setIsLoadingSrc(true);
         setSrcError(null);
 
-        const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+        const bucketName = firebaseConfig.storageBucket;
         if (!bucketName) {
             setSrcError("Firebase Storage 버킷 설정이 누락되었습니다.");
             setIsLoadingSrc(false);
@@ -370,7 +373,9 @@ export default function VideoPlayerDialog({
     }
 
     return () => {
-      logView();
+      if (isOpen) {
+        logView();
+      }
     };
   }, [isOpen, episode.filePath, episode.vttPath, logView]);
 

@@ -10,6 +10,7 @@ import { revalidatePath } from 'next/cache';
 import type { Field, Classification, Course, Episode, HeroContent } from '@/lib/types';
 import { Storage } from 'firebase-admin/storage';
 import { getPublicUrl, extractPathFromUrl } from '@/lib/utils';
+import { firebaseConfig } from '@/firebase/config';
 
 type UpdateResult = {
   success: boolean;
@@ -59,7 +60,7 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     const adminApp = initializeAdminApp();
     const db = admin.firestore(adminApp);
     const storage = admin.storage(adminApp);
-    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+    const bucketName = firebaseConfig.storageBucket;
      if (!bucketName) {
       throw new Error("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET environment variable is not set.");
     }
