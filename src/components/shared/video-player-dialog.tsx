@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -105,7 +106,16 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
         if (!userQuestion.trim() || !user) return;
 
         const questionContent = userQuestion.trim();
-        setUserQuestion('');
+        
+        // Optimistic UI Update: Add user's question to the list immediately
+        setMessages(prev => [...prev, {
+            id: uuidv4(), // temporary client-side ID
+            role: 'user',
+            content: questionContent,
+            createdAt: new Date(),
+        }]);
+        
+        setUserQuestion(''); // Clear input after adding to list
 
         startTransition(async () => {
             try {
@@ -114,10 +124,9 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
                     question: questionContent,
                     userId: user.id,
                 });
-                // The onSnapshot listener will automatically update the chat history
+                // The onSnapshot listener will eventually receive the real data and update the state.
             } catch (error) {
                 console.error("Error asking video tutor:", error);
-                // Optionally add an error message to the chat
                 setMessages(prev => [...prev, {
                     id: uuidv4(),
                     role: 'model',
@@ -180,7 +189,7 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
                             )
                         })}
                         {isPending && (
-                            <div className="flex items-start gap-3 justify-start">
+                            <div className="flex items-start gap-3 justify-start pt-4">
                                 <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
                                     <Bot className="h-5 w-5 animate-spin" />
                                 </div>
@@ -296,10 +305,10 @@ export default function VideoPlayerDialog({
   const viewLoggedRef = useRef(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsMounted(true);
-    }
+    // This effect runs only on the client
+    setIsMounted(true);
   }, []);
+
 
   const logView = useCallback(() => {
     if (!user || !startTimeRef.current || viewLoggedRef.current) {
@@ -402,6 +411,10 @@ export default function VideoPlayerDialog({
     };
   }, [vttSrc]);
   
+  if (!isMounted) {
+    return null; // Don't render anything on the server or before hydration
+  }
+  
   const videoProps = {
     id: `video-${videoKey}`,
     crossOrigin: "anonymous" as const,
@@ -448,10 +461,6 @@ export default function VideoPlayerDialog({
         </div>
     </div>
   );
-
-  if (!isMounted) {
-    return null;
-  }
 
   const mobileContent = (
     <div className="fixed inset-0 bg-background z-[100] flex flex-col">
