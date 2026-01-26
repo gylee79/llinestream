@@ -1,6 +1,7 @@
 
 import * as admin from 'firebase-admin';
 import { getApps, App } from 'firebase-admin/app';
+import { firebaseConfig } from '@/firebase/config';
 
 // This is a global variable to hold the initialized Firebase Admin app instance.
 // It ensures that we only initialize the app once per server instance.
@@ -29,8 +30,8 @@ export function initializeAdminApp(): App {
   // Retrieve credentials from environment variables.
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  const projectId = firebaseConfig.projectId;
+  const storageBucket = firebaseConfig.storageBucket;
 
   // Check if all necessary environment variables are set. This is a critical check.
   if (!privateKey || !clientEmail || !projectId || !storageBucket) {
