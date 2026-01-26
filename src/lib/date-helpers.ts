@@ -8,7 +8,7 @@ import { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
  * @param timestamp The Timestamp or Date to convert.
  * @returns A JavaScript Date object, or null if the input is invalid or a FieldValue.
  */
-export function toJSDate(timestamp: Timestamp | null | undefined): Date | null {
+export function toJSDate(timestamp: Timestamp | Date | null | undefined): Date | null {
   if (!timestamp) {
     return null;
   }
@@ -35,7 +35,7 @@ export function toDisplayDate(timestamp: Timestamp | Date | null | undefined): s
     if (!timestamp) {
         return '';
     }
-    const date = toJSDate(timestamp as Timestamp);
+    const date = toJSDate(timestamp);
     if (!date) {
         return '처리중...'; // Or some other placeholder for server-generated timestamps
     }
@@ -51,7 +51,7 @@ export function toDisplayDateTime(timestamp: Timestamp | Date | null | undefined
     if (!timestamp) {
         return '';
     }
-    const date = toJSDate(timestamp as Timestamp);
+    const date = toJSDate(timestamp);
     if (!date) {
         return '처리중...';
     }
@@ -76,7 +76,7 @@ export function toDisplayTime(timestamp: Timestamp | Date | null | undefined): s
     if (!timestamp) {
         return '';
     }
-    const date = toJSDate(timestamp as Timestamp);
+    const date = toJSDate(timestamp);
     if (!date) {
         return '처리중...';
     }
