@@ -70,29 +70,30 @@ const videoTutorFlow = ai.defineFlow(
       if (!fieldDoc.exists) throw new Error(`Field ${classificationData.fieldId} not found.`);
       const fieldData = fieldDoc.data();
 
+      // New: Fetch all episodes once to create a title map
+      const allEpisodesSnapshot = await db.collection('episodes').get();
+      const episodeTitleMap = new Map<string, string>();
+      allEpisodesSnapshot.forEach(doc => {
+          episodeTitleMap.set(doc.id, doc.data().title);
+      });
+
       // 2. Build context based on the selected scope
       let context = "";
-      let scopeDescriptionForPrompt = "";
       let query: admin.firestore.Query | null = null;
       
       switch (scope) {
         case 'episode':
-            context = episodeData.aiGeneratedContent || "";
-            scopeDescriptionForPrompt = `현재 시청중인 '${episodeData.title}' 영상 하나의 내용`;
-            console.log(`[Tutor-Flow] Scope: episode. Using content from episode ${episodeId}.`);
+            // This case is handled below, as it doesn't need a query
             break;
         case 'course':
             query = db.collection('episode_ai_chunks').where('courseId', '==', courseData.id);
-            scopeDescriptionForPrompt = `'${courseData.name}' 상세분류에 속한 모든 영상들의 내용`;
             break;
         case 'classification':
             query = db.collection('episode_ai_chunks').where('classificationId', '==', classificationData.id);
-            scopeDescriptionForPrompt = `'${classificationData.name}' 큰분류에 속한 모든 영상들의 내용`;
             break;
         case 'field':
         default:
             query = db.collection('episode_ai_chunks').where('fieldId', '==', fieldDoc.id);
-            scopeDescriptionForPrompt = `'${fieldData?.name}' 분야에 속한 모든 영상들의 내용`;
             break;
       }
       
@@ -103,23 +104,30 @@ const videoTutorFlow = ai.defineFlow(
             const chunks = querySnapshot.docs.map(doc => {
                 const chunkData = doc.data();
                 try {
-                    // The content is a JSON string, so we parse it to use as a structured object.
                     return {
                         episodeId: chunkData.episodeId,
+                        episodeTitle: episodeTitleMap.get(chunkData.episodeId) || '알 수 없는 영상',
                         analysis: JSON.parse(chunkData.content)
                     };
                 } catch (e) {
-                    // Fallback for old plain-text data or if parsing fails
                     return {
                         episodeId: chunkData.episodeId,
+                        episodeTitle: episodeTitleMap.get(chunkData.episodeId) || '알 수 없는 영상',
                         analysis: { summary: chunkData.content }
                     };
                 }
             });
-            // Pass the array of structured objects as a JSON string to the model.
             context = JSON.stringify(chunks, null, 2);
         }
+      } else if (scope === 'episode' && episodeData.aiGeneratedContent) {
+           console.log(`[Tutor-Flow] Scope: episode. Using content from episode ${episodeId}.`);
+           context = JSON.stringify([{
+              episodeId: episodeId,
+              episodeTitle: episodeData.title,
+              analysis: JSON.parse(episodeData.aiGeneratedContent)
+           }], null, 2);
       }
+
 
       if (!context) {
         const fallbackMessage = "죄송합니다, 현재 선택된 범위에는 답변의 근거가 될 분석 내용이 아직 없습니다. 다른 검색 범위를 선택하거나 잠시 후 다시 시도해주세요."
@@ -131,9 +139,14 @@ const videoTutorFlow = ai.defineFlow(
       const llmResponse = await ai.generate({
         model: googleAI.model('gemini-2.5-flash'),
         system: `You are a friendly and helpful Korean AI Tutor. You MUST answer all questions in Korean.
-        You will be given a JSON object or an array of JSON objects as context. Each object represents the detailed analysis of a video, including a transcript, summary, timeline, and keywords.
-        Based ONLY on the provided JSON context, answer the user's question. Analyze the structured data, especially the 'timeline' for time-specific events and descriptions.
-        If the context doesn't contain the answer, you MUST state that the information is not in the provided videos and you cannot answer in Korean. Do not use outside knowledge.
+        You will be given a JSON object or an array of JSON objects as context. Each object represents the detailed analysis of a video, including 'episodeId', 'episodeTitle', and 'analysis' (which contains transcript, summary, timeline, etc.).
+        The user is currently watching the episode with ID '${episodeId}' and title '${episodeData.title}'.
+
+        Based ONLY on the provided JSON context, answer the user's question.
+        - When referencing information from the *currently playing video* (ID: '${episodeId}'), you MUST cite the specific timestamp from the 'timeline' if available. For example: "현재 시청중인 영상의 00:01:23초에 관련 내용이 있습니다."
+        - When referencing information from a *different video*, you MUST state the name of that video using the 'episodeTitle' field. For example: "네, 관련 내용이 '${"다른 영상 제목"}' 편에 있습니다."
+        - Analyze the structured data, especially the 'timeline' for time-specific events and descriptions.
+        - If the context doesn't contain the answer, you MUST state that the information is not in the provided videos and you cannot answer in Korean. Do not use outside knowledge.
 
         Context:
         ---
@@ -177,5 +190,3 @@ const videoTutorFlow = ai.defineFlow(
     }
   }
 );
-
-    
