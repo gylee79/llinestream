@@ -18,8 +18,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
-import { getSignedUrl } from '@/lib/actions/get-signed-url';
-import { getVttContent } from '@/lib/actions/get-vtt-content';
+import { getPublicUrl } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -331,10 +330,6 @@ export default function VideoPlayerDialog({
         videoElement.load();
     }
     
-    if (vttSrc && vttSrc.startsWith('blob:')) {
-      URL.revokeObjectURL(vttSrc);
-    }
-    
     logView();
     
     onOpenChange(false);
@@ -343,58 +338,41 @@ export default function VideoPlayerDialog({
     setIsLoadingSrc(true);
     setSrcError(null);
     startTimeRef.current = null;
-  }, [videoKey, vttSrc, logView, onOpenChange]);
+  }, [videoKey, logView, onOpenChange]);
   
   useEffect(() => {
-    let localVttSrc: string | null = null;
-    
-    const fetchSources = async () => {
+    if (isOpen) {
         setIsLoadingSrc(true);
         setSrcError(null);
-        setVideoSrc(null);
-        setVttSrc(null);
 
-        const videoUrlPromise = episode.filePath ? getSignedUrl(episode.filePath) : Promise.resolve({ error: '비디오 파일 경로를 찾을 수 없습니다.' });
-        const vttContentPromise: Promise<{ content?: string; error?: string; }> = episode.vttPath ? getVttContent(episode.vttPath) : Promise.resolve({ content: undefined, error: undefined });
-
-        try {
-            const [videoResult, vttResult] = await Promise.all([videoUrlPromise, vttContentPromise]);
-
-            if ('signedURL' in videoResult) {
-                setVideoSrc(videoResult.signedURL);
-            } else {
-                setSrcError(videoResult.error || '비디오 주소를 가져오는 데 실패했습니다.');
-            }
-
-            if (vttResult?.content) {
-                const blob = new Blob([vttResult.content], { type: 'text/vtt' });
-                localVttSrc = URL.createObjectURL(blob);
-                setVttSrc(localVttSrc);
-            } else if (vttResult?.error) {
-                console.warn("Could not fetch VTT content:", vttResult.error);
-            }
-        } catch (err) {
-            console.error("Failed to fetch video sources:", err);
-            setSrcError('비디오 또는 자막 소스를 불러오는 데 실패했습니다.');
-        } finally {
+        const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+        if (!bucketName) {
+            setSrcError("Firebase Storage 버킷 설정이 누락되었습니다.");
             setIsLoadingSrc(false);
+            return;
         }
-    };
 
-    if (isOpen) {
+        if (episode.filePath) {
+            const publicVideoUrl = getPublicUrl(bucketName, episode.filePath);
+            setVideoSrc(publicVideoUrl);
+        } else {
+            setSrcError("비디오 파일 경로를 찾을 수 없습니다.");
+        }
+
+        if (episode.vttPath) {
+            const publicVttUrl = getPublicUrl(bucketName, episode.vttPath);
+            setVttSrc(publicVttUrl);
+        }
+
+        setIsLoadingSrc(false);
         startTimeRef.current = new Date();
         viewLoggedRef.current = false;
-        fetchSources();
     }
 
     return () => {
-      // Cleanup function to revoke the blob URL on unmount or when dependencies change
       logView();
-      if (localVttSrc) {
-        URL.revokeObjectURL(localVttSrc);
-      }
     };
-  }, [isOpen, episode.id, episode.filePath, episode.vttPath, logView]);
+  }, [isOpen, episode.filePath, episode.vttPath, logView]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -448,7 +426,7 @@ export default function VideoPlayerDialog({
                 <video ref={videoRef} key={videoSrc} {...videoProps}>
                 <source src={videoSrc} type="video/mp4" />
                 {vttSrc && (
-                    <track src={vttSrc} kind="subtitles" srcLang="ko" label="한국어" />
+                    <track src={vttSrc} kind="subtitles" srcLang="ko" label="한국어" default />
                 )}
                 브라우저가 비디오 태그를 지원하지 않습니다.
                 </video>
@@ -493,7 +471,7 @@ export default function VideoPlayerDialog({
                     <video ref={videoRef} key={videoSrc} {...videoProps}>
                     <source src={videoSrc} type="video/mp4" />
                     {vttSrc && (
-                        <track src={vttSrc} kind="subtitles" srcLang="ko" label="한국어" />
+                        <track src={vttSrc} kind="subtitles" srcLang="ko" label="한국어" default/>
                     )}
                     브라우저가 비디오 태그를 지원하지 않습니다.
                     </video>
