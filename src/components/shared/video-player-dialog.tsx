@@ -285,6 +285,7 @@ export default function VideoPlayerDialog({
 }: VideoPlayerDialogProps) {
   const { user } = useUser();
   const isMobile = useIsMobile();
+  const [isMounted, setIsMounted] = useState(false);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [vttSrc, setVttSrc] = useState<string | null>(null);
   const [isLoadingSrc, setIsLoadingSrc] = useState(true);
@@ -293,6 +294,10 @@ export default function VideoPlayerDialog({
   const startTimeRef = useRef<Date | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const viewLoggedRef = useRef(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const logView = useCallback(() => {
     if (!user || !startTimeRef.current || viewLoggedRef.current) {
@@ -451,7 +456,7 @@ export default function VideoPlayerDialog({
             </div>
         </div>
         <div className="flex-grow flex flex-col md:col-span-2 border-l min-h-0 md:h-full min-w-0">
-            <TabsContent value="summary" className="flex-grow px-4 pb-4 flex flex-col min-h-0 mt-0">
+            <TabsContent value="summary" className="flex-grow p-4 flex flex-col min-h-0 mt-0">
                 <AnalysisView episode={episode} />
             </TabsContent>
             <TabsContent value="tutor" className="flex-grow p-4 flex flex-col min-h-0 mt-0">
@@ -460,6 +465,10 @@ export default function VideoPlayerDialog({
         </div>
     </div>
   );
+
+  if (!isMounted) {
+    return null;
+  }
 
   const mobileContent = (
     <div className="fixed inset-0 bg-background z-[100] flex flex-col">
