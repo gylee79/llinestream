@@ -293,6 +293,7 @@ export default function VideoPlayerDialog({
   const startTimeRef = useRef<Date | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const viewLoggedRef = useRef(false);
+  const isFullscreenRef = useRef(false);
 
   const logView = useCallback(() => {
     if (!user || !startTimeRef.current || viewLoggedRef.current) {
@@ -319,7 +320,46 @@ export default function VideoPlayerDialog({
     }
   }, [user, episode.id, episode.title, episode.courseId]);
 
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    
+    const handleFullscreenChange = () => {
+        const isFullscreen = document.fullscreenElement !== null || (videoElement as any)?.webkitDisplayingFullscreen === true;
+        isFullscreenRef.current = isFullscreen;
+        logDebugMessage('fullscreen state changed', { isFullscreen });
+    };
+
+    const handleWebkitBeginFullscreen = () => {
+        isFullscreenRef.current = true;
+        logDebugMessage('webkitbeginfullscreen event fired');
+    };
+
+    const handleWebkitEndFullscreen = () => {
+        isFullscreenRef.current = false;
+        logDebugMessage('webkitendfullscreen event fired');
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    if (videoElement) {
+        videoElement.addEventListener('webkitbeginfullscreen', handleWebkitBeginFullscreen);
+        videoElement.addEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
+    }
+    
+    return () => {
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        if (videoElement) {
+            videoElement.removeEventListener('webkitbeginfullscreen', handleWebkitBeginFullscreen);
+            videoElement.removeEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
+        }
+    };
+  }, []);
+
   const handleClose = useCallback(() => {
+    if (isFullscreenRef.current) {
+        logDebugMessage('Close prevented due to fullscreen mode.');
+        return;
+    }
+
     logDebugMessage('handleClose explicitly called');
     const videoElement = videoRef.current;
     if (videoElement) {
@@ -328,24 +368,6 @@ export default function VideoPlayerDialog({
     logView();
     onOpenChange(false);
   }, [logView, onOpenChange]);
-
-  useEffect(() => {
-    logDebugMessage('VideoPlayerDialog MOUNTED');
-    const onFullscreenChange = () => logDebugMessage('fullscreenchange event fired');
-    const onWebkitBeginFullscreen = () => logDebugMessage('webkitbeginfullscreen event fired');
-    const onWebkitEndFullscreen = () => logDebugMessage('webkitendfullscreen event fired');
-
-    document.addEventListener('fullscreenchange', onFullscreenChange);
-    document.addEventListener('webkitbeginfullscreen', onWebkitBeginFullscreen);
-    document.addEventListener('webkitendfullscreen', onWebkitEndFullscreen);
-    
-    return () => {
-        logDebugMessage('VideoPlayerDialog UNMOUNTED');
-        document.removeEventListener('fullscreenchange', onFullscreenChange);
-        document.removeEventListener('webkitbeginfullscreen', onWebkitBeginFullscreen);
-        document.removeEventListener('webkitendfullscreen', onWebkitEndFullscreen);
-    }
-  }, []);
 
   useEffect(() => {
     logDebugMessage('VideoPlayerDialog main useEffect executing', { isOpen });
@@ -381,9 +403,12 @@ export default function VideoPlayerDialog({
     }
 
     return () => {
-      logDebugMessage('VideoPlayerDialog main useEffect cleanup running', { isOpen });
       if (isOpen) {
-        logView();
+        if (!isFullscreenRef.current) {
+            logView();
+        } else {
+            logDebugMessage('View log skipped on cleanup because video is in fullscreen.');
+        }
       }
     };
   }, [isOpen, episode, logView]);
