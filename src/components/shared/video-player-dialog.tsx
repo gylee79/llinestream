@@ -476,20 +476,17 @@ export default function VideoPlayerDialog({
   );
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
+    <Dialog open={isOpen}>
       <DialogContent 
         className="w-full h-full p-0 flex flex-col top-0 translate-y-0 rounded-none md:max-w-[90vw] md:h-[90vh] md:rounded-lg md:top-4 md:translate-y-0"
         onInteractOutside={(e) => {
             logDebugMessage('Dialog: onInteractOutside fired');
-            e.preventDefault();
         }}
         onPointerDownOutside={(e) => {
             logDebugMessage('Dialog: onPointerDownOutside fired');
-            e.preventDefault();
         }}
         onFocusOutside={(e) => {
             logDebugMessage('Dialog: onFocusOutside fired');
-            e.preventDefault();
         }}
         onOpenAutoFocus={(e) => {
             logDebugMessage('Dialog: onOpenAutoFocus fired');
