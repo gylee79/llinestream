@@ -446,7 +446,7 @@ export default function VideoPlayerDialog({
   const mobileContent = (
     <div className="fixed inset-0 bg-background z-[100] flex flex-col">
         {/* Header Part */}
-        <div className="flex items-center justify-between px-2 h-8 border-b flex-shrink-0 bg-background">
+        <div className="flex items-center justify-between px-2 h-10 border-b flex-shrink-0 bg-background">
             <h2 className="text-sm font-semibold leading-none truncate pr-2">
                 {episode.title}
             </h2>
