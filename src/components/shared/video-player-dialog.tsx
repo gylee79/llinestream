@@ -307,6 +307,9 @@ export default function VideoPlayerDialog({
 
   useEffect(() => {
     setIsMounted(true);
+    return () => {
+        logDebugMessage('VideoPlayerDialog UNMOUNTED');
+    }
   }, []);
 
 
@@ -335,7 +338,7 @@ export default function VideoPlayerDialog({
   }, [user, episode.id, episode.title, episode.courseId]);
 
   const handleClose = useCallback(() => {
-    logDebugMessage('handleClose called');
+    logDebugMessage('handleClose explicitly called');
     const videoElement = videoRef.current;
     if (videoElement) {
         videoElement.pause();
@@ -389,8 +392,8 @@ export default function VideoPlayerDialog({
     }
 
     return () => {
+      logDebugMessage('VideoPlayerDialog main useEffect cleanup running', { isOpen });
       if (isOpen) {
-        logDebugMessage('Video dialog cleanup effect called');
         logView();
         video?.removeEventListener('fullscreenchange', handleFullscreenChange);
         video?.removeEventListener('webkitbeginfullscreen', handleWebKitBeginFullscreen);
