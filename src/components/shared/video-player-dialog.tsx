@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -389,6 +390,7 @@ export default function VideoPlayerDialog({
 
     return () => {
       if (isOpen) {
+        logDebugMessage('Video dialog cleanup effect called');
         logView();
         video?.removeEventListener('fullscreenchange', handleFullscreenChange);
         video?.removeEventListener('webkitbeginfullscreen', handleWebKitBeginFullscreen);
