@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -335,6 +334,7 @@ export default function VideoPlayerDialog({
   }, [user, episode.id, episode.title, episode.courseId]);
 
   const handleClose = useCallback(() => {
+    logDebugMessage('handleClose called');
     const videoElement = videoRef.current;
     if (videoElement) {
         videoElement.pause();
@@ -348,12 +348,12 @@ export default function VideoPlayerDialog({
   useEffect(() => {
     const video = videoRef.current;
 
-    const handleFullscreenChange = () => logDebugMessage('fullscreenchange event fired');
-    const handleWebKitBeginFullscreen = () => logDebugMessage('webkitbeginfullscreen event fired');
-    const handleWebKitEndFullscreen = () => logDebugMessage('webkitendfullscreen event fired');
+    const handleFullscreenChange = () => logDebugMessage('Video Event: fullscreenchange');
+    const handleWebKitBeginFullscreen = () => logDebugMessage('Video Event: webkitbeginfullscreen');
+    const handleWebKitEndFullscreen = () => logDebugMessage('Video Event: webkitendfullscreen');
 
     if (isOpen) {
-        logDebugMessage('Video dialog opened');
+        logDebugMessage('Video dialog opened', { episodeId: episode.id });
         setIsLoadingSrc(true);
         setSrcError(null);
         setVideoSrc(null);
@@ -463,23 +463,28 @@ export default function VideoPlayerDialog({
   );
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={(openState) => {
+        logDebugMessage('Dialog: onOpenChange fired', { newOpenState: openState });
+        if (!openState) {
+            handleClose();
+        }
+    }}>
       <DialogContent 
         className="w-full h-full p-0 flex flex-col md:max-w-[90vw] md:h-[90vh] md:rounded-lg"
         onOpenAutoFocus={(e) => {
-            logDebugMessage('Dialog: onOpenAutoFocus fired');
+            logDebugMessage('Dialog: onOpenAutoFocus fired', { from: 'DialogContent' });
             e.preventDefault();
         }}
         onPointerDownOutside={(e) => {
-            logDebugMessage('Dialog: onPointerDownOutside fired');
+            logDebugMessage('Dialog: onPointerDownOutside fired', { target: (e.target as HTMLElement).tagName });
             e.preventDefault();
         }}
         onFocusOutside={(e) => {
-            logDebugMessage('Dialog: onFocusOutside fired');
+            logDebugMessage('Dialog: onFocusOutside fired', { target: (e.target as HTMLElement).tagName });
             e.preventDefault();
         }}
         onInteractOutside={(e) => {
-            logDebugMessage('Dialog: onInteractOutside fired');
+            logDebugMessage('Dialog: onInteractOutside fired', { target: (e.target as HTMLElement).tagName });
             e.preventDefault();
         }}
       >
