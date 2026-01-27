@@ -5,7 +5,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog';
 import type { Episode, Instructor, ChatMessage, ChatLog } from '@/lib/types';
 import { useEffect, useRef, useState, useTransition, useCallback } from 'react';
@@ -25,6 +24,8 @@ import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTim
 import { toDisplayDate } from '@/lib/date-helpers';
 import React from 'react';
 import { firebaseConfig } from '@/firebase/config';
+import { logDebugMessage } from '@/lib/actions/debug-actions';
+
 
 interface VideoPlayerDialogProps {
   isOpen: boolean;
@@ -333,7 +334,8 @@ export default function VideoPlayerDialog({
   }, [user, episode.id, episode.title, episode.courseId]);
 
   const handleClose = useCallback(() => {
-    const videoElement = document.getElementById(`video-${videoKey}`) as HTMLVideoElement;
+    logDebugMessage('handleClose called');
+    const videoElement = videoRef.current;
     if (videoElement) {
         videoElement.pause();
         videoElement.removeAttribute('src'); 
@@ -348,10 +350,23 @@ export default function VideoPlayerDialog({
     setIsLoadingSrc(true);
     setSrcError(null);
     startTimeRef.current = null;
-  }, [videoKey, logView, onOpenChange]);
+  }, [logView, onOpenChange]);
   
   useEffect(() => {
+    const video = videoRef.current;
+
+    const handleFullscreenChange = () => {
+        logDebugMessage('fullscreenchange event fired');
+    };
+    const handleWebKitBeginFullscreen = () => {
+        logDebugMessage('webkitbeginfullscreen event fired');
+    };
+    const handleWebKitEndFullscreen = () => {
+        logDebugMessage('webkitendfullscreen event fired');
+    };
+
     if (isOpen) {
+        logDebugMessage('Video dialog opened');
         setIsLoadingSrc(true);
         setSrcError(null);
 
@@ -377,14 +392,23 @@ export default function VideoPlayerDialog({
         setIsLoadingSrc(false);
         startTimeRef.current = new Date();
         viewLoggedRef.current = false;
+        
+        // Add event listeners for fullscreen changes
+        video?.addEventListener('fullscreenchange', handleFullscreenChange);
+        video?.addEventListener('webkitbeginfullscreen', handleWebKitBeginFullscreen);
+        video?.addEventListener('webkitendfullscreen', handleWebKitEndFullscreen);
     }
 
     return () => {
       if (isOpen) {
         logView();
+        // Clean up event listeners
+        video?.removeEventListener('fullscreenchange', handleFullscreenChange);
+        video?.removeEventListener('webkitbeginfullscreen', handleWebKitBeginFullscreen);
+        video?.removeEventListener('webkitendfullscreen', handleWebKitEndFullscreen);
       }
     };
-  }, [isOpen, episode.filePath, episode.vttPath, logView]);
+  }, [isOpen, episode, logView]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -433,9 +457,10 @@ export default function VideoPlayerDialog({
                     crossOrigin="anonymous"
                     controls
                     controlsList="nodownload"
+                    playsInline
+                    webkit-playsinline="true"
                     onContextMenu={(e: React.MouseEvent) => e.preventDefault()}
                     autoPlay
-                    playsInline
                     className="w-full h-full object-contain z-10 relative"
                     poster={episode.thumbnailUrl}
                 >
@@ -454,10 +479,22 @@ export default function VideoPlayerDialog({
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <DialogContent 
         className="w-full h-full p-0 flex flex-col top-0 translate-y-0 rounded-none md:max-w-[90vw] md:h-[90vh] md:rounded-lg md:top-4 md:translate-y-0"
-        onInteractOutside={(e) => e.preventDefault()}
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onFocusOutside={(e) => e.preventDefault()}
-        onOpenAutoFocus={(e) => e.preventDefault()}
+        onInteractOutside={(e) => {
+            logDebugMessage('Dialog: onInteractOutside fired');
+            e.preventDefault();
+        }}
+        onPointerDownOutside={(e) => {
+            logDebugMessage('Dialog: onPointerDownOutside fired');
+            e.preventDefault();
+        }}
+        onFocusOutside={(e) => {
+            logDebugMessage('Dialog: onFocusOutside fired');
+            e.preventDefault();
+        }}
+        onOpenAutoFocus={(e) => {
+            logDebugMessage('Dialog: onOpenAutoFocus fired');
+            e.preventDefault();
+        }}
       >
         <Tabs defaultValue="summary" className="flex-grow flex flex-col min-h-0">
             <DialogHeader className="p-4 border-b flex-shrink-0 bg-background z-10 flex flex-row justify-between items-center space-x-4 min-w-0">
