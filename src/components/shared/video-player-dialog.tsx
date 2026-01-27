@@ -446,14 +446,20 @@ export default function VideoPlayerDialog({
 
   const mobileContent = (
     <div className="fixed inset-0 bg-background z-[100] flex flex-col">
+        {/* Header Part */}
+        <div className="flex items-center justify-between p-2 border-b flex-shrink-0 bg-background">
+            <h2 className="text-base font-bold leading-tight tracking-tight truncate pl-2">
+                {episode.title}
+            </h2>
+            <button onClick={handleClose} className="p-2 rounded-full text-foreground/70 hover:text-foreground">
+                <X className="h-6 w-6" />
+                <span className="sr-only">Close</span>
+            </button>
+        </div>
+        
         {/* Video Part */}
         <div className="w-full aspect-video bg-black flex flex-col">
             <div className="w-full flex-grow relative">
-                <div className="absolute top-2 left-2 right-2 z-20 p-2 bg-gradient-to-b from-black/50 to-transparent rounded-t-lg pointer-events-none">
-                    <h2 className="text-white text-base font-bold leading-tight tracking-tight truncate pr-8">
-                        {episode.title}
-                    </h2>
-                </div>
                 <div className="absolute inset-0 flex items-center justify-center">
                     {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
                     {srcError && !isLoadingSrc && (
@@ -490,10 +496,6 @@ export default function VideoPlayerDialog({
                 </TabsContent>
             </Tabs>
         </div>
-        <button onClick={handleClose} className="absolute top-2 right-2 z-50 p-2 rounded-full bg-black/50 text-white">
-          <X className="h-6 w-6" />
-          <span className="sr-only">Close</span>
-        </button>
     </div>
   );
 
