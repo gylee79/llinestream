@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -295,7 +294,6 @@ export default function VideoPlayerDialog({
   setChatMessages,
 }: VideoPlayerDialogProps) {
   const { user } = useUser();
-  const [isMounted, setIsMounted] = useState(false);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [vttSrc, setVttSrc] = useState<string | null>(null);
   const [isLoadingSrc, setIsLoadingSrc] = useState(true);
@@ -306,7 +304,7 @@ export default function VideoPlayerDialog({
   const viewLoggedRef = useRef(false);
 
   useEffect(() => {
-    setIsMounted(true);
+    logDebugMessage('VideoPlayerDialog MOUNTED');
     return () => {
         logDebugMessage('VideoPlayerDialog UNMOUNTED');
     }
@@ -424,10 +422,6 @@ export default function VideoPlayerDialog({
         }
     };
   }, [vttSrc]);
-  
-  if (!isMounted) {
-    return null;
-  }
   
   const videoPlayerJsx = (
     <div className="w-full aspect-video bg-black md:col-span-3 md:h-full flex flex-col min-w-0">
