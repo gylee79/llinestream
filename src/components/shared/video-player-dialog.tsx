@@ -19,6 +19,8 @@ import { toDisplayDate } from '@/lib/date-helpers';
 import React from 'react';
 import { firebaseConfig } from '@/firebase/config';
 import { logDebugMessage } from '@/lib/actions/debug-actions';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
+
 
 interface VideoPlayerDialogProps {
   isOpen: boolean;
@@ -324,7 +326,7 @@ export default function VideoPlayerDialog({
     const videoElement = videoRef.current;
     
     const handleFullscreenChange = () => {
-        const isFullscreen = document.fullscreenElement !== null || (videoElement as any)?.webkitDisplayingFullscreen === true;
+        const isFullscreen = document.fullscreenElement !== null || (videoRef.current as any)?.webkitDisplayingFullscreen;
         isFullscreenRef.current = isFullscreen;
         logDebugMessage('fullscreen state changed', { isFullscreen });
     };
@@ -403,12 +405,8 @@ export default function VideoPlayerDialog({
     }
 
     return () => {
-      if (isOpen) {
-        if (!isFullscreenRef.current) {
-            logView();
-        } else {
-            logDebugMessage('View log skipped on cleanup because video is in fullscreen.');
-        }
+      if (isOpen && !isFullscreenRef.current) {
+        logView();
       }
     };
   }, [isOpen, episode, logView]);
@@ -436,20 +434,28 @@ export default function VideoPlayerDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center">
-        <div className="bg-background w-full h-full md:max-w-[90vw] md:h-[90vh] flex flex-col md:rounded-lg overflow-hidden">
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent 
+            className="w-full h-full max-w-full sm:max-w-full md:max-w-[90vw] md:h-[90vh] flex flex-col p-0"
+            onOpenAutoFocus={(e) => e.preventDefault()}
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onFocusOutside={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
+        >
             <Tabs defaultValue="summary" className="flex-grow flex flex-col min-h-0">
-                <header className="p-4 border-b flex-shrink-0 bg-background z-10 flex flex-row justify-between items-center space-x-4">
-                    <h2 className="text-base md:text-lg font-bold truncate pr-2">{episode.title}</h2>
+                <DialogHeader className="p-4 border-b flex-shrink-0 z-10 flex flex-row justify-between items-center space-x-4">
+                    <DialogTitle className="text-base md:text-lg font-bold truncate pr-2">{episode.title}</DialogTitle>
                     <TabsList className="hidden md:grid grid-cols-2 rounded-md h-9 max-w-fit mx-auto">
                         <TabsTrigger value="summary" className="rounded-l-md rounded-r-none h-full">비디오 분석</TabsTrigger>
                         <TabsTrigger value="tutor" className="rounded-r-md rounded-l-none h-full">AI 튜터</TabsTrigger>
                     </TabsList>
-                    <button onClick={handleClose} className="p-1 rounded-full text-foreground/70 hover:text-foreground">
-                        <X className="h-4 w-4" />
-                        <span className="sr-only">Close</span>
-                    </button>
-                </header>
+                    <DialogClose asChild>
+                      <button onClick={handleClose} className="p-1 rounded-full text-foreground/70 hover:text-foreground">
+                          <X className="h-4 w-4" />
+                          <span className="sr-only">Close</span>
+                      </button>
+                    </DialogClose>
+                </DialogHeader>
 
                 <div className="flex-grow flex flex-col md:grid md:grid-cols-5 min-h-0">
                     <div className="w-full aspect-video bg-black md:col-span-3 md:h-full flex flex-col min-w-0">
@@ -502,7 +508,7 @@ export default function VideoPlayerDialog({
                     </div>
                 </div>
             </Tabs>
-        </div>
-    </div>
+        </DialogContent>
+    </Dialog>
   );
 }
