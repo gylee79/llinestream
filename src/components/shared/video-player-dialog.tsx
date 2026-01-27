@@ -434,6 +434,10 @@ export default function VideoPlayerDialog({
     };
   }, [vttSrc]);
   
+  if (!isOpen) {
+    return null;
+  }
+  
   return (
     <div className={cn(
         "fixed inset-0 z-50 flex items-center justify-center bg-black/80 transition-opacity",
@@ -441,7 +445,7 @@ export default function VideoPlayerDialog({
     )}>
         <div className="bg-background w-full h-full md:max-w-[90vw] md:h-[90vh] md:rounded-lg flex flex-col">
             <Tabs defaultValue="summary" className="flex-grow flex flex-col min-h-0">
-                <header className="p-4 border-b flex-shrink-0 z-10 flex flex-row justify-between items-center space-x-4">
+                <header className="p-2 border-b flex-shrink-0 z-10 flex flex-row justify-between items-center space-x-4">
                     <h2 className="text-base md:text-lg font-bold truncate pr-2">{episode.title}</h2>
                     <TabsList className="hidden md:grid grid-cols-2 rounded-md h-9 max-w-fit mx-auto">
                         <TabsTrigger value="summary" className="rounded-l-md rounded-r-none h-full">비디오 분석</TabsTrigger>
