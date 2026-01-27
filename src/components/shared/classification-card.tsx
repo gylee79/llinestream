@@ -12,7 +12,7 @@ export default function ClassificationCard({ classification }: ClassificationCar
   return (
     <Link href={`/classifications/${classification.id}`} className="block h-full group">
       <Card className="relative h-full overflow-hidden transition-transform duration-300 ease-in-out hover:scale-105 bg-card border-0 rounded-2xl">
-        <div className="relative aspect-video overflow-hidden rounded-2xl">
+        <div className="relative aspect-square md:aspect-video overflow-hidden rounded-2xl">
           <Image
             src={classification.thumbnailUrl || 'https://picsum.photos/seed/placeholder/600/600'}
             alt={classification.name}
