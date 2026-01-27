@@ -131,7 +131,7 @@ export default function CourseDetailPage() {
   return (
     <>
       <div className="w-full bg-muted">
-        <div className="container mx-auto max-w-4xl pb-12">
+        <div className="container mx-auto max-w-4xl pb-12 pt-0">
           <div className="flex flex-col md:flex-row items-start gap-8 md:gap-12 pt-4">
             <div className="w-full md:w-1/2">
               <h1 className="font-headline text-3xl font-bold tracking-tight">{course.name}</h1>
