@@ -38,6 +38,11 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
     if (isMobile) {
         return 'basis-1/2';
     }
+
+    if (itemType === 'classification') {
+      return 'sm:basis-1/3 md:basis-1/4 lg:basis-1/5';
+    }
+    
     // Default for desktop: show more items for all carousels.
     return 'sm:basis-1/4 md:basis-1/5 lg:basis-1/6';
   };
