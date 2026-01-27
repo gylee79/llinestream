@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp } from 'firebase/firestore';
-import { toDisplayTime, toJSDate } from '@/lib/date-helpers';
+import { toDisplayTime } from '@/lib/date-helpers';
 import React from 'react';
 import { firebaseConfig } from '@/firebase/config';
 
@@ -477,7 +477,7 @@ export default function VideoPlayerDialog({
 
         {/* Tabs Part */}
         <div className="flex-grow flex flex-col border-t min-h-0">
-            <Tabs defaultValue="tutor" className="flex-grow flex flex-col min-h-0">
+            <Tabs defaultValue="summary" className="flex-grow flex flex-col min-h-0">
                 <TabsList className="grid w-full grid-cols-2 flex-shrink-0 rounded-none border-b">
                     <TabsTrigger value="summary">비디오 분석</TabsTrigger>
                     <TabsTrigger value="tutor">AI 튜터</TabsTrigger>
@@ -504,7 +504,7 @@ export default function VideoPlayerDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
-        <Tabs defaultValue="tutor">
+        <Tabs defaultValue="summary">
             <DialogContent 
                 className="w-full h-full p-0 flex flex-col top-0 translate-y-0 rounded-none md:max-w-[90vw] md:h-[90vh] md:rounded-lg md:top-1/2 md:-translate-y-1/2"
                 onInteractOutside={(e) => e.preventDefault()}
