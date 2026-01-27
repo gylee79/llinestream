@@ -19,7 +19,6 @@ import { toDisplayDate } from '@/lib/date-helpers';
 import React from 'react';
 import { firebaseConfig } from '@/firebase/config';
 import { logDebugMessage } from '@/lib/actions/debug-actions';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 
 
 interface VideoPlayerDialogProps {
@@ -291,8 +290,8 @@ export default function VideoPlayerDialog({
   const [vttSrc, setVttSrc] = useState<string | null>(null);
   const [isLoadingSrc, setIsLoadingSrc] = useState(true);
   const [srcError, setSrcError] = useState<string | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  
+  const [isReady, setIsReady] = useState(false);
+
   const startTimeRef = useRef<Date | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const viewLoggedRef = useRef(false);
@@ -339,81 +338,84 @@ export default function VideoPlayerDialog({
   }, [logView, onOpenChange]);
 
   useEffect(() => {
-    const videoElement = videoRef.current;
-
     const handleFullscreenChange = () => {
-        const isCurrentlyFullscreen = document.fullscreenElement !== null || (videoRef.current as any)?.webkitDisplayingFullscreen;
-        isFullscreenRef.current = isCurrentlyFullscreen;
-        setIsFullscreen(isCurrentlyFullscreen);
-        logDebugMessage('fullscreen state changed', { isFullscreen: isCurrentlyFullscreen });
+        const isFullscreen = document.fullscreenElement !== null || (videoRef.current as any)?.webkitDisplayingFullscreen;
+        isFullscreenRef.current = isFullscreen;
+        logDebugMessage('fullscreen state changed', { isFullscreen });
     };
 
-    const handleWebkitBeginFullscreen = () => {
-        isFullscreenRef.current = true;
-        setIsFullscreen(true);
-        logDebugMessage('webkitbeginfullscreen event fired');
-    };
-
-    const handleWebkitEndFullscreen = () => {
-        isFullscreenRef.current = false;
-        setIsFullscreen(false);
-        logDebugMessage('webkitendfullscreen event fired');
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    if (videoElement) {
-        videoElement.addEventListener('webkitbeginfullscreen', handleWebkitBeginFullscreen);
-        videoElement.addEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
-    }
+    const handleWebkitBeginFullscreen = () => { isFullscreenRef.current = true; };
+    const handleWebkitEndFullscreen = () => { isFullscreenRef.current = false; };
     
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    const videoElement = videoRef.current;
+    if (videoElement) {
+      videoElement.addEventListener('webkitbeginfullscreen', handleWebkitBeginFullscreen);
+      videoElement.addEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
+    }
+
     return () => {
-        document.removeEventListener('fullscreenchange', handleFullscreenChange);
-        if (videoElement) {
-            videoElement.removeEventListener('webkitbeginfullscreen', handleWebkitBeginFullscreen);
-            videoElement.removeEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
-        }
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+       if (videoElement) {
+        videoElement.removeEventListener('webkitbeginfullscreen', handleWebkitBeginFullscreen);
+        videoElement.removeEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
+      }
     };
   }, []);
 
   useEffect(() => {
     logDebugMessage('VideoPlayerDialog main useEffect executing', { isOpen });
-    if (isOpen) {
-        logDebugMessage('Video dialog opened', { episodeId: episode.id });
+    let unmounted = false;
+
+    async function loadSources() {
+        if (unmounted) return;
+        logDebugMessage('Video dialog opened or episode changed', { episodeId: episode.id });
         setIsLoadingSrc(true);
         setSrcError(null);
         setVideoSrc(null);
         setVttSrc(null);
+        setIsReady(false);
 
-        const bucketName = firebaseConfig.storageBucket;
-        if (!bucketName) {
-            setSrcError("Firebase Storage 버킷 설정이 누락되었습니다.");
+        try {
+            const bucketName = firebaseConfig.storageBucket;
+            if (!bucketName) throw new Error("Firebase Storage bucket 설정이 누락되었습니다.");
+            
+            if (episode.filePath) {
+              const publicVideoUrl = getPublicUrl(bucketName, episode.filePath);
+              if (unmounted) return;
+              setVideoSrc(publicVideoUrl);
+            } else {
+              throw new Error("비디오 파일 경로를 찾을 수 없습니다.");
+            }
+    
+            if (episode.vttPath) {
+              const publicVttUrl = getPublicUrl(bucketName, episode.vttPath);
+              if (unmounted) return;
+              setVttSrc(publicVttUrl);
+            }
+        } catch(e: any) {
+            if (unmounted) return;
+            setSrcError(e.message || '소스 로딩 중 오류 발생');
+        } finally {
+            if (unmounted) return;
             setIsLoadingSrc(false);
-            return;
+            setIsReady(true);
+            startTimeRef.current = new Date();
+            viewLoggedRef.current = false;
         }
+    }
 
-        if (episode.filePath) {
-            const publicVideoUrl = getPublicUrl(bucketName, episode.filePath);
-            setVideoSrc(publicVideoUrl);
-        } else {
-            setSrcError("비디오 파일 경로를 찾을 수 없습니다.");
-        }
-
-        if (episode.vttPath) {
-            const publicVttUrl = getPublicUrl(bucketName, episode.vttPath);
-            setVttSrc(publicVttUrl);
-        }
-
-        setIsLoadingSrc(false);
-        startTimeRef.current = new Date();
-        viewLoggedRef.current = false;
+    if (isOpen) {
+        loadSources();
     }
 
     return () => {
-      if (isOpen && !isFullscreenRef.current) {
-        logView();
-      }
+        unmounted = true;
+        if (isOpen && !isFullscreenRef.current) {
+            logView();
+        }
     };
-  }, [isOpen, episode, logView]);
+}, [isOpen, episode, logView]);
   
   useEffect(() => {
     const video = videoRef.current;
@@ -438,35 +440,20 @@ export default function VideoPlayerDialog({
   }
 
   return (
-    <Dialog 
-        open={isOpen} 
-        onOpenChange={(open) => {
-            if (!open && isFullscreenRef.current) {
-                logDebugMessage('Dialog close ignored due to fullscreen');
-                return;
-            }
-            onOpenChange(open);
-        }}
-    >
-        <DialogContent 
-            className="w-full h-full max-w-full sm:max-w-full md:max-w-[90vw] md:h-[90vh] flex flex-col p-0"
-            onOpenAutoFocus={(e) => e.preventDefault()}
-            onPointerDownOutside={(e) => e.preventDefault()}
-            onFocusOutside={(e) => e.preventDefault()}
-            onInteractOutside={(e) => e.preventDefault()}
-        >
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
+        <div className="bg-background w-full h-full md:max-w-[90vw] md:h-[90vh] md:rounded-lg flex flex-col">
             <Tabs defaultValue="summary" className="flex-grow flex flex-col min-h-0">
-                <DialogHeader className="p-4 border-b flex-shrink-0 z-10 flex flex-row justify-between items-center space-x-4">
-                    <DialogTitle className="text-base md:text-lg font-bold truncate pr-2">{episode.title}</DialogTitle>
+                <header className="p-4 border-b flex-shrink-0 z-10 flex flex-row justify-between items-center space-x-4">
+                    <h2 className="text-base md:text-lg font-bold truncate pr-2">{episode.title}</h2>
                     <TabsList className="hidden md:grid grid-cols-2 rounded-md h-9 max-w-fit mx-auto">
                         <TabsTrigger value="summary" className="rounded-l-md rounded-r-none h-full">비디오 분석</TabsTrigger>
                         <TabsTrigger value="tutor" className="rounded-r-md rounded-l-none h-full">AI 튜터</TabsTrigger>
                     </TabsList>
-                    <button onClick={handleClose} disabled={isFullscreen} className="p-1 rounded-full text-foreground/70 hover:text-foreground disabled:opacity-50">
+                    <button onClick={handleClose} disabled={isFullscreenRef.current} className="p-1 rounded-full text-foreground/70 hover:text-foreground disabled:opacity-50">
                         <X className="h-4 w-4" />
                         <span className="sr-only">Close</span>
                     </button>
-                </DialogHeader>
+                </header>
 
                 <div className="flex-grow flex flex-col md:grid md:grid-cols-5 min-h-0">
                     <div className="w-full aspect-video bg-black md:col-span-3 md:h-full flex flex-col min-w-0">
@@ -480,7 +467,7 @@ export default function VideoPlayerDialog({
                                     </div>
                                 )}
                             </div>
-                            {videoSrc && !isLoadingSrc && !srcError && (
+                            {isReady && videoSrc && !isLoadingSrc && !srcError && (
                                 <video
                                     ref={videoRef}
                                     key={episode.id}
@@ -519,7 +506,9 @@ export default function VideoPlayerDialog({
                     </div>
                 </div>
             </Tabs>
-        </DialogContent>
-    </Dialog>
+        </div>
+    </div>
   );
 }
+
+    
