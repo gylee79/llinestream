@@ -19,6 +19,7 @@ import { toDisplayDate } from '@/lib/date-helpers';
 import React from 'react';
 import { firebaseConfig } from '@/firebase/config';
 import { logDebugMessage } from '@/lib/actions/debug-actions';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 
 
 interface VideoPlayerDialogProps {
@@ -297,15 +298,15 @@ export default function VideoPlayerDialog({
 
   const logView = useCallback(() => {
     if (!user || !startTimeRef.current || viewLoggedRef.current) {
+      logDebugMessage('Skipping view log', { user: !!user, startTime: !!startTimeRef.current, logged: viewLoggedRef.current });
       return;
     }
     viewLoggedRef.current = true;
-
     const endTime = new Date();
     const durationWatched = (endTime.getTime() - startTimeRef.current.getTime()) / 1000;
 
+    logDebugMessage('Attempting to log view', { duration: durationWatched });
     if (durationWatched > 1) {
-      logDebugMessage('Logging view...', { duration: durationWatched });
       const payload = {
         userId: user.id,
         userName: user.name,
@@ -317,8 +318,6 @@ export default function VideoPlayerDialog({
         endedAt: endTime,
       };
       logEpisodeView(payload);
-    } else {
-        logDebugMessage('View duration too short, not logging.', { duration: durationWatched });
     }
   }, [user, episode.id, episode.title, episode.courseId]);
 
@@ -327,37 +326,31 @@ export default function VideoPlayerDialog({
     const videoElement = videoRef.current;
     if (videoElement) {
         videoElement.pause();
-        videoElement.removeAttribute('src'); 
-        videoElement.load();
     }
     logView();
     onOpenChange(false);
   }, [logView, onOpenChange]);
-  
-   useEffect(() => {
-    logDebugMessage('VideoPlayerDialog MOUNTED');
-    return () => {
-        logDebugMessage('VideoPlayerDialog UNMOUNTED');
-    }
-  }, []);
 
   useEffect(() => {
-    const handleFullscreenChange = () => logDebugMessage('fullscreenchange event fired');
-    const handleWebkitBeginFullscreen = () => logDebugMessage('webkitbeginfullscreen event fired');
-    const handleWebkitEndFullscreen = () => logDebugMessage('webkitendfullscreen event fired');
+    logDebugMessage('VideoPlayerDialog MOUNTED');
+    const onFullscreenChange = () => logDebugMessage('fullscreenchange event fired');
+    const onWebkitBeginFullscreen = () => logDebugMessage('webkitbeginfullscreen event fired');
+    const onWebkitEndFullscreen = () => logDebugMessage('webkitendfullscreen event fired');
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitbeginfullscreen', handleWebkitBeginFullscreen);
-    document.addEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitbeginfullscreen', onWebkitBeginFullscreen);
+    document.addEventListener('webkitendfullscreen', onWebkitEndFullscreen);
     
     return () => {
-        document.removeEventListener('fullscreenchange', handleFullscreenChange);
-        document.removeEventListener('webkitbeginfullscreen', handleWebkitBeginFullscreen);
-        document.removeEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
+        logDebugMessage('VideoPlayerDialog UNMOUNTED');
+        document.removeEventListener('fullscreenchange', onFullscreenChange);
+        document.removeEventListener('webkitbeginfullscreen', onWebkitBeginFullscreen);
+        document.removeEventListener('webkitendfullscreen', onWebkitEndFullscreen);
     }
   }, []);
 
   useEffect(() => {
+    logDebugMessage('VideoPlayerDialog main useEffect executing', { isOpen });
     if (isOpen) {
         logDebugMessage('Video dialog opened', { episodeId: episode.id });
         setIsLoadingSrc(true);
@@ -396,44 +389,71 @@ export default function VideoPlayerDialog({
       }
     };
   }, [isOpen, episode, logView]);
-
+  
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !vttSrc) return;
-
     const setInitialTrackMode = () => {
         if (video.textTracks.length > 0) {
             video.textTracks[0].mode = 'showing';
         }
     };
-
     if (video.readyState >= 1) {
         setInitialTrackMode();
     } else {
         video.addEventListener('loadedmetadata', setInitialTrackMode);
     }
-
     return () => {
-        if (video) {
-            video.removeEventListener('loadedmetadata', setInitialTrackMode);
-        }
+        if (video) video.removeEventListener('loadedmetadata', setInitialTrackMode);
     };
   }, [vttSrc]);
-  
-  const videoPlayerJsx = (
-    <div className="w-full aspect-video bg-black md:col-span-3 md:h-full flex flex-col min-w-0">
-        <div className="w-full flex-grow relative">
-            <div className="absolute inset-0 flex items-center justify-center">
-                {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
-                {srcError && !isLoadingSrc && (
-                <div className="text-destructive-foreground bg-destructive/80 p-4 rounded-lg text-center">
-                    <p className="font-semibold">비디오를 불러올 수 없습니다</p>
-                    <p className="text-sm mt-1">{srcError}</p>
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent 
+        className="max-w-full w-full h-full md:max-w-[90vw] md:h-[90vh] flex flex-col p-0 gap-0"
+        onOpenAutoFocus={(e) => {
+            logDebugMessage('Dialog: onOpenAutoFocus fired', { from: 'DialogContent' });
+            e.preventDefault();
+        }}
+        onPointerDownOutside={(e) => {
+            logDebugMessage('Dialog: onPointerDownOutside fired', { from: 'DialogContent' });
+            e.preventDefault();
+        }}
+        onInteractOutside={(e) => {
+            logDebugMessage('Dialog: onInteractOutside fired', { from: 'DialogContent' });
+            e.preventDefault();
+        }}
+      >
+        <Tabs defaultValue="summary" className="flex-grow flex flex-col min-h-0">
+          <DialogHeader className="p-4 border-b flex-shrink-0 bg-background z-10 flex flex-row justify-between items-center space-x-4 md:rounded-t-lg">
+            <DialogTitle className="text-base md:text-lg font-bold truncate pr-2">{episode.title}</DialogTitle>
+            <TabsList className="hidden md:grid grid-cols-2 rounded-md h-9 max-w-fit mx-auto">
+              <TabsTrigger value="summary" className="rounded-l-md rounded-r-none h-full">비디오 분석</TabsTrigger>
+              <TabsTrigger value="tutor" className="rounded-r-md rounded-l-none h-full">AI 튜터</TabsTrigger>
+            </TabsList>
+            <DialogClose asChild>
+              <button onClick={handleClose} className="p-1 rounded-full text-foreground/70 hover:text-foreground">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </button>
+            </DialogClose>
+          </DialogHeader>
+
+          <div className="flex-grow flex flex-col md:grid md:grid-cols-5 min-h-0">
+            <div className="w-full aspect-video bg-black md:col-span-3 md:h-full flex flex-col min-w-0">
+              <div className="w-full flex-grow relative">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
+                  {srcError && !isLoadingSrc && (
+                    <div className="text-destructive-foreground bg-destructive/80 p-4 rounded-lg text-center">
+                      <p className="font-semibold">비디오를 불러올 수 없습니다</p>
+                      <p className="text-sm mt-1">{srcError}</p>
+                    </div>
+                  )}
                 </div>
-                )}
-            </div>
-            {videoSrc && !isLoadingSrc && !srcError && (
-                <video
+                {videoSrc && !isLoadingSrc && !srcError && (
+                  <video
                     ref={videoRef}
                     key={episode.id}
                     id={`video-${episode.id}`}
@@ -446,56 +466,32 @@ export default function VideoPlayerDialog({
                     autoPlay
                     className="w-full h-full object-contain z-10 relative"
                     poster={episode.thumbnailUrl}
-                >
+                  >
                     <source src={videoSrc} type="video/mp4" />
                     {vttSrc && (
-                        <track src={vttSrc} kind="subtitles" srcLang="ko" label="한국어" default />
+                      <track src={vttSrc} kind="subtitles" srcLang="ko" label="한국어" default />
                     )}
                     브라우저가 비디오 태그를 지원하지 않습니다.
-                </video>
-            )}
-        </div>
-    </div>
-  );
-
-  if (!isOpen) {
-    return null;
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center">
-        <div className="bg-background w-full h-full max-w-full sm:max-w-full md:max-w-[90vw] md:h-[90vh] flex flex-col gap-0 shadow-lg md:rounded-lg">
-            <Tabs defaultValue="summary" className="flex-grow flex flex-col min-h-0">
-                <div className="p-4 border-b flex-shrink-0 bg-background z-10 flex flex-row justify-between items-center space-x-4 min-w-0 md:rounded-t-lg">
-                    <h2 className="text-base md:text-lg font-bold truncate pr-2">{episode.title}</h2>
-                    <TabsList className="hidden md:grid grid-cols-2 rounded-md h-9 max-w-fit ml-auto">
-                        <TabsTrigger value="summary" className="rounded-l-md rounded-r-none h-full">비디오 분석</TabsTrigger>
-                        <TabsTrigger value="tutor" className="rounded-r-md rounded-l-none h-full">AI 튜터</TabsTrigger>
-                    </TabsList>
-                    <button onClick={handleClose} className="p-1 rounded-full text-foreground/70 hover:text-foreground">
-                        <X className="h-4 w-4" />
-                        <span className="sr-only">Close</span>
-                    </button>
-                </div>
-
-                <div className="flex-grow flex flex-col md:grid md:grid-cols-5 min-h-0">
-                    {videoPlayerJsx}
-                    
-                    <div className="flex-grow flex flex-col md:col-span-2 border-l min-h-0 md:h-full min-w-0">
-                        <TabsList className="grid w-full grid-cols-2 flex-shrink-0 rounded-none border-b md:hidden">
-                            <TabsTrigger value="summary">비디오 분석</TabsTrigger>
-                            <TabsTrigger value="tutor">AI 튜터</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="summary" className="flex-grow p-0 flex flex-col min-h-0 mt-0">
-                            <AnalysisView episode={episode} />
-                        </TabsContent>
-                        <TabsContent value="tutor" className="flex-grow p-4 flex flex-col min-h-0 mt-0">
-                            {user ? <ChatView episode={episode} user={user} chatMessages={chatMessages} setChatMessages={setChatMessages} /> : <p className="text-center text-muted-foreground p-8">AI 튜터 기능은 로그인 후 사용 가능합니다.</p>}
-                        </TabsContent>
-                    </div>
-                </div>
-            </Tabs>
-        </div>
-    </div>
+                  </video>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex-grow flex flex-col md:col-span-2 border-l min-h-0 md:h-full min-w-0">
+              <TabsList className="grid w-full grid-cols-2 flex-shrink-0 rounded-none border-b md:hidden">
+                <TabsTrigger value="summary">비디오 분석</TabsTrigger>
+                <TabsTrigger value="tutor">AI 튜터</TabsTrigger>
+              </TabsList>
+              <TabsContent value="summary" className="flex-grow p-0 flex flex-col min-h-0 mt-0">
+                <AnalysisView episode={episode} />
+              </TabsContent>
+              <TabsContent value="tutor" className="flex-grow p-4 flex flex-col min-h-0 mt-0">
+                {user ? <ChatView episode={episode} user={user} chatMessages={chatMessages} setChatMessages={setChatMessages} /> : <p className="text-center text-muted-foreground p-8">AI 튜터 기능은 로그인 후 사용 가능합니다.</p>}
+              </TabsContent>
+            </div>
+          </div>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
   );
 }
