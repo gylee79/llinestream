@@ -94,6 +94,11 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
     try {
         const adminApp = initializeAdminApp();
         const db = admin.firestore(adminApp);
+
+        // Get the current number of episodes in the course to set the orderIndex
+        const courseEpisodesQuery = db.collection('episodes').where('courseId', '==', selectedCourseId);
+        const courseEpisodesSnap = await courseEpisodesQuery.get();
+        const newOrderIndex = courseEpisodesSnap.size;
         
         const episodeRef = db.collection('episodes').doc(episodeId);
         
@@ -107,6 +112,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             videoUrl: videoUrl,
             filePath: filePath,
             fileSize: fileSize,
+            orderIndex: newOrderIndex,
             thumbnailUrl: customThumbnailUrl || defaultThumbnailUrl, // Use custom if available
             defaultThumbnailUrl: defaultThumbnailUrl,
             defaultThumbnailPath: defaultThumbnailPath,
