@@ -1,22 +1,19 @@
 
 'use client';
 
-import { useState, useTransition, useMemo } from 'react';
-import Link from 'next/link';
+import { useState, useTransition, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, PlusCircle, ImageIcon, CheckCircle2, AlertTriangle, Loader, HelpCircle } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, ImageIcon, CheckCircle2, AlertTriangle, Loader, HelpCircle, GripVertical } from 'lucide-react';
 import type { Episode, Course, Classification, Field, Instructor } from '@/lib/types';
 import VideoUploadDialog from '@/components/admin/content/video-upload-dialog';
 import {
@@ -26,7 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, doc, query, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
@@ -45,6 +42,8 @@ import { formatDuration, sanitize } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import VideoPlayerDialog from '@/components/shared/video-player-dialog';
 import { resetAIEpisodeStatus } from '@/lib/actions/process-video';
+import { Reorder } from 'framer-motion';
+import { reorderEpisodes } from '@/lib/actions/reorder-episodes';
 
 
 const AIStatusIndicator = ({ episode }: { 
@@ -128,7 +127,8 @@ export default function VideoManager() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const episodesQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'episodes'), orderBy('createdAt', 'desc')) : null), [firestore]);
+  // Data fetching
+  const episodesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'episodes') : null), [firestore]);
   const { data: episodes, isLoading: episodesLoading } = useCollection<Episode>(episodesQuery);
   
   const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
@@ -143,20 +143,76 @@ export default function VideoManager() {
   const instructorsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'instructors') : null), [firestore]);
   const { data: instructors, isLoading: instructorsLoading } = useCollection<Instructor>(instructorsQuery);
 
+  // Dialog states
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [isThumbnailDialogOpen, setThumbnailDialogOpen] = useState(false);
   const [isPlayerDialogOpen, setPlayerDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
+  // Selected items for dialogs
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [selectedInstructor, setSelectedInstructor] = useState<Instructor | null>(null);
-
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [episodeToDelete, setEpisodeToDelete] = useState<Episode | null>(null);
 
-  const totalFileSize = useMemo(() => {
-    if (!episodes) return 0;
-    return episodes.reduce((acc, episode) => acc + (episode.fileSize || 0), 0);
-  }, [episodes]);
+  // Reordering state
+  const [orderedEpisodes, setOrderedEpisodes] = useState<Record<string, Episode[]>>({});
+  const [changedCourses, setChangedCourses] = useState<Set<string>>(new Set());
+  const [isSavingOrder, startOrderSaveTransition] = useTransition();
+
+  const getFullCoursePath = useCallback((courseId: string): string => {
+    if (!courses || !classifications || !fields) return '? > ? > ?';
+    
+    const course = courses.find(c => c.id === courseId);
+    if (!course) return `? > ? > ${courseId}`;
+
+    const classification = classifications.find(c => c.id === course.classificationId);
+    if (!classification) return `? > ? > ${course.name}`;
+
+    const field = fields.find(f => f.id === classification.fieldId);
+    if (!field) return `? > ${classification.name} > ${course.name}`;
+
+    return `${field.name} > ${classification.name} > ${course.name}`;
+  }, [courses, classifications, fields]);
+
+  const groupedAndSortedEpisodes = useMemo(() => {
+    if (!episodes || !courses) return {};
+    
+    const courseMap = new Map(courses.map(c => [c.id, c]));
+    
+    const groups: Record<string, { course: Course, episodes: Episode[] }> = {};
+
+    for (const episode of episodes) {
+        if (!groups[episode.courseId]) {
+            const course = courseMap.get(episode.courseId);
+            if (course) {
+                groups[episode.courseId] = {
+                    course: course,
+                    episodes: [],
+                };
+            }
+        }
+        if (groups[episode.courseId]) {
+            groups[episode.courseId].episodes.push(episode);
+        }
+    }
+    
+    // Sort episodes within each group by orderIndex
+    for (const courseId in groups) {
+        groups[courseId].episodes.sort((a, b) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
+    }
+    
+    return groups;
+}, [episodes, courses]);
+
+useEffect(() => {
+    const initialOrder: Record<string, Episode[]> = {};
+    for (const courseId in groupedAndSortedEpisodes) {
+        initialOrder[courseId] = groupedAndSortedEpisodes[courseId].episodes;
+    }
+    setOrderedEpisodes(initialOrder);
+    setChangedCourses(new Set()); // Reset changes when data reloads
+}, [groupedAndSortedEpisodes]);
+
 
   const handleOpenUploadDialog = (episode: Episode | null = null) => {
     setSelectedEpisode(episode);
@@ -173,21 +229,6 @@ export default function VideoManager() {
     setSelectedInstructor(instructors?.find(i => i.id === episode.instructorId) || null);
     setPlayerDialogOpen(true);
   }
-
-  const getFullCoursePath = (courseId: string): string => {
-    if (!courses || !classifications || !fields) return '? > ? > ?';
-    
-    const course = courses.find(c => c.id === courseId);
-    if (!course) return `? > ? > ${courseId}`;
-
-    const classification = classifications.find(c => c.id === course.classificationId);
-    if (!classification) return `? > ? > ${course.name}`;
-
-    const field = fields.find(f => f.id === classification.fieldId);
-    if (!field) return `? > ${classification.name} > ${course.name}`;
-
-    return `${field.name} > ${classification.name} > ${course.name}`;
-  };
 
   const getInstructorName = (instructorId?: string): string => {
     if (!instructorId || !instructors) return 'N/A';
@@ -236,6 +277,29 @@ export default function VideoManager() {
     }
   };
 
+  const handleReorder = (courseId: string, newOrder: Episode[]) => {
+    setOrderedEpisodes(prev => ({ ...prev, [courseId]: newOrder }));
+    setChangedCourses(prev => new Set(prev).add(courseId));
+  };
+
+  const handleSaveOrder = (courseId: string) => {
+      startOrderSaveTransition(async () => {
+          const episodeIds = orderedEpisodes[courseId]?.map(ep => ep.id) || [];
+          if(episodeIds.length === 0) return;
+
+          const result = await reorderEpisodes(courseId, episodeIds);
+          if (result.success) {
+              toast({ title: '저장 완료', description: '에피소드 순서가 저장되었습니다.' });
+              setChangedCourses(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(courseId);
+                  return newSet;
+              })
+          } else {
+              toast({ variant: 'destructive', title: '저장 실패', description: result.message });
+          }
+      });
+  };
 
   const isLoading = episodesLoading || coursesLoading || classLoading || fieldsLoading || instructorsLoading;
 
@@ -245,7 +309,7 @@ export default function VideoManager() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>비디오 관리</CardTitle>
-            <p className="text-sm text-muted-foreground">개별 에피소드를 업로드하고 관리합니다.</p>
+            <p className="text-sm text-muted-foreground">상세분류별로 에피소드를 드래그하여 순서를 변경하고 관리합니다.</p>
           </div>
           <Button onClick={() => handleOpenUploadDialog()}>
             <PlusCircle className="mr-2 h-4 w-4" />
@@ -254,106 +318,88 @@ export default function VideoManager() {
         </CardHeader>
         <CardContent>
           <TooltipProvider>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[80px]">썸네일</TableHead>
-                  <TableHead>제목</TableHead>
-                  <TableHead>소속 상세분류</TableHead>
-                  <TableHead>재생 시간</TableHead>
-                  <TableHead>
-                    <div>파일 용량</div>
-                    <div className="text-xs font-normal text-muted-foreground">({formatFileSize(totalFileSize)})</div>
-                  </TableHead>
-                  <TableHead>강사</TableHead>
-                  <TableHead>AI 상태</TableHead>
-                  <TableHead>무료 여부</TableHead>
-                  <TableHead className="text-right">관리</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>
-                          <TableCell colSpan={9}><Skeleton className="h-8 w-full" /></TableCell>
-                      </TableRow>
-                  ))
-                ) : (
-                  episodes?.map((episode) => (
-                    <TableRow key={episode.id}>
-                      <TableCell>
-                          <div className="relative aspect-video w-20 rounded-lg overflow-hidden bg-muted border">
-                              {episode.thumbnailUrl ? (
-                                  <Image
-                                      src={episode.thumbnailUrl}
-                                      alt={episode.title}
-                                      fill
-                                      sizes="80px"
-                                      className="object-cover"
-                                  />
-                              ) : (
-                                  <div className="flex items-center justify-center h-full w-full">
-                                      <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                                  </div>
-                              )}
-                          </div>
-                      </TableCell>
-                      <TableCell className="font-medium">{episode.title}</TableCell>
-                      <TableCell>{getFullCoursePath(episode.courseId)}</TableCell>
-                      <TableCell>{formatDuration(episode.duration)}</TableCell>
-                      <TableCell>{formatFileSize(episode.fileSize)}</TableCell>
-                      <TableCell>{getInstructorName(episode.instructorId)}</TableCell>
-                      <TableCell>
-                        <AIStatusIndicator episode={episode} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            checked={episode.isFree}
-                            onCheckedChange={() => toggleFreeStatus(episode)}
-                            aria-label="Toggle free status"
-                          />
-                          <Tooltip>
-                            <TooltipTrigger>
-                                <Badge variant={episode.isFree ? "secondary" : "outline"}>
-                                    {episode.isFree ? '무료' : '유료'}
-                                </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                {episode.isFree ? <p>무료영상은 구독과 관계없이 누구나 시청가능합니다.</p> : <p>유료영상은 해당 분류의 이용권 구독자만 시청가능합니다.</p>}
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right space-x-2">
-                         <Button variant="outline" size="sm" onClick={() => handlePlayVideo(episode)}>
-                            시청
-                         </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">메뉴 열기</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleOpenUploadDialog(episode)}>
-                              정보 수정
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleOpenThumbnailDialog(episode)}>
-                              썸네일 수정
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => requestDeleteEpisode(episode)}>
-                              삭제
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+            {isLoading ? (
+                <div className="space-y-4">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                </div>
+            ) : Object.keys(orderedEpisodes).length > 0 ? (
+                <Accordion type="multiple" className="w-full space-y-2">
+                    {Object.entries(orderedEpisodes).map(([courseId, episodeList]) => {
+                        const courseName = getFullCoursePath(courseId);
+                        const isChanged = changedCourses.has(courseId);
+                        return (
+                            <AccordionItem value={courseId} key={courseId} className="border-b-0">
+                                <Card className="overflow-hidden">
+                                <AccordionTrigger className="px-4 py-2 hover:no-underline bg-muted/50">
+                                    <div className="flex items-center justify-between w-full">
+                                        <div className="flex flex-col text-left">
+                                            <span className="font-semibold">{courseName}</span>
+                                            <span className="text-sm text-muted-foreground">({episodeList.length}개 에피소드)</span>
+                                        </div>
+                                        <Button 
+                                            size="sm" 
+                                            disabled={!isChanged || isSavingOrder}
+                                            onClick={(e) => { e.stopPropagation(); handleSaveOrder(courseId); }}
+                                            className="mr-4"
+                                        >
+                                            {isSavingOrder && changedCourses.has(courseId) ? '저장 중...' : '순서 저장'}
+                                        </Button>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="p-2">
+                                    <Reorder.Group axis="y" values={episodeList} onReorder={(newOrder) => handleReorder(courseId, newOrder as Episode[])}>
+                                        <div className="space-y-2">
+                                        {episodeList.map((episode) => (
+                                            <Reorder.Item key={episode.id} value={episode} className="bg-background rounded-lg border">
+                                                <div className="p-2 flex items-center gap-3">
+                                                    <GripVertical className="cursor-grab text-muted-foreground" />
+                                                    <div className="relative aspect-video w-16 rounded-md overflow-hidden bg-muted border flex-shrink-0">
+                                                        {episode.thumbnailUrl ? (
+                                                            <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="64px" className="object-cover" />
+                                                        ) : (
+                                                            <ImageIcon className="h-5 w-5 text-muted-foreground m-auto" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-grow grid grid-cols-6 gap-2 items-center text-sm min-w-0">
+                                                      <p className="font-medium truncate col-span-2" title={episode.title}>{episode.title}</p>
+                                                      <p className="truncate">{formatDuration(episode.duration)}</p>
+                                                      <p className="truncate">{getInstructorName(episode.instructorId)}</p>
+                                                      <div className="flex items-center gap-2">
+                                                        <AIStatusIndicator episode={episode} />
+                                                        <Switch checked={episode.isFree} onCheckedChange={() => toggleFreeStatus(episode)} />
+                                                      </div>
+                                                      <div className="col-span-1 flex justify-end items-center">
+                                                          <Button variant="outline" size="sm" onClick={() => handlePlayVideo(episode)}>시청</Button>
+                                                          <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                              </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                              <DropdownMenuItem onClick={() => handleOpenUploadDialog(episode)}>정보 수정</DropdownMenuItem>
+                                                              <DropdownMenuItem onClick={() => handleOpenThumbnailDialog(episode)}>썸네일 수정</DropdownMenuItem>
+                                                              <DropdownMenuItem className="text-destructive" onClick={() => requestDeleteEpisode(episode)}>삭제</DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                          </DropdownMenu>
+                                                      </div>
+                                                    </div>
+                                                </div>
+                                            </Reorder.Item>
+                                        ))}
+                                        </div>
+                                    </Reorder.Group>
+                                </AccordionContent>
+                                </Card>
+                            </AccordionItem>
+                        )
+                    })}
+                </Accordion>
+            ) : (
+                <div className="text-center text-muted-foreground py-10">에피소드가 없습니다.</div>
+            )}
           </TooltipProvider>
         </CardContent>
       </Card>
