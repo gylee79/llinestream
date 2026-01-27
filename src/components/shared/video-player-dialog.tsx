@@ -47,7 +47,6 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
     const [userQuestion, setUserQuestion] = useState('');
     const chatScrollAreaRef = useRef<HTMLDivElement>(null);
     
-    // Internal state for chat messages if not provided by props
     const [internalMessages, setInternalMessages] = useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -276,7 +275,6 @@ const AnalysisView = ({ episode }: { episode: Episode }) => {
             </div>
         )
     } catch(e) {
-        // Fallback for old plain-text content
         return (
             <ScrollArea className="h-full w-full">
                 <p className="p-4 text-sm text-muted-foreground whitespace-pre-line break-words">{episode.aiGeneratedContent}</p>
@@ -298,18 +296,10 @@ export default function VideoPlayerDialog({
   const [vttSrc, setVttSrc] = useState<string | null>(null);
   const [isLoadingSrc, setIsLoadingSrc] = useState(true);
   const [srcError, setSrcError] = useState<string | null>(null);
-  const videoKey = episode.id; 
+  
   const startTimeRef = useRef<Date | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const viewLoggedRef = useRef(false);
-
-  useEffect(() => {
-    logDebugMessage('VideoPlayerDialog MOUNTED');
-    return () => {
-        logDebugMessage('VideoPlayerDialog UNMOUNTED');
-    }
-  }, []);
-
 
   const logView = useCallback(() => {
     if (!user || !startTimeRef.current || viewLoggedRef.current) {
@@ -321,6 +311,7 @@ export default function VideoPlayerDialog({
     const durationWatched = (endTime.getTime() - startTimeRef.current.getTime()) / 1000;
 
     if (durationWatched > 1) {
+      logDebugMessage('Logging view...', { duration: durationWatched });
       const payload = {
         userId: user.id,
         userName: user.name,
@@ -332,6 +323,8 @@ export default function VideoPlayerDialog({
         endedAt: endTime,
       };
       logEpisodeView(payload);
+    } else {
+        logDebugMessage('View duration too short, not logging.', { duration: durationWatched });
     }
   }, [user, episode.id, episode.title, episode.courseId]);
 
@@ -348,12 +341,26 @@ export default function VideoPlayerDialog({
   }, [logView, onOpenChange]);
   
   useEffect(() => {
+    logDebugMessage('VideoPlayerDialog MOUNTED');
     const video = videoRef.current;
-
+    
     const handleFullscreenChange = () => logDebugMessage('Video Event: fullscreenchange');
     const handleWebKitBeginFullscreen = () => logDebugMessage('Video Event: webkitbeginfullscreen');
     const handleWebKitEndFullscreen = () => logDebugMessage('Video Event: webkitendfullscreen');
 
+    video?.addEventListener('fullscreenchange', handleFullscreenChange);
+    video?.addEventListener('webkitbeginfullscreen', handleWebKitBeginFullscreen);
+    video?.addEventListener('webkitendfullscreen', handleWebKitEndFullscreen);
+    
+    return () => {
+        logDebugMessage('VideoPlayerDialog UNMOUNTED');
+        video?.removeEventListener('fullscreenchange', handleFullscreenChange);
+        video?.removeEventListener('webkitbeginfullscreen', handleWebKitBeginFullscreen);
+        video?.removeEventListener('webkitendfullscreen', handleWebKitEndFullscreen);
+    }
+  }, []);
+
+  useEffect(() => {
     if (isOpen) {
         logDebugMessage('Video dialog opened', { episodeId: episode.id });
         setIsLoadingSrc(true);
@@ -383,19 +390,12 @@ export default function VideoPlayerDialog({
         setIsLoadingSrc(false);
         startTimeRef.current = new Date();
         viewLoggedRef.current = false;
-        
-        video?.addEventListener('fullscreenchange', handleFullscreenChange);
-        video?.addEventListener('webkitbeginfullscreen', handleWebKitBeginFullscreen);
-        video?.addEventListener('webkitendfullscreen', handleWebKitEndFullscreen);
     }
 
     return () => {
       logDebugMessage('VideoPlayerDialog main useEffect cleanup running', { isOpen });
       if (isOpen) {
         logView();
-        video?.removeEventListener('fullscreenchange', handleFullscreenChange);
-        video?.removeEventListener('webkitbeginfullscreen', handleWebKitBeginFullscreen);
-        video?.removeEventListener('webkitendfullscreen', handleWebKitEndFullscreen);
       }
     };
   }, [isOpen, episode, logView]);
@@ -438,8 +438,8 @@ export default function VideoPlayerDialog({
             {videoSrc && !isLoadingSrc && !srcError && (
                 <video
                     ref={videoRef}
-                    key={videoSrc}
-                    id={`video-${videoKey}`}
+                    key={episode.id}
+                    id={`video-${episode.id}`}
                     crossOrigin="anonymous"
                     controls
                     controlsList="nodownload"
@@ -470,8 +470,8 @@ export default function VideoPlayerDialog({
     }}>
       <DialogContent 
         className="w-full h-full p-0 flex flex-col md:max-w-[90vw] md:h-[90vh] md:rounded-lg"
-        onInteractOutside={(e) => {
-            logDebugMessage('Dialog: onInteractOutside fired', { target: (e.target as HTMLElement).tagName });
+        onOpenAutoFocus={(e) => {
+            logDebugMessage('Dialog: onOpenAutoFocus fired', { from: 'DialogContent' });
             e.preventDefault();
         }}
         onPointerDownOutside={(e) => {
@@ -482,8 +482,8 @@ export default function VideoPlayerDialog({
             logDebugMessage('Dialog: onFocusOutside fired', { target: (e.target as HTMLElement).tagName });
             e.preventDefault();
         }}
-        onOpenAutoFocus={(e) => {
-            logDebugMessage('Dialog: onOpenAutoFocus fired', { from: 'DialogContent' });
+        onInteractOutside={(e) => {
+            logDebugMessage('Dialog: onInteractOutside fired', { target: (e.target as HTMLElement).tagName });
             e.preventDefault();
         }}
       >
