@@ -198,7 +198,7 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
                                 handleAskQuestion();
                             }
                         }}
-                        disabled={isPending || !isAIAvailable}
+                        disabled={isPending || !isAIAvailable || userQuestion === ''}
                     />
                     <Button onClick={handleAskQuestion} disabled={isPending || !userQuestion.trim() || !isAIAvailable}>
                         <Send className="h-4 w-4" />
@@ -230,7 +230,6 @@ const AnalysisView = ({ episode }: { episode: Episode }) => {
                 <ScrollArea className="h-full w-full rounded-md p-4">
                     <div className="w-full space-y-4">
                         <div className="space-y-1">
-                            <h4 className="font-semibold">{episode.title}</h4>
                             <p className="text-base text-foreground whitespace-pre-line break-words">{data.summary || '요약이 없습니다.'}</p>
                         </div>
                         {data.timeline && data.timeline.length > 0 && (
@@ -447,12 +446,12 @@ export default function VideoPlayerDialog({
   const mobileContent = (
     <div className="fixed inset-0 bg-background z-[100] flex flex-col">
         {/* Header Part */}
-        <div className="flex items-center justify-between p-2 border-b flex-shrink-0 bg-background">
-            <h2 className="text-base font-bold leading-tight tracking-tight truncate pl-2">
+        <div className="flex items-center justify-between p-1 border-b flex-shrink-0 bg-background">
+            <h2 className="text-sm font-semibold leading-tight tracking-tight truncate pl-2">
                 {episode.title}
             </h2>
-            <button onClick={handleClose} className="p-2 rounded-full text-foreground/70 hover:text-foreground">
-                <X className="h-6 w-6" />
+            <button onClick={handleClose} className="p-1 rounded-full text-foreground/70 hover:text-foreground">
+                <X className="h-5 w-5" />
                 <span className="sr-only">Close</span>
             </button>
         </div>
