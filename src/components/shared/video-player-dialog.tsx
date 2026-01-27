@@ -1,7 +1,7 @@
 'use client';
 
 import type { Episode, Instructor, ChatMessage, ChatLog } from '@/lib/types';
-import { useEffect, useRef, useState, useTransition, useCallback }from 'react';
+import { useEffect, useRef, useState, useTransition, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
@@ -19,7 +19,6 @@ import { toDisplayDate } from '@/lib/date-helpers';
 import React from 'react';
 import { firebaseConfig } from '@/firebase/config';
 import { logDebugMessage } from '@/lib/actions/debug-actions';
-
 
 interface VideoPlayerDialogProps {
   isOpen: boolean;
@@ -344,8 +343,8 @@ export default function VideoPlayerDialog({
         logDebugMessage('fullscreen state changed', { isFullscreen });
     };
 
-    const handleWebkitBeginFullscreen = () => { isFullscreenRef.current = true; };
-    const handleWebkitEndFullscreen = () => { isFullscreenRef.current = false; };
+    const handleWebkitBeginFullscreen = () => { isFullscreenRef.current = true; logDebugMessage('fullscreen state changed (webkitbegin)', { isFullscreen: true }); };
+    const handleWebkitEndFullscreen = () => { isFullscreenRef.current = false; logDebugMessage('fullscreen state changed (webkitend)', { isFullscreen: false }); };
     
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     const videoElement = videoRef.current;
@@ -435,12 +434,11 @@ export default function VideoPlayerDialog({
     };
   }, [vttSrc]);
   
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
+    <div className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center bg-black/80 transition-opacity",
+        isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+    )}>
         <div className="bg-background w-full h-full md:max-w-[90vw] md:h-[90vh] md:rounded-lg flex flex-col">
             <Tabs defaultValue="summary" className="flex-grow flex flex-col min-h-0">
                 <header className="p-4 border-b flex-shrink-0 z-10 flex flex-row justify-between items-center space-x-4">
@@ -449,7 +447,11 @@ export default function VideoPlayerDialog({
                         <TabsTrigger value="summary" className="rounded-l-md rounded-r-none h-full">비디오 분석</TabsTrigger>
                         <TabsTrigger value="tutor" className="rounded-r-md rounded-l-none h-full">AI 튜터</TabsTrigger>
                     </TabsList>
-                    <button onClick={handleClose} disabled={isFullscreenRef.current} className="p-1 rounded-full text-foreground/70 hover:text-foreground disabled:opacity-50">
+                    <button 
+                        onClick={handleClose}
+                        disabled={isFullscreenRef.current}
+                        className="p-1 rounded-full text-foreground/70 hover:text-foreground disabled:opacity-50"
+                    >
                         <X className="h-4 w-4" />
                         <span className="sr-only">Close</span>
                     </button>
@@ -510,5 +512,3 @@ export default function VideoPlayerDialog({
     </div>
   );
 }
-
-    
