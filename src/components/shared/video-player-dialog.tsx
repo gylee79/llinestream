@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp } from 'firebase/firestore';
-import { toDisplayTime } from '@/lib/date-helpers';
+import { toDisplayTime, toDisplayDate } from '@/lib/date-helpers';
 import React from 'react';
 import { firebaseConfig } from '@/firebase/config';
 
@@ -67,14 +67,13 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
             collection(firestore, 'chat_logs'), 
             where('userId', '==', user.id),
             where('episodeId', '==', episode.id), 
-            orderBy('createdAt', 'desc')
+            orderBy('createdAt', 'asc')
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const logs = snapshot.docs.map(doc => doc.data() as ChatLog);
-            const reversedLogs = logs.reverse(); 
 
-            const newMessages = reversedLogs.flatMap(log => {
+            const newMessages = logs.flatMap(log => {
                 const logDate = (log.createdAt as FirebaseTimestamp)?.toDate() || new Date();
                 const answerDate = new Date(logDate.getTime() + 1);
                 return [
@@ -146,31 +145,54 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
                 </div>
                 ) : (
                     <div className="space-y-4">
-                        {messages.map(message => (
-                             <div key={message.id} className={cn("flex items-end gap-3", message.role === 'user' ? 'justify-end' : 'justify-start')}>
-                                {message.role === 'model' && (
-                                    <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                                        <Bot className="h-5 w-5" />
-                                    </div>
-                                )}
-                                <div className="flex flex-col space-y-1">
-                                  <div className={cn(
-                                      "max-w-md p-3 rounded-lg",
-                                      message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-background border'
-                                  )}>
-                                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                                  </div>
-                                  <span className={cn("text-xs text-muted-foreground px-1", message.role === 'user' ? 'text-right' : 'text-left')}>
-                                    {toDisplayTime(message.createdAt)}
-                                  </span>
-                                </div>
-                                {message.role === 'user' && (
-                                    <div className="flex-shrink-0 h-8 w-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
-                                        <UserIcon className="h-5 w-5" />
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                        {(() => {
+                            let lastDate: string | null = null;
+                            return messages.map(message => {
+                                const currentDate = toDisplayDate(message.createdAt);
+                                const showSeparator = currentDate && currentDate !== lastDate;
+                                if (showSeparator) {
+                                    lastDate = currentDate;
+                                }
+
+                                return (
+                                    <React.Fragment key={message.id}>
+                                        {showSeparator && (
+                                            <div className="relative my-4">
+                                                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                                    <div className="w-full border-t" />
+                                                </div>
+                                                <div className="relative flex justify-center">
+                                                    <span className="bg-background px-2 text-xs text-muted-foreground">{currentDate}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div className={cn("flex items-end gap-3", message.role === 'user' ? 'justify-end' : 'justify-start')}>
+                                            {message.role === 'model' && (
+                                                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                                                    <Bot className="h-5 w-5" />
+                                                </div>
+                                            )}
+                                            <div className="flex flex-col space-y-1">
+                                                <div className={cn(
+                                                    "max-w-md p-3 rounded-lg",
+                                                    message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-background border'
+                                                )}>
+                                                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                                                </div>
+                                                <span className={cn("text-xs text-muted-foreground px-1", message.role === 'user' ? 'text-right' : 'text-left')}>
+                                                    {toDisplayTime(message.createdAt)}
+                                                </span>
+                                            </div>
+                                            {message.role === 'user' && (
+                                                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
+                                                    <UserIcon className="h-5 w-5" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </React.Fragment>
+                                );
+                            });
+                        })()}
                         {isPending && (
                             <div className="flex items-start gap-3 justify-start pt-4">
                                 <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
@@ -507,7 +529,7 @@ export default function VideoPlayerDialog({
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
         <Tabs defaultValue="summary">
             <DialogContent 
-                className="w-full h-full p-0 flex flex-col top-0 translate-y-0 rounded-none md:max-w-[90vw] md:h-[90vh] md:rounded-lg md:top-1/2 md:-translate-y-1/2"
+                className="w-full p-0 flex flex-col rounded-none md:max-w-[90vw] md:h-[90vh] md:top-4 md:translate-y-0 md:rounded-lg"
                 onInteractOutside={(e) => e.preventDefault()}
                 onOpenAutoFocus={(e) => e.preventDefault()}
             >
