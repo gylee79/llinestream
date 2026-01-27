@@ -19,7 +19,6 @@ import { toDisplayDate } from '@/lib/date-helpers';
 import React from 'react';
 import { firebaseConfig } from '@/firebase/config';
 import { logDebugMessage } from '@/lib/actions/debug-actions';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 
 interface VideoPlayerDialogProps {
@@ -459,27 +458,13 @@ export default function VideoPlayerDialog({
     </div>
   );
 
+  if (!isOpen) {
+    return null;
+  }
+
   return (
-    <Dialog open={isOpen}>
-        <DialogContent 
-            className="w-full h-full max-w-full sm:max-w-full md:max-w-[90vw] md:h-[90vh] flex flex-col p-0 gap-0"
-            onOpenAutoFocus={(e) => {
-                logDebugMessage('Dialog: onOpenAutoFocus fired', { from: 'DialogContent' });
-                e.preventDefault();
-            }}
-            onPointerDownOutside={(e) => {
-                logDebugMessage('Dialog: onPointerDownOutside fired', { target: (e.target as HTMLElement).tagName });
-                e.preventDefault();
-            }}
-            onFocusOutside={(e) => {
-                logDebugMessage('Dialog: onFocusOutside fired', { target: (e.target as HTMLElement).tagName });
-                e.preventDefault();
-            }}
-            onInteractOutside={(e) => {
-                logDebugMessage('Dialog: onInteractOutside fired', { target: (e.target as HTMLElement).tagName });
-                e.preventDefault();
-            }}
-        >
+    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center">
+        <div className="bg-background w-full h-full max-w-full sm:max-w-full md:max-w-[90vw] md:h-[90vh] flex flex-col gap-0 shadow-lg md:rounded-lg">
             <Tabs defaultValue="summary" className="flex-grow flex flex-col min-h-0">
                 <div className="p-4 border-b flex-shrink-0 bg-background z-10 flex flex-row justify-between items-center space-x-4 min-w-0 md:rounded-t-lg">
                     <h2 className="text-base md:text-lg font-bold truncate pr-2">{episode.title}</h2>
@@ -510,7 +495,7 @@ export default function VideoPlayerDialog({
                     </div>
                 </div>
             </Tabs>
-        </DialogContent>
-    </Dialog>
+        </div>
+    </div>
   );
 }
