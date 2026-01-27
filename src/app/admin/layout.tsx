@@ -14,6 +14,7 @@ import {
   Users,
   History,
   ShieldAlert,
+  Bug,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -32,6 +33,7 @@ const adminNavLinks = [
   { href: '/admin/view-history', label: '시청 기록', icon: History },
   { href: '/admin/chats', label: 'AI 채팅 기록', icon: MessageSquare },
   { href: '/admin/settings', label: '설정', icon: Cog },
+  { href: '/admin/debug', label: '디버그 로그', icon: Bug },
 ];
 
 const AdminNav = ({ className }: { className?: string }) => {
