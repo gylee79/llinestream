@@ -179,9 +179,6 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
                                                 )}>
                                                     <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                                                 </div>
-                                                <span className={cn("text-xs text-muted-foreground px-1", message.role === 'user' ? 'text-right' : 'text-left')}>
-                                                    {toDisplayTime(message.createdAt)}
-                                                </span>
                                             </div>
                                             {message.role === 'user' && (
                                                 <div className="flex-shrink-0 h-8 w-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
@@ -529,7 +526,7 @@ export default function VideoPlayerDialog({
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
         <Tabs defaultValue="summary">
             <DialogContent 
-                className="w-full p-0 flex flex-col rounded-none md:max-w-[90vw] md:h-[90vh] md:top-4 md:translate-y-0 md:rounded-lg"
+                className="w-full h-full p-0 flex flex-col top-0 translate-y-0 rounded-none md:max-w-[90vw] md:h-[90vh] md:rounded-lg md:top-4 md:translate-y-0"
                 onInteractOutside={(e) => e.preventDefault()}
                 onOpenAutoFocus={(e) => e.preventDefault()}
             >
