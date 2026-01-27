@@ -1,11 +1,5 @@
 'use client';
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import type { Episode, Instructor, ChatMessage, ChatLog } from '@/lib/types';
 import { useEffect, useRef, useState, useTransition, useCallback } from 'react';
 import { Button } from '../ui/button';
@@ -342,8 +336,25 @@ export default function VideoPlayerDialog({
   
   useEffect(() => {
     logDebugMessage('VideoPlayerDialog MOUNTED');
+    const handleFullscreenChange = () => {
+      logDebugMessage('fullscreenchange event fired');
+    };
+    const handleWebkitBeginFullscreen = () => {
+      logDebugMessage('webkitbeginfullscreen event fired');
+    };
+    const handleWebkitEndFullscreen = () => {
+      logDebugMessage('webkitendfullscreen event fired');
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitbeginfullscreen', handleWebkitBeginFullscreen);
+    document.addEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
+    
     return () => {
         logDebugMessage('VideoPlayerDialog UNMOUNTED');
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        document.removeEventListener('webkitbeginfullscreen', handleWebkitBeginFullscreen);
+        document.removeEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
     }
   }, []);
 
@@ -448,42 +459,44 @@ export default function VideoPlayerDialog({
     </div>
   );
 
-  return (
-    <Dialog open={isOpen}>
-      <DialogContent 
-        className="w-full h-full p-0 flex flex-col md:max-w-[90vw] md:h-[90vh] md:rounded-lg"
-      >
-        <Tabs defaultValue="summary" className="flex-grow flex flex-col min-h-0">
-            <DialogHeader className="p-4 border-b flex-shrink-0 bg-background z-10 flex flex-row justify-between items-center space-x-4 min-w-0">
-                <DialogTitle className="text-base md:text-lg font-bold truncate pr-2">{episode.title}</DialogTitle>
-                <TabsList className="hidden md:grid grid-cols-2 rounded-md h-9 max-w-fit ml-auto">
-                    <TabsTrigger value="summary" className="rounded-l-md rounded-r-none h-full">비디오 분석</TabsTrigger>
-                    <TabsTrigger value="tutor" className="rounded-r-md rounded-l-none h-full">AI 튜터</TabsTrigger>
-                </TabsList>
-                <button onClick={handleClose} className="p-1 rounded-full text-foreground/70 hover:text-foreground">
-                    <X className="h-4 w-4" />
-                    <span className="sr-only">Close</span>
-                </button>
-            </DialogHeader>
+  if (!isOpen) {
+    return null;
+  }
 
-            <div className="flex-grow flex flex-col md:grid md:grid-cols-5 min-h-0">
-                {videoPlayerJsx}
-                
-                <div className="flex-grow flex flex-col md:col-span-2 border-l min-h-0 md:h-full min-w-0">
-                    <TabsList className="grid w-full grid-cols-2 flex-shrink-0 rounded-none border-b md:hidden">
-                        <TabsTrigger value="summary">비디오 분석</TabsTrigger>
-                        <TabsTrigger value="tutor">AI 튜터</TabsTrigger>
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-0">
+        <div className="w-full h-full bg-background flex flex-col md:max-w-[90vw] md:h-[90vh] md:rounded-lg">
+            <Tabs defaultValue="summary" className="flex-grow flex flex-col min-h-0">
+                <div className="p-4 border-b flex-shrink-0 bg-background z-10 flex flex-row justify-between items-center space-x-4 min-w-0 md:rounded-t-lg">
+                    <h2 className="text-base md:text-lg font-bold truncate pr-2">{episode.title}</h2>
+                    <TabsList className="hidden md:grid grid-cols-2 rounded-md h-9 max-w-fit ml-auto">
+                        <TabsTrigger value="summary" className="rounded-l-md rounded-r-none h-full">비디오 분석</TabsTrigger>
+                        <TabsTrigger value="tutor" className="rounded-r-md rounded-l-none h-full">AI 튜터</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="summary" className="flex-grow p-0 flex flex-col min-h-0 mt-0">
-                        <AnalysisView episode={episode} />
-                    </TabsContent>
-                    <TabsContent value="tutor" className="flex-grow p-4 flex flex-col min-h-0 mt-0">
-                        {user ? <ChatView episode={episode} user={user} chatMessages={chatMessages} setChatMessages={setChatMessages} /> : <p className="text-center text-muted-foreground p-8">AI 튜터 기능은 로그인 후 사용 가능합니다.</p>}
-                    </TabsContent>
+                    <button onClick={handleClose} className="p-1 rounded-full text-foreground/70 hover:text-foreground">
+                        <X className="h-4 w-4" />
+                        <span className="sr-only">Close</span>
+                    </button>
                 </div>
-            </div>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
+
+                <div className="flex-grow flex flex-col md:grid md:grid-cols-5 min-h-0">
+                    {videoPlayerJsx}
+                    
+                    <div className="flex-grow flex flex-col md:col-span-2 border-l min-h-0 md:h-full min-w-0">
+                        <TabsList className="grid w-full grid-cols-2 flex-shrink-0 rounded-none border-b md:hidden">
+                            <TabsTrigger value="summary">비디오 분석</TabsTrigger>
+                            <TabsTrigger value="tutor">AI 튜터</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="summary" className="flex-grow p-0 flex flex-col min-h-0 mt-0">
+                            <AnalysisView episode={episode} />
+                        </TabsContent>
+                        <TabsContent value="tutor" className="flex-grow p-4 flex flex-col min-h-0 mt-0">
+                            {user ? <ChatView episode={episode} user={user} chatMessages={chatMessages} setChatMessages={setChatMessages} /> : <p className="text-center text-muted-foreground p-8">AI 튜터 기능은 로그인 후 사용 가능합니다.</p>}
+                        </TabsContent>
+                    </div>
+                </div>
+            </Tabs>
+        </div>
+    </div>
   );
 }
