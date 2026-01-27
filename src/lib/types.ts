@@ -74,6 +74,7 @@ export interface Episode {
   videoUrl: string;
   filePath?: string; // Path in Firebase Storage
   fileSize?: number; // Size in bytes
+  orderIndex?: number; // For manual ordering
   // The single source of truth for the thumbnail to be displayed.
   // This will be the customThumbnailUrl if it exists, otherwise the defaultThumbnailUrl.
   thumbnailUrl: string;
