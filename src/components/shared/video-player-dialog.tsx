@@ -470,8 +470,8 @@ export default function VideoPlayerDialog({
     }}>
       <DialogContent 
         className="w-full h-full p-0 flex flex-col md:max-w-[90vw] md:h-[90vh] md:rounded-lg"
-        onOpenAutoFocus={(e) => {
-            logDebugMessage('Dialog: onOpenAutoFocus fired', { from: 'DialogContent' });
+        onInteractOutside={(e) => {
+            logDebugMessage('Dialog: onInteractOutside fired', { target: (e.target as HTMLElement).tagName });
             e.preventDefault();
         }}
         onPointerDownOutside={(e) => {
@@ -482,8 +482,8 @@ export default function VideoPlayerDialog({
             logDebugMessage('Dialog: onFocusOutside fired', { target: (e.target as HTMLElement).tagName });
             e.preventDefault();
         }}
-        onInteractOutside={(e) => {
-            logDebugMessage('Dialog: onInteractOutside fired', { target: (e.target as HTMLElement).tagName });
+        onOpenAutoFocus={(e) => {
+            logDebugMessage('Dialog: onOpenAutoFocus fired', { from: 'DialogContent' });
             e.preventDefault();
         }}
       >
