@@ -342,21 +342,8 @@ export default function VideoPlayerDialog({
   
   useEffect(() => {
     logDebugMessage('VideoPlayerDialog MOUNTED');
-    const video = videoRef.current;
-    
-    const handleFullscreenChange = () => logDebugMessage('Video Event: fullscreenchange');
-    const handleWebKitBeginFullscreen = () => logDebugMessage('Video Event: webkitbeginfullscreen');
-    const handleWebKitEndFullscreen = () => logDebugMessage('Video Event: webkitendfullscreen');
-
-    video?.addEventListener('fullscreenchange', handleFullscreenChange);
-    video?.addEventListener('webkitbeginfullscreen', handleWebKitBeginFullscreen);
-    video?.addEventListener('webkitendfullscreen', handleWebKitEndFullscreen);
-    
     return () => {
         logDebugMessage('VideoPlayerDialog UNMOUNTED');
-        video?.removeEventListener('fullscreenchange', handleFullscreenChange);
-        video?.removeEventListener('webkitbeginfullscreen', handleWebKitBeginFullscreen);
-        video?.removeEventListener('webkitendfullscreen', handleWebKitEndFullscreen);
     }
   }, []);
 
@@ -462,30 +449,9 @@ export default function VideoPlayerDialog({
   );
 
   return (
-    <Dialog open={isOpen} onOpenChange={(openState) => {
-        logDebugMessage('Dialog: onOpenChange fired', { newOpenState: openState });
-        if (!openState) {
-            handleClose();
-        }
-    }}>
+    <Dialog open={isOpen}>
       <DialogContent 
         className="w-full h-full p-0 flex flex-col md:max-w-[90vw] md:h-[90vh] md:rounded-lg"
-        onOpenAutoFocus={(e) => {
-            logDebugMessage('Dialog: onOpenAutoFocus fired', { from: 'DialogContent' });
-            e.preventDefault();
-        }}
-        onPointerDownOutside={(e) => {
-            logDebugMessage('Dialog: onPointerDownOutside fired', { target: (e.target as HTMLElement).tagName });
-            e.preventDefault();
-        }}
-        onFocusOutside={(e) => {
-            logDebugMessage('Dialog: onFocusOutside fired', { target: (e.target as HTMLElement).tagName });
-            e.preventDefault();
-        }}
-        onInteractOutside={(e) => {
-            logDebugMessage('Dialog: onInteractOutside fired', { target: (e.target as HTMLElement).tagName });
-            e.preventDefault();
-        }}
       >
         <Tabs defaultValue="summary" className="flex-grow flex flex-col min-h-0">
             <DialogHeader className="p-4 border-b flex-shrink-0 bg-background z-10 flex flex-row justify-between items-center space-x-4 min-w-0">
