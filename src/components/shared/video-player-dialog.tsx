@@ -198,7 +198,7 @@ const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: 
                                 handleAskQuestion();
                             }
                         }}
-                        disabled={isPending || !isAIAvailable || userQuestion === ''}
+                        disabled={isPending || !isAIAvailable}
                     />
                     <Button onClick={handleAskQuestion} disabled={isPending || !userQuestion.trim() || !isAIAvailable}>
                         <Send className="h-4 w-4" />
@@ -446,12 +446,12 @@ export default function VideoPlayerDialog({
   const mobileContent = (
     <div className="fixed inset-0 bg-background z-[100] flex flex-col">
         {/* Header Part */}
-        <div className="flex items-center justify-between p-1 border-b flex-shrink-0 bg-background">
-            <h2 className="text-sm font-semibold leading-tight tracking-tight truncate pl-2">
+        <div className="flex items-center justify-between px-2 h-8 border-b flex-shrink-0 bg-background">
+            <h2 className="text-sm font-semibold leading-none truncate pr-2">
                 {episode.title}
             </h2>
             <button onClick={handleClose} className="p-1 rounded-full text-foreground/70 hover:text-foreground">
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
                 <span className="sr-only">Close</span>
             </button>
         </div>
