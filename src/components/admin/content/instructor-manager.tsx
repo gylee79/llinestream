@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -39,6 +38,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toDisplayDate } from '@/lib/date-helpers';
 import { PlusCircle } from 'lucide-react';
+import InstructorEditDialog from './instructor-edit-dialog';
 
 const instructorFormSchema = z.object({
   name: z.string().min(2, { message: '이름은 2자 이상이어야 합니다.' }),
@@ -230,9 +230,16 @@ function InstructorRegistrationDialog({ open, onOpenChange }: { open: boolean, o
 export default function InstructorManager() {
   const firestore = useFirestore();
   const [isRegisterDialogOpen, setRegisterDialogOpen] = useState(false);
-  
+  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedInstructor, setSelectedInstructor] = useState<Instructor | null>(null);
+
   const instructorsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'instructors'), orderBy('createdAt', 'desc')) : null), [firestore]);
   const { data: instructors, isLoading } = useCollection<Instructor>(instructorsQuery);
+
+  const handleEdit = (instructor: Instructor) => {
+    setSelectedInstructor(instructor);
+    setEditDialogOpen(true);
+  };
 
   return (
     <>
@@ -256,13 +263,14 @@ export default function InstructorManager() {
                 <TableHead>연락처</TableHead>
                 <TableHead>생년월일</TableHead>
                 <TableHead>등록일</TableHead>
+                <TableHead className="text-right">관리</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 ))
               ) : instructors?.length ? (
@@ -273,11 +281,14 @@ export default function InstructorManager() {
                     <TableCell>{instructor.phone}</TableCell>
                     <TableCell>{instructor.dob}</TableCell>
                     <TableCell>{toDisplayDate(instructor.createdAt)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm" onClick={() => handleEdit(instructor)}>수정</Button>
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center h-24">
+                  <TableCell colSpan={6} className="text-center h-24">
                     등록된 강사가 없습니다.
                   </TableCell>
                 </TableRow>
@@ -291,6 +302,13 @@ export default function InstructorManager() {
         open={isRegisterDialogOpen}
         onOpenChange={setRegisterDialogOpen}
       />
+      {selectedInstructor && (
+          <InstructorEditDialog
+              instructor={selectedInstructor}
+              open={isEditDialogOpen}
+              onOpenChange={setEditDialogOpen}
+          />
+      )}
     </>
   );
 }
