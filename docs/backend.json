@@ -345,19 +345,6 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["episodeId", "courseId", "classificationId", "fieldId", "content", "createdAt"]
-    },
-    "DebugLog": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "title": "Debug Log",
-        "type": "object",
-        "description": "Stores a single client-side debug log entry for remote debugging.",
-        "properties": {
-            "id": { "type": "string" },
-            "timestamp": { "type": "string", "format": "date-time" },
-            "message": { "type": "string" },
-            "context": { "type": "object" }
-        },
-        "required": ["timestamp", "message"]
     }
   },
   "auth": {
@@ -581,17 +568,6 @@
           "description": "Centralized storage for AI-generated episode content, queryable by fieldId. Doc ID is the same as Episode ID.",
           "params": [
             { "name": "episodeId", "description": "The unique identifier of the episode." }
-          ]
-        }
-      },
-      {
-        "path": "/debug_logs/{logId}",
-        "definition": {
-          "entityName": "DebugLog",
-          "schema": { "$ref": "#/backend/entities/DebugLog" },
-          "description": "A collection for storing client-side debug logs for remote debugging.",
-          "params": [
-            { "name": "logId", "description": "The unique identifier of the log entry." }
           ]
         }
       }

@@ -229,10 +229,3 @@ export type AiSearchScope = 'episode' | 'course' | 'classification' | 'field';
 export interface AITutorSettings {
   defaultSearchScope: AiSearchScope;
 }
-
-export interface DebugLog {
-  id: string;
-  timestamp: Timestamp;
-  message: string;
-  context?: any;
-}

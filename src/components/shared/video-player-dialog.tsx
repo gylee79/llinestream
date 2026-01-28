@@ -18,7 +18,6 @@ import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTim
 import { toDisplayDate } from '@/lib/date-helpers';
 import React from 'react';
 import { firebaseConfig } from '@/firebase/config';
-import { logDebugMessage } from '@/lib/actions/debug-actions';
 
 interface VideoPlayerDialogProps {
   isOpen: boolean;
@@ -298,14 +297,12 @@ export default function VideoPlayerDialog({
 
   const logView = useCallback(() => {
     if (!user || !startTimeRef.current || viewLoggedRef.current) {
-      logDebugMessage('Skipping view log', { user: !!user, startTime: !!startTimeRef.current, logged: viewLoggedRef.current });
       return;
     }
     viewLoggedRef.current = true;
     const endTime = new Date();
     const durationWatched = (endTime.getTime() - startTimeRef.current.getTime()) / 1000;
 
-    logDebugMessage('Attempting to log view', { duration: durationWatched });
     if (durationWatched > 1) {
       const payload = {
         userId: user.id,
@@ -323,11 +320,9 @@ export default function VideoPlayerDialog({
 
   const handleClose = useCallback(() => {
     if (isFullscreenRef.current) {
-        logDebugMessage('Close prevented due to fullscreen mode.');
         return;
     }
 
-    logDebugMessage('handleClose explicitly called');
     const videoElement = videoRef.current;
     if (videoElement) {
         videoElement.pause();
@@ -340,11 +335,10 @@ export default function VideoPlayerDialog({
     const handleFullscreenChange = () => {
         const isFullscreen = document.fullscreenElement !== null || (videoRef.current as any)?.webkitDisplayingFullscreen;
         isFullscreenRef.current = isFullscreen;
-        logDebugMessage('fullscreen state changed', { isFullscreen });
     };
 
-    const handleWebkitBeginFullscreen = () => { isFullscreenRef.current = true; logDebugMessage('fullscreen state changed (webkitbegin)', { isFullscreen: true }); };
-    const handleWebkitEndFullscreen = () => { isFullscreenRef.current = false; logDebugMessage('fullscreen state changed (webkitend)', { isFullscreen: false }); };
+    const handleWebkitBeginFullscreen = () => { isFullscreenRef.current = true; };
+    const handleWebkitEndFullscreen = () => { isFullscreenRef.current = false; };
     
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     const videoElement = videoRef.current;
@@ -363,12 +357,10 @@ export default function VideoPlayerDialog({
   }, []);
 
   useEffect(() => {
-    logDebugMessage('VideoPlayerDialog main useEffect executing', { isOpen });
     let unmounted = false;
 
     async function loadSources() {
         if (unmounted) return;
-        logDebugMessage('Video dialog opened or episode changed', { episodeId: episode.id });
         setIsLoadingSrc(true);
         setSrcError(null);
         setVideoSrc(null);
@@ -516,5 +508,3 @@ export default function VideoPlayerDialog({
     </div>
   );
 }
-
-    
