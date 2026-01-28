@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition, useMemo, useEffect, useCallback } from 'react';
@@ -332,10 +333,10 @@ useEffect(() => {
                             <AccordionItem value={courseId} key={courseId} className="border-b-0">
                                 <Card className="overflow-hidden">
                                 <div className="flex items-center w-full bg-muted/50 pr-4">
-                                    <AccordionTrigger className="flex-grow px-4 py-2 text-left hover:no-underline">
-                                        <div className="flex items-baseline gap-2">
-                                            <span className="font-headline font-semibold text-lg">{courseName}</span>
-                                            <span className="text-sm text-muted-foreground">({episodeList.length}개 에피소드)</span>
+                                    <AccordionTrigger className="flex-grow px-4 py-2 text-left hover:no-underline font-headline">
+                                        <div className="flex items-baseline gap-2 truncate">
+                                            <span className="text-lg font-semibold truncate">{courseName}</span>
+                                            <span className="text-sm text-muted-foreground flex-shrink-0">({episodeList.length}개 에피소드)</span>
                                         </div>
                                     </AccordionTrigger>
                                     <Button 
@@ -368,6 +369,16 @@ useEffect(() => {
                                                       <div className="flex items-center gap-2">
                                                         <AIStatusIndicator episode={episode} />
                                                         <Switch checked={episode.isFree} onCheckedChange={() => toggleFreeStatus(episode)} />
+                                                        <Tooltip>
+                                                            <TooltipTrigger>
+                                                                <Badge variant={episode.isFree ? "secondary" : "outline"}>
+                                                                    {episode.isFree ? '무료' : '유료'}
+                                                                </Badge>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>{episode.isFree ? '무료영상은 구독과 관계없이 누구나 시청가능합니다.' : '유료영상은 해당 분류의 이용권 구독자만 시청가능합니다.'}</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
                                                       </div>
                                                       <div className="col-span-1 flex justify-end items-center">
                                                           <Button variant="outline" size="sm" onClick={() => handlePlayVideo(episode)}>시청</Button>
@@ -453,3 +464,5 @@ useEffect(() => {
     </>
   );
 }
+
+    
