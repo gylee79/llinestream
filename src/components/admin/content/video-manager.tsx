@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useTransition, useMemo, useEffect } from 'react';
+import { useState, useTransition, useMemo, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import {
   Accordion,
@@ -27,7 +26,7 @@ import { collection, doc, query, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { deleteHierarchyItem } from '@/lib/actions/delete-hierarchy-item';
-import ThumbnailEditorDialog from '@/components/admin/content/thumbnail-editor-dialog';
+import ThumbnailEditorDialog from './thumbnail-editor-dialog';
 import {
   AlertDialog,
   AlertDialogAction,
