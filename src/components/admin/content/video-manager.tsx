@@ -333,8 +333,8 @@ useEffect(() => {
                                 <Card className="overflow-hidden">
                                 <div className="flex items-center w-full bg-muted/50 pr-4">
                                     <AccordionTrigger className="flex-grow px-4 py-2 text-left hover:no-underline">
-                                        <div className="flex flex-col">
-                                            <span className="font-semibold">{courseName}</span>
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="font-headline font-semibold text-lg">{courseName}</span>
                                             <span className="text-sm text-muted-foreground">({episodeList.length}개 에피소드)</span>
                                         </div>
                                     </AccordionTrigger>
@@ -342,7 +342,7 @@ useEffect(() => {
                                         size="sm" 
                                         disabled={!isChanged || isSavingOrder}
                                         onClick={(e) => { e.stopPropagation(); handleSaveOrder(courseId); }}
-                                        className="ml-4"
+                                        className="ml-4 flex-shrink-0"
                                     >
                                         {isSavingOrder && changedCourses.has(courseId) ? '저장 중...' : '순서 저장'}
                                     </Button>
