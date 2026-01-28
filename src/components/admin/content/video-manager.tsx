@@ -331,22 +331,22 @@ useEffect(() => {
                         return (
                             <AccordionItem value={courseId} key={courseId} className="border-b-0">
                                 <Card className="overflow-hidden">
-                                <AccordionTrigger className="px-4 py-2 hover:no-underline bg-muted/50">
-                                    <div className="flex items-center justify-between w-full">
-                                        <div className="flex flex-col text-left">
+                                <div className="flex items-center w-full bg-muted/50 pr-4">
+                                    <AccordionTrigger className="flex-grow px-4 py-2 text-left hover:no-underline">
+                                        <div className="flex flex-col">
                                             <span className="font-semibold">{courseName}</span>
                                             <span className="text-sm text-muted-foreground">({episodeList.length}개 에피소드)</span>
                                         </div>
-                                        <Button 
-                                            size="sm" 
-                                            disabled={!isChanged || isSavingOrder}
-                                            onClick={(e) => { e.stopPropagation(); handleSaveOrder(courseId); }}
-                                            className="mr-4"
-                                        >
-                                            {isSavingOrder && changedCourses.has(courseId) ? '저장 중...' : '순서 저장'}
-                                        </Button>
-                                    </div>
-                                </AccordionTrigger>
+                                    </AccordionTrigger>
+                                    <Button 
+                                        size="sm" 
+                                        disabled={!isChanged || isSavingOrder}
+                                        onClick={(e) => { e.stopPropagation(); handleSaveOrder(courseId); }}
+                                        className="ml-4"
+                                    >
+                                        {isSavingOrder && changedCourses.has(courseId) ? '저장 중...' : '순서 저장'}
+                                    </Button>
+                                </div>
                                 <AccordionContent className="p-2">
                                     <Reorder.Group axis="y" values={episodeList} onReorder={(newOrder) => handleReorder(courseId, newOrder as Episode[])}>
                                         <div className="space-y-2">
