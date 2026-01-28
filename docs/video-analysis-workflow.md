@@ -21,7 +21,7 @@
 ### Step 2: Cloud Function 실행 및 AI 분석 (백엔드)
 1.  **자동 트리거:** `episodes` 컬렉션에 `pending` 상태의 새 문서가 감지되면, **v2 Cloud Function (`analyzeVideoOnWrite`)** 이 자동으로 실행됩니다.
 2.  **상태 변경:** 함수는 즉시 해당 에피소드 문서의 상태를 `'processing'`으로 변경하여 중복 작업을 방지합니다.
-3.  **AI 분석 요청:** Storage에 저장된 비디오 파일을 `gemini-1.5-flash-latest` 모델로 전달하여 **구조화된 JSON 데이터**(대본, 요약, 타임라인, 키워드 등)를 요청합니다.
+3.  **AI 분석 요청:** Storage에 저장된 비디오 파일을 `gemini-2.5-flash` 모델로 전달하여 **구조화된 JSON 데이터**(대본, 요약, 타임라인, 키워드 등)를 요청합니다.
 
 ### Step 3: 분석 결과 저장 (백엔드)
 AI 분석이 완료되면, Cloud Function은 Firestore에 **두 종류의 데이터**를 저장합니다.
