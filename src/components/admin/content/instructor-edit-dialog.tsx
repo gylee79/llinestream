@@ -69,7 +69,10 @@ export default function InstructorEditDialog({ instructor, open, onOpenChange }:
     try {
       const result = await updateInstructor({
         id: instructor.id,
-        ...data,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        dob: data.dob,
       });
 
       if (result.success) {
