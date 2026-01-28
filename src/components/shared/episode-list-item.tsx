@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from 'next/image';
@@ -14,6 +13,7 @@ import EpisodeCommentDialog from '@/components/shared/episode-comment-dialog';
 import { cn } from '@/lib/utils';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
+import { toJSDate } from '@/lib/date-helpers';
 
 const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -38,7 +38,10 @@ export default function EpisodeListItem({ episode, instructor, user, comments, h
     const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
     const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
 
-    const isPlayable = !!(episode.isFree || (user && course && user.activeSubscriptions?.[course.id]));
+    const subscription = user?.activeSubscriptions?.[course?.id || ''];
+    const isSubscriptionActive = subscription ? new Date() < (toJSDate(subscription.expiresAt) || new Date(0)) : false;
+
+    const isPlayable = !!(episode.isFree || (user && course && isSubscriptionActive));
 
     const { averageRating, ratedCommentsCount } = useMemo(() => {
         if (!comments || comments.length === 0) return { averageRating: 0, ratedCommentsCount: 0 };
