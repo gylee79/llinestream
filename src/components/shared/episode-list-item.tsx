@@ -1,19 +1,23 @@
 'use client';
 
 import Image from 'next/image';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Suspense } from 'react';
 import { Lock, Play, Star, Clock, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { Episode, Instructor, Course, User, EpisodeComment } from '@/lib/types';
-import VideoPlayerDialog from '@/components/shared/video-player-dialog';
-import PaymentDialog from '@/components/shared/payment-dialog';
-import EpisodeCommentDialog from '@/components/shared/episode-comment-dialog';
 import { cn } from '@/lib/utils';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { toJSDate } from '@/lib/date-helpers';
+import dynamic from 'next/dynamic';
+import { Skeleton } from '../ui/skeleton';
+
+const VideoPlayerDialog = dynamic(() => import('@/components/shared/video-player-dialog'));
+const PaymentDialog = dynamic(() => import('@/components/shared/payment-dialog'));
+const EpisodeCommentDialog = dynamic(() => import('@/components/shared/episode-comment-dialog'));
+
 
 const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -124,7 +128,7 @@ export default function EpisodeListItem({ episode, instructor, user, comments, h
                 </CardContent>
             </Card>
 
-            {isPlayable && (
+            {isPlayerOpen && (
                 <VideoPlayerDialog 
                     isOpen={isPlayerOpen}
                     onOpenChange={setPlayerOpen}
@@ -133,7 +137,7 @@ export default function EpisodeListItem({ episode, instructor, user, comments, h
                 />
             )}
 
-            {user && (
+            {isCommentOpen && user && (
                 <EpisodeCommentDialog 
                     isOpen={isCommentOpen}
                     onOpenChange={setCommentOpen}
