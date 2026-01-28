@@ -76,13 +76,7 @@ export default function AdminViewHistoryPage() {
       
       <Card className="mt-6">
         <CardHeader>
-            <div>
-              <CardTitle>전체 시청 기록</CardTitle>
-              <CardDescription>
-                사용자, 비디오 제목, 날짜별로 시청 기록을 필터링할 수 있습니다.
-              </CardDescription>
-            </div>
-             <div className="flex flex-wrap items-center gap-4 mt-4">
+            <div className="flex flex-wrap items-center gap-4">
                 <Select value={filterUser} onValueChange={setFilterUser} disabled={isLoading}>
                     <SelectTrigger className="w-[180px]"><SelectValue placeholder="모든 사용자" /></SelectTrigger>
                     <SelectContent>
