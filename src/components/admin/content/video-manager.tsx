@@ -54,7 +54,8 @@ const AIStatusIndicator = ({ episode }: {
 
     const handleStartAnalysis = () => {
         startTransition(async () => {
-            toast({ title: "AI 분석 요청", description: `'${episode.title}'에 대한 분석을 시작합니다.` });
+            const actionText = episode.aiProcessingStatus === 'completed' ? '재분석' : '분석';
+            toast({ title: `AI ${actionText} 요청`, description: `'${episode.title}'에 대한 ${actionText}을 시작합니다.` });
             const result = await resetAIEpisodeStatus(episode.id);
             if (result.success) {
                 toast({ title: "성공", description: result.message });
@@ -62,56 +63,72 @@ const AIStatusIndicator = ({ episode }: {
                 toast({ variant: 'destructive', title: "실패", description: result.message });
             }
         });
-    }
+    };
 
-    if (isPending || episode.aiProcessingStatus === 'processing') {
-         return (
-            <Tooltip>
-                <TooltipTrigger>
-                    <Loader className="h-4 w-4 text-blue-500 animate-spin" />
-                </TooltipTrigger>
-                <TooltipContent><p>AI 분석 처리 중...</p></TooltipContent>
-            </Tooltip>
-        );
-    }
+    const modelName = episode.aiModel || '?';
     
-    switch (episode.aiProcessingStatus) {
-        case 'completed':
+    const statusContent = () => {
+        if (isPending || episode.aiProcessingStatus === 'processing') {
             return (
                 <Tooltip>
                     <TooltipTrigger>
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        <Loader className="h-4 w-4 text-blue-500 animate-spin" />
                     </TooltipTrigger>
-                    <TooltipContent><p>AI 분석 완료</p></TooltipContent>
+                    <TooltipContent><p>AI 분석 처리 중...</p></TooltipContent>
                 </Tooltip>
             );
-        case 'failed':
-            return (
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-auto w-auto p-0" onClick={handleStartAnalysis}>
-                            <AlertTriangle className="h-4 w-4 text-destructive" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>AI 분석 실패: {episode.aiProcessingError || '알 수 없는 오류'}</p>
-                        <p className="font-semibold">클릭하여 재시도</p>
-                    </TooltipContent>
-                </Tooltip>
-            );
-        case 'pending':
-        default:
-             return (
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                         <Button variant="ghost" size="icon" className="h-auto w-auto p-0" onClick={handleStartAnalysis}>
-                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>AI 분석 대기 중. 클릭하여 시작</p></TooltipContent>
-                </Tooltip>
-            )
-    }
+        }
+        
+        switch (episode.aiProcessingStatus) {
+            case 'completed':
+                return (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-auto w-auto p-0" onClick={handleStartAnalysis}>
+                                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>AI 분석 완료</p>
+                            <p className="font-semibold">클릭하여 재분석</p>
+                        </TooltipContent>
+                    </Tooltip>
+                );
+            case 'failed':
+                return (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-auto w-auto p-0" onClick={handleStartAnalysis}>
+                                <AlertTriangle className="h-4 w-4 text-destructive" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>AI 분석 실패: {episode.aiProcessingError || '알 수 없는 오류'}</p>
+                            <p className="font-semibold">클릭하여 재시도</p>
+                        </TooltipContent>
+                    </Tooltip>
+                );
+            case 'pending':
+            default:
+                return (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-auto w-auto p-0" onClick={handleStartAnalysis}>
+                                <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>AI 분석 대기 중. 클릭하여 시작</p></TooltipContent>
+                    </Tooltip>
+                );
+        }
+    };
+
+    return (
+        <div className="flex items-center gap-1">
+            {statusContent()}
+            <span className="text-xs text-muted-foreground">({modelName})</span>
+        </div>
+    );
 };
 
 const formatFileSize = (bytes: number | undefined): string => {
@@ -369,16 +386,7 @@ useEffect(() => {
                                                       <div className="flex items-center gap-2">
                                                         <AIStatusIndicator episode={episode} />
                                                         <Switch checked={episode.isFree} onCheckedChange={() => toggleFreeStatus(episode)} />
-                                                        <Tooltip>
-                                                            <TooltipTrigger>
-                                                                <Badge variant={episode.isFree ? "secondary" : "outline"}>
-                                                                    {episode.isFree ? '무료' : '유료'}
-                                                                </Badge>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent>
-                                                                <p>{episode.isFree ? '무료영상은 구독과 관계없이 누구나 시청가능합니다.' : '유료영상은 해당 분류의 이용권 구독자만 시청가능합니다.'}</p>
-                                                            </TooltipContent>
-                                                        </Tooltip>
+                                                        <span className="text-xs">{episode.isFree ? '무료' : '유료'}</span>
                                                       </div>
                                                       <div className="col-span-1 flex justify-end items-center">
                                                           <Button variant="outline" size="sm" onClick={() => handlePlayVideo(episode)}>시청</Button>
@@ -464,5 +472,3 @@ useEffect(() => {
     </>
   );
 }
-
-    

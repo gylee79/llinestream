@@ -92,6 +92,7 @@ export interface Episode {
 
   aiProcessingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
   aiProcessingError?: string | null;
+  aiModel?: string; // The model used for the last AI analysis
   
   createdAt: Timestamp;
 }
