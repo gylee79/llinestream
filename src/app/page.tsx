@@ -1,3 +1,4 @@
+
 'use client';
 import Hero from '@/components/home/hero';
 import { useCollection, useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
@@ -72,16 +73,11 @@ export default function Home() {
         />
       <div className="container mx-auto space-y-10 md:space-y-12 py-12">
         {user && watchedEpisodes.length > 0 && (
-          <section>
-            <h2 className="font-headline text-2xl font-semibold tracking-tight mb-4">
-              시청 기록 <span className="text-muted-foreground text-xl">({watchedEpisodes.length})</span>
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {watchedEpisodes.map((episode) => (
-                <EpisodeCard key={episode.id} episode={episode} />
-              ))}
-            </div>
-          </section>
+          <ContentCarousel
+            title="시청 기록"
+            items={watchedEpisodes}
+            itemType="episode"
+          />
         )}
         {fields?.map((field) => {
           const classificationsInField = classifications?.filter(
