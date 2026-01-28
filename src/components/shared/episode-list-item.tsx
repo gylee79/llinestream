@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useState, useMemo, Suspense } from 'react';
+import { useState, useMemo } from 'react';
 import { Lock, Play, Star, Clock, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -42,10 +42,10 @@ export default function EpisodeListItem({ episode, instructor, user, comments, h
     const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
     const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
 
-    const subscription = user?.activeSubscriptions?.[course?.id || ''];
+    // Corrected subscription check logic
+    const subscription = user?.activeSubscriptions?.[episode.courseId];
     const isSubscriptionActive = subscription ? new Date() < (toJSDate(subscription.expiresAt) || new Date(0)) : false;
-
-    const isPlayable = !!(episode.isFree || (user && course && isSubscriptionActive));
+    const isPlayable = !!(episode.isFree || (user && isSubscriptionActive));
 
     const { averageRating, ratedCommentsCount } = useMemo(() => {
         if (!comments || comments.length === 0) return { averageRating: 0, ratedCommentsCount: 0 };
@@ -62,8 +62,11 @@ export default function EpisodeListItem({ episode, instructor, user, comments, h
         if (courseLoading) return;
         if (isPlayable) {
             setPlayerOpen(true);
-        } else {
+        } else if (user) { // Only open payment dialog if user is logged in
             setPaymentOpen(true);
+        } else {
+            // Or redirect to login
+            // For now, nothing happens, as the lock icon suggests it's not available.
         }
     };
     
@@ -122,6 +125,11 @@ export default function EpisodeListItem({ episode, instructor, user, comments, h
                                     fill sizes="96px" 
                                     className="object-cover"
                                 />
+                                {!isPlayable && (
+                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                        <Lock className="h-6 w-6 text-white" />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -145,7 +153,7 @@ export default function EpisodeListItem({ episode, instructor, user, comments, h
                     user={user}
                 />
             )}
-            {!isPlayable && course && (
+            {!isPlayable && user && course && (
                 <PaymentDialog 
                     open={isPaymentOpen}
                     onOpenChange={setPaymentOpen}
