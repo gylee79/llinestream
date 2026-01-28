@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview AI Tutor flow for answering questions about a video episode.
@@ -18,6 +17,14 @@ import { z } from 'zod';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import type { Course, Classification, Episode, AiSearchScope } from '@/lib/types';
+
+// Helper function to remove milliseconds from a timestamp string (e.g., "HH:MM:SS.mmm" -> "HH:MM:SS")
+function removeMilliseconds(timestamp: string): string {
+    if (typeof timestamp === 'string' && timestamp.includes('.')) {
+        return timestamp.split('.')[0];
+    }
+    return timestamp;
+}
 
 const VideoTutorInputSchema = z.object({
   episodeId: z.string().describe('The ID of the video episode being asked about.'),
@@ -46,6 +53,24 @@ const videoTutorFlow = ai.defineFlow(
 
     const adminApp = initializeAdminApp();
     const db = admin.firestore(adminApp);
+    
+    // This helper function processes the raw analysis JSON string to remove milliseconds from timestamps
+    const processAnalysisContent = (content: string) => {
+        try {
+            const analysis = JSON.parse(content);
+            if (analysis.timeline && Array.isArray(analysis.timeline)) {
+                analysis.timeline = analysis.timeline.map((item: any) => ({
+                    ...item,
+                    startTime: removeMilliseconds(item.startTime),
+                    endTime: removeMilliseconds(item.endTime),
+                }));
+            }
+            return analysis;
+        } catch (e) {
+            // If parsing fails, just return a summary object to avoid breaking the flow.
+            return { summary: content };
+        }
+    };
     
     try {
       // Fetch AI settings to determine the scope
@@ -103,19 +128,11 @@ const videoTutorFlow = ai.defineFlow(
         if (!querySnapshot.empty) {
             const chunks = querySnapshot.docs.map(doc => {
                 const chunkData = doc.data();
-                try {
-                    return {
-                        episodeId: chunkData.episodeId,
-                        episodeTitle: episodeTitleMap.get(chunkData.episodeId) || '알 수 없는 영상',
-                        analysis: JSON.parse(chunkData.content)
-                    };
-                } catch (e) {
-                    return {
-                        episodeId: chunkData.episodeId,
-                        episodeTitle: episodeTitleMap.get(chunkData.episodeId) || '알 수 없는 영상',
-                        analysis: { summary: chunkData.content }
-                    };
-                }
+                return {
+                    episodeId: chunkData.episodeId,
+                    episodeTitle: episodeTitleMap.get(chunkData.episodeId) || '알 수 없는 영상',
+                    analysis: processAnalysisContent(chunkData.content)
+                };
             });
             context = JSON.stringify(chunks, null, 2);
         }
@@ -124,7 +141,7 @@ const videoTutorFlow = ai.defineFlow(
            context = JSON.stringify([{
               episodeId: episodeId,
               episodeTitle: episodeData.title,
-              analysis: JSON.parse(episodeData.aiGeneratedContent)
+              analysis: processAnalysisContent(episodeData.aiGeneratedContent)
            }], null, 2);
       }
 
@@ -143,7 +160,8 @@ const videoTutorFlow = ai.defineFlow(
         The user is currently watching the episode titled '${episodeData.title}'.
 
         Based ONLY on the provided JSON context, answer the user's question.
-        - When referencing information from the *currently playing video*, simply state "이 영상에서는..." or "현재 영상에서는...". You MUST cite the specific timestamp from the 'timeline' if available. For example: "이 영상의 00:01:23초에 관련 내용이 있습니다."
+        - When referencing information from the *currently playing video*, simply state "이 영상에서는..." or "현재 영상에서는...". You MUST cite the specific timestamp from the 'timeline' if available.
+        - IMPORTANT: When citing timestamps, you MUST format them as HH:MM:SS and exclude any milliseconds. For example, use "00:01:23초" instead of "00:01:23.456초". For a time range, use a format like "00:01:23초 - 00:01:45초".
         - When referencing information from a *different video*, you MUST state the name of that video using the 'episodeTitle' field. For example: "네, 관련 내용이 '${"다른 영상 제목"}' 편에 있습니다."
         - Analyze the structured data, especially the 'timeline' for time-specific events and descriptions.
         - If the context doesn't contain the answer, you MUST state that the information is not in the provided videos and you cannot answer in Korean. Do not use outside knowledge.
