@@ -1,14 +1,13 @@
-
 'use client';
 import Hero from '@/components/home/hero';
 import { useCollection, useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
-import { collection, doc, query, limit, orderBy } from 'firebase/firestore';
+import { collection, doc, query, orderBy } from 'firebase/firestore';
 import { Course, Classification, Episode, HeroImageSettings, Field, EpisodeViewLog } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import ClassificationCard from '@/components/shared/classification-card';
-import ContinueWatching from '@/components/home/continue-watching';
 import ContentCarousel from '@/components/shared/content-carousel';
 import { useMemo } from 'react';
+import EpisodeCard from '@/components/shared/episode-card';
 
 export default function Home() {
   const firestore = useFirestore();
@@ -27,8 +26,7 @@ export default function Home() {
       if (!user || !firestore) return null;
       return query(
           collection(firestore, 'users', user.id, 'viewHistory'),
-          orderBy('endedAt', 'desc'),
-          limit(20)
+          orderBy('endedAt', 'desc')
       );
   }, [user, firestore]);
   const { data: viewLogs, isLoading: historyLoading } = useCollection<EpisodeViewLog>(viewLogsQuery);
@@ -41,7 +39,7 @@ export default function Home() {
       const episodeMap = new Map(allEpisodes.map(e => [e.id, e]));
       const validLogs = viewLogs.filter(log => log.duration >= 5);
       const uniqueEpisodeIds = [...new Set(validLogs.map(log => log.episodeId))];
-      return uniqueEpisodeIds.slice(0, 10).map(episodeId => episodeMap.get(episodeId)).filter(Boolean) as Episode[];
+      return uniqueEpisodeIds.map(episodeId => episodeMap.get(episodeId)).filter(Boolean) as Episode[];
   }, [viewLogs, allEpisodes]);
 
 
@@ -75,11 +73,14 @@ export default function Home() {
       <div className="container mx-auto space-y-10 md:space-y-12 py-12">
         {user && watchedEpisodes.length > 0 && (
           <section>
-            <ContentCarousel
-              title="시청 기록"
-              items={watchedEpisodes}
-              itemType="episode"
-            />
+            <h2 className="font-headline text-2xl font-semibold tracking-tight mb-4">
+              시청 기록 <span className="text-muted-foreground text-xl">({watchedEpisodes.length})</span>
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {watchedEpisodes.map((episode) => (
+                <EpisodeCard key={episode.id} episode={episode} />
+              ))}
+            </div>
           </section>
         )}
         {fields?.map((field) => {
