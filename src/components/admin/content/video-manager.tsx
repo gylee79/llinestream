@@ -350,17 +350,16 @@ useEffect(() => {
                             <AccordionItem value={courseId} key={courseId} className="border-b-0">
                                 <Card className="overflow-hidden">
                                 <div className="flex items-center w-full bg-muted/50 pr-4">
-                                    <AccordionTrigger className="flex-grow px-4 py-2 text-left hover:no-underline font-headline">
-                                        <div className="flex items-baseline gap-2 truncate">
+                                    <AccordionTrigger className="flex-grow px-4 py-2 text-left hover:no-underline">
+                                        <div className="flex items-baseline gap-2 font-headline truncate">
                                             <span className="text-lg font-semibold truncate">{courseName}</span>
                                             <span className="text-sm text-muted-foreground flex-shrink-0">({episodeList.length}개 에피소드)</span>
                                         </div>
                                     </AccordionTrigger>
                                     <Button 
-                                        size="sm" 
                                         disabled={!isChanged || isSavingOrder}
                                         onClick={(e) => { e.stopPropagation(); handleSaveOrder(courseId); }}
-                                        className="ml-4 flex-shrink-0"
+                                        className="ml-4 flex-shrink-0 h-7 text-xs px-2"
                                     >
                                         {isSavingOrder && changedCourses.has(courseId) ? '저장 중...' : '순서 저장'}
                                     </Button>
