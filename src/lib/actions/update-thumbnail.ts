@@ -79,7 +79,10 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     let oldImagePath: string | undefined;
 
     // Determine the old path to delete
-    if (fieldToUpdate && pathFieldToUpdate) {
+    if (itemType === 'settings' && subCollection && fieldToUpdate) {
+        const pathField = fieldToUpdate === 'url' ? 'path' : 'pathMobile';
+        oldImagePath = currentData?.[subCollection]?.[pathField];
+    } else if (fieldToUpdate && pathFieldToUpdate) {
         const oldUrl = subCollection ? currentData?.[subCollection]?.[fieldToUpdate] : currentData?.[fieldToUpdate];
         oldImagePath = currentData?.[pathFieldToUpdate] || extractPathFromUrl(oldUrl);
     } else { // Default thumbnail logic
@@ -95,7 +98,9 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
             ? `settings/hero-${subCollection}-${fieldToUpdate.includes('Mobile') ? 'mobile' : 'pc'}`
             : `${itemType}/${itemId}/${fieldToUpdate || 'thumbnails'}`;
             
-        newImagePath = `${pathPrefix}/${Date.now()}-${imageName}`;
+        const extension = imageName.split('.').pop() || 'jpg';
+        const fixedImageName = `background.${extension}`;
+        newImagePath = `${pathPrefix}/${fixedImageName}`;
         
         const base64EncodedImageString = base64Image.replace(/^data:image\/\w+;base64,/, '');
         const fileBuffer = Buffer.from(base64EncodedImageString, 'base64');
@@ -117,9 +122,11 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     let dataToUpdate: { [key: string]: any };
 
     if (itemType === 'settings' && subCollection && fieldToUpdate) { // Hero image case
+        const pathField = fieldToUpdate === 'url' ? 'path' : 'pathMobile';
         dataToUpdate = {
-            [`${subCollection}.${fieldToUpdate}`]: downloadUrl
-        }
+            [`${subCollection}.${fieldToUpdate}`]: downloadUrl,
+            [`${subCollection}.${pathField}`]: newImagePath
+        };
     } else if (fieldToUpdate && pathFieldToUpdate) { // Generic field update (e.g., introImageUrl)
         dataToUpdate = {
             [fieldToUpdate]: downloadUrl,
