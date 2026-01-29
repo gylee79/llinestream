@@ -52,7 +52,7 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
         ) : (
           <Skeleton className="h-full w-full" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
         <div className="absolute inset-0 z-10 flex h-full flex-col items-center justify-end p-6 text-center text-white">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
