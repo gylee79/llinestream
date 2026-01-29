@@ -12,7 +12,6 @@ import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { toJSDate } from '@/lib/date-helpers';
 import dynamic from 'next/dynamic';
-import { Skeleton } from '../ui/skeleton';
 
 const VideoPlayerDialog = dynamic(() => import('@/components/shared/video-player-dialog'));
 const PaymentDialog = dynamic(() => import('@/components/shared/payment-dialog'));
@@ -42,10 +41,10 @@ export default function EpisodeListItem({ episode, instructor, user, comments, h
     const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
     const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
 
-    // Corrected subscription check logic
     const subscription = user?.activeSubscriptions?.[episode.courseId];
     const isSubscriptionActive = subscription ? new Date() < (toJSDate(subscription.expiresAt) || new Date(0)) : false;
-    const isPlayable = !!(episode.isFree || (user && isSubscriptionActive));
+    
+    const isPlayable = !!(episode.isFree || isSubscriptionActive);
 
     const { averageRating, ratedCommentsCount } = useMemo(() => {
         if (!comments || comments.length === 0) return { averageRating: 0, ratedCommentsCount: 0 };
@@ -126,7 +125,7 @@ export default function EpisodeListItem({ episode, instructor, user, comments, h
                                     className="object-cover"
                                 />
                                 {!isPlayable && (
-                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
                                         <Lock className="h-6 w-6 text-white" />
                                     </div>
                                 )}
