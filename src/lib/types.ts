@@ -155,6 +155,8 @@ export interface FooterSettings {
 export interface HeroContent {
   url?: string;
   urlMobile?: string;
+  path?: string;
+  pathMobile?: string;
   title?: string;
   description?: string;
 }
