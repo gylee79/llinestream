@@ -22,8 +22,6 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
   const { user } = useUser();
   const finalImageUrl = isMobile ? (imageUrlMobile || imageUrl) : imageUrl;
 
-  const heroDescription = "공부하며 궁금한 내용 AI가 도와드립니다~"
-
   return (
     <div className="w-full">
       <motion.div 
@@ -65,9 +63,9 @@ export default function Hero({ title, description, imageUrl, imageUrlMobile }: H
                 {title}
               </h1>
             )}
-            {heroDescription && (
+            {description && (
               <p className="mt-4 max-w-prose text-base text-white/90 md:text-lg">
-                {heroDescription}
+                {description}
               </p>
             )}
              <div className="mt-8 flex justify-center gap-4">
