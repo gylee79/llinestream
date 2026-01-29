@@ -82,10 +82,13 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     if (itemType === 'settings' && subCollection && fieldToUpdate) {
         const pathField = fieldToUpdate === 'url' ? 'path' : 'pathMobile';
         oldImagePath = currentData?.[subCollection]?.[pathField];
+    } else if (itemType === 'episodes') {
+        const episodeData = currentData as Episode;
+        oldImagePath = episodeData.customThumbnailPath || extractPathFromUrl(episodeData.customThumbnailUrl);
     } else if (fieldToUpdate && pathFieldToUpdate) {
         const oldUrl = subCollection ? currentData?.[subCollection]?.[fieldToUpdate] : currentData?.[fieldToUpdate];
         oldImagePath = currentData?.[pathFieldToUpdate] || extractPathFromUrl(oldUrl);
-    } else { // Default thumbnail logic
+    } else { // Default thumbnail logic for Field, Classification, Course
         oldImagePath = (currentData as Field | Classification | Course).thumbnailPath || extractPathFromUrl((currentData as Field | Classification | Course).thumbnailUrl);
     }
 
