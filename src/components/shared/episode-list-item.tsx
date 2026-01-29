@@ -75,12 +75,9 @@ export default function EpisodeListItem({ episode, instructor, user, comments, h
                 <CardContent className="p-3">
                      <div className="flex gap-3">
                         {/* Left Column */}
-                        <div className="flex-grow flex flex-col min-w-0">
-                            <div className="mt-2 md:mt-0">
-                                <h3 className="font-headline text-base font-bold leading-tight tracking-tight line-clamp-2">{episode.title}</h3>
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{episode.description}</p>
-                            </div>
-                            <div className="flex items-center gap-4 text-[10px] md:text-[11px] text-muted-foreground mt-2">
+                        <div className="flex-grow flex flex-col justify-between min-w-0">
+                            <h3 className="font-headline text-base font-bold leading-tight tracking-tight line-clamp-2">{episode.title}</h3>
+                            <div className="flex items-center gap-4 text-[10px] md:text-[11px] text-muted-foreground mt-1">
                                 <p>강사: {instructor?.name || 'N/A'}</p>
                                 <div className="flex items-center gap-1">
                                     <Clock className="w-3 h-3" />
