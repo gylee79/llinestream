@@ -85,13 +85,16 @@ export default function AboutPage() {
         {heroImagesLoading ? (
             <Skeleton className="absolute inset-0" />
         ) : (
+          <>
             <Image
                 src={heroImageUrl || "https://picsum.photos/seed/smart-beauty/1600/900"}
                 alt="스마트 뷰티 교육"
                 fill
                 sizes="100vw"
-                className="object-cover brightness-50"
+                className="object-cover"
             />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
+          </>
         )}
         <motion.div 
             initial={{ opacity: 0, y: 20 }}
