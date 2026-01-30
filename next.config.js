@@ -1,7 +1,5 @@
-// This file has been moved to next.config.js to support the current Next.js version.
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   serverExternalPackages: [
     "genkit",
     "@genkit-ai/firebase",
@@ -39,4 +37,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
