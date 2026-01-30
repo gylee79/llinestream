@@ -1,15 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: [
-    "genkit",
-    "@genkit-ai/firebase",
-    "@genkit-ai/google-genai",
-    "firebase-admin",
-  ],
   experimental: {
     serverActions: {
       bodySizeLimit: '500mb',
     },
+    serverExternalPackages: [
+      "genkit",
+      "@genkit-ai/firebase",
+      "@genkit-ai/google-genai",
+      "firebase-admin",
+    ],
   },
   images: {
     remotePatterns: [
