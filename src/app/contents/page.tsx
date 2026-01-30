@@ -1,23 +1,21 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection } from 'firebase/firestore';
 import type { Course, Classification, Field, Instructor } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from '@/components/ui/card';
+
 
 export default function ContentsPage() {
   const firestore = useFirestore();
+  const [activeTab, setActiveTab] = useState<string | undefined>(undefined);
 
   const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
@@ -50,63 +48,79 @@ export default function ContentsPage() {
     }, {} as Record<string, Course[]>);
   }, [courses, classifications, isLoading]);
 
+  // Set default active tab once fields are loaded
+  if (!activeTab && fields && fields.length > 0) {
+    setActiveTab(fields[0].id);
+  }
+
   return (
     <div className="container mx-auto py-12">
-      <header className="mb-12">
+      <header className="mb-8">
         <h1 className="font-headline text-4xl font-bold tracking-tight">전체 강좌</h1>
         <p className="mt-2 text-lg text-muted-foreground">분야별로 모든 강좌를 확인해보세요.</p>
       </header>
       
       {isLoading ? (
         <div className="space-y-4">
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
+          <div className="flex space-x-2">
+            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-10 w-24" />
+          </div>
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full" />
         </div>
       ) : (
-        <Accordion type="multiple" className="w-full space-y-4">
-            {fields?.map((field) => {
-              const fieldCourses = groupedCourses[field.id] || [];
-              if (fieldCourses.length === 0) return null;
-
-              return (
-                <AccordionItem value={field.id} key={field.id} className="border-b-0 rounded-lg bg-card shadow-sm overflow-hidden">
-                  <AccordionTrigger className="px-6 py-4 text-xl font-bold hover:no-underline">
-                    {field.name}
-                  </AccordionTrigger>
-                  <AccordionContent className="px-2 pt-0">
-                    <div className="divide-y">
-                      {fieldCourses.map(course => {
-                        const classification = classifications?.find(c => c.id === course.classificationId);
-                        const instructor = instructors?.find(i => i.id === course.instructorId);
-
-                        return (
-                          <Link href={`/courses/${course.id}`} key={course.id} className="block p-4 hover:bg-muted/50 transition-colors">
-                            <div className="flex items-center gap-4">
-                              <Avatar className="h-14 w-14 rounded-full">
+        <Tabs defaultValue={fields?.[0]?.id} className="w-full">
+          <TabsList className="mb-6">
+            {fields?.map((field) => (
+              <TabsTrigger key={field.id} value={field.id}>
+                {field.name}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          
+          {fields?.map((field) => {
+            const fieldCourses = groupedCourses[field.id] || [];
+            return (
+              <TabsContent key={field.id} value={field.id}>
+                {fieldCourses.length > 0 ? (
+                  <div className="space-y-4">
+                    {fieldCourses.map(course => {
+                      const instructor = instructors?.find(i => i.id === course.instructorId);
+                      return (
+                        <Link href={`/courses/${course.id}`} key={course.id} className="block group">
+                          <Card className="hover:bg-muted/50 transition-colors">
+                            <CardContent className="p-4 flex items-start gap-4">
+                              <Avatar className="h-16 w-16 rounded-full">
                                 {course.thumbnailUrl ? (
                                   <AvatarImage src={course.thumbnailUrl} alt={course.name} className="object-cover" />
                                 ) : (
-                                  <AvatarFallback className="text-xl font-bold">?</AvatarFallback>
+                                  <AvatarFallback className="text-2xl font-bold bg-muted">?</AvatarFallback>
                                 )}
                               </Avatar>
                               <div className="flex-1">
-                                {classification && <Badge variant="secondary" className="mb-1">{classification.name}</Badge>}
-                                <h3 className="font-bold text-base leading-tight">{course.name}</h3>
-                                <p className="text-sm text-muted-foreground mt-1">
+                                <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">{course.name}</h3>
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
+                                <p className="text-sm font-semibold text-foreground mt-2">
                                   {instructor?.name || '강사 정보 없음'}
                                 </p>
                               </div>
-                            </div>
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              )
-            })}
-        </Accordion>
+                            </CardContent>
+                          </Card>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-16 border rounded-lg bg-muted/50">
+                    <p className="text-muted-foreground">이 분야에는 아직 등록된 강좌가 없습니다.</p>
+                  </div>
+                )}
+              </TabsContent>
+            )
+          })}
+        </Tabs>
       )}
     </div>
   );
