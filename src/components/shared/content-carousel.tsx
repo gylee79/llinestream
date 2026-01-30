@@ -51,7 +51,7 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
     <section>
       <div className="flex justify-between items-center mb-4">
         {title && (
-            <h2 className="font-headline text-2xl font-semibold tracking-tight">
+            <h2 className="font-body text-2xl font-semibold tracking-tight">
               {title} <span className="text-muted-foreground text-xl">({items.length})</span>
             </h2>
         )}
