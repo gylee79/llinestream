@@ -2,16 +2,23 @@
 'use client';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, orderBy } from 'firebase/firestore';
-import { Course, Classification, Episode, Field, EpisodeViewLog } from '@/lib/types';
+import { Course, Classification, Episode, Field, EpisodeViewLog, Instructor } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import ContentCarousel from '@/components/shared/content-carousel';
 import { useMemo } from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { BookUser, ShoppingCart, Bell, Search, BookOpen } from 'lucide-react';
+import ContentCarousel from '@/components/shared/content-carousel';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 
 export default function Home() {
@@ -24,6 +31,12 @@ export default function Home() {
   const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
   const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
   
+  const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
+  const { data: allCourses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
+  
+  const instructorsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'instructors') : null), [firestore]);
+  const { data: instructors, isLoading: instructorsLoading } = useCollection<Instructor>(instructorsQuery);
+
   const viewLogsQuery = useMemoFirebase(() => {
       if (!user || !firestore) return null;
       return query(
@@ -48,8 +61,25 @@ export default function Home() {
     return classifications?.slice(0, 2) || [];
   }, [classifications]);
 
+  const groupedCourses = useMemo(() => {
+    if (!allCourses || !classifications) return {};
+    
+    const classificationMap = new Map(classifications.map(c => [c.id, c.fieldId]));
+    
+    return allCourses.reduce((acc, course) => {
+        const fieldId = classificationMap.get(course.classificationId);
+        if (fieldId) {
+            if (!acc[fieldId]) {
+                acc[fieldId] = [];
+            }
+            acc[fieldId].push(course);
+        }
+        return acc;
+    }, {} as Record<string, Course[]>);
+  }, [allCourses, classifications]);
 
-  const isLoading = fieldsLoading || classificationsLoading || (user && (historyLoading || episodesLoading));
+
+  const isLoading = fieldsLoading || classificationsLoading || coursesLoading || instructorsLoading || (user && (historyLoading || episodesLoading));
   
   if (isLoading) {
       return (
@@ -165,24 +195,50 @@ export default function Home() {
           />
         )}
 
-        {/* All Courses by Field */}
-        {fields?.map((field) => {
-          const classificationsInField = classifications?.filter(
-            (c) => c.fieldId === field.id
-          );
-          
-          if (!classificationsInField || classificationsInField.length === 0) return null;
+        {/* All Courses by Field - Accordion Style */}
+        <Accordion type="multiple" className="w-full space-y-4">
+            {fields?.map((field) => {
+              const fieldCourses = groupedCourses[field.id] || [];
+              if (fieldCourses.length === 0) return null;
 
-          return (
-            <section key={field.id}>
-              <ContentCarousel
-                title={field.name}
-                items={classificationsInField}
-                itemType="classification"
-              />
-            </section>
-          );
-        })}
+              return (
+                <AccordionItem value={field.id} key={field.id} className="border-b-0 rounded-lg bg-card shadow-sm overflow-hidden">
+                  <AccordionTrigger className="px-6 py-4 text-xl font-bold hover:no-underline">
+                    {field.name}
+                  </AccordionTrigger>
+                  <AccordionContent className="px-2 pt-0">
+                    <div className="divide-y">
+                      {fieldCourses.map(course => {
+                        const classification = classifications?.find(c => c.id === course.classificationId);
+                        const instructor = instructors?.find(i => i.id === course.instructorId);
+
+                        return (
+                          <Link href={`/courses/${course.id}`} key={course.id} className="block p-4 hover:bg-muted/50 transition-colors">
+                            <div className="flex items-center gap-4">
+                              <Avatar className="h-14 w-14 rounded-full">
+                                {course.thumbnailUrl ? (
+                                  <AvatarImage src={course.thumbnailUrl} alt={course.name} className="object-cover" />
+                                ) : (
+                                  <AvatarFallback className="text-xl font-bold">?</AvatarFallback>
+                                )}
+                              </Avatar>
+                              <div className="flex-1">
+                                {classification && <Badge variant="secondary" className="mb-1">{classification.name}</Badge>}
+                                <h3 className="font-bold text-base leading-tight">{course.name}</h3>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  {instructor?.name || '강사 정보 없음'}
+                                </p>
+                              </div>
+                            </div>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              )
+            })}
+        </Accordion>
       </div>
     </div>
   );
