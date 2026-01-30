@@ -1,12 +1,12 @@
 'use client';
 
-import type { Episode, Instructor, ChatMessage, ChatLog } from '@/lib/types';
-import { useEffect, useRef, useState, useTransition, useCallback } from 'react';
+import type { Episode, Instructor, Course } from '@/lib/types';
+import React, { useEffect, useRef, useState, useTransition, useCallback } from 'react';
 import { Button } from '../ui/button';
-import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
-import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock } from 'lucide-react';
+import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { cn } from '@/lib/utils';
@@ -14,215 +14,36 @@ import { v4 as uuidv4 } from 'uuid';
 import { getPublicUrl } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
-import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp, doc } from 'firebase/firestore';
 import { toDisplayDate } from '@/lib/date-helpers';
-import React from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import Image from 'next/image';
 import { firebaseConfig } from '@/firebase/config';
 
-interface VideoPlayerDialogProps {
-  isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-  episode: Episode;
-  instructor: Instructor | null;
-  chatMessages?: ChatMessage[];
-  setChatMessages?: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
+// ========= TYPES AND SUB-COMPONENTS (Self-contained) =========
+
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'model';
+  content: string;
+  createdAt: Date;
 }
 
-const ChatView = ({ episode, user, chatMessages: propMessages, setChatMessages: propSetMessages }: { 
-    episode: Episode, 
-    user: any,
-    chatMessages?: ChatMessage[];
-    setChatMessages?: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
-}) => {
-    const firestore = useFirestore();
-    const [isPending, startTransition] = useTransition();
-    const [userQuestion, setUserQuestion] = useState('');
-    const chatScrollAreaRef = useRef<HTMLDivElement>(null);
-    
-    const [internalMessages, setInternalMessages] = useState<ChatMessage[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+interface ChatLog {
+  id: string;
+  userId: string;
+  episodeId: string;
+  courseId: string;
+  question: string;
+  answer: string;
+  contextReferences: string[];
+  createdAt: FirebaseTimestamp;
+}
 
-    const messages = propMessages !== undefined ? propMessages : internalMessages;
-    const setMessages = propSetMessages !== undefined ? propSetMessages : setInternalMessages;
-
-    const isAIAvailable = episode.aiProcessingStatus === 'completed';
-
-    useEffect(() => {
-        if (!user || !firestore) {
-            setIsLoading(false);
-            setMessages([]);
-            return;
-        }
-        
-        const q = query(
-            collection(firestore, 'chat_logs'), 
-            where('userId', '==', user.id),
-            where('episodeId', '==', episode.id), 
-            orderBy('createdAt', 'asc')
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const logs = snapshot.docs.map(doc => doc.data() as ChatLog);
-
-            const newMessages = logs.flatMap(log => {
-                const logDate = (log.createdAt as FirebaseTimestamp)?.toDate() || new Date();
-                const answerDate = new Date(logDate.getTime() + 1);
-                return [
-                    { id: `${log.id}-q`, role: 'user' as const, content: log.question, createdAt: logDate },
-                    { id: `${log.id}-a`, role: 'model' as const, content: log.answer, createdAt: answerDate }
-                ];
-            });
-            
-            setMessages(newMessages);
-            setIsLoading(false);
-        }, (error) => {
-            console.error("Error fetching chat history:", error);
-            setIsLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, [user, episode.id, firestore, setMessages]);
-
-    useEffect(() => {
-        if (chatScrollAreaRef.current) {
-            chatScrollAreaRef.current.scrollTo({ top: chatScrollAreaRef.current.scrollHeight, behavior: 'smooth' });
-        }
-    }, [messages, isPending]);
-
-    const handleAskQuestion = () => {
-        if (!userQuestion.trim() || !user || isPending) return;
-
-        const questionContent = userQuestion.trim();
-        
-        setMessages(prev => [...prev, {
-            id: uuidv4(),
-            role: 'user',
-            content: questionContent,
-            createdAt: new Date(),
-        }]);
-        
-        setUserQuestion('');
-
-        startTransition(async () => {
-            try {
-                await askVideoTutor({
-                    episodeId: episode.id,
-                    question: questionContent,
-                    userId: user.id,
-                });
-            } catch (error) {
-                console.error("Error asking video tutor:", error);
-                setMessages(prev => [...prev, {
-                    id: uuidv4(),
-                    role: 'model',
-                    content: "죄송합니다, 답변을 생성하는 중에 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-                    createdAt: new Date(),
-                }]);
-            }
-        });
-    }
-
-    return (
-        <div className="flex flex-1 flex-col gap-2 min-h-0">
-            <ScrollArea className="flex-grow rounded-md p-4" viewportRef={chatScrollAreaRef}>
-                {isLoading ? (
-                    <div className="flex items-center justify-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>
-                ) : messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center">
-                    <Bot className="h-12 w-12 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground mt-2">
-                        AI 튜터에게 비디오 내용에 대해 궁금한 점을 검색해보세요.
-                    </p>
-                </div>
-                ) : (
-                    <div className="space-y-4">
-                        {(() => {
-                            let lastDate: string | null = null;
-                            return messages.map(message => {
-                                const currentDate = toDisplayDate(message.createdAt);
-                                const showSeparator = currentDate && currentDate !== lastDate;
-                                if (showSeparator) {
-                                    lastDate = currentDate;
-                                }
-
-                                return (
-                                    <React.Fragment key={message.id}>
-                                        {showSeparator && (
-                                            <div className="relative my-4">
-                                                <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                                                    <div className="w-full border-t" />
-                                                </div>
-                                                <div className="relative flex justify-center">
-                                                    <span className="bg-background px-2 text-xs text-muted-foreground">{currentDate}</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                        <div className={cn("flex items-end gap-3", message.role === 'user' ? 'justify-end' : 'justify-start')}>
-                                            {message.role === 'model' && (
-                                                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                                                    <Bot className="h-5 w-5" />
-                                                </div>
-                                            )}
-                                            <div className="flex flex-col space-y-1">
-                                                <div className={cn(
-                                                    "max-w-md p-3 rounded-lg",
-                                                    message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-background border'
-                                                )}>
-                                                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                                                </div>
-                                            </div>
-                                            {message.role === 'user' && (
-                                                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
-                                                    <UserIcon className="h-5 w-5" />
-                                                </div>
-                                            )}
-                                        </div>
-                                    </React.Fragment>
-                                );
-                            });
-                        })()}
-                        {isPending && (
-                            <div className="flex items-start gap-3 justify-start pt-4">
-                                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                                    <Bot className="h-5 w-5 animate-spin" />
-                                </div>
-                                <div className="max-w-md p-3 rounded-lg bg-background border">
-                                    <p className="text-sm text-muted-foreground">답변을 생각하고 있어요...</p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </ScrollArea>
-             <div className="flex-shrink-0">
-                <div className="flex gap-2 items-center">
-                    <Textarea 
-                        placeholder={!isAIAvailable ? "AI 분석이 아직 완료되지 않았습니다." : "AI에게 검색할 내용을 입력하세요..."}
-                        className="flex-grow resize-none h-10 min-h-0" 
-                        rows={1}
-                        value={userQuestion}
-                        onChange={(e) => setUserQuestion(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey && !isPending) {
-                                e.preventDefault();
-                                handleAskQuestion();
-                            }
-                        }}
-                        disabled={isPending || !isAIAvailable}
-                    />
-                    <Button onClick={handleAskQuestion} disabled={isPending || !userQuestion.trim() || !isAIAvailable}>
-                        <Send className="h-4 w-4" />
-                    </Button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const AnalysisView = ({ episode }: { episode: Episode }) => {
+const SyllabusView = ({ episode }: { episode: Episode }) => {
     if (!episode.aiGeneratedContent) {
         return (
-            <div className="flex-grow flex flex-col items-center justify-center text-center p-4 bg-muted rounded-lg">
+            <div className="flex-grow flex flex-col items-center justify-center text-center p-4 bg-white rounded-lg">
                 <FileText className="h-12 w-12 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground mt-2">
                     {episode.aiProcessingStatus === 'completed'
@@ -236,35 +57,34 @@ const AnalysisView = ({ episode }: { episode: Episode }) => {
     try {
         const data = JSON.parse(episode.aiGeneratedContent);
         return (
-            <div className="flex-grow flex flex-col min-h-0">
-                <ScrollArea className="h-full w-full rounded-md p-4">
-                    <div className="w-full space-y-4">
-                        <div className="space-y-1">
-                            <p className="text-base text-foreground whitespace-pre-line break-words">{data.summary || '요약이 없습니다.'}</p>
-                        </div>
-                        {data.timeline && data.timeline.length > 0 && (
-                            <div className="space-y-2">
-                                <h4 className="font-semibold flex items-center gap-2"><Clock className="w-4 h-4" />타임라인</h4>
-                                <Accordion type="single" collapsible className="w-full">
-                                    {data.timeline.map((item: any, i: number) => (
-                                        <AccordionItem value={`item-${i}`} key={i} className="border-b-0">
-                                            <AccordionTrigger className="text-sm hover:no-underline text-left">
-                                                <div className="flex items-start gap-2">
-                                                    <span>{item.startTime.split('.')[0]}</span>
-                                                    <span>{item.subtitle}</span> 
-                                                </div>
-                                            </AccordionTrigger>
-                                            <AccordionContent className="px-4">
-                                                <p className="text-sm text-foreground whitespace-pre-line break-words">{item.description}</p>
-                                            </AccordionContent>
-                                        </AccordionItem>
-                                    ))}
-                                </Accordion>
-                            </div>
-                        )}
+            <ScrollArea className="h-full w-full">
+                <div className="w-full space-y-4 p-1">
+                    <div className="space-y-1">
+                        <h4 className="font-semibold text-base">강의 요약</h4>
+                        <p className="text-sm text-foreground whitespace-pre-line break-words">{data.summary || '요약이 없습니다.'}</p>
                     </div>
-                </ScrollArea>
-            </div>
+                    {data.timeline && data.timeline.length > 0 && (
+                        <div className="space-y-2">
+                            <h4 className="font-semibold flex items-center gap-2 text-base"><Clock className="w-4 h-4" />타임라인</h4>
+                            <Accordion type="single" collapsible className="w-full">
+                                {data.timeline.map((item: any, i: number) => (
+                                    <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white">
+                                        <AccordionTrigger className="text-sm hover:no-underline text-left px-3 py-2">
+                                            <div className="flex items-start gap-2">
+                                                <span className="font-mono">{item.startTime.split('.')[0]}</span>
+                                                <span className="truncate">{item.subtitle}</span> 
+                                            </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="px-3 pb-3">
+                                            <p className="text-sm text-foreground whitespace-pre-line break-words">{item.description}</p>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                ))}
+                            </Accordion>
+                        </div>
+                    )}
+                </div>
+            </ScrollArea>
         )
     } catch(e) {
         return (
@@ -275,36 +95,169 @@ const AnalysisView = ({ episode }: { episode: Episode }) => {
     }
 };
 
-export default function VideoPlayerDialog({ 
-  isOpen, 
-  onOpenChange, 
-  episode, 
-  instructor,
-  chatMessages,
-  setChatMessages,
-}: VideoPlayerDialogProps) {
+const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
+    const firestore = useFirestore();
+    const [isPending, startTransition] = useTransition();
+    const [userQuestion, setUserQuestion] = useState('');
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const chatScrollAreaRef = useRef<HTMLDivElement>(null);
+
+    const isAIAvailable = episode.aiProcessingStatus === 'completed';
+
+    useEffect(() => {
+        if (!user || !firestore) {
+            setIsLoading(false);
+            setMessages([]);
+            return;
+        }
+
+        const q = query(
+            collection(firestore, 'chat_logs'), 
+            where('userId', '==', user.id),
+            where('episodeId', '==', episode.id), 
+            orderBy('createdAt', 'asc')
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const logs = snapshot.docs.map(doc => doc.data() as ChatLog);
+            const newMessages = logs.flatMap(log => {
+                const logDate = (log.createdAt as FirebaseTimestamp)?.toDate() || new Date();
+                return [
+                    { id: `${log.id}-q`, role: 'user' as const, content: log.question, createdAt: logDate },
+                    { id: `${log.id}-a`, role: 'model' as const, content: log.answer, createdAt: new Date(logDate.getTime() + 1) }
+                ];
+            });
+            setMessages(newMessages);
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Error fetching chat history:", error);
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [user, episode.id, firestore]);
+
+    useEffect(() => {
+        chatScrollAreaRef.current?.scrollTo({ top: chatScrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+    }, [messages, isPending]);
+
+    const handleAskQuestion = () => {
+        if (!userQuestion.trim() || !user || isPending) return;
+        const questionContent = userQuestion.trim();
+        setMessages(prev => [...prev, { id: uuidv4(), role: 'user', content: questionContent, createdAt: new Date() }]);
+        setUserQuestion('');
+        startTransition(async () => {
+            try {
+                await askVideoTutor({ episodeId: episode.id, question: questionContent, userId: user.id });
+            } catch (error) {
+                setMessages(prev => [...prev, { id: uuidv4(), role: 'model', content: "죄송합니다, 답변 생성 중 오류가 발생했습니다.", createdAt: new Date() }]);
+            }
+        });
+    };
+
+    return (
+        <div className="flex flex-1 flex-col gap-4 min-h-0">
+            <ScrollArea className="flex-grow" viewportRef={chatScrollAreaRef}>
+                <div className="p-1 space-y-4">
+                  {isLoading ? (
+                      <div className="flex items-center justify-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>
+                  ) : messages.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                          <Bot className="h-12 w-12 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground mt-2">AI 튜터에게 비디오 내용에 대해 궁금한 점을 질문해보세요.</p>
+                      </div>
+                  ) : (
+                      messages.map(message => (
+                        <div key={message.id} className={cn("flex items-end gap-2", message.role === 'user' ? 'justify-end' : 'justify-start')}>
+                            {message.role === 'model' && <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center"><Bot className="h-5 w-5" /></div>}
+                            <p className={cn("text-sm p-3 rounded-lg max-w-sm", message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-white border')}>{message.content}</p>
+                        </div>
+                      ))
+                  )}
+                  {isPending && (
+                      <div className="flex items-start gap-2 pt-4">
+                          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center"><Bot className="h-5 w-5 animate-spin" /></div>
+                          <div className="p-3 rounded-lg bg-white border text-sm text-muted-foreground">답변을 생각하고 있어요...</div>
+                      </div>
+                  )}
+                </div>
+            </ScrollArea>
+            <div className="flex-shrink-0 p-1">
+                <div className="flex gap-2">
+                    <Textarea 
+                        placeholder={!isAIAvailable ? "AI 분석이 아직 완료되지 않았습니다." : "AI에게 질문할 내용을 입력하세요..."}
+                        value={userQuestion}
+                        onChange={(e) => setUserQuestion(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isPending) { e.preventDefault(); handleAskQuestion(); } }}
+                        disabled={isPending || !isAIAvailable}
+                        className="flex-grow resize-none"
+                    />
+                    <Button onClick={handleAskQuestion} disabled={isPending || !userQuestion.trim() || !isAIAvailable}><Send className="h-4 w-4" /></Button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const TextbookView = () => (
+    <ScrollArea className="h-full">
+        <div className="p-4 text-center flex flex-col items-center h-full justify-center">
+            <Image src="https://picsum.photos/seed/textbook/200/280" width={150} height={210} alt="교재 이미지" className="rounded-md shadow-md" />
+            <p className="text-sm text-muted-foreground mt-4">교재 정보는 현재 준비 중입니다.</p>
+            <Button className="mt-4 bg-orange-500 hover:bg-orange-600 text-white font-bold">교재 구매하기</Button>
+        </div>
+    </ScrollArea>
+);
+
+const BookmarkView = () => (
+    <ScrollArea className="h-full">
+        <div className="p-4">
+            <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Bookmark className="mr-2 h-4 w-4" /> 현재 시간 북마크
+            </Button>
+            <p className="text-sm text-muted-foreground mt-6 text-center">북마크 기능은 준비 중입니다.</p>
+            <ul className="mt-4 space-y-2">
+              <li className="flex justify-between items-center p-3 bg-white rounded-md text-sm border"><span>01:23 - 컴포넌트 소개</span> <X className="h-4 w-4 text-muted-foreground cursor-pointer" /></li>
+              <li className="flex justify-between items-center p-3 bg-white rounded-md text-sm border"><span>15:45 - State와 Props</span> <X className="h-4 w-4 text-muted-foreground cursor-pointer" /></li>
+              <li className="flex justify-between items-center p-3 bg-white rounded-md text-sm border"><span>28:10 - Hooks 심화</span> <X className="h-4 w-4 text-muted-foreground cursor-pointer" /></li>
+            </ul>
+        </div>
+    </ScrollArea>
+);
+
+// ========= MAIN COMPONENT =========
+
+interface VideoPlayerDialogProps {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  episode: Episode;
+  instructor: Instructor | null;
+}
+
+export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
   const { user } = useUser();
+  const firestore = useFirestore();
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [vttSrc, setVttSrc] = useState<string | null>(null);
   const [isLoadingSrc, setIsLoadingSrc] = useState(true);
   const [srcError, setSrcError] = useState<string | null>(null);
-  const [isReady, setIsReady] = useState(false);
 
   const startTimeRef = useRef<Date | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const viewLoggedRef = useRef(false);
-  const isFullscreenRef = useRef(false);
+
+  const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
+  const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
 
   const logView = useCallback(() => {
-    if (!user || !startTimeRef.current || viewLoggedRef.current) {
-      return;
-    }
+    if (!user || !startTimeRef.current || viewLoggedRef.current) return;
     viewLoggedRef.current = true;
     const endTime = new Date();
     const durationWatched = (endTime.getTime() - startTimeRef.current.getTime()) / 1000;
 
     if (durationWatched > 1) {
-      const payload = {
+      logEpisodeView({
         userId: user.id,
         userName: user.name,
         userEmail: user.email,
@@ -313,64 +266,30 @@ export default function VideoPlayerDialog({
         courseId: episode.courseId,
         startedAt: startTimeRef.current,
         endedAt: endTime,
-      };
-      logEpisodeView(payload);
+      });
     }
-  }, [user, episode.id, episode.title, episode.courseId]);
+  }, [user, episode]);
 
   const handleClose = useCallback(() => {
-    if (isFullscreenRef.current) {
-        return;
-    }
-
-    const videoElement = videoRef.current;
-    if (videoElement) {
-        videoElement.pause();
-    }
+    videoRef.current?.pause();
     logView();
     onOpenChange(false);
   }, [logView, onOpenChange]);
 
   useEffect(() => {
-    const handleFullscreenChange = () => {
-        const isFullscreen = document.fullscreenElement !== null || (videoRef.current as any)?.webkitDisplayingFullscreen;
-        isFullscreenRef.current = isFullscreen;
-    };
+    if (!isOpen) return;
 
-    const handleWebkitBeginFullscreen = () => { isFullscreenRef.current = true; };
-    const handleWebkitEndFullscreen = () => { isFullscreenRef.current = false; };
-    
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    const videoElement = videoRef.current;
-    if (videoElement) {
-      videoElement.addEventListener('webkitbeginfullscreen', handleWebkitBeginFullscreen);
-      videoElement.addEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
-    }
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-       if (videoElement) {
-        videoElement.removeEventListener('webkitbeginfullscreen', handleWebkitBeginFullscreen);
-        videoElement.removeEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     let unmounted = false;
-
     async function loadSources() {
         if (unmounted) return;
         setIsLoadingSrc(true);
         setSrcError(null);
         setVideoSrc(null);
         setVttSrc(null);
-        setIsReady(false);
 
         try {
             const bucketName = firebaseConfig.storageBucket;
             if (!bucketName) throw new Error("Firebase Storage bucket 설정이 누락되었습니다.");
-            
             if (episode.filePath) {
               const publicVideoUrl = getPublicUrl(bucketName, episode.filePath);
               if (unmounted) return;
@@ -378,7 +297,6 @@ export default function VideoPlayerDialog({
             } else {
               throw new Error("비디오 파일 경로를 찾을 수 없습니다.");
             }
-    
             if (episode.vttPath) {
               const publicVttUrl = getPublicUrl(bucketName, episode.vttPath);
               if (unmounted) return;
@@ -390,121 +308,83 @@ export default function VideoPlayerDialog({
         } finally {
             if (unmounted) return;
             setIsLoadingSrc(false);
-            setIsReady(true);
-            startTimeRef.current = new Date();
-            viewLoggedRef.current = false;
         }
     }
 
-    if (isOpen) {
-        loadSources();
-    }
+    loadSources();
+    startTimeRef.current = new Date();
+    viewLoggedRef.current = false;
 
-    return () => {
-        unmounted = true;
-        if (isOpen && !isFullscreenRef.current) {
-            logView();
-        }
-    };
-}, [isOpen, episode, logView]);
-  
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !vttSrc) return;
-    const setInitialTrackMode = () => {
-        if (video.textTracks.length > 0) {
-            video.textTracks[0].mode = 'showing';
-        }
-    };
-    if (video.readyState >= 1) {
-        setInitialTrackMode();
-    } else {
-        video.addEventListener('loadedmetadata', setInitialTrackMode);
-    }
-    return () => {
-        if (video) video.removeEventListener('loadedmetadata', setInitialTrackMode);
-    };
-  }, [vttSrc]);
-  
-  if (!isOpen) {
-    return null;
-  }
-  
+    return () => { unmounted = true; };
+}, [isOpen, episode]);
+
   return (
-    <div className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center bg-black/80 transition-opacity",
-        isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-    )}>
-        <div className="bg-background w-full h-full md:max-w-[90vw] md:h-[90vh] md:rounded-lg flex flex-col">
-            <Tabs defaultValue="summary" className="flex-grow flex flex-col min-h-0">
-                <header className="p-1 border-b flex-shrink-0 z-10 flex flex-row justify-between items-center space-x-4">
-                    <h2 className="text-base md:text-lg font-bold truncate pr-2">{episode.title}</h2>
-                    <TabsList className="hidden md:grid grid-cols-2 rounded-md h-9 max-w-fit mx-auto">
-                        <TabsTrigger value="summary" className="rounded-l-md rounded-r-none h-full">비디오 분석</TabsTrigger>
-                        <TabsTrigger value="tutor" className="rounded-r-md rounded-l-none h-full">AI 튜터</TabsTrigger>
-                    </TabsList>
-                    <button 
-                        onClick={handleClose}
-                        disabled={isFullscreenRef.current}
-                        className="p-1 rounded-full text-foreground/70 hover:text-foreground disabled:opacity-50"
-                    >
-                        <X className="h-4 w-4" />
-                        <span className="sr-only">Close</span>
-                    </button>
-                </header>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent 
+        className="max-w-screen-2xl w-full h-full md:w-[95vw] md:h-[95vh] flex flex-col p-0"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+      >
+        <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2 md:p-4 border-b bg-white rounded-t-lg">
+            <div className="flex items-center gap-2 text-sm md:text-base font-medium text-gray-700 truncate">
+                {courseLoading ? <Loader className="h-4 w-4 animate-spin"/> : <span className="font-bold truncate">{course?.name}</span>}
+                <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <span className="text-gray-500 truncate">{episode.title}</span>
+            </div>
+            <DialogClose asChild>
+                <Button variant="ghost" size="icon" onClick={handleClose}>
+                    <X className="h-5 w-5" />
+                </Button>
+            </DialogClose>
+        </DialogHeader>
 
-                <div className="flex-grow flex flex-col md:grid md:grid-cols-5 min-h-0">
-                    <div className="w-full aspect-video bg-black md:col-span-3 md:h-full flex flex-col min-w-0">
-                        <div className="w-full flex-grow relative">
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
-                                {srcError && !isLoadingSrc && (
-                                    <div className="text-destructive-foreground bg-destructive/80 p-4 rounded-lg text-center">
-                                        <p className="font-semibold">비디오를 불러올 수 없습니다</p>
-                                        <p className="text-sm mt-1">{srcError}</p>
-                                    </div>
-                                )}
-                            </div>
-                            {isReady && videoSrc && !isLoadingSrc && !srcError && (
-                                <video
-                                    ref={videoRef}
-                                    key={episode.id}
-                                    id={`video-${episode.id}`}
-                                    crossOrigin="anonymous"
-                                    controls
-                                    controlsList="nodownload"
-                                    playsInline
-                                    webkit-playsinline="true"
-                                    onContextMenu={(e: React.MouseEvent) => e.preventDefault()}
-                                    autoPlay
-                                    className="w-full h-full object-contain z-10 relative"
-                                    poster={episode.thumbnailUrl}
-                                >
-                                    <source src={videoSrc} type="video/mp4" />
-                                    {vttSrc && (
-                                    <track src={vttSrc} kind="subtitles" srcLang="ko" label="한국어" default />
-                                    )}
-                                    브라우저가 비디오 태그를 지원하지 않습니다.
-                                </video>
-                            )}
-                        </div>
+        <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-4 p-4 overflow-hidden bg-gray-100">
+            {/* Video Player Section */}
+            <div className="md:col-span-7 flex flex-col bg-black rounded-lg overflow-hidden shadow-lg">
+                <div className="w-full flex-grow relative">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
+                        {srcError && <div className="text-white bg-black/50 p-4 rounded-lg">{srcError}</div>}
                     </div>
-                    
-                    <div className="flex-grow flex flex-col md:col-span-2 border-l min-h-0 md:h-full min-w-0">
-                    <TabsList className="grid w-full grid-cols-2 flex-shrink-0 rounded-none border-b md:hidden">
-                        <TabsTrigger value="summary">비디오 분석</TabsTrigger>
-                        <TabsTrigger value="tutor">AI 튜터</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="summary" className="flex-grow p-0 flex flex-col min-h-0 mt-0">
-                        <AnalysisView episode={episode} />
-                    </TabsContent>
-                    <TabsContent value="tutor" className="flex-grow p-4 flex flex-col min-h-0 mt-0">
-                        {user ? <ChatView episode={episode} user={user} chatMessages={chatMessages} setChatMessages={setChatMessages} /> : <p className="text-center text-muted-foreground p-8">AI 튜터 기능은 로그인 후 사용 가능합니다.</p>}
-                    </TabsContent>
-                    </div>
+                    {videoSrc && !isLoadingSrc && !srcError && (
+                        <video
+                            ref={videoRef}
+                            key={episode.id}
+                            controls
+                            playsInline
+                            webkit-playsinline="true"
+                            autoPlay
+                            className="w-full h-full object-contain"
+                        >
+                            <source src={videoSrc} type="video/mp4" />
+                            {vttSrc && <track src={vttSrc} kind="subtitles" srcLang="ko" label="한국어" default />}
+                        </video>
+                    )}
                 </div>
-            </Tabs>
+                <div className="flex-shrink-0 p-4 bg-gray-800 text-white">
+                  <h3 className="font-bold text-lg">{episode.title}</h3>
+                  <p className="text-sm text-gray-300 mt-1">{instructor?.name || '강사 정보 없음'}</p>
+                </div>
+            </div>
+
+            {/* Sidebar Section */}
+            <div className="md:col-span-3 flex flex-col bg-slate-50 rounded-lg shadow-inner overflow-hidden">
+                <Tabs defaultValue="syllabus" className="flex-1 flex flex-col min-h-0">
+                    <TabsList className="grid w-full grid-cols-4 flex-shrink-0 rounded-none h-auto p-0">
+                        <TabsTrigger value="syllabus" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">강의목차</TabsTrigger>
+                        <TabsTrigger value="qna" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">질문답변</TabsTrigger>
+                        <TabsTrigger value="textbook" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">교재정보</TabsTrigger>
+                        <TabsTrigger value="bookmark" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">북마크</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="syllabus" className="flex-1 mt-0 overflow-y-auto"><SyllabusView episode={episode} /></TabsContent>
+                    <TabsContent value="qna" className="flex-1 mt-0 p-2 overflow-y-auto">{user ? <ChatView episode={episode} user={user} /> : <p>로그인 후 사용 가능</p>}</TabsContent>
+                    <TabsContent value="textbook" className="flex-1 mt-0 overflow-y-auto"><TextbookView /></TabsContent>
+                    <TabsContent value="bookmark" className="flex-1 mt-0 overflow-y-auto"><BookmarkView /></TabsContent>
+                </Tabs>
+            </div>
         </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
