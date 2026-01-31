@@ -3,7 +3,7 @@ import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebas
 import { collection, query, orderBy } from 'firebase/firestore';
 import { Course, Classification, Episode, Field, EpisodeViewLog, Instructor, User } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,27 +16,68 @@ import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 const CollapsibleUserPanel = ({ user }: { user: User }) => {
     const [isOpen, setIsOpen] = useState(false);
     const controls = useAnimation();
+    const contentWrapperRef = useRef<HTMLDivElement>(null);
 
-    const togglePanel = () => {
-        const newState = !isOpen;
-        setIsOpen(newState);
-        controls.start(newState ? "open" : "closed");
+    const getContentHeight = useCallback(() => {
+        return contentWrapperRef.current?.scrollHeight || 0;
+    }, []);
+
+    const handleDrag = (event: MouseEvent | TouchEvent | PointerEvent, info: any) => {
+        const contentHeight = getContentHeight();
+        if (!contentHeight) return;
+
+        // The 'y' value from controls.get() might be a MotionValue.
+        // It's safer to get the raw value. Let's assume it's a number for simplicity with set/start.
+        // A better way would be a dedicated motion value, but this works with controls.
+        const currentHeight = (controls as any).current?.height || (isOpen ? getContentHeight() : 0);
+        let newHeight = currentHeight + info.delta.y;
+
+        // Clamp the height between 0 and the full content height
+        controls.set({ height: Math.max(0, Math.min(newHeight, contentHeight)) });
     };
 
-    const onDragEnd = (event: any, info: any) => {
-        const shouldOpen = info.velocity.y > 20 || (info.velocity.y >= 0 && info.point.y > 80);
-        if (shouldOpen) {
+    const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: any) => {
+        const contentHeight = getContentHeight();
+        if (!contentHeight) return;
+
+        const velocity = info.velocity.y;
+        const currentHeight = (controls as any).current?.height || 0;
+        const threshold = contentHeight / 2;
+
+        if (velocity > 500 || (velocity >= 0 && currentHeight > threshold)) {
+            controls.start({ height: contentHeight, transition: { type: 'spring', stiffness: 300, damping: 30 } });
             setIsOpen(true);
-            controls.start("open");
         } else {
+            controls.start({ height: 0, transition: { type: 'spring', stiffness: 300, damping: 30 } });
             setIsOpen(false);
-            controls.start("closed");
         }
     };
+    
+    const togglePanel = () => {
+        const contentHeight = getContentHeight();
+        if (!contentHeight) return;
+        
+        const newState = !isOpen;
+        if (newState) {
+            controls.start({ height: contentHeight, transition: { type: "spring", stiffness: 400, damping: 40 } });
+        } else {
+            controls.start({ height: 0, transition: { type: "spring", stiffness: 400, damping: 40 } });
+        }
+        setIsOpen(newState);
+    };
+
+    // This effect ensures that if the content inside changes size (e.g., window resize),
+    // the animation to an open state will use the new correct height.
+    useEffect(() => {
+        if (isOpen) {
+            const contentHeight = getContentHeight();
+            controls.start({ height: contentHeight, transition: { type: 'spring', stiffness: 400, damping: 40 } });
+        }
+    }, [isOpen, getContentHeight, controls]);
 
     return (
         <div className="bg-primary rounded-xl text-primary-foreground shadow-lg">
-            <div className="p-4 pt-2">
+            <div className="p-4 pt-2" onClick={togglePanel} style={{ cursor: 'pointer' }}>
                  <div className="flex justify-between items-center mb-2 min-h-[28px]">
                     <AnimatePresence initial={false}>
                         <motion.div
@@ -70,36 +111,33 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
 
                 <motion.div
                     className="overflow-hidden"
-                    initial="closed"
                     animate={controls}
-                    variants={{
-                        open: { height: 'auto', opacity: 1 },
-                        closed: { height: 0, opacity: 0 },
-                    }}
-                    transition={{ duration: 0.4, ease: [0.04, 0.62, 0.23, 0.98] }}
+                    initial={{ height: 0 }}
                 >
-                    <div className="p-4 bg-primary-foreground/10 rounded-lg flex justify-around">
-                        <Link href="/pricing" className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
-                            <div className="h-12 w-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
-                                <ShoppingCart className="h-6 w-6" />
-                            </div>
-                            <span>수강신청</span>
-                        </Link>
-                        <Link href="/my-courses" className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
-                            <div className="h-12 w-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
-                                <BookUser className="h-6 w-6" />
-                            </div>
-                            <span>나의 강의실</span>
-                        </Link>
-                        <button className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
-                            <div className="h-12 w-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
-                                <div className="relative">
-                                    <Bell className="h-6 w-6" />
-                                    <Badge variant="destructive" className="absolute -right-2 -top-2 h-4 w-4 justify-center rounded-full p-0 text-[10px]">0</Badge>
-                                </div>
-                            </div>
-                            <span>알림</span>
-                        </button>
+                    <div ref={contentWrapperRef}>
+                      <div className="p-4 bg-primary-foreground/10 rounded-lg flex justify-around">
+                          <Link href="/pricing" className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
+                              <div className="h-12 w-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
+                                  <ShoppingCart className="h-6 w-6" />
+                              </div>
+                              <span>수강신청</span>
+                          </Link>
+                          <Link href="/my-courses" className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
+                              <div className="h-12 w-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
+                                  <BookUser className="h-6 w-6" />
+                              </div>
+                              <span>나의 강의실</span>
+                          </Link>
+                          <button className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
+                              <div className="h-12 w-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
+                                  <div className="relative">
+                                      <Bell className="h-6 w-6" />
+                                      <Badge variant="destructive" className="absolute -right-2 -top-2 h-4 w-4 justify-center rounded-full p-0 text-[10px]">0</Badge>
+                                  </div>
+                              </div>
+                              <span>알림</span>
+                          </button>
+                      </div>
                     </div>
                 </motion.div>
             </div>
@@ -110,7 +148,8 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                 drag="y"
                 dragConstraints={{ top: 0, bottom: 0 }}
                 dragElastic={0.1}
-                onDragEnd={onDragEnd}
+                onDrag={handleDrag}
+                onDragEnd={handleDragEnd}
                 onTap={togglePanel}
             >
                  <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
