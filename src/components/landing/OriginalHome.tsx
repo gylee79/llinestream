@@ -70,7 +70,7 @@ const CollapsibleUserPanel = ({ user, isMobile }: { user: User, isMobile: boolea
 
 
     return (
-        <div className="bg-gradient-to-br from-primary to-foreground rounded-xl text-primary-foreground shadow-lg opacity-70">
+        <div className="bg-gradient-to-br from-primary to-foreground rounded-xl text-primary-foreground shadow-lg">
             <div className="px-4">
                 <div
                     className="relative"
