@@ -11,74 +11,72 @@ import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { BookUser, ShoppingCart, Bell, Search, BookOpen, ImageIcon, ChevronUp } from 'lucide-react';
 import ContentCarousel from '@/components/shared/content-carousel';
-import { motion, AnimatePresence, useAnimation } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, animate, useTransform } from 'framer-motion';
 
 const CollapsibleUserPanel = ({ user }: { user: User }) => {
     const [isOpen, setIsOpen] = useState(false);
-    const controls = useAnimation();
     const contentWrapperRef = useRef<HTMLDivElement>(null);
+    const height = useMotionValue(0);
+    const dragStartHeight = useRef(0);
 
-    const getContentHeight = useCallback(() => {
-        return contentWrapperRef.current?.scrollHeight || 0;
-    }, []);
+    const togglePanel = useCallback(() => {
+        const contentHeight = contentWrapperRef.current?.scrollHeight || 0;
+        const newState = !isOpen;
+        animate(height, newState ? contentHeight : 0, {
+            type: "spring",
+            stiffness: 400,
+            damping: 40
+        });
+        setIsOpen(newState);
+    }, [isOpen, height]);
+
+    const handleDragStart = () => {
+        dragStartHeight.current = height.get();
+    };
 
     const handleDrag = (event: MouseEvent | TouchEvent | PointerEvent, info: any) => {
-        const contentHeight = getContentHeight();
+        const contentHeight = contentWrapperRef.current?.scrollHeight || 0;
         if (!contentHeight) return;
-
-        // The 'y' value from controls.get() might be a MotionValue.
-        // It's safer to get the raw value. Let's assume it's a number for simplicity with set/start.
-        // A better way would be a dedicated motion value, but this works with controls.
-        const currentHeight = (controls as any).current?.height || (isOpen ? getContentHeight() : 0);
-        let newHeight = currentHeight + info.delta.y;
-
-        // Clamp the height between 0 and the full content height
-        controls.set({ height: Math.max(0, Math.min(newHeight, contentHeight)) });
+        
+        const newHeight = dragStartHeight.current + info.offset.y;
+        height.set(Math.max(0, Math.min(newHeight, contentHeight)));
     };
 
     const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: any) => {
-        const contentHeight = getContentHeight();
+        const contentHeight = contentWrapperRef.current?.scrollHeight || 0;
         if (!contentHeight) return;
 
+        const currentHeight = height.get();
         const velocity = info.velocity.y;
-        const currentHeight = (controls as any).current?.height || 0;
-        const threshold = contentHeight / 2;
 
-        if (velocity > 500 || (velocity >= 0 && currentHeight > threshold)) {
-            controls.start({ height: contentHeight, transition: { type: 'spring', stiffness: 300, damping: 30 } });
+        if (velocity > 500 || currentHeight > contentHeight / 2) {
+            animate(height, contentHeight, { type: "spring", stiffness: 300, damping: 30 });
             setIsOpen(true);
         } else {
-            controls.start({ height: 0, transition: { type: 'spring', stiffness: 300, damping: 30 } });
+            animate(height, 0, { type: "spring", stiffness: 300, damping: 30 });
             setIsOpen(false);
         }
     };
     
-    const togglePanel = () => {
-        const contentHeight = getContentHeight();
-        if (!contentHeight) return;
-        
-        const newState = !isOpen;
-        if (newState) {
-            controls.start({ height: contentHeight, transition: { type: "spring", stiffness: 400, damping: 40 } });
-        } else {
-            controls.start({ height: 0, transition: { type: "spring", stiffness: 400, damping: 40 } });
-        }
-        setIsOpen(newState);
-    };
-
     // This effect ensures that if the content inside changes size (e.g., window resize),
     // the animation to an open state will use the new correct height.
     useEffect(() => {
         if (isOpen) {
-            const contentHeight = getContentHeight();
-            controls.start({ height: contentHeight, transition: { type: 'spring', stiffness: 400, damping: 40 } });
+            const contentHeight = contentWrapperRef.current?.scrollHeight || 0;
+            animate(height, contentHeight, { type: 'spring', stiffness: 400, damping: 40 });
         }
-    }, [isOpen, getContentHeight, controls]);
+    }, [isOpen, height]);
+
+    const rotate = useTransform(height, [0, 100], [0, 180]);
+
 
     return (
         <div className="bg-primary rounded-xl text-primary-foreground shadow-lg">
-            <div className="p-4 pt-2" onClick={togglePanel} style={{ cursor: 'pointer' }}>
-                 <div className="flex justify-between items-center mb-2 min-h-[28px]">
+            <div className="p-4 pt-2">
+                 <div 
+                    className="flex justify-between items-center mb-2 min-h-[28px] cursor-pointer"
+                    onClick={togglePanel}
+                >
                     <AnimatePresence initial={false}>
                         <motion.div
                             key={isOpen ? "open" : "closed"}
@@ -111,8 +109,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
 
                 <motion.div
                     className="overflow-hidden"
-                    animate={controls}
-                    initial={{ height: 0 }}
+                    style={{ height }}
                 >
                     <div ref={contentWrapperRef}>
                       <div className="p-4 bg-primary-foreground/10 rounded-lg flex justify-around">
@@ -147,12 +144,16 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                 className="w-full flex justify-center py-3 cursor-grab"
                 drag="y"
                 dragConstraints={{ top: 0, bottom: 0 }}
-                dragElastic={0.1}
+                dragElastic={{ top: 0, bottom: 0.5 }}
+                onDragStart={handleDragStart}
                 onDrag={handleDrag}
                 onDragEnd={handleDragEnd}
                 onTap={togglePanel}
+                style={{ touchAction: 'none' }} // Prevents page scroll on mobile
             >
-                 <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                 <motion.div
+                    style={{ rotate }}
+                 >
                     <ChevronUp className="h-5 w-5 opacity-70" />
                 </motion.div>
             </motion.div>
