@@ -4,12 +4,13 @@ import { useMemo } from 'react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection } from 'firebase/firestore';
-import type { Course, Classification, Field, Instructor } from '@/lib/types';
+import type { Course, Classification, Field } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Star } from 'lucide-react';
 
 export default function ContentsPage() {
   const firestore = useFirestore();
@@ -23,13 +24,10 @@ export default function ContentsPage() {
   const coursesQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'courses') : null), [firestore]);
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
 
-  const instructorsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'instructors') : null), [firestore]);
-  const { data: instructors, isLoading: instructorsLoading } = useCollection<Instructor>(instructorsQuery);
-
-  const isLoading = fieldsLoading || classificationsLoading || coursesLoading || instructorsLoading;
+  const isLoading = fieldsLoading || classificationsLoading || coursesLoading;
 
   const structuredData = useMemo(() => {
-    if (isLoading || !fields || !classifications || !courses || !instructors) return [];
+    if (isLoading || !fields || !classifications || !courses) return [];
 
     // Sort all data by orderIndex
     const sortedFields = [...fields].sort((a, b) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
@@ -50,8 +48,6 @@ export default function ContentsPage() {
       classificationMapByField.set(cls.fieldId, list);
     });
 
-    const instructorMap = new Map(instructors.map(i => [i.id, i]));
-
     return sortedFields.map(field => {
       const fieldClassifications = classificationMapByField.get(field.id) || [];
       return {
@@ -62,14 +58,13 @@ export default function ContentsPage() {
             classification: cls,
             courses: classificationCourses.map(course => ({
               course,
-              instructor: instructorMap.get(course.instructorId || '')
             }))
           };
         }).filter(c => c.courses.length > 0)
       };
     }).filter(f => f.classifications.length > 0);
 
-  }, [fields, classifications, courses, instructors, isLoading]);
+  }, [fields, classifications, courses, isLoading]);
 
   return (
     <div className="container py-12">
@@ -123,7 +118,7 @@ export default function ContentsPage() {
                     <TabsContent key={classification.id} value={classification.id} className="mt-6">
                       <div className="space-y-4">
                         {courses.length > 0 ? (
-                          courses.map(({ course, instructor }) => (
+                          courses.map(({ course }, index) => (
                             <Link href={`/courses/${course.id}`} key={course.id} className="block group">
                               <Card className="hover:bg-muted/50 transition-colors">
                                 <CardContent className="p-4 flex items-center gap-4">
@@ -137,9 +132,16 @@ export default function ContentsPage() {
                                   <div className="flex-1">
                                     <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">{course.name}</h3>
                                     <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
-                                    <p className="text-sm font-semibold text-foreground mt-2">
-                                      {instructor?.name || '강사 정보 없음'}
-                                    </p>
+                                    <div className="flex items-center text-xs mt-2 gap-2">
+                                        <div className="flex items-center gap-1">
+                                            <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                            <span className="font-bold text-sm">{(course.rating || 0).toFixed(1)}</span>
+                                            <span className="text-muted-foreground">({course.reviewCount || 0})</span>
+                                        </div>
+                                        <p className="text-muted-foreground font-semibold">
+                                            {classification.name}・{index + 1}위
+                                        </p>
+                                    </div>
                                   </div>
                                 </CardContent>
                               </Card>
