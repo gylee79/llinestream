@@ -81,11 +81,11 @@ export default function FieldDetailPage() {
     );
 
     return (
-        <div className="container mx-auto py-12">
+        <div className="container mx-auto pt-0 pb-12">
             {isLoading ? renderSkeletons() : field && (
                  <header className="mb-8">
-                    <h1 className="font-headline text-4xl font-bold tracking-tight">{field.name}</h1>
-                    <p className="mt-2 text-lg text-muted-foreground">{field.description || `모든 강좌를 확인해보세요.`}</p>
+                    <h1 className="font-headline text-3xl font-bold tracking-tight">{field.name}</h1>
+                    <p className="mt-2 text-sm text-muted-foreground">{field.description || `모든 강좌를 확인해보세요.`}</p>
                 </header>
             )}
 
