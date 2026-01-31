@@ -1,3 +1,4 @@
+
 'use client';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, orderBy } from 'firebase/firestore';
@@ -22,13 +23,11 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
     const setPanelState = useCallback((open: boolean) => {
         const contentHeight = contentWrapperRef.current?.scrollHeight || 0;
         const newHeight = open ? contentHeight : 0;
-        // This check prevents re-animating if the state is already correct.
-        if (height.get() === newHeight) return;
         
         animate(height, newHeight, {
             type: "spring",
-            stiffness: 400,
-            damping: 40
+            stiffness: 300,
+            damping: 35
         });
         setIsOpen(open);
     }, [height]);
@@ -41,9 +40,6 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
         const contentHeight = contentWrapperRef.current?.scrollHeight || 0;
         if (!contentHeight) return;
         
-        // Change logic to correctly map drag direction to height change
-        // Dragging down (positive info.offset.y) should increase height.
-        // Dragging up (negative info.offset.y) should decrease height.
         const newHeight = dragStartHeight.current + info.offset.y;
         height.set(Math.max(0, Math.min(newHeight, contentHeight)));
     };
@@ -55,21 +51,17 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
         const currentHeight = height.get();
         const velocity = info.velocity.y;
 
-        // If dragging down fast, or dragged more than half way open, open it.
         if (velocity > 500 || currentHeight > contentHeight / 2) {
             setPanelState(true);
-        } else { // Otherwise, close it.
+        } else {
             setPanelState(false);
         }
     };
     
-    // This effect ensures that if the content inside changes size (e.g., window resize),
-    // the animation to an open state will use the new correct height.
     useEffect(() => {
         if (isOpen) {
             const contentHeight = contentWrapperRef.current?.scrollHeight || 0;
-            // Animate to the new height if it's already open
-            animate(height, contentHeight, { type: 'spring', stiffness: 400, damping: 40 });
+            animate(height, contentHeight, { type: 'spring', stiffness: 300, damping: 35 });
         }
     }, [isOpen, height]);
 
@@ -161,7 +153,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                  <motion.div
                     style={{ rotate }}
                  >
-                    <ChevronUp className="h-5 w-5 opacity-70" />
+                    <ChevronUp className="h-3 w-3 opacity-70" />
                 </motion.div>
             </motion.div>
         </div>
