@@ -101,7 +101,7 @@ const CollapsibleUserPanel = ({ user, isMobile }: { user: User, isMobile: boolea
                                 transition={{ duration: 0.3, ease: 'easeInOut' }}
                             >
                                 <p className="font-bold">{user.name}님</p>
-                                <div className="flex items-center gap-3 text-sm">
+                                <div className={cn("flex items-center text-sm", isMobile ? 'gap-2' : 'gap-3')}>
                                     <Link href="/pricing" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">수강신청</Link>
                                     <span className="opacity-50">·</span>
                                     <Link href="/my-courses" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">나의 강의실</Link>
