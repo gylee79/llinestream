@@ -140,7 +140,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
 
             {/* Handle Area */}
             <motion.div
-                className="w-full flex justify-center py-1 cursor-grab"
+                className="w-full flex justify-center cursor-grab"
                 drag="y"
                 dragConstraints={{ top: 0, bottom: 0 }}
                 dragElastic={{ top: 0, bottom: 0.5 }}
@@ -153,7 +153,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                  <motion.div
                     style={{ rotate }}
                  >
-                    <ChevronUp className="h-3 w-3 opacity-70" />
+                    <ChevronUp className="h-6 w-6 opacity-70" />
                 </motion.div>
             </motion.div>
         </div>
