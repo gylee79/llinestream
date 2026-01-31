@@ -149,7 +149,7 @@ export default function Header() {
 
 
           <div className="flex items-center justify-end space-x-2">
-            <div className="hidden md:block">
+            <div>
               <LandingPageSwitch />
             </div>
 
