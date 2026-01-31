@@ -72,46 +72,50 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
         <div className="bg-primary rounded-xl text-primary-foreground shadow-lg">
             <div className="px-4">
                 <div
-                    className="relative flex items-center cursor-pointer"
+                    className="relative cursor-pointer"
                     style={{ minHeight: '4.5rem' }}
                     onClick={() => setPanelState(!isOpen)}
                 >
                     <AnimatePresence initial={false}>
-                        <motion.div
-                            key={isOpen ? "open" : "closed"}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0, position: 'absolute' }}
-                            transition={{ duration: 0.4, ease: "easeInOut" }}
-                            className="w-full"
-                        >
-                            {isOpen ? (
-                                <div className="flex w-full justify-between items-center py-4">
-                                    <h2 className="font-bold text-lg">{user.name}님, 환영합니다!</h2>
+                        {isOpen ? (
+                            <motion.div
+                                key="open"
+                                className="absolute inset-0 flex w-full items-center"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                            >
+                                <h2 className="font-bold text-lg">{user.name}님, 환영합니다!</h2>
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key="closed"
+                                className="absolute inset-0 flex w-full justify-between items-center"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                            >
+                                <p className="font-bold">{user.name}님</p>
+                                <div className="flex items-center gap-3 text-sm">
+                                    <Link href="/pricing" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">수강신청</Link>
+                                    <span className="opacity-50">·</span>
+                                    <Link href="/my-courses" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">나의 강의실</Link>
+                                    <span className="opacity-50">·</span>
+                                    <button onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity relative">
+                                        알림
+                                        <Badge variant="destructive" className="absolute -right-3 -top-1.5 h-4 w-4 justify-center rounded-full p-0 text-[9px]">0</Badge>
+                                    </button>
                                 </div>
-                            ) : (
-                                <div className="flex w-full justify-between items-center py-4">
-                                    <p className="font-bold">{user.name}님</p>
-                                    <div className="flex items-center gap-3 text-sm">
-                                        <Link href="/pricing" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">수강신청</Link>
-                                        <span className="opacity-50">·</span>
-                                        <Link href="/my-courses" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">나의 강의실</Link>
-                                        <span className="opacity-50">·</span>
-                                        <button onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity relative">
-                                            알림
-                                            <Badge variant="destructive" className="absolute -right-3 -top-1.5 h-4 w-4 justify-center rounded-full p-0 text-[9px]">0</Badge>
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </motion.div>
+                            </motion.div>
+                        )}
                     </AnimatePresence>
                 </div>
 
                 <motion.div
                     className="overflow-hidden"
                     style={{ height }}
-                    onTap={() => { if (!isOpen) setPanelState(true); }}
                 >
                     <div ref={contentWrapperRef} className="pb-4">
                       <div className="p-4 bg-primary-foreground/10 rounded-lg flex justify-around">
@@ -143,7 +147,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
 
             {/* Handle Area */}
             <motion.div
-                className="w-full flex justify-center py-2 cursor-grab"
+                className="w-full flex justify-center cursor-grab"
                 drag="y"
                 dragConstraints={{ top: 0, bottom: 0 }}
                 dragElastic={{ top: 0, bottom: 0.5 }}
@@ -154,6 +158,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                 style={{ touchAction: 'none' }} // Prevents page scroll on mobile
             >
                  <motion.div
+                    className="h-5 w-5"
                     style={{ rotate }}
                  >
                     <ChevronUp className="h-5 w-5 opacity-70" />
