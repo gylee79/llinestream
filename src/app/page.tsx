@@ -70,9 +70,9 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
 
     return (
         <div className="bg-primary rounded-xl text-primary-foreground shadow-lg">
-            <div className="px-4 pt-4 pb-6">
+            <div className="px-4 pt-4 pb-0">
                  <div 
-                    className="flex justify-between items-center mb-2 min-h-[28px]"
+                    className="flex justify-between items-center mb-2 min-h-[28px] py-2"
                     onClick={() => setPanelState(!isOpen)}
                 >
                     <AnimatePresence initial={false}>
@@ -140,7 +140,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
 
             {/* Handle Area */}
             <motion.div
-                className="w-full flex justify-center cursor-grab"
+                className="w-full flex justify-center py-2 cursor-grab"
                 drag="y"
                 dragConstraints={{ top: 0, bottom: 0 }}
                 dragElastic={{ top: 0, bottom: 0.5 }}
@@ -153,7 +153,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                  <motion.div
                     style={{ rotate }}
                  >
-                    <ChevronUp className="h-6 w-6 opacity-70" />
+                    <ChevronUp className="h-10 w-10 opacity-70" />
                 </motion.div>
             </motion.div>
         </div>
