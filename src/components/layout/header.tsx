@@ -162,7 +162,10 @@ export default function Header() {
           </div>
 
 
-          <div className="flex items-center justify-end space-x-2">
+          <div className="flex items-center justify-end space-x-4">
+            <div className="hidden md:flex items-center text-xs text-muted-foreground">
+              {preference === 'about' ? '홈페이지 버전' : '강의앱 버전'}
+            </div>
             
             {isUserLoading ? (
               <Avatar className="h-8 w-8">
