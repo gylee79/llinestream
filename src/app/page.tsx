@@ -110,7 +110,7 @@ export default function Home() {
         
         {/* All Fields Section (ICON-BASED) */}
         <section>
-          <h2 className="font-headline text-2xl font-semibold tracking-tight mb-4">분야별 강좌</h2>
+          <h2 className="font-body text-xl font-bold tracking-tight mb-4">분야별 강좌</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {fields?.map((field) => (
               <Link href={`/fields/${field.id}`} key={field.id} className="block group">
