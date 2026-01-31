@@ -27,7 +27,7 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
     return null;
   }
 
-  const isContinueWatching = title === '시청 기록';
+  const isContinueWatching = title === '최근 학습 기록';
   
   const getItemBasisClass = () => {
     // For "Continue Watching" on mobile, show 2.5 items.
@@ -51,7 +51,7 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
     <section>
       <div className="flex justify-between items-center mb-4">
         {title && (
-            <h2 className="text-xl font-bold tracking-tight">
+            <h2 className="font-body text-xl font-bold tracking-tight">
               {title} <span className="text-lg text-muted-foreground">({items.length})</span>
             </h2>
         )}
