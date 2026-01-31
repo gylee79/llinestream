@@ -1,21 +1,18 @@
-
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection } from 'firebase/firestore';
 import type { Course, Classification, Field, Instructor } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from '@/components/ui/card';
-
+import { Separator } from '@/components/ui/separator';
 
 export default function ContentsPage() {
   const firestore = useFirestore();
-  const [activeTab, setActiveTab] = useState<string | undefined>(undefined);
 
   const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
@@ -31,27 +28,43 @@ export default function ContentsPage() {
 
   const isLoading = fieldsLoading || classificationsLoading || coursesLoading || instructorsLoading;
 
-  const groupedCourses = useMemo(() => {
-    if (isLoading || !courses || !classifications) return {};
-    
-    const classificationMap = new Map(classifications.map(c => [c.id, c.fieldId]));
-    
-    return courses.reduce((acc, course) => {
-        const fieldId = classificationMap.get(course.classificationId);
-        if (fieldId) {
-            if (!acc[fieldId]) {
-                acc[fieldId] = [];
-            }
-            acc[fieldId].push(course);
-        }
-        return acc;
-    }, {} as Record<string, Course[]>);
-  }, [courses, classifications, isLoading]);
+  const structuredData = useMemo(() => {
+    if (isLoading || !fields || !classifications || !courses || !instructors) return [];
 
-  // Set default active tab once fields are loaded
-  if (!activeTab && fields && fields.length > 0) {
-    setActiveTab(fields[0].id);
-  }
+    const courseMapByClassification = new Map<string, Course[]>();
+    courses.forEach(course => {
+      const list = courseMapByClassification.get(course.classificationId) || [];
+      list.push(course);
+      courseMapByClassification.set(course.classificationId, list);
+    });
+
+    const classificationMapByField = new Map<string, Classification[]>();
+    classifications.forEach(cls => {
+      const list = classificationMapByField.get(cls.fieldId) || [];
+      list.push(cls);
+      classificationMapByField.set(cls.fieldId, list);
+    });
+
+    const instructorMap = new Map(instructors.map(i => [i.id, i]));
+
+    return fields.map(field => {
+      const fieldClassifications = classificationMapByField.get(field.id) || [];
+      return {
+        field,
+        classifications: fieldClassifications.map(cls => {
+          const classificationCourses = courseMapByClassification.get(cls.id) || [];
+          return {
+            classification: cls,
+            courses: classificationCourses.map(course => ({
+              course,
+              instructor: instructorMap.get(course.instructorId || '')
+            }))
+          };
+        }).filter(c => c.courses.length > 0) // Only include classifications that have courses
+      };
+    }).filter(f => f.classifications.length > 0); // Only include fields that have classifications with courses
+
+  }, [fields, classifications, courses, instructors, isLoading]);
 
   return (
     <div className="container mx-auto py-12">
@@ -61,66 +74,89 @@ export default function ContentsPage() {
       </header>
       
       {isLoading ? (
-        <div className="space-y-4">
-          <div className="flex space-x-2">
-            <Skeleton className="h-10 w-24" />
-            <Skeleton className="h-10 w-24" />
-            <Skeleton className="h-10 w-24" />
+        <div className="space-y-8">
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-1/4" />
+            <Skeleton className="h-px w-full" />
+            <div className="flex space-x-2">
+              <Skeleton className="h-10 w-24 rounded-full" />
+              <Skeleton className="h-10 w-24 rounded-full" />
+            </div>
+            <Skeleton className="h-32 w-full" />
           </div>
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-48 w-full" />
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-1/4" />
+            <Skeleton className="h-px w-full" />
+            <div className="flex space-x-2">
+              <Skeleton className="h-10 w-24 rounded-full" />
+            </div>
+            <Skeleton className="h-32 w-full" />
+          </div>
         </div>
       ) : (
-        <Tabs defaultValue={fields?.[0]?.id} className="w-full">
-          <TabsList className="mb-6">
-            {fields?.map((field) => (
-              <TabsTrigger key={field.id} value={field.id}>
-                {field.name}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          
-          {fields?.map((field) => {
-            const fieldCourses = groupedCourses[field.id] || [];
-            return (
-              <TabsContent key={field.id} value={field.id}>
-                {fieldCourses.length > 0 ? (
-                  <div className="space-y-4">
-                    {fieldCourses.map(course => {
-                      const instructor = instructors?.find(i => i.id === course.instructorId);
-                      return (
-                        <Link href={`/courses/${course.id}`} key={course.id} className="block group">
-                          <Card className="hover:bg-muted/50 transition-colors">
-                            <CardContent className="p-4 flex items-start gap-4">
-                              <Avatar className="h-16 w-16 rounded-full">
-                                {course.thumbnailUrl ? (
-                                  <AvatarImage src={course.thumbnailUrl} alt={course.name} className="object-cover" />
-                                ) : (
-                                  <AvatarFallback className="text-2xl font-bold bg-muted">?</AvatarFallback>
-                                )}
-                              </Avatar>
-                              <div className="flex-1">
-                                <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">{course.name}</h3>
-                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
-                                <p className="text-sm font-semibold text-foreground mt-2">
-                                  {instructor?.name || '강사 정보 없음'}
-                                </p>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </Link>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-16 border rounded-lg bg-muted/50">
-                    <p className="text-muted-foreground">이 분야에는 아직 등록된 강좌가 없습니다.</p>
-                  </div>
-                )}
-              </TabsContent>
-            )
-          })}
-        </Tabs>
+        <div className="space-y-12">
+          {structuredData.map(({ field, classifications }) => (
+            <div key={field.id}>
+              <h2 className="text-2xl font-bold text-foreground">{field.name}</h2>
+              <Separator className="my-4" />
+              
+              {classifications.length > 0 ? (
+                <Tabs defaultValue={classifications[0].classification.id} className="w-full">
+                  <TabsList className="h-auto bg-transparent p-0 space-x-2">
+                    {classifications.map(({ classification }) => (
+                      <TabsTrigger 
+                        key={classification.id} 
+                        value={classification.id} 
+                        className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                      >
+                        {classification.name}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+
+                  {classifications.map(({ classification, courses }) => (
+                    <TabsContent key={classification.id} value={classification.id} className="mt-6">
+                      <div className="space-y-4">
+                        {courses.length > 0 ? (
+                          courses.map(({ course, instructor }) => (
+                            <Link href={`/courses/${course.id}`} key={course.id} className="block group">
+                              <Card className="hover:bg-muted/50 transition-colors">
+                                <CardContent className="p-4 flex items-center gap-4">
+                                  <Avatar className="h-16 w-16 rounded-full">
+                                    {course.thumbnailUrl ? (
+                                      <AvatarImage src={course.thumbnailUrl} alt={course.name} className="object-cover" />
+                                    ) : (
+                                      <AvatarFallback className="text-2xl font-bold bg-muted">?</AvatarFallback>
+                                    )}
+                                  </Avatar>
+                                  <div className="flex-1">
+                                    <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">{course.name}</h3>
+                                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
+                                    <p className="text-sm font-semibold text-foreground mt-2">
+                                      {instructor?.name || '강사 정보 없음'}
+                                    </p>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </Link>
+                          ))
+                        ) : (
+                           <div className="text-center py-16 border rounded-lg bg-muted/50">
+                              <p className="text-muted-foreground">이 분류에는 아직 등록된 강좌가 없습니다.</p>
+                           </div>
+                        )}
+                      </div>
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              ) : (
+                <div className="text-center py-16 border rounded-lg bg-muted/50">
+                  <p className="text-muted-foreground">이 분야에는 아직 표시할 강좌가 없습니다.</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
