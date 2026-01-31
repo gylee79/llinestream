@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback, useTransition } from 'react';
+import { useState, useEffect, useCallback, useTransition, useMemo } from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -139,7 +139,6 @@ export default function HierarchyManager() {
   const [orderedFields, setOrderedFields] = useState<Field[]>([]);
   const [orderedClassifications, setOrderedClassifications] = useState<Classification[]>([]);
   const [orderedCourses, setOrderedCourses] = useState<Course[]>([]);
-  const [changedGroups, setChangedGroups] = useState<Set<HierarchyGroup>>(new Set());
 
   const [nameDialog, setNameDialog] = useState<NameDialogState>({ isOpen: false, item: null, type: '분야' });
   const [thumbnailDialog, setThumbnailDialog] = useState<ThumbnailDialogState>({ isOpen: false, item: null, type: 'fields' });
@@ -187,6 +186,33 @@ export default function HierarchyManager() {
       }
   }, [courses]);
   
+  // --- Start of Change Detection Logic ---
+  const originalSortedFields = useMemo(() => fields ? sortItems(fields) : [], [fields]);
+  const originalSortedClassifications = useMemo(() => classifications ? sortItems(classifications) : [], [classifications]);
+  const originalSortedCourses = useMemo(() => courses ? sortItems(courses) : [], [courses]);
+
+  const isFieldsOrderChanged = useMemo(() => {
+    if (!fields || orderedFields.length !== fields.length) return false;
+    const originalOrderIds = originalSortedFields.map(f => f.id);
+    const currentOrderIds = orderedFields.map(f => f.id);
+    return JSON.stringify(originalOrderIds) !== JSON.stringify(currentOrderIds);
+  }, [fields, orderedFields, originalSortedFields]);
+
+  const isClassificationsOrderChanged = useMemo(() => {
+    if (!classifications || orderedClassifications.length !== classifications.length) return false;
+    const originalOrderIds = originalSortedClassifications.map(i => i.id);
+    const currentOrderIds = orderedClassifications.map(i => i.id);
+    return JSON.stringify(originalOrderIds) !== JSON.stringify(currentOrderIds);
+  }, [classifications, orderedClassifications, originalSortedClassifications]);
+
+  const isCoursesOrderChanged = useMemo(() => {
+    if (!courses || orderedCourses.length !== courses.length) return false;
+    const originalOrderIds = originalSortedCourses.map(i => i.id);
+    const currentOrderIds = orderedCourses.map(i => i.id);
+    return JSON.stringify(originalOrderIds) !== JSON.stringify(currentOrderIds);
+  }, [courses, orderedCourses, originalSortedCourses]);
+  // --- End of Change Detection Logic ---
+  
   useEffect(() => {
     if (selectedField && fields && !fields.find(f => f.id === selectedField)) {
       setSelectedField(null);
@@ -201,10 +227,6 @@ export default function HierarchyManager() {
     }
   }, [classifications, selectedClassification, selectedField]);
   
-  useEffect(() => {
-     setChangedGroups(new Set());
-  }, [selectedField, selectedClassification]);
-
   const handleSelectField = (id: string | null) => {
     setSelectedField(id);
     setSelectedClassification(null);
@@ -324,7 +346,6 @@ export default function HierarchyManager() {
     if (group === 'fields') setOrderedFields(newOrder);
     else if (group === 'classifications') setOrderedClassifications(newOrder);
     else if (group === 'courses') setOrderedCourses(newOrder);
-    setChangedGroups(prev => new Set(prev).add(group));
   };
 
   const handleSaveOrder = (group: HierarchyGroup) => {
@@ -337,11 +358,6 @@ export default function HierarchyManager() {
         const result = await reorderHierarchyItems(group, ids);
         if (result.success) {
             toast({ title: '성공', description: '순서가 저장되었습니다.' });
-            setChangedGroups(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(group);
-                return newSet;
-            });
         } else {
             toast({ variant: 'destructive', title: '실패', description: result.message });
         }
@@ -373,8 +389,8 @@ export default function HierarchyManager() {
               title="분야 (Field)" 
               onAdd={() => openNameDialog('분야')}
               onSaveOrder={() => handleSaveOrder('fields')}
-              isSaveOrderDisabled={!changedGroups.has('fields') || isSavingOrder}
-              isSavingOrder={isSavingOrder && changedGroups.has('fields')}
+              isSaveOrderDisabled={!isFieldsOrderChanged || isSavingOrder}
+              isSavingOrder={isSavingOrder && isFieldsOrderChanged}
             >
               {fieldsLoading || isPending ? renderSkeletons() : (
                 <Reorder.Group axis="y" values={orderedFields} onReorder={(newOrder) => handleReorder('fields', newOrder)}>
@@ -397,8 +413,8 @@ export default function HierarchyManager() {
               title="큰분류 (Classification)" 
               onAdd={selectedField ? () => openNameDialog('큰분류') : null}
               onSaveOrder={selectedField ? () => handleSaveOrder('classifications') : undefined}
-              isSaveOrderDisabled={!changedGroups.has('classifications') || isSavingOrder}
-              isSavingOrder={isSavingOrder && changedGroups.has('classifications')}
+              isSaveOrderDisabled={!isClassificationsOrderChanged || isSavingOrder}
+              isSavingOrder={isSavingOrder && isClassificationsOrderChanged}
             >
               {!selectedField ? <p className="text-center text-sm text-muted-foreground pt-4">분야를 선택해주세요.</p> :
                classificationsLoading || isPending ? renderSkeletons() : (
@@ -422,8 +438,8 @@ export default function HierarchyManager() {
               title="상세분류 (Course)" 
               onAdd={selectedClassification ? () => openNameDialog('상세분류') : null}
               onSaveOrder={selectedClassification ? () => handleSaveOrder('courses') : undefined}
-              isSaveOrderDisabled={!changedGroups.has('courses') || isSavingOrder}
-              isSavingOrder={isSavingOrder && changedGroups.has('courses')}
+              isSaveOrderDisabled={!isCoursesOrderChanged || isSavingOrder}
+              isSavingOrder={isSavingOrder && isCoursesOrderChanged}
             >
               {!selectedClassification ? <p className="text-center text-sm text-muted-foreground pt-4">큰분류를 선택해주세요.</p> :
                coursesLoading || isPending ? renderSkeletons() : (
