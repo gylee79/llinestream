@@ -13,8 +13,9 @@ import { BookUser, ShoppingCart, Bell, Search, BookOpen, ImageIcon, ChevronDown,
 import ContentCarousel from '@/components/shared/content-carousel';
 import { motion, AnimatePresence, useMotionValue, animate, useTransform } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
-const CollapsibleUserPanel = ({ user }: { user: User }) => {
+const CollapsibleUserPanel = ({ user, isMobile }: { user: User, isMobile: boolean }) => {
     const [isOpen, setIsOpen] = useState(false);
     const contentWrapperRef = useRef<HTMLDivElement>(null);
     const height = useMotionValue(0);
@@ -90,7 +91,10 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                         ) : (
                             <motion.div
                                 key="closed"
-                                className="absolute inset-0 flex w-full justify-between items-end"
+                                className={cn(
+                                    "absolute inset-0 flex w-full justify-between items-end",
+                                    isMobile && "pb-2"
+                                )}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
@@ -171,6 +175,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
 export default function Home() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const isMobile = useIsMobile();
 
   const fieldsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'fields'), orderBy('orderIndex')) : null), [firestore]);
   const { data: sortedFields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
@@ -217,7 +222,7 @@ export default function Home() {
       <div className="container space-y-6 md:space-y-8 py-6 md:py-8">
         
         {user ? (
-            <CollapsibleUserPanel user={user} />
+            <CollapsibleUserPanel user={user} isMobile={isMobile} />
         ) : (
             <section className="rounded-xl bg-primary/10 shadow-sm p-6 md:p-8 text-center">
                  <h1 className="text-xl md:text-2xl font-bold">LlineStream에 오신 것을 환영합니다!</h1>
