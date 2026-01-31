@@ -1,4 +1,3 @@
-
 'use client';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, orderBy } from 'firebase/firestore';
@@ -13,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { BookUser, ShoppingCart, Bell, Search, BookOpen, ImageIcon, ChevronUp } from 'lucide-react';
 import ContentCarousel from '@/components/shared/content-carousel';
 import { motion, AnimatePresence, useMotionValue, animate, useTransform } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 const CollapsibleUserPanel = ({ user }: { user: User }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -70,9 +70,12 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
 
     return (
         <div className="bg-primary rounded-xl text-primary-foreground shadow-lg">
-            <div className="px-4 pt-4 pb-0">
+            <div className={cn("px-4", isOpen ? "pt-4 pb-0" : "py-4")}>
                  <div 
-                    className="flex justify-between items-center mb-2 min-h-[28px] py-2"
+                    className={cn(
+                        "flex justify-between items-center min-h-[28px]",
+                        isOpen && "mb-2"
+                    )}
                     onClick={() => setPanelState(!isOpen)}
                 >
                     <AnimatePresence initial={false}>
@@ -140,7 +143,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
 
             {/* Handle Area */}
             <motion.div
-                className="w-full flex justify-center py-2 cursor-grab"
+                className="w-full flex justify-center py-1 cursor-grab"
                 drag="y"
                 dragConstraints={{ top: 0, bottom: 0 }}
                 dragElastic={{ top: 0, bottom: 0.5 }}
@@ -153,7 +156,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                  <motion.div
                     style={{ rotate }}
                  >
-                    <ChevronUp className="h-10 w-10 opacity-70" />
+                    <ChevronUp className="h-5 w-5 opacity-70" />
                 </motion.div>
             </motion.div>
         </div>
