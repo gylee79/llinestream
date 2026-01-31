@@ -3,7 +3,7 @@
 import { useParams, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { useCollection, useDoc, useFirestore, useMemoFirebase } from '@/firebase/hooks';
-import { collection, query, where, doc, orderBy } from 'firebase/firestore';
+import { collection, query, where, doc } from 'firebase/firestore';
 import type { Course, Classification, Field, Instructor } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -19,7 +19,7 @@ export default function FieldDetailPage() {
     const fieldRef = useMemoFirebase(() => (firestore && fieldId ? doc(firestore, 'fields', fieldId) : null), [firestore, fieldId]);
     const { data: field, isLoading: fieldLoading } = useDoc<Field>(fieldRef);
     
-    const classificationsQuery = useMemoFirebase(() => (firestore && fieldId ? query(collection(firestore, 'classifications'), where('fieldId', '==', fieldId), orderBy('orderIndex')) : null), [firestore, fieldId]);
+    const classificationsQuery = useMemoFirebase(() => (firestore && fieldId ? query(collection(firestore, 'classifications'), where('fieldId', '==', fieldId)) : null), [firestore, fieldId]);
     const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
 
     // Get all classification IDs to query courses in one go
@@ -39,6 +39,8 @@ export default function FieldDetailPage() {
     const structuredData = useMemo(() => {
         if (!classifications || !courses || !instructors) return [];
         
+        const sortedClassifications = [...classifications].sort((a, b) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
+
         const courseMapByClassification = new Map<string, Course[]>();
         courses.forEach(course => {
           const list = courseMapByClassification.get(course.classificationId) || [];
@@ -48,7 +50,7 @@ export default function FieldDetailPage() {
 
         const instructorMap = new Map(instructors.map(i => [i.id, i]));
         
-        return classifications.map(cls => {
+        return sortedClassifications.map(cls => {
             const classificationCourses = courseMapByClassification.get(cls.id) || [];
             // Sort courses by orderIndex
             classificationCourses.sort((a, b) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
