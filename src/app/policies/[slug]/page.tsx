@@ -22,7 +22,7 @@ export default function PolicyPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto max-w-4xl py-12">
+      <div className="container max-w-4xl py-12">
         <Card>
           <CardHeader>
             <Skeleton className="h-9 w-1/2" />
@@ -42,7 +42,7 @@ export default function PolicyPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-4xl py-12">
+    <div className="container max-w-4xl py-12">
       <Card>
         <CardHeader>
           <CardTitle className="font-headline text-3xl">{policy.title}</CardTitle>

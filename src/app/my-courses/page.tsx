@@ -32,7 +32,7 @@ export default function MyCoursesPage() {
   const isLoading = isUserLoading || coursesLoading || instructorsLoading || fieldsLoading;
 
   return (
-    <div className="container mx-auto py-12">
+    <div className="container py-12">
       <header className="mb-12">
         <h1 className="font-headline text-4xl font-bold tracking-tight">나의 강의실</h1>
         <p className="mt-2 text-lg text-muted-foreground">보유 중인 모든 수강권을 확인하고 학습을 시작하세요.</p>

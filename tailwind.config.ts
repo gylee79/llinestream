@@ -9,7 +9,8 @@ export default {
   prefix: "",
   theme: {
     container: {
-      padding: "2rem",
+      center: true,
+      padding: "1rem",
       screens: {
         "2xl": "1400px",
       },

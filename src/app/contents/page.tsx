@@ -72,7 +72,7 @@ export default function ContentsPage() {
   }, [fields, classifications, courses, instructors, isLoading]);
 
   return (
-    <div className="container mx-auto py-12">
+    <div className="container py-12">
       <header className="mb-8">
         <h1 className="font-headline text-4xl font-bold tracking-tight">전체 강좌</h1>
         <p className="mt-2 text-lg text-muted-foreground">분야별로 모든 강좌를 확인해보세요.</p>

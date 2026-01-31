@@ -113,7 +113,7 @@ export default function AboutPage() {
         </motion.div>
       </section>
 
-      <div className="container mx-auto py-16 md:py-24 space-y-16 md:space-y-24">
+      <div className="container py-16 md:py-24 space-y-16 md:space-y-24">
 
         {/* Curriculum Section */}
         <section>

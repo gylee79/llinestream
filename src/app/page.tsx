@@ -112,7 +112,7 @@ export default function Home() {
   
   if (isLoading) {
       return (
-          <div className="container mx-auto py-8 space-y-8">
+          <div className="container py-8 space-y-8">
             <Skeleton className="h-40 w-full rounded-lg" />
             <Skeleton className="h-8 w-1/3" />
             <div className="grid grid-cols-2 gap-4">
@@ -126,7 +126,7 @@ export default function Home() {
 
   return (
     <div className="flex-1 bg-muted/50">
-      <div className="container mx-auto space-y-6 md:space-y-8 py-6 md:py-8">
+      <div className="container space-y-6 md:space-y-8 py-6 md:py-8">
         
         {user ? (
             <CollapsibleUserPanel user={user} />
