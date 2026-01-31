@@ -9,7 +9,7 @@ import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
-import { BookUser, ShoppingCart, Bell, Search, BookOpen, ImageIcon, ChevronUp } from 'lucide-react';
+import { BookUser, ShoppingCart, Bell, Search, BookOpen, ImageIcon, ChevronDown } from 'lucide-react';
 import ContentCarousel from '@/components/shared/content-carousel';
 import { motion, AnimatePresence, useMotionValue, animate, useTransform } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -158,10 +158,10 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                 style={{ touchAction: 'none' }} // Prevents page scroll on mobile
             >
                  <motion.div
-                    className="h-5 w-5"
+                    className="h-10 w-10 py-1"
                     style={{ rotate }}
                  >
-                    <ChevronUp className="h-5 w-5 opacity-70" />
+                    <ChevronDown className="h-full w-full opacity-70" />
                 </motion.div>
             </motion.div>
         </div>
