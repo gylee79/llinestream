@@ -115,55 +115,56 @@ export default function Header() {
     <>
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 max-w-screen-2xl items-center">
-          {/* Mobile Menu */}
-          <div className="md:hidden">
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Menu className="h-6 w-6" />
-                  <span className="sr-only">Toggle Navigation</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm">
-                  <SheetHeader className="border-b pb-4">
-                      <Link href="/" className="self-start">
-                          <LlineStreamLogo appName={appName} />
-                      </Link>
-                      <SheetTitle className="sr-only">메뉴</SheetTitle>
-                      <SheetDescription className="sr-only">메인 네비게이션 메뉴</SheetDescription>
-                  </SheetHeader>
-                  <nav className="grid gap-4 py-6 text-lg font-medium">
-                      {navLinks.map((link) => (
-                      <SheetClose asChild key={link.href}>
-                          <NavLink {...link} isMobile />
-                      </SheetClose>
-                      ))}
-                      {isAdmin && (
-                      <SheetClose asChild>
-                          <NavLink {...adminLink} isMobile />
-                      </SheetClose>
-                      )}
-                  </nav>
-              </SheetContent>
-            </Sheet>
-          </div>
-          
-          {/* Desktop Logo and Navigation */}
-          <div className="flex flex-1 items-center justify-start">
-              <Link href="/" className="ml-4 md:ml-0 mr-6 flex items-center space-x-2">
-              <LlineStreamLogo appName={appName} />
-              </Link>
-              <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
-              {navLinks.map((link) => (
-                  <NavLink key={link.href} {...link} />
-              ))}
-              {isAdmin && <NavLink {...adminLink} />}
-              </nav>
+          <div className="flex flex-1 items-center">
+            {/* Mobile Menu */}
+            <div className="md:hidden">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="-ml-2">
+                    <Menu className="h-6 w-6" />
+                    <span className="sr-only">Toggle Navigation</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm">
+                    <SheetHeader className="border-b pb-4">
+                        <Link href="/" className="self-start">
+                            <LlineStreamLogo appName={appName} />
+                        </Link>
+                        <SheetTitle className="sr-only">메뉴</SheetTitle>
+                        <SheetDescription className="sr-only">메인 네비게이션 메뉴</SheetDescription>
+                    </SheetHeader>
+                    <nav className="grid gap-4 py-6 text-lg font-medium">
+                        {navLinks.map((link) => (
+                        <SheetClose asChild key={link.href}>
+                            <NavLink {...link} isMobile />
+                        </SheetClose>
+                        ))}
+                        {isAdmin && (
+                        <SheetClose asChild>
+                            <NavLink {...adminLink} isMobile />
+                        </SheetClose>
+                        )}
+                    </nav>
+                </SheetContent>
+              </Sheet>
+            </div>
+            
+            {/* Logo */}
+            <Link href="/" className="mr-6 flex items-center space-x-2">
+            <LlineStreamLogo appName={appName} />
+            </Link>
+            
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
+            {navLinks.map((link) => (
+                <NavLink key={link.href} {...link} />
+            ))}
+            {isAdmin && <NavLink {...adminLink} />}
+            </nav>
           </div>
 
-
-          <div className="flex items-center justify-end space-x-4">
-            <div className="hidden md:flex items-center text-xs text-muted-foreground">
+          <div className="flex items-center justify-end space-x-2 md:space-x-4">
+            <div className="flex items-center text-xs text-muted-foreground">
               {preference === 'about' ? '홈페이지 버전' : '강의앱 버전'}
             </div>
             
