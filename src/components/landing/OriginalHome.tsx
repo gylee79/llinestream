@@ -9,11 +9,12 @@ import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
-import { BookUser, ShoppingCart, Bell, Search, BookOpen, ImageIcon, ChevronDown, ChevronUp } from 'lucide-react';
+import { BookUser, ShoppingCart, Bell, Search, BookOpen, ImageIcon, ChevronDown, ChevronUp, Settings } from 'lucide-react';
 import ContentCarousel from '@/components/shared/content-carousel';
 import { motion, AnimatePresence, useMotionValue, animate, useTransform } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import LandingPageSwitch from '../layout/LandingPageSwitch';
 
 const CollapsibleUserPanel = ({ user, isMobile }: { user: User, isMobile: boolean }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -70,7 +71,7 @@ const CollapsibleUserPanel = ({ user, isMobile }: { user: User, isMobile: boolea
 
 
     return (
-        <div className="bg-gradient-to-br from-primary to-foreground rounded-xl text-primary-foreground shadow-lg">
+        <div className="bg-gradient-to-br from-primary to-foreground rounded-xl text-primary-foreground">
             <div className="px-4">
                 <div
                     className="relative"
@@ -143,6 +144,12 @@ const CollapsibleUserPanel = ({ user, isMobile }: { user: User, isMobile: boolea
                               </div>
                               <span>알림</span>
                           </button>
+                          <div className="flex flex-col items-center gap-2 text-sm font-medium">
+                                <div className="h-12 w-12 rounded-full bg-primary-foreground/20 flex items-center justify-center">
+                                    <Settings className="h-6 w-6" />
+                                </div>
+                                <span><LandingPageSwitch /></span>
+                          </div>
                       </div>
                     </div>
                 </motion.div>

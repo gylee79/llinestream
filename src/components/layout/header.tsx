@@ -13,8 +13,8 @@ import {
   Shield,
   X,
   ShoppingCart,
-  Info,
   BookUser,
+  Info,
 } from 'lucide-react';
 
 import { LlineStreamLogo } from '@/components/icons';
@@ -47,7 +47,7 @@ import type { FooterSettings } from '@/lib/types';
 import { doc } from 'firebase/firestore';
 import ProfileDialog from '@/components/profile/profile-dialog';
 import BillingDialog from '@/components/profile/billing-dialog';
-import LandingPageSwitch from './LandingPageSwitch';
+import { useLandingPage } from '@/context/landing-page-context';
 
 
 const navLinks = [
@@ -75,6 +75,10 @@ export default function Header() {
   const footerRef = useMemoFirebase(() => (firestore ? doc(firestore, 'settings', 'footer') : null), [firestore]);
   const { data: settings } = useDoc<FooterSettings>(footerRef);
   const appName = settings?.appName || 'LlineStream';
+  
+  const { preference, isLandingPageLoading } = useLandingPage();
+  const versionLabel = preference === 'original' ? '강의앱 버전' : '홈페이지 버전';
+
 
   const handleLogout = async () => {
     if (auth) {
@@ -149,8 +153,12 @@ export default function Header() {
 
 
           <div className="flex items-center justify-end space-x-2">
-            <div>
-              <LandingPageSwitch />
+            <div className="hidden md:block">
+              {!isLandingPageLoading && (
+                <div className="text-xs font-semibold text-muted-foreground bg-muted/50 rounded-full px-3 py-1.5 border">
+                  {versionLabel}
+                </div>
+              )}
             </div>
 
             {isUserLoading ? (
