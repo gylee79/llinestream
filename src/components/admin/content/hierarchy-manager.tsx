@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2, ImageIcon, ExternalLink, GripVertical } from 'lucide-react';
 import type { Field, Classification, Course } from '@/lib/types';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
-import { collection, query, where, doc, setDoc, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import HierarchyItemDialog, { type HierarchyItem } from './hierarchy-item-dialog';
@@ -146,24 +146,46 @@ export default function HierarchyManager() {
   const [deleteAlert, setDeleteAlert] = useState<DeleteAlertState>({ isOpen: false, item: null, collectionName: null });
   const [courseEditDialog, setCourseEditDialog] = useState<{isOpen: boolean, course: Course | null}>({ isOpen: false, course: null });
 
-  const fieldsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'fields'), orderBy('orderIndex', 'asc')) : null), [firestore]);
+  const fieldsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'fields')) : null), [firestore]);
   const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
 
   const classificationsQuery = useMemoFirebase(() =>
-    firestore && selectedField ? query(collection(firestore, 'classifications'), where('fieldId', '==', selectedField), orderBy('orderIndex', 'asc')) : null,
+    firestore && selectedField ? query(collection(firestore, 'classifications'), where('fieldId', '==', selectedField)) : null,
     [firestore, selectedField]
   );
   const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
 
   const coursesQuery = useMemoFirebase(() =>
-    firestore && selectedClassification ? query(collection(firestore, 'courses'), where('classificationId', '==', selectedClassification), orderBy('orderIndex', 'asc')) : null,
+    firestore && selectedClassification ? query(collection(firestore, 'courses'), where('classificationId', '==', selectedClassification)) : null,
     [firestore, selectedClassification]
   );
   const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
   
-  useEffect(() => { if (fields) setOrderedFields(fields) }, [fields]);
-  useEffect(() => { if (classifications) setOrderedClassifications(classifications) }, [classifications]);
-  useEffect(() => { if (courses) setOrderedCourses(courses) }, [courses]);
+  const sortItems = <T extends { orderIndex?: number }>(items: T[]): T[] => {
+    return [...items].sort((a, b) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
+  };
+  
+  useEffect(() => { 
+    if (fields) {
+        setOrderedFields(sortItems(fields));
+    }
+  }, [fields]);
+
+  useEffect(() => { 
+      if (classifications) {
+          setOrderedClassifications(sortItems(classifications));
+      } else {
+          setOrderedClassifications([]);
+      }
+  }, [classifications]);
+
+  useEffect(() => { 
+      if (courses) {
+          setOrderedCourses(sortItems(courses));
+      } else {
+          setOrderedCourses([]);
+      }
+  }, [courses]);
   
   useEffect(() => {
     if (selectedField && fields && !fields.find(f => f.id === selectedField)) {
