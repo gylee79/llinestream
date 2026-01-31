@@ -12,17 +12,20 @@ export default function LandingPageSwitch() {
     if (isLandingPageLoading) {
         return null; // Or a skeleton
     }
+    
+    const isAppVersion = preference === 'original';
+    const labelText = isAppVersion ? '홈페이지로 전환' : '강의앱으로 전환';
 
     return (
         <div className="flex items-center space-x-2">
             <Switch
                 id="landing-page-switch"
-                checked={preference === 'original'}
+                checked={isAppVersion}
                 onCheckedChange={togglePreference}
             />
             {!isMobile && 
                 <Label htmlFor="landing-page-switch" className="text-xs text-muted-foreground whitespace-nowrap">
-                    기존 홈을 첫 화면으로
+                    {labelText}
                 </Label>
             }
         </div>
