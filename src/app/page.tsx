@@ -19,16 +19,15 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
     const height = useMotionValue(0);
     const dragStartHeight = useRef(0);
 
-    const togglePanel = useCallback(() => {
+    const setPanelState = useCallback((open: boolean) => {
         const contentHeight = contentWrapperRef.current?.scrollHeight || 0;
-        const newState = !isOpen;
-        animate(height, newState ? contentHeight : 0, {
+        animate(height, open ? contentHeight : 0, {
             type: "spring",
             stiffness: 400,
             damping: 40
         });
-        setIsOpen(newState);
-    }, [isOpen, height]);
+        setIsOpen(open);
+    }, [height]);
 
     const handleDragStart = () => {
         dragStartHeight.current = height.get();
@@ -50,11 +49,9 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
         const velocity = info.velocity.y;
 
         if (velocity > 500 || currentHeight > contentHeight / 2) {
-            animate(height, contentHeight, { type: "spring", stiffness: 300, damping: 30 });
-            setIsOpen(true);
+            setPanelState(true);
         } else {
-            animate(height, 0, { type: "spring", stiffness: 300, damping: 30 });
-            setIsOpen(false);
+            setPanelState(false);
         }
     };
     
@@ -74,8 +71,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
         <div className="bg-primary rounded-xl text-primary-foreground shadow-lg">
             <div className="p-4 pt-2">
                  <div 
-                    className="flex justify-between items-center mb-2 min-h-[28px] cursor-pointer"
-                    onClick={togglePanel}
+                    className="flex justify-between items-center mb-2 min-h-[28px]"
                 >
                     <AnimatePresence initial={false}>
                         <motion.div
@@ -148,7 +144,6 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                 onDragStart={handleDragStart}
                 onDrag={handleDrag}
                 onDragEnd={handleDragEnd}
-                onTap={togglePanel}
                 style={{ touchAction: 'none' }} // Prevents page scroll on mobile
             >
                  <motion.div
