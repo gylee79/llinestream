@@ -65,19 +65,23 @@ export function useCollection<T = any>(
       ? (targetRefOrQuery as CollectionReference).path
       : ((targetRefOrQuery as InternalQuery)._query?.path?.canonicalString() || 'unknown path');
     
-    // auth.currentUser is a stable reference within the auth object from context
-    const currentUser = auth.currentUser;
-    const contextualError = new FirestorePermissionError({
-      operation: 'list',
-      path,
-    }, currentUser);
-
-    setError(contextualError);
+    if (err.code === 'permission-denied') {
+        const currentUser = auth.currentUser;
+        const contextualError = new FirestorePermissionError({
+            operation: 'list',
+            path,
+        }, currentUser);
+        setError(contextualError);
+        errorEmitter.emit('permission-error', contextualError);
+    } else {
+        // Handle other errors, like missing indexes, by setting the original error
+        setError(err);
+        // We can still log it for easier debugging in the console
+        console.error("useCollection Firestore Error:", err);
+    }
+    
     setData(null);
     setIsLoading(false);
-
-    // trigger global error propagation
-    errorEmitter.emit('permission-error', contextualError);
   }, [targetRefOrQuery, auth]);
 
   useEffect(() => {

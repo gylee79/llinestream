@@ -50,8 +50,7 @@ export function useDoc<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   const handleError = useCallback((err: FirestoreError) => {
-    if (docRef) {
-      // auth.currentUser is a stable reference within the auth object from context
+    if (err.code === 'permission-denied' && docRef) {
       const currentUser = auth.currentUser;
       const contextualError = new FirestorePermissionError({
         operation: 'get',
@@ -61,6 +60,7 @@ export function useDoc<T = any>(
       errorEmitter.emit('permission-error', contextualError);
     } else {
       setError(err);
+      console.error("useDoc Firestore Error:", err);
     }
     setData(null);
     setIsLoading(false);
