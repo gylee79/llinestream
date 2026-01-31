@@ -152,15 +152,6 @@ export default function Header() {
             <div className="hidden md:block">
               <LandingPageSwitch />
             </div>
-            <Button variant="ghost" size="icon" className="relative" onClick={openCart}>
-                  <ShoppingCart className="h-5 w-5" />
-                  {items.length > 0 && (
-                      <Badge variant="destructive" className="absolute -right-2 -top-2 h-5 w-5 justify-center rounded-full p-0">
-                          {items.length}
-                      </Badge>
-                  )}
-                  <span className="sr-only">장바구니 열기</span>
-              </Button>
 
             {isUserLoading ? (
               <Avatar className="h-8 w-8">
@@ -177,6 +168,9 @@ export default function Header() {
                       />
                       <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
                     </Avatar>
+                    {items.length > 0 && (
+                      <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-destructive ring-2 ring-background" />
+                    )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -193,6 +187,13 @@ export default function Header() {
                     <DropdownMenuItem onSelect={() => router.push('/my-courses')}>
                         <BookUser className="mr-2 h-4 w-4" />
                         <span>나의 강의실</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={openCart}>
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                      <span>장바구니</span>
+                      {items.length > 0 && (
+                        <Badge variant="secondary" className="ml-auto">{items.length}</Badge>
+                      )}
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
                       <UserIcon className="mr-2 h-4 w-4" />
@@ -211,9 +212,20 @@ export default function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button asChild>
-                <Link href="/login">로그인</Link>
-              </Button>
+              <>
+                <Button variant="ghost" size="icon" className="relative" onClick={openCart}>
+                    <ShoppingCart className="h-5 w-5" />
+                    {items.length > 0 && (
+                        <Badge variant="destructive" className="absolute -right-2 -top-2 h-5 w-5 justify-center rounded-full p-0">
+                            {items.length}
+                        </Badge>
+                    )}
+                    <span className="sr-only">장바구니 열기</span>
+                </Button>
+                <Button asChild>
+                  <Link href="/login">로그인</Link>
+                </Button>
+              </>
             )}
           </div>
         </div>
