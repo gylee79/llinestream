@@ -242,7 +242,9 @@ export default function Home() {
         )}
         
         <section>
-          <h2 className="font-body text-xl font-bold tracking-tight mb-4">분야별 강좌</h2>
+          <h2 className="font-body text-xl font-bold tracking-tight mb-4">
+            분야별 강좌 <span className="text-lg text-muted-foreground">({sortedFields?.length || 0})</span>
+          </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {sortedFields?.map((field) => (
               <Link href={`/fields/${field.id}`} key={field.id} className="block group">
