@@ -26,6 +26,7 @@ export interface Field {
   name: string;
   thumbnailUrl: string;
   thumbnailPath?: string;
+  orderIndex?: number;
 }
 
 export interface Classification {
@@ -35,6 +36,7 @@ export interface Classification {
   description: string;
   thumbnailUrl: string;
   thumbnailPath?: string;
+  orderIndex?: number;
   // prices field is removed from here
 }
 
@@ -48,6 +50,7 @@ export interface Course {
   thumbnailPath?: string;
   introImageUrls?: string[];
   introImagePaths?: string[];
+  orderIndex?: number;
   // New fields for richer display
   level?: '입문' | '초급' | '중급' | '고급';
   tags?: string[];
