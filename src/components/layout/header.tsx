@@ -16,6 +16,7 @@ import {
   BookUser,
   Info,
   Settings,
+  BookOpen,
 } from 'lucide-react';
 
 import { LlineStreamLogo } from '@/components/icons';
@@ -52,14 +53,6 @@ import { useLandingPage } from '@/context/landing-page-context';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
-
-const navLinks = [
-  { href: '/', label: '홈', icon: Home },
-  { href: '/about', label: '동영상강의홈', icon: Info },
-  { href: '/contents', label: '영상 콘텐츠', icon: Clapperboard },
-  { href: '/pricing', label: '가격 안내', icon: CreditCard },
-];
-
 const adminLink = { href: '/admin', label: '관리자', icon: Shield };
 
 export default function Header() {
@@ -79,7 +72,22 @@ export default function Header() {
   const { data: settings } = useDoc<FooterSettings>(footerRef);
   const appName = settings?.appName || 'LlineStream';
   
-  const { preference, togglePreference, isLandingPageLoading } = useLandingPage();
+  const { preference, togglePreference } = useLandingPage();
+
+  const navLinks =
+    preference === 'about'
+      ? [ // Homepage version
+          { href: '/', label: '홈', icon: Home },
+          { href: '/about', label: '동영상강의', icon: BookOpen },
+          { href: '/contents', label: '영상 콘텐츠', icon: Clapperboard },
+          { href: '/pricing', label: '가격 안내', icon: CreditCard },
+        ]
+      : [ // App version
+          { href: '/', label: '홈', icon: Home },
+          { href: '/contents', label: '영상 콘텐츠', icon: Clapperboard },
+          { href: '/pricing', label: '가격 안내', icon: CreditCard },
+          { href: '/about', label: '아카데미소개', icon: Info },
+        ];
 
 
   const handleLogout = async () => {
