@@ -72,18 +72,17 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
         <div className="bg-primary rounded-xl text-primary-foreground shadow-lg">
             <div className="px-4">
                 <div
-                    className="relative cursor-pointer"
+                    className="relative"
                     style={{ minHeight: '3rem' }}
-                    onClick={() => setPanelState(!isOpen)}
                 >
-                    <AnimatePresence initial={false}>
+                     <AnimatePresence initial={false}>
                         {isOpen ? (
                             <motion.div
                                 key="open"
                                 className="absolute inset-0 flex w-full items-center"
-                                initial={{ opacity: 0, y: 10 }}
+                                initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
+                                exit={{ opacity: 0, y: 10 }}
                                 transition={{ duration: 0.3, ease: 'easeInOut' }}
                             >
                                 <h2 className="font-bold text-lg">{user.name}님, 환영합니다!</h2>
@@ -158,7 +157,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                 style={{ touchAction: 'none' }} // Prevents page scroll on mobile
             >
                  <motion.div
-                    className="h-10 w-10"
+                    className="h-6 w-6"
                     style={{ rotate }}
                  >
                     <ChevronDown className="h-full w-full opacity-70" />
