@@ -73,7 +73,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
             <div className="px-4">
                 <div
                     className="relative cursor-pointer"
-                    style={{ minHeight: '4.5rem' }}
+                    style={{ minHeight: '3rem' }}
                     onClick={() => setPanelState(!isOpen)}
                 >
                     <AnimatePresence initial={false}>
