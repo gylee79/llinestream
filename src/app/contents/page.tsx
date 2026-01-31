@@ -31,15 +31,20 @@ export default function ContentsPage() {
   const structuredData = useMemo(() => {
     if (isLoading || !fields || !classifications || !courses || !instructors) return [];
 
+    // Sort all data by orderIndex
+    const sortedFields = [...fields].sort((a, b) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
+    const sortedClassifications = [...classifications].sort((a, b) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
+    const sortedCourses = [...courses].sort((a, b) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
+
     const courseMapByClassification = new Map<string, Course[]>();
-    courses.forEach(course => {
+    sortedCourses.forEach(course => {
       const list = courseMapByClassification.get(course.classificationId) || [];
       list.push(course);
       courseMapByClassification.set(course.classificationId, list);
     });
 
     const classificationMapByField = new Map<string, Classification[]>();
-    classifications.forEach(cls => {
+    sortedClassifications.forEach(cls => {
       const list = classificationMapByField.get(cls.fieldId) || [];
       list.push(cls);
       classificationMapByField.set(cls.fieldId, list);
@@ -47,7 +52,7 @@ export default function ContentsPage() {
 
     const instructorMap = new Map(instructors.map(i => [i.id, i]));
 
-    return fields.map(field => {
+    return sortedFields.map(field => {
       const fieldClassifications = classificationMapByField.get(field.id) || [];
       return {
         field,
@@ -60,9 +65,9 @@ export default function ContentsPage() {
               instructor: instructorMap.get(course.instructorId || '')
             }))
           };
-        }).filter(c => c.courses.length > 0) // Only include classifications that have courses
+        }).filter(c => c.courses.length > 0)
       };
-    }).filter(f => f.classifications.length > 0); // Only include fields that have classifications with courses
+    }).filter(f => f.classifications.length > 0);
 
   }, [fields, classifications, courses, instructors, isLoading]);
 

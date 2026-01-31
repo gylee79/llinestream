@@ -16,9 +16,14 @@ export default function Home() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  const fieldsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'fields'), orderBy('name')) : null), [firestore]);
+  const fieldsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'fields') : null), [firestore]);
   const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
   
+  const sortedFields = useMemo(() => {
+    if (!fields) return [];
+    return [...fields].sort((a, b) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
+  }, [fields]);
+
   const viewLogsQuery = useMemoFirebase(() => {
       if (!user || !firestore) return null;
       return query(
@@ -112,7 +117,7 @@ export default function Home() {
         <section>
           <h2 className="font-body text-xl font-bold tracking-tight mb-4">분야별 강좌</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {fields?.map((field) => (
+            {sortedFields?.map((field) => (
               <Link href={`/fields/${field.id}`} key={field.id} className="block group">
                 <Card className="flex flex-col items-center justify-center text-center p-4 h-full hover:bg-secondary/70 transition-colors">
                    <div className="relative h-16 w-16 md:h-20 md:w-20 flex-shrink-0 overflow-hidden rounded-md bg-muted border">
