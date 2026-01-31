@@ -1,4 +1,3 @@
-
 'use client';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, orderBy } from 'firebase/firestore';
@@ -17,8 +16,8 @@ export default function Home() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  const classificationsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'classifications'), orderBy('name')) : null), [firestore]);
-  const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
+  const fieldsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'fields'), orderBy('name')) : null), [firestore]);
+  const { data: fields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
   
   const viewLogsQuery = useMemoFirebase(() => {
       if (!user || !firestore) return null;
@@ -41,7 +40,7 @@ export default function Home() {
   }, [viewLogs, allEpisodes]);
 
 
-  const isLoading = classificationsLoading || (user && (historyLoading || episodesLoading));
+  const isLoading = fieldsLoading || (user && (historyLoading || episodesLoading));
   
   if (isLoading) {
       return (
@@ -109,18 +108,18 @@ export default function Home() {
           />
         )}
         
-        {/* All Categories Section (ICON-BASED) */}
+        {/* All Fields Section (ICON-BASED) */}
         <section>
-          <h2 className="text-2xl font-bold tracking-tight mb-4">전체 카테고리</h2>
+          <h2 className="font-headline text-2xl font-semibold tracking-tight mb-4">분야별 강좌</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {classifications?.map((classification) => (
-              <Link href={`/classifications/${classification.id}`} key={classification.id} className="block group">
+            {fields?.map((field) => (
+              <Link href={`/fields/${field.id}`} key={field.id} className="block group">
                 <Card className="flex flex-col items-center justify-center text-center p-4 h-full hover:bg-secondary/70 transition-colors">
                    <div className="relative h-16 w-16 md:h-20 md:w-20 flex-shrink-0 overflow-hidden rounded-md bg-muted border">
-                      {classification.thumbnailUrl ? (
+                      {field.thumbnailUrl ? (
                           <Image
-                              src={classification.thumbnailUrl}
-                              alt={classification.name}
+                              src={field.thumbnailUrl}
+                              alt={field.name}
                               fill
                               sizes="(max-width: 768px) 64px, 80px"
                               className="object-cover"
@@ -131,7 +130,7 @@ export default function Home() {
                           </div>
                       )}
                     </div>
-                    <p className="mt-2 font-semibold text-sm md:text-base line-clamp-2">{classification.name}</p>
+                    <p className="mt-2 font-semibold text-sm md:text-base line-clamp-2">{field.name}</p>
                 </Card>
               </Link>
             ))}
@@ -142,4 +141,3 @@ export default function Home() {
     </div>
   );
 }
-
