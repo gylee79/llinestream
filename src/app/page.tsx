@@ -70,12 +70,10 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
 
     return (
         <div className="bg-primary rounded-xl text-primary-foreground shadow-lg">
-            <div className={cn("px-4", isOpen ? "pt-4 pb-0" : "py-4")}>
-                 <div 
-                    className={cn(
-                        "flex justify-between items-center min-h-[28px]",
-                        isOpen && "mb-2"
-                    )}
+            <div className="px-4">
+                <div
+                    className="relative flex items-center cursor-pointer"
+                    style={{ minHeight: '4.5rem' }}
                     onClick={() => setPanelState(!isOpen)}
                 >
                     <AnimatePresence initial={false}>
@@ -83,26 +81,28 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                             key={isOpen ? "open" : "closed"}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="flex w-full justify-between items-center"
+                            exit={{ opacity: 0, position: 'absolute' }}
+                            transition={{ duration: 0.4, ease: "easeInOut" }}
+                            className="w-full"
                         >
                             {isOpen ? (
-                                <h2 className="font-bold text-lg">{user.name}님, 환영합니다!</h2>
-                            ) : (
-                                <>
-                                <p className="font-bold">{user.name}님</p>
-                                <div className="flex items-center gap-3 text-sm">
-                                    <Link href="/pricing" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">수강신청</Link>
-                                    <span className="opacity-50">·</span>
-                                    <Link href="/my-courses" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">나의 강의실</Link>
-                                    <span className="opacity-50">·</span>
-                                    <button onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity relative">
-                                        알림
-                                        <Badge variant="destructive" className="absolute -right-3 -top-1.5 h-4 w-4 justify-center rounded-full p-0 text-[9px]">0</Badge>
-                                    </button>
+                                <div className="flex w-full justify-between items-center py-4">
+                                    <h2 className="font-bold text-lg">{user.name}님, 환영합니다!</h2>
                                 </div>
-                                </>
+                            ) : (
+                                <div className="flex w-full justify-between items-center py-4">
+                                    <p className="font-bold">{user.name}님</p>
+                                    <div className="flex items-center gap-3 text-sm">
+                                        <Link href="/pricing" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">수강신청</Link>
+                                        <span className="opacity-50">·</span>
+                                        <Link href="/my-courses" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">나의 강의실</Link>
+                                        <span className="opacity-50">·</span>
+                                        <button onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity relative">
+                                            알림
+                                            <Badge variant="destructive" className="absolute -right-3 -top-1.5 h-4 w-4 justify-center rounded-full p-0 text-[9px]">0</Badge>
+                                        </button>
+                                    </div>
+                                </div>
                             )}
                         </motion.div>
                     </AnimatePresence>
@@ -113,7 +113,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                     style={{ height }}
                     onTap={() => { if (!isOpen) setPanelState(true); }}
                 >
-                    <div ref={contentWrapperRef}>
+                    <div ref={contentWrapperRef} className="pb-4">
                       <div className="p-4 bg-primary-foreground/10 rounded-lg flex justify-around">
                           <Link href="/pricing" className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
                               <div className="h-12 w-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
@@ -143,7 +143,7 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
 
             {/* Handle Area */}
             <motion.div
-                className="w-full flex justify-center py-1 cursor-grab"
+                className="w-full flex justify-center py-2 cursor-grab"
                 drag="y"
                 dragConstraints={{ top: 0, bottom: 0 }}
                 dragElastic={{ top: 0, bottom: 0.5 }}
