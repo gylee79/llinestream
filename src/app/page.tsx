@@ -1,3 +1,4 @@
+
 'use client';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, orderBy } from 'firebase/firestore';
@@ -219,7 +220,7 @@ export default function Home() {
 
   return (
     <div className="flex-1 bg-muted/50">
-      <div className="container space-y-6 md:space-y-8 py-6 md:py-8">
+      <div className="container space-y-6 md:space-y-8 pb-6 md:pb-8">
         
         {user ? (
             <CollapsibleUserPanel user={user} isMobile={isMobile} />
