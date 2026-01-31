@@ -17,7 +17,7 @@ export default {
     extend: {
       fontFamily: {
         body: ['Pretendard', 'sans-serif'],
-        headline: ['Georgia', 'serif'],
+        headline: ['Pretendard', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
