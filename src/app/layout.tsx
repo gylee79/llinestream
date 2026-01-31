@@ -7,6 +7,7 @@ import Footer from '@/components/layout/footer';
 import { FirebaseClientProvider } from '@/firebase';
 import { CartProvider } from '@/context/cart-context';
 import CartSidebar from '@/components/cart/cart-sidebar';
+import { LandingPageProvider } from '@/context/landing-page-context';
 
 export const metadata: Metadata = {
   title: 'LlineStream',
@@ -32,15 +33,17 @@ export default function RootLayout({
       </head>
       <body className={cn('min-h-screen bg-background font-body antialiased')}>
         <FirebaseClientProvider>
-          <CartProvider>
-            <div className="relative flex min-h-dvh flex-col bg-background">
-              <Header />
-              <main className="flex-1">{children}</main>
-              <Footer />
-              <CartSidebar />
-            </div>
-            <Toaster />
-          </CartProvider>
+          <LandingPageProvider>
+            <CartProvider>
+              <div className="relative flex min-h-dvh flex-col bg-background">
+                <Header />
+                <main className="flex-1">{children}</main>
+                <Footer />
+                <CartSidebar />
+              </div>
+              <Toaster />
+            </CartProvider>
+          </LandingPageProvider>
         </FirebaseClientProvider>
       </body>
     </html>

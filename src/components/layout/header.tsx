@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -48,6 +47,7 @@ import type { FooterSettings } from '@/lib/types';
 import { doc } from 'firebase/firestore';
 import ProfileDialog from '@/components/profile/profile-dialog';
 import BillingDialog from '@/components/profile/billing-dialog';
+import LandingPageSwitch from './LandingPageSwitch';
 
 
 const navLinks = [
@@ -149,6 +149,9 @@ export default function Header() {
 
 
           <div className="flex items-center justify-end space-x-2">
+            <div className="hidden md:block">
+              <LandingPageSwitch />
+            </div>
             <Button variant="ghost" size="icon" className="relative" onClick={openCart}>
                   <ShoppingCart className="h-5 w-5" />
                   {items.length > 0 && (
