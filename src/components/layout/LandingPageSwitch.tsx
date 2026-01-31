@@ -3,9 +3,11 @@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useLandingPage } from "@/context/landing-page-context";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function LandingPageSwitch() {
     const { preference, togglePreference, isLandingPageLoading } = useLandingPage();
+    const isMobile = useIsMobile();
 
     if (isLandingPageLoading) {
         return null; // Or a skeleton
@@ -18,9 +20,11 @@ export default function LandingPageSwitch() {
                 checked={preference === 'original'}
                 onCheckedChange={togglePreference}
             />
-            <Label htmlFor="landing-page-switch" className="text-xs text-muted-foreground whitespace-nowrap">
-                기존 홈을 첫 화면으로
-            </Label>
+            {!isMobile && 
+                <Label htmlFor="landing-page-switch" className="text-xs text-muted-foreground whitespace-nowrap">
+                    기존 홈을 첫 화면으로
+                </Label>
+            }
         </div>
     );
 }

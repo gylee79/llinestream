@@ -149,9 +149,7 @@ export default function Header() {
 
 
           <div className="flex items-center justify-end space-x-2">
-            <div className="hidden md:block">
-              <LandingPageSwitch />
-            </div>
+            <LandingPageSwitch />
             <Button variant="ghost" size="icon" className="relative" onClick={openCart}>
                   <ShoppingCart className="h-5 w-5" />
                   {items.length > 0 && (
