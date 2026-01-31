@@ -36,21 +36,48 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
 
     return (
         <div className="bg-primary rounded-xl text-primary-foreground shadow-lg">
-            {/* Animated Content */}
-            <motion.div
-                className="overflow-hidden"
-                initial="closed"
-                animate={controls}
-                variants={{
-                    open: { height: 'auto', opacity: 1 },
-                    closed: { height: 0, opacity: 0 },
-                }}
-                transition={{ duration: 0.4, ease: [0.04, 0.62, 0.23, 0.98] }}
-            >
-                <div className="p-4 pt-2">
-                    <div className="flex justify-between items-center mb-2">
-                        <h2 className="font-bold text-lg">{user.name}님, 환영합니다!</h2>
-                    </div>
+            <div className="p-4 pt-2">
+                 <div className="flex justify-between items-center mb-2 min-h-[28px]">
+                    <AnimatePresence initial={false}>
+                        <motion.div
+                            key={isOpen ? "open" : "closed"}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="flex w-full justify-between items-center"
+                        >
+                            {isOpen ? (
+                                <h2 className="font-bold text-lg">{user.name}님, 환영합니다!</h2>
+                            ) : (
+                                <>
+                                <p className="font-bold">{user.name}님</p>
+                                <div className="flex items-center gap-3 text-sm">
+                                    <Link href="/pricing" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">수강신청</Link>
+                                    <span className="opacity-50">·</span>
+                                    <Link href="/my-courses" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">나의 강의실</Link>
+                                    <span className="opacity-50">·</span>
+                                    <button onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity relative">
+                                        알림
+                                        <Badge variant="destructive" className="absolute -right-3 -top-1.5 h-4 w-4 justify-center rounded-full p-0 text-[9px]">0</Badge>
+                                    </button>
+                                </div>
+                                </>
+                            )}
+                        </motion.div>
+                    </AnimatePresence>
+                </div>
+
+                <motion.div
+                    className="overflow-hidden"
+                    initial="closed"
+                    animate={controls}
+                    variants={{
+                        open: { height: 'auto', opacity: 1 },
+                        closed: { height: 0, opacity: 0 },
+                    }}
+                    transition={{ duration: 0.4, ease: [0.04, 0.62, 0.23, 0.98] }}
+                >
                     <div className="p-4 bg-primary-foreground/10 rounded-lg flex justify-around">
                         <Link href="/pricing" className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
                             <div className="h-12 w-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
@@ -74,8 +101,8 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                             <span>알림</span>
                         </button>
                     </div>
-                </div>
-            </motion.div>
+                </motion.div>
+            </div>
 
             {/* Handle Area */}
             <motion.div
@@ -86,7 +113,9 @@ const CollapsibleUserPanel = ({ user }: { user: User }) => {
                 onDragEnd={onDragEnd}
                 onTap={togglePanel}
             >
-                <div className="w-10 h-1.5 bg-primary-foreground/30 rounded-full" />
+                 <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                    <ChevronUp className="h-5 w-5 opacity-70" />
+                </motion.div>
             </motion.div>
         </div>
     );
