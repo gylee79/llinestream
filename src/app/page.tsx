@@ -11,70 +11,83 @@ import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { BookUser, ShoppingCart, Bell, Search, BookOpen, ImageIcon, ChevronUp } from 'lucide-react';
 import ContentCarousel from '@/components/shared/content-carousel';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 
 const CollapsibleUserPanel = ({ user }: { user: User }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const controls = useAnimation();
+
+    const togglePanel = () => {
+        const newState = !isOpen;
+        setIsOpen(newState);
+        controls.start(newState ? "open" : "closed");
+    };
+
+    const onDragEnd = (event: any, info: any) => {
+        const shouldOpen = info.velocity.y > 20 || (info.velocity.y >= 0 && info.point.y > 80);
+        if (shouldOpen) {
+            setIsOpen(true);
+            controls.start("open");
+        } else {
+            setIsOpen(false);
+            controls.start("closed");
+        }
+    };
 
     return (
         <div className="bg-primary rounded-xl text-primary-foreground shadow-lg">
-            <div 
-                className="flex justify-between items-center p-4 cursor-pointer"
-                onClick={() => setIsOpen(!isOpen)}
+            {/* Animated Content */}
+            <motion.div
+                className="overflow-hidden"
+                initial="closed"
+                animate={controls}
+                variants={{
+                    open: { height: 'auto', opacity: 1 },
+                    closed: { height: 0, opacity: 0 },
+                }}
+                transition={{ duration: 0.4, ease: [0.04, 0.62, 0.23, 0.98] }}
             >
-                <h2 className="font-bold text-lg">{user.name}님, 환영합니다!</h2>
-                <div className="flex items-center gap-2">
-                    <span className="text-sm hidden sm:inline">메뉴</span>
-                    <motion.div animate={{ rotate: isOpen ? 0 : 180 }}>
-                        <ChevronUp className="h-5 w-5" />
-                    </motion.div>
+                <div className="p-4 pt-2">
+                    <div className="flex justify-between items-center mb-2">
+                        <h2 className="font-bold text-lg">{user.name}님, 환영합니다!</h2>
+                    </div>
+                    <div className="p-4 bg-primary-foreground/10 rounded-lg flex justify-around">
+                        <Link href="/pricing" className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
+                            <div className="h-12 w-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
+                                <ShoppingCart className="h-6 w-6" />
+                            </div>
+                            <span>수강신청</span>
+                        </Link>
+                        <Link href="/my-courses" className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
+                            <div className="h-12 w-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
+                                <BookUser className="h-6 w-6" />
+                            </div>
+                            <span>나의 강의실</span>
+                        </Link>
+                        <button className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
+                            <div className="h-12 w-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
+                                <div className="relative">
+                                    <Bell className="h-6 w-6" />
+                                    <Badge variant="destructive" className="absolute -right-2 -top-2 h-4 w-4 justify-center rounded-full p-0 text-[10px]">0</Badge>
+                                </div>
+                            </div>
+                            <span>알림</span>
+                        </button>
+                    </div>
                 </div>
-            </div>
+            </motion.div>
 
-            <AnimatePresence>
-                {isOpen && (
-                    <motion.div
-                        key="user-panel-content"
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3, ease: 'easeInOut' }}
-                        className="overflow-hidden"
-                    >
-                        <div className="border-t border-primary-foreground/20" />
-                        <div className="p-4 flex justify-around">
-                            <Link href="/pricing" className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
-                                <div className="h-12 w-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
-                                    <ShoppingCart className="h-6 w-6" />
-                                </div>
-                                <span>수강신청</span>
-                            </Link>
-                            <Link href="/my-courses" className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
-                                <div className="h-12 w-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
-                                    <BookUser className="h-6 w-6" />
-                                </div>
-                                <span>나의 강의실</span>
-                            </Link>
-                            <button className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
-                                <div className="h-12 w-12 rounded-full bg-primary-foreground/10 flex items-center justify-center">
-                                    <div className="relative">
-                                        <Bell className="h-6 w-6" />
-                                        <Badge variant="destructive" className="absolute -right-2 -top-2 h-4 w-4 justify-center rounded-full p-0 text-[10px]">0</Badge>
-                                    </div>
-                                </div>
-                                <span>알림</span>
-                            </button>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-             <div 
-                className="w-full flex justify-center pb-2 cursor-pointer"
-                onClick={() => setIsOpen(!isOpen)}
+            {/* Handle Area */}
+            <motion.div
+                className="w-full flex justify-center py-3 cursor-grab"
+                drag="y"
+                dragConstraints={{ top: 0, bottom: 0 }}
+                dragElastic={0.1}
+                onDragEnd={onDragEnd}
+                onTap={togglePanel}
             >
                 <div className="w-10 h-1.5 bg-primary-foreground/30 rounded-full" />
-            </div>
+            </motion.div>
         </div>
     );
 };
