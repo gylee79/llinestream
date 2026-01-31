@@ -52,7 +52,7 @@ import LandingPageSwitch from './LandingPageSwitch';
 
 const navLinks = [
   { href: '/', label: '홈', icon: Home },
-  { href: '/about', label: '엘라인아카데미소개', icon: Info },
+  { href: '/about', label: '동영상강의홈', icon: Info },
   { href: '/contents', label: '영상 콘텐츠', icon: Clapperboard },
   { href: '/pricing', label: '가격 안내', icon: CreditCard },
 ];
@@ -149,7 +149,9 @@ export default function Header() {
 
 
           <div className="flex items-center justify-end space-x-2">
-            <LandingPageSwitch />
+            <div className="hidden md:block">
+              <LandingPageSwitch />
+            </div>
             <Button variant="ghost" size="icon" className="relative" onClick={openCart}>
                   <ShoppingCart className="h-5 w-5" />
                   {items.length > 0 && (
