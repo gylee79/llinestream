@@ -1,4 +1,3 @@
-
 'use client';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, orderBy } from 'firebase/firestore';
@@ -71,7 +70,7 @@ const CollapsibleUserPanel = ({ user, isMobile }: { user: User, isMobile: boolea
 
 
     return (
-        <div className="bg-primary rounded-xl text-primary-foreground shadow-lg">
+        <div className="bg-gradient-to-br from-primary to-foreground rounded-xl text-primary-foreground shadow-lg">
             <div className="px-4">
                 <div
                     className="relative"
