@@ -59,7 +59,7 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
         const data = JSON.parse(episode.aiGeneratedContent);
         return (
             <ScrollArea className="h-full w-full">
-                <div className="space-y-4">
+                <div className="space-y-4 p-4">
                     <div className="space-y-1">
                         <h4 className="font-semibold text-base">강의 요약</h4>
                         <p className="text-sm text-foreground whitespace-pre-line break-words">{data.summary || '요약이 없습니다.'}</p>
@@ -158,9 +158,9 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
     };
 
     return (
-        <div className="flex flex-1 flex-col gap-4 min-h-0">
-            <ScrollArea className="flex-grow" viewportRef={chatScrollAreaRef}>
-                <div className="space-y-4">
+        <div className="flex flex-1 flex-col gap-4 min-h-0 p-4">
+            <ScrollArea className="flex-grow -mx-4">
+                <div className="space-y-4 px-4">
                   {isLoading ? (
                       <div className="flex items-center justify-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>
                   ) : messages.length === 0 ? (
@@ -203,7 +203,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
 
 const TextbookView = () => (
     <ScrollArea className="h-full">
-        <div className="text-center flex flex-col items-center h-full justify-center">
+        <div className="text-center flex flex-col items-center h-full justify-center p-4">
             <Image src="https://picsum.photos/seed/textbook/200/280" width={150} height={210} alt="교재 이미지" className="rounded-md shadow-md" />
             <p className="text-sm text-muted-foreground mt-4">교재 정보는 현재 준비 중입니다.</p>
             <Button className="mt-4 bg-orange-500 hover:bg-orange-600 text-white font-bold">교재 구매하기</Button>
@@ -287,7 +287,7 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
     
     return (
         <ScrollArea className="h-full">
-            <div className="space-y-4">
+            <div className="space-y-4 p-4">
                 <div className="space-y-2">
                     <Textarea 
                         placeholder="북마크에 메모를 추가하세요 (선택)"
@@ -482,16 +482,16 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <TabsTrigger value="textbook" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">교재정보</TabsTrigger>
                         <TabsTrigger value="bookmark" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">북마크</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="syllabus" className="mt-0 flex-grow min-h-0 p-4">
+                    <TabsContent value="syllabus" className="mt-0 flex-grow min-h-0">
                         <SyllabusView episode={episode} />
                     </TabsContent>
-                    <TabsContent value="qna" className="mt-0 flex flex-col flex-grow min-h-0 p-4">
+                    <TabsContent value="qna" className="mt-0 flex flex-col flex-grow min-h-0">
                         {user ? <ChatView episode={episode} user={user} /> : <div className="text-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
-                    <TabsContent value="textbook" className="mt-0 flex-grow min-h-0 p-4">
+                    <TabsContent value="textbook" className="mt-0 flex-grow min-h-0">
                         <TextbookView />
                     </TabsContent>
-                    <TabsContent value="bookmark" className="mt-0 flex-grow min-h-0 p-4">
+                    <TabsContent value="bookmark" className="mt-0 flex-grow min-h-0">
                         {user ? <BookmarkView episode={episode} user={user} videoRef={videoRef}/> : <div className="text-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
                 </Tabs>
