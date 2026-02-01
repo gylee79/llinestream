@@ -491,10 +491,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <TabsTrigger value="textbook" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">교재정보</TabsTrigger>
                         <TabsTrigger value="bookmark" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">북마크</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="syllabus" className="flex-1 mt-0 overflow-y-auto"><SyllabusView episode={episode} /></TabsContent>
-                    <TabsContent value="qna" className="flex-1 mt-0 p-2 overflow-y-auto">{user ? <ChatView episode={episode} user={user} /> : <p>로그인 후 사용 가능</p>}</TabsContent>
-                    <TabsContent value="textbook" className="flex-1 mt-0 overflow-y-auto"><TextbookView /></TabsContent>
-                    <TabsContent value="bookmark" className="flex-1 mt-0 overflow-y-auto">{user ? <BookmarkView episode={episode} user={user} videoRef={videoRef}/> : <p>로그인 후 사용 가능</p>}</TabsContent>
+                    <TabsContent value="syllabus" className="flex-1 mt-0 overflow-hidden"><SyllabusView episode={episode} /></TabsContent>
+                    <TabsContent value="qna" className="flex flex-col flex-1 mt-0 p-2 overflow-hidden">{user ? <ChatView episode={episode} user={user} /> : <p>로그인 후 사용 가능</p>}</TabsContent>
+                    <TabsContent value="textbook" className="flex-1 mt-0 overflow-hidden"><TextbookView /></TabsContent>
+                    <TabsContent value="bookmark" className="flex-1 mt-0 overflow-hidden">{user ? <BookmarkView episode={episode} user={user} videoRef={videoRef}/> : <p>로그인 후 사용 가능</p>}</TabsContent>
                 </Tabs>
             </div>
         </div>
@@ -502,3 +502,5 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
+
+    
