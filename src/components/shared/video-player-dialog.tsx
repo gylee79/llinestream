@@ -442,17 +442,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         onInteractOutside={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
       >
-        <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between p-2 md:p-4 border-b bg-white rounded-t-lg">
+        <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between p-1 md:p-2 border-b bg-white rounded-t-lg pr-12">
             <div className="flex items-center gap-2 text-sm md:text-base font-medium text-gray-700 truncate">
                 {courseLoading ? <Loader className="h-4 w-4 animate-spin"/> : <span className="font-bold truncate">{course?.name}</span>}
                 <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
                 <span className="text-gray-500 truncate">{episode.title}</span>
             </div>
-            <DialogClose asChild>
-                <Button variant="ghost" size="icon" onClick={handleClose}>
-                    <X className="h-5 w-5" />
-                </Button>
-            </DialogClose>
         </DialogHeader>
 
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-4 p-4 overflow-hidden bg-gray-100">
@@ -494,16 +489,16 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <TabsTrigger value="textbook" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">교재정보</TabsTrigger>
                         <TabsTrigger value="bookmark" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">북마크</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="syllabus" className="flex-grow mt-0 min-h-0">
+                    <TabsContent value="syllabus" className="mt-0 flex-grow min-h-0">
                         <SyllabusView episode={episode} />
                     </TabsContent>
-                    <TabsContent value="qna" className="flex-grow mt-0 p-2 flex flex-col min-h-0">
+                    <TabsContent value="qna" className="mt-0 p-2 flex flex-col flex-grow min-h-0">
                         {user ? <ChatView episode={episode} user={user} /> : <div className="text-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
-                    <TabsContent value="textbook" className="flex-grow mt-0 min-h-0">
+                    <TabsContent value="textbook" className="mt-0 flex-grow min-h-0">
                         <TextbookView />
                     </TabsContent>
-                    <TabsContent value="bookmark" className="flex-grow mt-0 min-h-0">
+                    <TabsContent value="bookmark" className="mt-0 flex-grow min-h-0">
                         {user ? <BookmarkView episode={episode} user={user} videoRef={videoRef}/> : <div className="text-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
                 </Tabs>
