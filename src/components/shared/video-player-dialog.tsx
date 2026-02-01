@@ -59,7 +59,7 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
         const data = JSON.parse(episode.aiGeneratedContent);
         return (
             <ScrollArea className="h-full w-full">
-                <div className="w-full space-y-4 p-4">
+                <div className="space-y-4 p-4">
                     <div className="space-y-1">
                         <h4 className="font-semibold text-base">강의 요약</h4>
                         <p className="text-sm text-foreground whitespace-pre-line break-words">{data.summary || '요약이 없습니다.'}</p>
@@ -71,7 +71,7 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
                                 {data.timeline.map((item: any, i: number) => (
                                     <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white">
                                         <AccordionTrigger className="text-sm hover:no-underline text-left px-3 py-2">
-                                            <div className="flex items-start gap-2">
+                                            <div className="flex items-start gap-2 min-w-0">
                                                 <span className="font-mono">{item.startTime.split('.')[0]}</span>
                                                 <span className="truncate">{item.subtitle}</span> 
                                             </div>
