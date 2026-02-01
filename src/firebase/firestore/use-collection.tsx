@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Query,
   onSnapshot,
@@ -60,30 +60,6 @@ export function useCollection<T = any>(
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
-  const handleError = useCallback((err: FirestoreError) => {
-    const path = targetRefOrQuery?.type === 'collection'
-      ? (targetRefOrQuery as CollectionReference).path
-      : ((targetRefOrQuery as InternalQuery)._query?.path?.canonicalString() || 'unknown path');
-    
-    if (err.code === 'permission-denied') {
-        const currentUser = auth.currentUser;
-        const contextualError = new FirestorePermissionError({
-            operation: 'list',
-            path,
-        }, currentUser);
-        setError(contextualError);
-        errorEmitter.emit('permission-error', contextualError);
-    } else {
-        // Handle other errors, like missing indexes, by setting the original error
-        setError(err);
-        // We can still log it for easier debugging in the console
-        console.error("useCollection Firestore Error:", err);
-    }
-    
-    setData(null);
-    setIsLoading(false);
-  }, [targetRefOrQuery, auth]);
-
   useEffect(() => {
     // If the query is not ready, or is invalid, reset the state and wait.
     if (!targetRefOrQuery || !(targetRefOrQuery as InternalQuery)._query?.path.segments.length) {
@@ -106,10 +82,34 @@ export function useCollection<T = any>(
         setIsLoading(false);
     };
 
+    const handleError = (err: FirestoreError) => {
+        const path = targetRefOrQuery?.type === 'collection'
+          ? (targetRefOrQuery as CollectionReference).path
+          : ((targetRefOrQuery as InternalQuery)._query?.path?.canonicalString() || 'unknown path');
+        
+        if (err.code === 'permission-denied') {
+            const currentUser = auth.currentUser;
+            const contextualError = new FirestorePermissionError({
+                operation: 'list',
+                path,
+            }, currentUser);
+            setError(contextualError);
+            errorEmitter.emit('permission-error', contextualError);
+        } else {
+            // Handle other errors, like missing indexes, by setting the original error
+            setError(err);
+            // We can still log it for easier debugging in the console
+            console.error("useCollection Firestore Error:", err);
+        }
+        
+        setData(null);
+        setIsLoading(false);
+    };
+
     const unsubscribe = onSnapshot(targetRefOrQuery, handleNext, handleError);
 
     return () => unsubscribe();
-  }, [targetRefOrQuery, handleError]);
+  }, [targetRefOrQuery, auth]);
 
   return { data, isLoading, error };
 }
