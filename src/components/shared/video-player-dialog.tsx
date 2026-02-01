@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark } from '@/lib/types';
@@ -437,12 +436,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="max-w-screen-2xl w-full h-full md:w-[95vw] md:h-[95vh] flex flex-col p-0"
+        className="w-full h-full rounded-none border-0 p-0 flex flex-col md:w-[95vw] md:h-[95vh] md:rounded-lg"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
       >
-        <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between p-1 md:p-2 border-b bg-white rounded-t-lg pr-12">
+        <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between p-1 md:p-2 border-b bg-white rounded-none md:rounded-t-lg pr-12">
             <div className="flex items-center gap-2 text-sm md:text-base font-medium text-gray-700 truncate">
                 {courseLoading ? <Loader className="h-4 w-4 animate-spin"/> : <span className="font-bold truncate">{course?.name}</span>}
                 <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -450,9 +449,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             </div>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-4 p-4 overflow-hidden bg-gray-100">
+        <div className="flex-1 flex flex-col md:grid md:grid-cols-10 md:gap-4 p-0 md:p-4 overflow-hidden bg-gray-100">
             {/* Video Player Section */}
-            <div className="md:col-span-7 flex flex-col bg-black rounded-lg overflow-hidden shadow-lg">
+            <div className="md:col-span-7 flex flex-col bg-black rounded-none md:rounded-lg overflow-hidden shadow-lg">
                 <div className="w-full flex-grow relative">
                     <div className="absolute inset-0 flex items-center justify-center">
                         {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
@@ -474,14 +473,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         </video>
                     )}
                 </div>
-                <div className="flex-shrink-0 p-4 bg-gray-800 text-white">
-                  <h3 className="font-bold text-lg">{episode.title}</h3>
-                  <p className="text-sm text-gray-300 mt-1">{instructor?.name || '강사 정보 없음'}</p>
-                </div>
             </div>
 
             {/* Sidebar Section */}
-            <div className="md:col-span-3 flex flex-col bg-slate-50 rounded-lg shadow-inner overflow-hidden flex-1 min-h-0">
+            <div className="md:col-span-3 flex flex-col bg-slate-50 rounded-none md:rounded-lg shadow-inner overflow-hidden flex-1 min-h-0">
                 <Tabs defaultValue="syllabus" className="flex-1 flex flex-col min-h-0">
                     <TabsList className="grid w-full grid-cols-4 flex-shrink-0 rounded-none h-auto p-0">
                         <TabsTrigger value="syllabus" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">강의목차</TabsTrigger>
