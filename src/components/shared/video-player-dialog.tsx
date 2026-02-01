@@ -494,22 +494,18 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <TabsTrigger value="textbook" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">교재정보</TabsTrigger>
                         <TabsTrigger value="bookmark" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">북마크</TabsTrigger>
                     </TabsList>
-                    <div className="flex-grow min-h-0 relative">
-                        <div className="absolute inset-0">
-                            <TabsContent value="syllabus" className="h-full mt-0">
-                                <SyllabusView episode={episode} />
-                            </TabsContent>
-                            <TabsContent value="qna" className="h-full flex flex-col mt-0 p-2">
-                                {user ? <ChatView episode={episode} user={user} /> : <div className="text-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
-                            </TabsContent>
-                            <TabsContent value="textbook" className="h-full mt-0">
-                                <TextbookView />
-                            </TabsContent>
-                            <TabsContent value="bookmark" className="h-full mt-0">
-                                {user ? <BookmarkView episode={episode} user={user} videoRef={videoRef}/> : <div className="text-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
-                            </TabsContent>
-                        </div>
-                    </div>
+                    <TabsContent value="syllabus" className="flex-grow mt-0 min-h-0">
+                        <SyllabusView episode={episode} />
+                    </TabsContent>
+                    <TabsContent value="qna" className="flex-grow mt-0 p-2 flex flex-col min-h-0">
+                        {user ? <ChatView episode={episode} user={user} /> : <div className="text-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
+                    </TabsContent>
+                    <TabsContent value="textbook" className="flex-grow mt-0 min-h-0">
+                        <TextbookView />
+                    </TabsContent>
+                    <TabsContent value="bookmark" className="flex-grow mt-0 min-h-0">
+                        {user ? <BookmarkView episode={episode} user={user} videoRef={videoRef}/> : <div className="text-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
+                    </TabsContent>
                 </Tabs>
             </div>
         </div>
