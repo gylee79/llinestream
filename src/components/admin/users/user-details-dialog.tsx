@@ -260,23 +260,31 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
               </Table>
             </ScrollArea>
             <h4 className="font-semibold mt-6 mb-2">보너스 이용 기간 관리</h4>
-            <div className="flex gap-2 items-center">
+            <div className="space-y-4">
                 <Select value={bonusCourseId} onValueChange={setBonusCourseId}>
-                    <SelectTrigger className="w-[180px]"><SelectValue placeholder="상세분류 선택" /></SelectTrigger>
+                    <SelectTrigger className="w-full">
+                        <SelectValue placeholder="상세분류 선택" />
+                    </SelectTrigger>
                     <SelectContent>{courses?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                 </Select>
-                <div className="flex items-center">
-                  <Button variant="outline" size="icon" className="h-10 w-10" onClick={() => adjustBonusDays(-1)}><Minus className="h-4 w-4" /></Button>
-                  <Input 
-                    type="number" 
-                    placeholder="일수(토큰)" 
-                    className="w-24 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                    value={bonusDays} 
-                    onChange={handleBonusDaysInputChange} 
-                  />
-                  <Button variant="outline" size="icon" className="h-10 w-10" onClick={() => adjustBonusDays(1)}><Plus className="h-4 w-4" /></Button>
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center border rounded-md flex-1">
+                        <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => adjustBonusDays(-1)}>
+                            <Minus className="h-4 w-4" />
+                        </Button>
+                        <Input 
+                            type="number" 
+                            placeholder="일수" 
+                            className="flex-1 text-center border-0 focus-visible:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                            value={bonusDays} 
+                            onChange={handleBonusDaysInputChange} 
+                        />
+                        <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => adjustBonusDays(1)}>
+                            <Plus className="h-4 w-4" />
+                        </Button>
+                    </div>
+                    <Button onClick={handleApplyBonusDays} className="shrink-0">기간 적용</Button>
                 </div>
-                <Button onClick={handleApplyBonusDays}>기간 적용</Button>
             </div>
           </TabsContent>
           <TabsContent value="history" className="mt-4">
