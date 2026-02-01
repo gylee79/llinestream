@@ -59,7 +59,7 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
         const data = JSON.parse(episode.aiGeneratedContent);
         return (
             <ScrollArea className="h-full w-full">
-                <div className="w-full space-y-4 p-1">
+                <div className="w-full space-y-4 p-4">
                     <div className="space-y-1">
                         <h4 className="font-semibold text-base">강의 요약</h4>
                         <p className="text-sm text-foreground whitespace-pre-line break-words">{data.summary || '요약이 없습니다.'}</p>
@@ -449,9 +449,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             </div>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col md:grid md:grid-cols-10 md:gap-4 p-0 md:p-4 overflow-hidden bg-gray-100">
+        <div className="flex-1 flex flex-col md:grid md:grid-cols-10 md:gap-4 md:p-4 overflow-hidden bg-gray-100">
             {/* Video Player Section */}
-            <div className="md:col-span-7 flex flex-col bg-black rounded-none md:rounded-lg overflow-hidden shadow-lg">
+            <div className="md:col-span-7 flex flex-col bg-black md:rounded-lg overflow-hidden shadow-lg">
                 <div className="w-full flex-grow relative">
                     <div className="absolute inset-0 flex items-center justify-center">
                         {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
@@ -476,7 +476,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             </div>
 
             {/* Sidebar Section */}
-            <div className="md:col-span-3 flex flex-col bg-slate-50 rounded-none md:rounded-lg shadow-inner overflow-hidden flex-1 min-h-0">
+            <div className="md:col-span-3 flex flex-col bg-slate-50 md:rounded-lg shadow-inner overflow-hidden flex-1 min-h-0">
                 <Tabs defaultValue="syllabus" className="flex-1 flex flex-col min-h-0">
                     <TabsList className="grid w-full grid-cols-4 flex-shrink-0 rounded-none h-auto p-0">
                         <TabsTrigger value="syllabus" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">강의목차</TabsTrigger>
