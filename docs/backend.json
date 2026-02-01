@@ -46,6 +46,21 @@
         "joinDate"
       ]
     },
+    "Bookmark": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Bookmark",
+      "type": "object",
+      "description": "Represents a user's bookmark within a video episode.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "episodeId": { "type": "string" },
+        "timestamp": { "type": "number", "description": "The video time in seconds." },
+        "note": { "type": "string", "description": "An optional user note for the bookmark." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "episodeId", "timestamp", "createdAt"]
+    },
     "Field": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Field",
@@ -546,6 +561,18 @@
           "params": [
             { "name": "userId", "description": "The unique identifier of the user." },
             { "name": "chatId", "description": "The unique identifier of the chat interaction." }
+          ]
+        }
+      },
+       {
+        "path": "/users/{userId}/bookmarks/{bookmarkId}",
+        "definition": {
+          "entityName": "Bookmark",
+          "schema": { "$ref": "#/backend/entities/Bookmark" },
+          "description": "Stores a user's personal bookmarks for video episodes. Readable and writable only by the owning user.",
+          "params": [
+            { "name": "userId", "description": "The unique identifier of the user." },
+            { "name": "bookmarkId", "description": "The unique identifier of the bookmark." }
           ]
         }
       },

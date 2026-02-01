@@ -234,3 +234,12 @@ export type AiSearchScope = 'episode' | 'course' | 'classification' | 'field';
 export interface AITutorSettings {
   defaultSearchScope: AiSearchScope;
 }
+
+export interface Bookmark {
+  id: string;
+  userId: string;
+  episodeId: string;
+  timestamp: number; // in seconds
+  note?: string; // Optional note
+  createdAt: Timestamp;
+}

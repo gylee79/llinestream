@@ -1,12 +1,13 @@
+
 'use client';
 
-import type { Episode, Instructor, Course } from '@/lib/types';
-import React, { useEffect, useRef, useState, useTransition, useCallback } from 'react';
+import type { Episode, Instructor, Course, User, Bookmark } from '@/lib/types';
+import React, { useEffect, useRef, useState, useTransition, useCallback, useMemo } from 'react';
 import { Button } from '../ui/button';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
-import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark } from 'lucide-react';
+import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark as BookmarkIcon, Trash2 } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { cn } from '@/lib/utils';
@@ -14,11 +15,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { getPublicUrl } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
-import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp, doc, addDoc, deleteDoc } from 'firebase/firestore';
 import { toDisplayDate } from '@/lib/date-helpers';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import Image from 'next/image';
 import { firebaseConfig } from '@/firebase/config';
+import { useToast } from '@/hooks/use-toast';
 
 // ========= TYPES AND SUB-COMPONENTS (Self-contained) =========
 
@@ -210,21 +212,133 @@ const TextbookView = () => (
     </ScrollArea>
 );
 
-const BookmarkView = () => (
-    <ScrollArea className="h-full">
-        <div className="p-4">
-            <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Bookmark className="mr-2 h-4 w-4" /> 현재 시간 북마크
-            </Button>
-            <p className="text-sm text-muted-foreground mt-6 text-center">북마크 기능은 준비 중입니다.</p>
-            <ul className="mt-4 space-y-2">
-              <li className="flex justify-between items-center p-3 bg-white rounded-md text-sm border"><span>01:23 - 컴포넌트 소개</span> <X className="h-4 w-4 text-muted-foreground cursor-pointer" /></li>
-              <li className="flex justify-between items-center p-3 bg-white rounded-md text-sm border"><span>15:45 - State와 Props</span> <X className="h-4 w-4 text-muted-foreground cursor-pointer" /></li>
-              <li className="flex justify-between items-center p-3 bg-white rounded-md text-sm border"><span>28:10 - Hooks 심화</span> <X className="h-4 w-4 text-muted-foreground cursor-pointer" /></li>
-            </ul>
-        </div>
-    </ScrollArea>
-);
+const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: User, videoRef: React.RefObject<HTMLVideoElement> }) => {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [note, setNote] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const bookmarksQuery = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return query(
+            collection(firestore, 'users', user.id, 'bookmarks'),
+            where('episodeId', '==', episode.id),
+            orderBy('timestamp', 'asc')
+        );
+    }, [user.id, episode.id, firestore]);
+
+    const { data: bookmarks, isLoading } = useCollection<Bookmark>(bookmarksQuery);
+
+    const formatTime = (seconds: number) => {
+        const date = new Date(0);
+        date.setSeconds(seconds);
+        return date.toISOString().substr(14, 5); // MM:SS
+    };
+
+    const handleAddBookmark = async () => {
+        if (!videoRef.current || !user || !firestore) return;
+        
+        const currentTime = Math.floor(videoRef.current.currentTime);
+
+        if (bookmarks?.some(b => b.timestamp === currentTime)) {
+            toast({
+                variant: 'destructive',
+                title: '오류',
+                description: '이미 같은 시간에 북마크가 존재합니다.',
+            });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            await addDoc(collection(firestore, 'users', user.id, 'bookmarks'), {
+                userId: user.id,
+                episodeId: episode.id,
+                timestamp: currentTime,
+                note: note.trim(),
+                createdAt: FirebaseTimestamp.now(),
+            });
+            toast({ title: '성공', description: '북마크가 추가되었습니다.' });
+            setNote('');
+        } catch (error) {
+            console.error(error);
+            toast({ variant: 'destructive', title: '오류', description: '북마크 추가에 실패했습니다.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleDeleteBookmark = async (bookmarkId: string) => {
+        if (!user || !firestore) return;
+        try {
+            await deleteDoc(doc(firestore, 'users', user.id, 'bookmarks', bookmarkId));
+            toast({ title: '성공', description: '북마크가 삭제되었습니다.' });
+        } catch (error) {
+            console.error(error);
+            toast({ variant: 'destructive', title: '오류', description: '북마크 삭제에 실패했습니다.' });
+        }
+    };
+    
+    const handleSeekTo = (time: number) => {
+        if (videoRef.current) {
+            videoRef.current.currentTime = time;
+            videoRef.current.play();
+        }
+    };
+    
+    return (
+        <ScrollArea className="h-full">
+            <div className="p-4 space-y-4">
+                <div className="space-y-2">
+                    <Textarea 
+                        placeholder="북마크에 메모를 추가하세요 (선택)"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        disabled={isSaving}
+                    />
+                    <Button 
+                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                        onClick={handleAddBookmark}
+                        disabled={isSaving}
+                    >
+                      <BookmarkIcon className="mr-2 h-4 w-4" /> 
+                      {isSaving ? '저장 중...' : '현재 시간 북마크'}
+                    </Button>
+                </div>
+                
+                {isLoading && <p className="text-center text-sm text-muted-foreground">북마크 로딩 중...</p>}
+                
+                {!isLoading && bookmarks && bookmarks.length === 0 && (
+                    <p className="text-sm text-muted-foreground mt-6 text-center">저장된 북마크가 없습니다.</p>
+                )}
+
+                {!isLoading && bookmarks && bookmarks.length > 0 && (
+                    <ul className="space-y-2">
+                        {bookmarks.map(bookmark => (
+                            <li key={bookmark.id} className="group flex justify-between items-center p-3 bg-white rounded-md text-sm border hover:bg-slate-50">
+                                <button onClick={() => handleSeekTo(bookmark.timestamp)} className="text-left flex-grow min-w-0">
+                                    <div className="flex items-center">
+                                        <span className="font-mono text-primary font-semibold mr-3">[{formatTime(bookmark.timestamp)}]</span>
+                                        <p className="truncate text-foreground">{bookmark.note || '메모 없음'}</p>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground mt-1 block">{toDisplayDate(bookmark.createdAt)}</span>
+                                </button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => handleDeleteBookmark(bookmark.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        </ScrollArea>
+    );
+};
 
 // ========= MAIN COMPONENT =========
 
@@ -380,7 +494,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     <TabsContent value="syllabus" className="flex-1 mt-0 overflow-y-auto"><SyllabusView episode={episode} /></TabsContent>
                     <TabsContent value="qna" className="flex-1 mt-0 p-2 overflow-y-auto">{user ? <ChatView episode={episode} user={user} /> : <p>로그인 후 사용 가능</p>}</TabsContent>
                     <TabsContent value="textbook" className="flex-1 mt-0 overflow-y-auto"><TextbookView /></TabsContent>
-                    <TabsContent value="bookmark" className="flex-1 mt-0 overflow-y-auto"><BookmarkView /></TabsContent>
+                    <TabsContent value="bookmark" className="flex-1 mt-0 overflow-y-auto">{user ? <BookmarkView episode={episode} user={user} videoRef={videoRef}/> : <p>로그인 후 사용 가능</p>}</TabsContent>
                 </Tabs>
             </div>
         </div>

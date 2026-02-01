@@ -1,3 +1,4 @@
+
 {
   "indexes": [
     {
@@ -63,6 +64,15 @@
       "queryScope": "COLLECTION_GROUP",
       "fields": [
         { "fieldPath": "purchasedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionId": "bookmarks",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "episodeId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "ASCENDING" }
       ]
     }
   ],
