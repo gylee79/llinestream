@@ -486,7 +486,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             </div>
 
             {/* Sidebar Section */}
-            <div className="md:col-span-3 flex flex-col bg-slate-50 rounded-lg shadow-inner overflow-hidden">
+            <div className="md:col-span-3 flex flex-col bg-slate-50 rounded-lg shadow-inner overflow-hidden flex-1 min-h-0">
                 <Tabs defaultValue="syllabus" className="flex-1 flex flex-col min-h-0">
                     <TabsList className="grid w-full grid-cols-4 flex-shrink-0 rounded-none h-auto p-0">
                         <TabsTrigger value="syllabus" className="py-3 rounded-none data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-inner">강의목차</TabsTrigger>
