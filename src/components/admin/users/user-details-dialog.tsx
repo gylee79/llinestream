@@ -83,7 +83,7 @@ export function UserDetailsDialog({ user: initialUser, open, onOpenChange, cours
         toast({ title: '저장 완료', description: '사용자 정보가 업데이트되었습니다.' });
       } catch (error) {
         console.error(error);
-        toast({ variant: 'destructive', title: '저장 실패', description: '사용자 정보 업데이트 중 오류 발생' });
+        toast({ variant: 'destructive', title: '저장 실패', description: '사용자 정보 업데이트 중 오류가 발생' });
       }
     };
     
