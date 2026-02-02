@@ -239,7 +239,12 @@ export interface Bookmark {
   id: string;
   userId: string;
   episodeId: string;
+  courseId: string;
   timestamp: number; // in seconds
   note?: string; // Optional note
   createdAt: Timestamp;
+   // denormalized for admin view
+  userName?: string;
+  userEmail?: string;
+  episodeTitle?: string;
 }

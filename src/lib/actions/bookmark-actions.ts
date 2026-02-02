@@ -1,3 +1,4 @@
+
 'use server';
 
 import { config } from 'dotenv';
@@ -38,6 +39,7 @@ export async function addBookmark(payload: AddBookmarkPayload): Promise<{ succes
         const bookmarkId = db.collection('bookmarks').doc().id;
 
         const bookmarkData = {
+            id: bookmarkId,
             userId,
             episodeId,
             courseId,
