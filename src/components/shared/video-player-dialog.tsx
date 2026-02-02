@@ -162,8 +162,8 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
 
     return (
         <div className="flex flex-col h-full">
-            <ScrollArea className="flex-grow">
-                <div className="space-y-4 p-4">
+            <ScrollArea className="flex-grow -mx-4">
+                <div className="space-y-4 px-4">
                   {isLoading ? (
                       <div className="flex items-center justify-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>
                   ) : messages.length === 0 ? (
@@ -187,7 +187,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
                   )}
                 </div>
             </ScrollArea>
-            <div className="flex-shrink-0 p-4 border-t">
+            <div className="flex-shrink-0 pt-4 border-t">
                 <div className="flex gap-2">
                     <Textarea 
                         placeholder={!isAIAvailable ? "AI 분석이 아직 완료되지 않았습니다." : "AI에게 질문할 내용을 입력하세요..."}
@@ -205,8 +205,8 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
 };
 
 const TextbookView = () => (
-    <ScrollArea className="h-full">
-        <div className="text-center flex flex-col items-center h-full justify-center p-5 pr-6">
+    <ScrollArea className="h-full p-4">
+        <div className="text-center flex flex-col items-center h-full justify-center">
             <Image src="https://picsum.photos/seed/textbook/200/280" width={150} height={210} alt="교재 이미지" className="rounded-md shadow-md" />
             <p className="text-sm text-muted-foreground mt-4">교재 정보는 현재 준비 중입니다.</p>
             <Button className="mt-4 bg-orange-500 hover:bg-orange-600 text-white font-bold">교재 구매하기</Button>
@@ -290,7 +290,7 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
     
     return (
         <ScrollArea className="h-full">
-            <div className="space-y-4 p-5 pr-6">
+            <div className="space-y-4 p-4">
                 <div className="space-y-2">
                     <Textarea 
                         placeholder="북마크에 메모를 추가하세요 (선택)"
@@ -386,12 +386,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     }
   }, [user, episode]);
 
-  const handleClose = useCallback(() => {
-    videoRef.current?.pause();
-    logView();
-    onOpenChange(false);
-  }, [logView, onOpenChange]);
-
   useEffect(() => {
     if (!isOpen) return;
 
@@ -453,11 +447,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-muted-foreground truncate">{episode.title}</span>
             </div>
-             <DialogClose asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0">
-                    <X className="h-4 w-4" />
-                </Button>
-            </DialogClose>
         </DialogHeader>
 
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:p-6 overflow-hidden bg-background md:bg-muted/50">
@@ -498,8 +487,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     <TabsContent value="syllabus" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
                         <SyllabusView episode={episode} />
                     </TabsContent>
-                    <TabsContent value="qna" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
-                        {user ? <ChatView episode={episode} user={user} /> : <div className="flex-grow flex items-center justify-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
+                    <TabsContent value="qna" className="mt-0 flex-grow min-h-0 bg-white flex flex-col p-4">
+                        {user ? <ChatView episode={episode} user={user} /> : <div className="flex-grow flex items-center justify-center text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
                     <TabsContent value="textbook" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
                         <TextbookView />
