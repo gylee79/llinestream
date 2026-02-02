@@ -437,8 +437,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
           }
         }}
       >
-        <div className="flex-shrink-0 flex items-center justify-between px-4 py-1 md:px-6 md:py-2 bg-background md:bg-muted/50 md:rounded-t-xl border-b md:border-none">
-             <DialogTitle className="text-sm font-medium text-muted-foreground line-clamp-1">
+        <div className="flex-shrink-0 flex items-center justify-between p-4 border-b">
+             <div className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8">
                 {courseLoading ? (
                     <Skeleton className="h-5 w-48" />
                 ) : (
@@ -448,14 +448,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     <span>{episode.title}</span>
                     </>
                 )}
-             </DialogTitle>
-             <DialogClose className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-            </DialogClose>
+             </div>
+             {/* The main DialogContent will have its own close button, so we don't add one here */}
         </div>
-
-        <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:p-6 md:pt-2 overflow-hidden bg-background md:bg-muted/50">
+        <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:px-6 md:pb-6 overflow-hidden bg-muted/50">
             {/* Video Player Section */}
             <Card className="col-span-10 md:col-span-7 flex flex-col bg-black md:rounded-xl overflow-hidden shadow-lg border-border">
                 <div className="w-full flex-grow relative">
