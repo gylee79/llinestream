@@ -170,12 +170,17 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
                           <p className="text-sm text-muted-foreground mt-2">AI 튜터에게 비디오 내용에 대해 궁금한 점을 질문해보세요.</p>
                       </div>
                   ) : (
-                      messages.map(message => (
-                        <div key={message.id} className={cn("flex items-end gap-2", message.role === 'user' ? 'justify-end' : 'justify-start')}>
-                            {message.role === 'model' && <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center"><Bot className="h-5 w-5" /></div>}
-                            <p className={cn("text-sm p-3 rounded-lg max-w-sm", message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-white border')}>{message.content}</p>
-                        </div>
-                      ))
+                      messages.map(message => {
+                        const formattedContent = message.role === 'model'
+                            ? message.content.replace(/(\d{2}:\d{2}:\d{2})\.\d+/g, '$1')
+                            : message.content;
+                        return (
+                            <div key={message.id} className={cn("flex items-end gap-2", message.role === 'user' ? 'justify-end' : 'justify-start')}>
+                                {message.role === 'model' && <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center"><Bot className="h-5 w-5" /></div>}
+                                <p className={cn("text-sm p-3 rounded-lg max-w-sm whitespace-pre-line", message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-white border')}>{formattedContent}</p>
+                            </div>
+                        )
+                      })
                   )}
                   {isPending && (
                       <div className="flex items-start gap-2 pt-4">
@@ -194,6 +199,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isPending) { e.preventDefault(); handleAskQuestion(); } }}
                         disabled={isPending || !isAIAvailable}
                         className="flex-grow resize-none"
+                        rows={1}
                     />
                     <Button onClick={handleAskQuestion} disabled={isPending || !userQuestion.trim() || !isAIAvailable}><Send className="h-4 w-4" /></Button>
                 </div>
