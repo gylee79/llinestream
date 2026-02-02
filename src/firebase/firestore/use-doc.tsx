@@ -1,6 +1,6 @@
 'use client';
     
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   DocumentReference,
   onSnapshot,
@@ -48,6 +48,23 @@ export function useDoc<T = any>(
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
+  const handleError = useCallback((err: FirestoreError) => {
+    if (err.code === 'permission-denied' && docRef) {
+      const currentUser = auth.currentUser;
+      const contextualError = new FirestorePermissionError({
+        operation: 'get',
+        path: docRef.path,
+      }, currentUser);
+      setError(contextualError);
+      errorEmitter.emit('permission-error', contextualError);
+    } else {
+      setError(err);
+      console.error("useDoc Firestore Error:", err);
+    }
+    setData(null);
+    setIsLoading(false);
+  }, [auth, docRef]);
+
   useEffect(() => {
     // If the ref is not ready, reset the state and wait.
     if (!docRef) {
@@ -70,27 +87,10 @@ export function useDoc<T = any>(
       setIsLoading(false);
     };
 
-    const handleError = (err: FirestoreError) => {
-        if (err.code === 'permission-denied' && docRef) {
-          const currentUser = auth.currentUser;
-          const contextualError = new FirestorePermissionError({
-            operation: 'get',
-            path: docRef.path,
-          }, currentUser);
-          setError(contextualError);
-          errorEmitter.emit('permission-error', contextualError);
-        } else {
-          setError(err);
-          console.error("useDoc Firestore Error:", err);
-        }
-        setData(null);
-        setIsLoading(false);
-    };
-
     const unsubscribe = onSnapshot(docRef, handleNext, handleError);
 
     return () => unsubscribe();
-  }, [docRef, auth]);
+  }, [docRef, handleError]);
 
   return { data, isLoading, error };
 }
