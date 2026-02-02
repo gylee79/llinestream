@@ -21,6 +21,8 @@ import Image from 'next/image';
 import { firebaseConfig } from '@/firebase/config';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '../ui/card';
+import Link from 'next/link';
+import { Skeleton } from '../ui/skeleton';
 
 // ========= TYPES AND SUB-COMPONENTS (Self-contained) =========
 
@@ -45,7 +47,7 @@ interface ChatLog {
 const SyllabusView = ({ episode }: { episode: Episode }) => {
     if (!episode.aiGeneratedContent) {
         return (
-            <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
+            <div className="flex-grow flex flex-col items-center justify-center text-center">
                 <FileText className="h-12 w-12 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground mt-2">
                     {episode.aiProcessingStatus === 'completed'
@@ -59,42 +61,38 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
     try {
         const data = JSON.parse(episode.aiGeneratedContent);
         return (
-            <ScrollArea className="h-full w-full">
-                <div className="space-y-4 p-5 pr-6">
-                    <div className="space-y-1">
-                        <h4 className="font-semibold text-base">강의 요약</h4>
-                        <p className="text-sm text-foreground whitespace-pre-line break-keep [word-break:keep-all]">{data.summary || '요약이 없습니다.'}</p>
-                    </div>
-                    {data.timeline && data.timeline.length > 0 && (
-                        <div className="space-y-2">
-                            <h4 className="font-semibold flex items-center gap-2 text-base"><Clock className="w-4 h-4" />타임라인</h4>
-                            <Accordion type="single" collapsible className="w-full">
-                                {data.timeline.map((item: any, i: number) => (
-                                    <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white">
-                                        <AccordionTrigger className="text-sm hover:no-underline text-left px-3 py-2">
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <span className="font-mono">{item.startTime.split('.')[0]}</span>
-                                                <p className="break-keep [word-break:keep-all]">{item.subtitle}</p> 
-                                            </div>
-                                        </AccordionTrigger>
-                                        <AccordionContent className="px-3 pb-3">
-                                            <p className="text-sm text-foreground whitespace-pre-line break-keep [word-break:keep-all]">{item.description}</p>
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                ))}
-                            </Accordion>
-                        </div>
-                    )}
+            <div className="space-y-4 p-5 pr-6">
+                <div className="space-y-1">
+                    <h4 className="font-semibold text-base">강의 요약</h4>
+                    <p className="text-sm text-foreground whitespace-pre-line break-keep [word-break:keep-all]">{data.summary || '요약이 없습니다.'}</p>
                 </div>
-            </ScrollArea>
+                {data.timeline && data.timeline.length > 0 && (
+                    <div className="space-y-2">
+                        <h4 className="font-semibold flex items-center gap-2 text-base"><Clock className="w-4 h-4" />타임라인</h4>
+                        <Accordion type="single" collapsible className="w-full">
+                            {data.timeline.map((item: any, i: number) => (
+                                <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white">
+                                    <AccordionTrigger className="text-sm hover:no-underline text-left px-3 py-2">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="font-mono">{item.startTime.split('.')[0]}</span>
+                                            <p className="break-keep [word-break:keep-all]">{item.subtitle}</p> 
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="px-3 pb-3">
+                                        <p className="text-sm text-foreground whitespace-pre-line break-keep [word-break:keep-all]">{item.description}</p>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    </div>
+                )}
+            </div>
         )
     } catch(e) {
         return (
-            <ScrollArea className="h-full w-full">
-                <div className="p-5 pr-6">
-                    <p className="text-sm text-muted-foreground whitespace-pre-line break-keep [word-break:keep-all]">{episode.aiGeneratedContent}</p>
-                </div>
-            </ScrollArea>
+            <div className="p-5 pr-6">
+                <p className="text-sm text-muted-foreground whitespace-pre-line break-keep [word-break:keep-all]">{episode.aiGeneratedContent}</p>
+            </div>
         )
     }
 };
@@ -162,8 +160,8 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
 
     return (
         <div className="flex flex-col h-full">
-            <ScrollArea className="flex-grow -mx-4">
-                <div className="space-y-4 px-4">
+            <ScrollArea className="flex-grow" viewportRef={chatScrollAreaRef}>
+                <div className="space-y-4">
                   {isLoading ? (
                       <div className="flex items-center justify-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>
                   ) : messages.length === 0 ? (
@@ -205,13 +203,13 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
 };
 
 const TextbookView = () => (
-    <ScrollArea className="h-full p-4">
+    <div className="h-full p-4">
         <div className="text-center flex flex-col items-center h-full justify-center">
             <Image src="https://picsum.photos/seed/textbook/200/280" width={150} height={210} alt="교재 이미지" className="rounded-md shadow-md" />
             <p className="text-sm text-muted-foreground mt-4">교재 정보는 현재 준비 중입니다.</p>
             <Button className="mt-4 bg-orange-500 hover:bg-orange-600 text-white font-bold">교재 구매하기</Button>
         </div>
-    </ScrollArea>
+    </div>
 );
 
 const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: User, videoRef: React.RefObject<HTMLVideoElement> }) => {
@@ -289,56 +287,54 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
     };
     
     return (
-        <ScrollArea className="h-full">
-            <div className="space-y-4 p-4">
-                <div className="space-y-2">
-                    <Textarea 
-                        placeholder="북마크에 메모를 추가하세요 (선택)"
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        disabled={isSaving}
-                    />
-                    <Button 
-                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                        onClick={handleAddBookmark}
-                        disabled={isSaving}
-                    >
-                      <BookmarkIcon className="mr-2 h-4 w-4" /> 
-                      {isSaving ? '저장 중...' : '현재 시간 북마크'}
-                    </Button>
-                </div>
-                
-                {isLoading && <p className="text-center text-sm text-muted-foreground">북마크 로딩 중...</p>}
-                
-                {!isLoading && bookmarks && bookmarks.length === 0 && (
-                    <p className="text-sm text-muted-foreground mt-6 text-center">저장된 북마크가 없습니다.</p>
-                )}
-
-                {!isLoading && bookmarks && bookmarks.length > 0 && (
-                    <ul className="space-y-2">
-                        {bookmarks.map(bookmark => (
-                            <li key={bookmark.id} className="group flex justify-between items-center p-3 bg-white rounded-md text-sm border hover:bg-slate-50">
-                                <button onClick={() => handleSeekTo(bookmark.timestamp)} className="text-left flex-grow min-w-0">
-                                    <div className="flex items-center">
-                                        <span className="font-mono text-primary font-semibold mr-3">[{formatTime(bookmark.timestamp)}]</span>
-                                        <p className="truncate text-foreground">{bookmark.note || '메모 없음'}</p>
-                                    </div>
-                                    <span className="text-xs text-muted-foreground mt-1 block">{toDisplayDate(bookmark.createdAt)}</span>
-                                </button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={() => handleDeleteBookmark(bookmark.id)}
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                            </li>
-                        ))}
-                    </ul>
-                )}
+        <div className="space-y-4 p-4">
+            <div className="space-y-2">
+                <Textarea 
+                    placeholder="북마크에 메모를 추가하세요 (선택)"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    disabled={isSaving}
+                />
+                <Button 
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                    onClick={handleAddBookmark}
+                    disabled={isSaving}
+                >
+                  <BookmarkIcon className="mr-2 h-4 w-4" /> 
+                  {isSaving ? '저장 중...' : '현재 시간 북마크'}
+                </Button>
             </div>
-        </ScrollArea>
+            
+            {isLoading && <p className="text-center text-sm text-muted-foreground">북마크 로딩 중...</p>}
+            
+            {!isLoading && bookmarks && bookmarks.length === 0 && (
+                <p className="text-sm text-muted-foreground mt-6 text-center">저장된 북마크가 없습니다.</p>
+            )}
+
+            {!isLoading && bookmarks && bookmarks.length > 0 && (
+                <ul className="space-y-2">
+                    {bookmarks.map(bookmark => (
+                        <li key={bookmark.id} className="group flex justify-between items-center p-3 bg-white rounded-md text-sm border hover:bg-slate-50">
+                            <button onClick={() => handleSeekTo(bookmark.timestamp)} className="text-left flex-grow min-w-0">
+                                <div className="flex items-center">
+                                    <span className="font-mono text-primary font-semibold mr-3">[{formatTime(bookmark.timestamp)}]</span>
+                                    <p className="truncate text-foreground">{bookmark.note || '메모 없음'}</p>
+                                </div>
+                                <span className="text-xs text-muted-foreground mt-1 block">{toDisplayDate(bookmark.createdAt)}</span>
+                            </button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => handleDeleteBookmark(bookmark.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
     );
 };
 
@@ -441,7 +437,21 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
           }
         }}
       >
-        <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:p-6 overflow-hidden bg-background md:bg-muted/50">
+        <div className="flex-shrink-0 flex items-center justify-between px-4 pt-4 pb-2 md:px-6 md:pb-0 md:pt-4 bg-background md:bg-muted/50 md:rounded-t-xl">
+             <DialogTitle className="text-sm font-medium text-muted-foreground line-clamp-1">
+                {courseLoading ? (
+                    <Skeleton className="h-5 w-48" />
+                ) : (
+                    <>
+                    <Link href={`/courses/${episode.courseId}`} className="hover:underline">{course?.name}</Link>
+                    <ChevronRight className="h-4 w-4 inline-block mx-1" />
+                    <span>{episode.title}</span>
+                    </>
+                )}
+             </DialogTitle>
+        </div>
+
+        <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:p-6 md:pt-2 overflow-hidden bg-background md:bg-muted/50">
             {/* Video Player Section */}
             <Card className="col-span-10 md:col-span-7 flex flex-col bg-black md:rounded-xl overflow-hidden shadow-lg border-border">
                 <div className="w-full flex-grow relative">
@@ -468,7 +478,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             </Card>
 
             {/* Sidebar Section */}
-            <Card className="col-span-10 md:col-span-3 flex flex-col flex-1 md:flex-auto md:bg-card md:rounded-xl shadow-lg border-border overflow-hidden min-h-0 min-w-0">
+            <Card className="col-span-10 md:col-span-3 flex flex-col flex-1 md:flex-auto md:bg-card md:rounded-xl shadow-lg border-border overflow-hidden min-w-0">
                 <Tabs defaultValue="syllabus" className="flex-1 flex flex-col min-h-0">
                     <TabsList className="grid w-full grid-cols-4 flex-shrink-0 rounded-none h-auto p-0 bg-gray-50 border-b">
                         <TabsTrigger value="syllabus" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">강의목차</TabsTrigger>
@@ -477,7 +487,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <TabsTrigger value="bookmark" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">북마크</TabsTrigger>
                     </TabsList>
                     <TabsContent value="syllabus" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
-                        <SyllabusView episode={episode} />
+                        <ScrollArea className="h-full w-full">
+                            <SyllabusView episode={episode} />
+                        </ScrollArea>
                     </TabsContent>
                     <TabsContent value="qna" className="mt-0 flex-grow min-h-0 bg-white flex flex-col p-4">
                         {user ? <ChatView episode={episode} user={user} /> : <div className="flex-grow flex items-center justify-center text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
@@ -486,7 +498,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <TextbookView />
                     </TabsContent>
                     <TabsContent value="bookmark" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
-                        {user ? <BookmarkView episode={episode} user={user} videoRef={videoRef}/> : <div className="flex-grow flex items-center justify-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
+                        {user ? <ScrollArea className="h-full w-full"><BookmarkView episode={episode} user={user} videoRef={videoRef}/></ScrollArea> : <div className="flex-grow flex items-center justify-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
                 </Tabs>
             </Card>
