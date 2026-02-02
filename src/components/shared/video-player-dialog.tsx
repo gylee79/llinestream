@@ -429,8 +429,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     startTimeRef.current = new Date();
     viewLoggedRef.current = false;
 
-    return () => { unmounted = true; };
-}, [isOpen, episode]);
+    // This cleanup runs when the dialog closes (isOpen becomes false) or the component unmounts
+    return () => { 
+        unmounted = true; 
+        logView();
+    };
+}, [isOpen, episode, logView]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -483,7 +487,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             </Card>
 
             {/* Sidebar Section */}
-            <Card className="col-span-10 md:col-span-3 flex flex-col flex-1 md:flex-auto md:bg-card md:rounded-xl shadow-lg border-border overflow-hidden min-w-0">
+            <Card className="col-span-10 md:col-span-3 flex-1 md:flex-auto flex flex-col md:bg-card md:rounded-xl shadow-lg border-border overflow-hidden min-w-0">
                 <Tabs defaultValue="syllabus" className="flex-1 flex flex-col min-h-0">
                     <TabsList className="grid w-full grid-cols-4 flex-shrink-0 rounded-none h-auto p-0 bg-gray-50 border-b">
                         <TabsTrigger value="syllabus" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">강의목차</TabsTrigger>
@@ -497,7 +501,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         </ScrollArea>
                     </TabsContent>
                     <TabsContent value="qna" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
-                        {user ? <ChatView episode={episode} user={user} /> : <div className="flex-grow flex items-center justify-center text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
+                         {user ? <ChatView episode={episode} user={user} /> : <div className="flex-grow flex items-center justify-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
                     <TabsContent value="textbook" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
                         <TextbookView />
