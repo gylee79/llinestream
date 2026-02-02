@@ -27,9 +27,9 @@ export const users: (Omit<User, 'id' | 'activeSubscriptions' | 'createdAt'> & { 
 ];
 
 export const fields: Omit<Field, 'id'>[] = [
-  { name: '교육', thumbnailUrl: 'https://picsum.photos/seed/education/100/100' },
-  { name: '영화', thumbnailUrl: 'https://picsum.photos/seed/movie/100/100' },
-  { name: '라이프스타일', thumbnailUrl: 'https://picsum.photos/seed/lifestyle/100/100' },
+  { name: '교육', description: '다양한 분야의 전문 지식을 영상으로 만나보세요.', thumbnailUrl: 'https://picsum.photos/seed/education/100/100' },
+  { name: '영화', description: '최신 영화부터 명작까지, 감동과 재미를 선사합니다.', thumbnailUrl: 'https://picsum.photos/seed/movie/100/100' },
+  { name: '라이프스타일', description: '건강, 취미, 여행 등 다채로운 삶의 이야기를 담았습니다.', thumbnailUrl: 'https://picsum.photos/seed/lifestyle/100/100' },
 ];
 
 export const classifications: Omit<Classification, 'id' | 'fieldId'>[] = [
