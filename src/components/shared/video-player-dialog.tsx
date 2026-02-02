@@ -290,13 +290,28 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
     const bookmarksQuery = useMemoFirebase(() => {
         if (!user || !firestore) return null;
         return query(
-            collection(firestore, 'users', user.id, 'bookmarks'),
+            collection(firestore, 'bookmarks'),
+            where('userId', '==', user.id),
             where('episodeId', '==', episode.id),
             orderBy('timestamp', 'asc')
         );
     }, [user.id, episode.id, firestore]);
 
-    const { data: bookmarks, isLoading } = useCollection<Bookmark>(bookmarksQuery);
+    const { data: bookmarks, isLoading, error: bookmarksError } = useCollection<Bookmark>(bookmarksQuery);
+
+    useEffect(() => {
+        if (bookmarksError) {
+            console.error("Firestore query error:", bookmarksError);
+            if (bookmarksError.message.includes("indexes")) {
+                 toast({
+                    variant: "destructive",
+                    title: "색인 필요",
+                    description: "북마크를 불러오려면 Firestore 색인 생성이 필요합니다. 브라우저 콘솔의 링크를 클릭하여 색인을 생성해주세요.",
+                    duration: 10000,
+                });
+            }
+        }
+    }, [bookmarksError, toast]);
 
     const handleAddBookmark = () => {
         if (!videoRef.current || !user || !firestore) return;
