@@ -24,7 +24,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Card } from '../ui/card';
 import Link from 'next/link';
 import { Skeleton } from '../ui/skeleton';
-import { addBookmark, deleteBookmark } from '@/lib/actions/bookmark-actions';
+import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/bookmark-actions';
+import { Input } from '../ui/input';
 
 // ========= TYPES AND SUB-COMPONENTS (Self-contained) =========
 
@@ -220,10 +221,71 @@ const TextbookView = () => (
     </div>
 );
 
+const BookmarkItem = ({ bookmark, onSeek, onDelete }: { bookmark: Bookmark, onSeek: (time: number) => void, onDelete: (id: string) => void }) => {
+    const { user } = useUser();
+    const { toast } = useToast();
+    const [note, setNote] = useState(bookmark.note || '');
+    const [isSaving, setIsSaving] = useState(false);
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    useEffect(() => {
+        setNote(bookmark.note || '');
+    }, [bookmark.note]);
+
+    const handleNoteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newNote = e.target.value;
+        setNote(newNote);
+        setIsSaving(true);
+        
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        
+        timeoutRef.current = setTimeout(() => {
+            if (!user) return;
+            updateBookmarkNote({ userId: user.id, bookmarkId: bookmark.id, note: newNote })
+                .then(result => {
+                    if (!result.success) {
+                        toast({ variant: 'destructive', title: '메모 저장 실패', description: result.message });
+                    }
+                })
+                .finally(() => {
+                    setIsSaving(false);
+                });
+        }, 1500); // 1.5-second debounce
+    };
+
+    const formatTime = (seconds: number) => {
+        const date = new Date(0);
+        date.setSeconds(seconds);
+        return date.toISOString().substr(14, 5); // MM:SS
+    };
+
+    return (
+        <li className="group flex items-center gap-2 p-2 bg-white rounded-md border">
+            <Button variant="ghost" size="sm" onClick={() => onSeek(bookmark.timestamp)} className="font-mono text-primary font-semibold">
+                [{formatTime(bookmark.timestamp)}]
+            </Button>
+            <Input
+                value={note}
+                onChange={handleNoteChange}
+                placeholder="메모 입력..."
+                className="flex-grow h-8 text-sm border-0 focus-visible:ring-1 focus-visible:ring-ring"
+            />
+             {isSaving && <Loader className="h-4 w-4 animate-spin text-muted-foreground" />}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => onDelete(bookmark.id)}
+            >
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+        </li>
+    );
+}
+
 const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: User, videoRef: React.RefObject<HTMLVideoElement> }) => {
     const firestore = useFirestore();
     const { toast } = useToast();
-    const [note, setNote] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
     const bookmarksQuery = useMemoFirebase(() => {
@@ -237,25 +299,14 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
 
     const { data: bookmarks, isLoading } = useCollection<Bookmark>(bookmarksQuery);
 
-    const formatTime = (seconds: number) => {
-        const date = new Date(0);
-        date.setSeconds(seconds);
-        return date.toISOString().substr(14, 5); // MM:SS
-    };
-
     const handleAddBookmark = () => {
         if (!videoRef.current || !user || !firestore) return;
         
         videoRef.current.pause();
-        
         const currentTime = Math.floor(videoRef.current.currentTime);
 
         if (bookmarks?.some(b => b.timestamp === currentTime)) {
-            toast({
-                variant: 'destructive',
-                title: '오류',
-                description: '이미 같은 시간에 북마크가 존재합니다.',
-            });
+            toast({ variant: 'destructive', title: '오류', description: '이미 같은 시간에 북마크가 존재합니다.' });
             if (videoRef.current) videoRef.current.play();
             return;
         }
@@ -266,11 +317,10 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
             episodeId: episode.id,
             courseId: episode.courseId,
             timestamp: currentTime,
-            note: note.trim(),
+            note: '',
         }).then((result) => {
             if (result.success) {
                 toast({ title: '성공', description: '북마크가 추가되었습니다.' });
-                setNote('');
             } else {
                 toast({ variant: 'destructive', title: '오류', description: result.message });
             }
@@ -307,52 +357,35 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
     
     return (
         <div className="space-y-4 p-5 pr-6">
-            <div className="space-y-2">
-                <Textarea 
-                    placeholder="북마크에 메모를 추가하세요 (선택)"
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    disabled={isSaving}
-                />
-                <Button 
-                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                    onClick={handleAddBookmark}
-                    disabled={isSaving}
-                >
-                  <BookmarkIcon className="mr-2 h-4 w-4" /> 
-                  {isSaving ? '저장 중...' : '현재 시간 북마크'}
-                </Button>
-            </div>
+            <Button 
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                onClick={handleAddBookmark}
+                disabled={isSaving}
+            >
+              <BookmarkIcon className="mr-2 h-4 w-4" /> 
+              {isSaving ? '저장 중...' : '현재 시간 북마크'}
+            </Button>
             
-            {isLoading && <p className="text-center text-sm text-muted-foreground">북마크 로딩 중...</p>}
-            
-            {!isLoading && bookmarks && bookmarks.length === 0 && (
-                <p className="text-sm text-muted-foreground mt-6 text-center">저장된 북마크가 없습니다.</p>
-            )}
+            <div className="mt-4 space-y-2">
+                {isLoading && <p className="text-center text-sm text-muted-foreground">북마크 로딩 중...</p>}
+                
+                {!isLoading && bookmarks && bookmarks.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center pt-4">저장된 북마크가 없습니다.</p>
+                )}
 
-            {!isLoading && bookmarks && bookmarks.length > 0 && (
-                <ul className="space-y-2">
-                    {bookmarks.map(bookmark => (
-                        <li key={bookmark.id} className="group flex justify-between items-center p-3 bg-white rounded-md text-sm border hover:bg-slate-50">
-                            <button onClick={() => handleSeekTo(bookmark.timestamp)} className="text-left flex-grow min-w-0">
-                                <div className="flex items-center">
-                                    <span className="font-mono text-primary font-semibold mr-3">[{formatTime(bookmark.timestamp)}]</span>
-                                    <p className="truncate text-foreground">{bookmark.note || '메모 없음'}</p>
-                                </div>
-                                <span className="text-xs text-muted-foreground mt-1 block">{toDisplayDate(bookmark.createdAt)}</span>
-                            </button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => handleDeleteBookmark(bookmark.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                        </li>
-                    ))}
-                </ul>
-            )}
+                {!isLoading && bookmarks && bookmarks.length > 0 && (
+                    <ul className="space-y-2">
+                        {bookmarks.map(bookmark => (
+                            <BookmarkItem 
+                                key={bookmark.id} 
+                                bookmark={bookmark}
+                                onSeek={handleSeekTo}
+                                onDelete={handleDeleteBookmark}
+                            />
+                        ))}
+                    </ul>
+                )}
+            </div>
         </div>
     );
 };

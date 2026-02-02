@@ -99,3 +99,35 @@ export async function deleteBookmark(userId: string, bookmarkId: string): Promis
         return { success: false, message: `북마크 삭제 실패: ${errorMessage}` };
     }
 }
+
+
+export async function updateBookmarkNote(payload: { userId: string; bookmarkId: string; note: string; }): Promise<{ success: boolean; message: string; }> {
+    const { userId, bookmarkId, note } = payload;
+    if (!userId || !bookmarkId) {
+        return { success: false, message: '사용자 ID와 북마크 ID는 필수입니다.' };
+    }
+
+    try {
+        const adminApp = initializeAdminApp();
+        const db = admin.firestore(adminApp);
+        
+        const batch = db.batch();
+
+        const userBookmarkRef = db.collection('users').doc(userId).collection('bookmarks').doc(bookmarkId);
+        batch.update(userBookmarkRef, { note });
+
+        const globalBookmarkRef = db.collection('bookmarks').doc(bookmarkId);
+        batch.update(globalBookmarkRef, { note });
+
+        await batch.commit();
+        
+        revalidatePath(`/admin/bookmarks`); 
+
+        return { success: true, message: '북마크 메모가 업데이트되었습니다.' };
+
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+        console.error("updateBookmarkNote Error:", error, payload);
+        return { success: false, message: `북마크 메모 업데이트 실패: ${errorMessage}` };
+    }
+}
