@@ -24,6 +24,7 @@ export interface User {
 export interface Field {
   id: string; // This will be the document ID from Firestore, added on the client
   name: string;
+  description: string;
   thumbnailUrl: string;
   thumbnailPath?: string;
   orderIndex?: number;
