@@ -198,7 +198,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
                         onChange={(e) => setUserQuestion(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isPending) { e.preventDefault(); handleAskQuestion(); } }}
                         disabled={isPending || !isAIAvailable}
-                        className="flex-grow resize-none"
+                        className="flex-grow resize-none min-h-0 h-10"
                         rows={1}
                     />
                     <Button onClick={handleAskQuestion} disabled={isPending || !userQuestion.trim() || !isAIAvailable}><Send className="h-4 w-4" /></Button>
