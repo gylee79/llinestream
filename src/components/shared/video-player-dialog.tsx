@@ -488,7 +488,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <TabsTrigger value="textbook" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">교재정보</TabsTrigger>
                         <TabsTrigger value="bookmark" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">북마크</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="syllabus" className="mt-0 flex-grow min-h-0 bg-white p-4">
+                    <TabsContent value="syllabus" className="mt-0 flex flex-col flex-grow min-h-0 bg-white p-4">
                         <SyllabusView episode={episode} />
                     </TabsContent>
                     <TabsContent value="qna" className="mt-0 flex flex-col flex-grow min-h-0 bg-white p-4">
