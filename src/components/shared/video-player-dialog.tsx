@@ -441,14 +441,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
           }
         }}
       >
-        <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between px-4 md:px-6 py-2 border-b bg-background rounded-t-lg md:rounded-t-2xl">
-            <div className="flex items-center gap-2 text-sm md:text-base font-medium text-foreground truncate min-w-0">
-                {courseLoading ? <Loader className="h-4 w-4 animate-spin"/> : <span className="font-bold truncate">{course?.name}</span>}
-                <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <span className="text-muted-foreground truncate">{episode.title}</span>
-            </div>
-        </DialogHeader>
-
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:p-6 overflow-hidden bg-background md:bg-muted/50">
             {/* Video Player Section */}
             <Card className="col-span-10 md:col-span-7 flex flex-col bg-black md:rounded-xl overflow-hidden shadow-lg border-border">
