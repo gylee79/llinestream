@@ -241,8 +241,10 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
         return date.toISOString().substr(14, 5); // MM:SS
     };
 
-    const handleAddBookmark = async () => {
+    const handleAddBookmark = () => {
         if (!videoRef.current || !user || !firestore) return;
+        
+        videoRef.current.pause();
         
         const currentTime = Math.floor(videoRef.current.currentTime);
 
@@ -252,26 +254,36 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
                 title: '오류',
                 description: '이미 같은 시간에 북마크가 존재합니다.',
             });
+            if (videoRef.current) {
+                videoRef.current.play();
+            }
             return;
         }
 
         setIsSaving(true);
-        try {
-            await addDoc(collection(firestore, 'users', user.id, 'bookmarks'), {
-                userId: user.id,
-                episodeId: episode.id,
-                timestamp: currentTime,
-                note: note.trim(),
-                createdAt: FirebaseTimestamp.now(),
+        const dataToSave = {
+            userId: user.id,
+            episodeId: episode.id,
+            timestamp: currentTime,
+            note: note.trim(),
+            createdAt: FirebaseTimestamp.now(),
+        };
+
+        addDoc(collection(firestore, 'users', user.id, 'bookmarks'), dataToSave)
+            .then(() => {
+                toast({ title: '성공', description: '북마크가 추가되었습니다.' });
+                setNote('');
+            })
+            .catch((error) => {
+                console.error("Bookmark save error:", error);
+                toast({ variant: 'destructive', title: '오류', description: '북마크 추가에 실패했습니다.' });
+            })
+            .finally(() => {
+                setIsSaving(false);
+                if (videoRef.current) {
+                    videoRef.current.play();
+                }
             });
-            toast({ title: '성공', description: '북마크가 추가되었습니다.' });
-            setNote('');
-        } catch (error) {
-            console.error(error);
-            toast({ variant: 'destructive', title: '오류', description: '북마크 추가에 실패했습니다.' });
-        } finally {
-            setIsSaving(false);
-        }
     };
 
     const handleDeleteBookmark = async (bookmarkId: string) => {
