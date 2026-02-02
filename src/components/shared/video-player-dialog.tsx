@@ -287,7 +287,7 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
     };
     
     return (
-        <div className="space-y-4 p-4">
+        <div className="space-y-4 p-5 pr-6">
             <div className="space-y-2">
                 <Textarea 
                     placeholder="북마크에 메모를 추가하세요 (선택)"
@@ -437,7 +437,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
           }
         }}
       >
-        <div className="flex-shrink-0 flex items-center justify-between px-4 pt-4 pb-2 md:px-6 md:pb-0 md:pt-4 bg-background md:bg-muted/50 md:rounded-t-xl">
+        <div className="flex-shrink-0 flex items-center justify-between px-4 py-1 md:px-6 md:py-2 bg-background md:bg-muted/50 md:rounded-t-xl border-b md:border-none">
              <DialogTitle className="text-sm font-medium text-muted-foreground line-clamp-1">
                 {courseLoading ? (
                     <Skeleton className="h-5 w-48" />
@@ -449,6 +449,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     </>
                 )}
              </DialogTitle>
+             <DialogClose className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+            </DialogClose>
         </div>
 
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:p-6 md:pt-2 overflow-hidden bg-background md:bg-muted/50">
