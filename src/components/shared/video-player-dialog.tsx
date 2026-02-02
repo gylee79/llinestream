@@ -59,8 +59,8 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
     try {
         const data = JSON.parse(episode.aiGeneratedContent);
         return (
-            <ScrollArea className="h-full w-full">
-                <div className="space-y-4 p-4">
+            <ScrollArea className="h-full w-full p-4">
+                <div className="space-y-4">
                     <div className="space-y-1">
                         <h4 className="font-semibold text-base">강의 요약</h4>
                         <p className="text-sm text-foreground whitespace-pre-line break-words">{data.summary || '요약이 없습니다.'}</p>
@@ -90,8 +90,8 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
         )
     } catch(e) {
         return (
-            <ScrollArea className="h-full w-full">
-                <p className="p-4 text-sm text-muted-foreground whitespace-pre-line break-words">{episode.aiGeneratedContent}</p>
+            <ScrollArea className="h-full w-full p-4">
+                <p className="text-sm text-muted-foreground whitespace-pre-line break-words">{episode.aiGeneratedContent}</p>
             </ScrollArea>
         )
     }
@@ -159,8 +159,8 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
     };
 
     return (
-        <div className="flex-1 flex flex-col gap-4 min-h-0 p-4">
-            <ScrollArea className="flex-grow px-4 -mx-4" viewportRef={chatScrollAreaRef}>
+        <div className="flex-1 flex flex-col gap-4 min-h-0">
+            <ScrollArea className="flex-grow px-4" viewportRef={chatScrollAreaRef}>
                 <div className="space-y-4">
                   {isLoading ? (
                       <div className="flex items-center justify-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>
@@ -203,8 +203,8 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
 };
 
 const TextbookView = () => (
-    <ScrollArea className="h-full">
-        <div className="text-center flex flex-col items-center h-full justify-center p-4">
+    <ScrollArea className="h-full p-4">
+        <div className="text-center flex flex-col items-center h-full justify-center">
             <Image src="https://picsum.photos/seed/textbook/200/280" width={150} height={210} alt="교재 이미지" className="rounded-md shadow-md" />
             <p className="text-sm text-muted-foreground mt-4">교재 정보는 현재 준비 중입니다.</p>
             <Button className="mt-4 bg-orange-500 hover:bg-orange-600 text-white font-bold">교재 구매하기</Button>
@@ -287,8 +287,8 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
     };
     
     return (
-        <ScrollArea className="h-full">
-            <div className="space-y-4 p-4">
+        <ScrollArea className="h-full p-4">
+            <div className="space-y-4">
                 <div className="space-y-2">
                     <Textarea 
                         placeholder="북마크에 메모를 추가하세요 (선택)"
@@ -445,8 +445,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
           }
         }}
       >
-        <DialogHeader className="flex-shrink-0 flex items-center px-4 md:px-6 py-2 border-b bg-background rounded-t-lg">
-            <div className="flex items-center gap-2 text-sm md:text-base font-medium text-foreground truncate min-w-0 pr-8">
+        <DialogHeader className="flex-shrink-0 flex items-center px-4 md:px-6 py-2 border-b bg-background rounded-t-lg md:rounded-t-2xl pr-12">
+            <div className="flex items-center gap-2 text-sm md:text-base font-medium text-foreground truncate min-w-0">
                 {courseLoading ? <Loader className="h-4 w-4 animate-spin"/> : <span className="font-bold truncate">{course?.name}</span>}
                 <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-muted-foreground truncate">{episode.title}</span>
@@ -455,7 +455,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
         <div className="flex-1 grid md:grid-cols-10 gap-0 md:gap-6 md:p-6 overflow-hidden bg-background md:bg-muted/50">
             {/* Video Player Section */}
-            <Card className="col-span-10 md:col-span-7 flex flex-col bg-black md:rounded-xl overflow-hidden shadow-lg border border-border">
+            <Card className="col-span-10 md:col-span-7 flex flex-col bg-black md:rounded-xl overflow-hidden shadow-lg border-border">
                 <div className="w-full flex-grow relative">
                     <div className="absolute inset-0 flex items-center justify-center">
                         {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
@@ -480,7 +480,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             </Card>
 
             {/* Sidebar Section */}
-            <Card className="col-span-10 md:col-span-3 flex flex-col md:bg-card md:rounded-xl shadow-lg border border-border overflow-hidden min-h-0">
+            <Card className="col-span-10 md:col-span-3 flex flex-col md:bg-card md:rounded-xl shadow-lg border-border overflow-hidden min-h-0">
                 <Tabs defaultValue="syllabus" className="flex-1 flex flex-col min-h-0">
                     <TabsList className="grid w-full grid-cols-4 flex-shrink-0 rounded-none h-auto p-0 bg-gray-50 border-b">
                         <TabsTrigger value="syllabus" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">강의목차</TabsTrigger>
@@ -491,7 +491,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     <TabsContent value="syllabus" className="mt-0 flex-grow min-h-0 bg-white">
                         <SyllabusView episode={episode} />
                     </TabsContent>
-                    <TabsContent value="qna" className="mt-0 flex flex-col flex-grow min-h-0 bg-white">
+                    <TabsContent value="qna" className="mt-0 flex flex-col flex-grow min-h-0 bg-white p-4">
                         {user ? <ChatView episode={episode} user={user} /> : <div className="text-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
                     <TabsContent value="textbook" className="mt-0 flex-grow min-h-0 bg-white">
