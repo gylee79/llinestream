@@ -161,9 +161,9 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
     };
 
     return (
-        <div className="flex-1 flex flex-col gap-4 min-h-0">
-            <ScrollArea className="flex-grow -mx-4" viewportRef={chatScrollAreaRef}>
-                <div className="space-y-4 px-4">
+        <div className="flex flex-col h-full">
+            <ScrollArea className="flex-grow">
+                <div className="space-y-4 p-4">
                   {isLoading ? (
                       <div className="flex items-center justify-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>
                   ) : messages.length === 0 ? (
@@ -187,7 +187,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
                   )}
                 </div>
             </ScrollArea>
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 p-4 border-t">
                 <div className="flex gap-2">
                     <Textarea 
                         placeholder={!isAIAvailable ? "AI 분석이 아직 완료되지 않았습니다." : "AI에게 질문할 내용을 입력하세요..."}
@@ -487,7 +487,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             </Card>
 
             {/* Sidebar Section */}
-            <Card className="col-span-10 md:col-span-3 flex flex-col md:bg-card md:rounded-xl shadow-lg border-border overflow-hidden min-h-0 min-w-0">
+            <Card className="col-span-10 md:col-span-3 flex flex-col flex-1 md:flex-auto md:bg-card md:rounded-xl shadow-lg border-border overflow-hidden min-h-0 min-w-0">
                 <Tabs defaultValue="syllabus" className="flex-1 flex flex-col min-h-0">
                     <TabsList className="grid w-full grid-cols-4 flex-shrink-0 rounded-none h-auto p-0 bg-gray-50 border-b">
                         <TabsTrigger value="syllabus" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">강의목차</TabsTrigger>
@@ -495,17 +495,17 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <TabsTrigger value="textbook" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">교재정보</TabsTrigger>
                         <TabsTrigger value="bookmark" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">북마크</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="syllabus" className="mt-0 flex-grow min-h-0 bg-white">
+                    <TabsContent value="syllabus" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
                         <SyllabusView episode={episode} />
                     </TabsContent>
-                    <TabsContent value="qna" className="mt-0 flex flex-col flex-grow min-h-0 bg-white p-4">
-                        {user ? <ChatView episode={episode} user={user} /> : <div className="text-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
+                    <TabsContent value="qna" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
+                        {user ? <ChatView episode={episode} user={user} /> : <div className="flex-grow flex items-center justify-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
-                    <TabsContent value="textbook" className="mt-0 flex-grow min-h-0 bg-white">
+                    <TabsContent value="textbook" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
                         <TextbookView />
                     </TabsContent>
-                    <TabsContent value="bookmark" className="mt-0 flex-grow min-h-0 bg-white">
-                        {user ? <BookmarkView episode={episode} user={user} videoRef={videoRef}/> : <div className="text-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
+                    <TabsContent value="bookmark" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
+                        {user ? <BookmarkView episode={episode} user={user} videoRef={videoRef}/> : <div className="flex-grow flex items-center justify-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
                 </Tabs>
             </Card>
