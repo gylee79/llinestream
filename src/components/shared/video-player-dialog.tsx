@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import Image from 'next/image';
 import { firebaseConfig } from '@/firebase/config';
 import { useToast } from '@/hooks/use-toast';
+import { Card } from '../ui/card';
 
 // ========= TYPES AND SUB-COMPONENTS (Self-contained) =========
 
@@ -159,7 +160,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
 
     return (
         <div className="flex-1 flex flex-col gap-4 min-h-0 p-4">
-            <ScrollArea className="flex-grow -mx-4 px-4">
+            <ScrollArea className="flex-grow px-4 -mx-4" viewportRef={chatScrollAreaRef}>
                 <div className="space-y-4">
                   {isLoading ? (
                       <div className="flex items-center justify-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>
@@ -444,22 +445,17 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
           }
         }}
       >
-        <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between px-4 md:px-6 py-3 border-b bg-background rounded-t-2xl">
-            <div className="flex items-center gap-2 text-sm md:text-base font-medium text-foreground truncate min-w-0">
+        <DialogHeader className="flex-shrink-0 flex items-center px-4 md:px-6 py-2 border-b bg-background rounded-t-lg">
+            <div className="flex items-center gap-2 text-sm md:text-base font-medium text-foreground truncate min-w-0 pr-8">
                 {courseLoading ? <Loader className="h-4 w-4 animate-spin"/> : <span className="font-bold truncate">{course?.name}</span>}
                 <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-muted-foreground truncate">{episode.title}</span>
             </div>
-             <DialogClose asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={handleClose}>
-                    <X className="h-4 w-4"/>
-                </Button>
-            </DialogClose>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col md:flex-row gap-0 md:gap-6 md:p-6 overflow-hidden bg-background md:bg-muted/50">
+        <div className="flex-1 grid md:grid-cols-10 gap-0 md:gap-6 md:p-6 overflow-hidden bg-background md:bg-muted/50">
             {/* Video Player Section */}
-            <div className="flex-[7] flex flex-col bg-black md:rounded-xl overflow-hidden shadow-lg border border-border">
+            <Card className="col-span-10 md:col-span-7 flex flex-col bg-black md:rounded-xl overflow-hidden shadow-lg border border-border">
                 <div className="w-full flex-grow relative">
                     <div className="absolute inset-0 flex items-center justify-center">
                         {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
@@ -481,10 +477,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         </video>
                     )}
                 </div>
-            </div>
+            </Card>
 
             {/* Sidebar Section */}
-            <div className="flex-[3] flex flex-col md:bg-card md:rounded-xl shadow-lg border border-border overflow-hidden min-h-0">
+            <Card className="col-span-10 md:col-span-3 flex flex-col md:bg-card md:rounded-xl shadow-lg border border-border overflow-hidden min-h-0">
                 <Tabs defaultValue="syllabus" className="flex-1 flex flex-col min-h-0">
                     <TabsList className="grid w-full grid-cols-4 flex-shrink-0 rounded-none h-auto p-0 bg-gray-50 border-b">
                         <TabsTrigger value="syllabus" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">강의목차</TabsTrigger>
@@ -505,7 +501,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         {user ? <BookmarkView episode={episode} user={user} videoRef={videoRef}/> : <div className="text-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
                 </Tabs>
-            </div>
+            </Card>
         </div>
       </DialogContent>
     </Dialog>
