@@ -45,7 +45,7 @@ interface ChatLog {
 const SyllabusView = ({ episode }: { episode: Episode }) => {
     if (!episode.aiGeneratedContent) {
         return (
-            <div className="flex-grow flex flex-col items-center justify-center text-center">
+            <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
                 <FileText className="h-12 w-12 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground mt-2">
                     {episode.aiProcessingStatus === 'completed'
@@ -60,10 +60,10 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
         const data = JSON.parse(episode.aiGeneratedContent);
         return (
             <ScrollArea className="h-full w-full">
-                <div className="space-y-4">
+                <div className="space-y-4 p-5 pr-6">
                     <div className="space-y-1">
                         <h4 className="font-semibold text-base">강의 요약</h4>
-                        <p className="text-sm text-foreground whitespace-pre-line break-words">{data.summary || '요약이 없습니다.'}</p>
+                        <p className="text-sm text-foreground whitespace-pre-line break-keep [word-break:keep-all]">{data.summary || '요약이 없습니다.'}</p>
                     </div>
                     {data.timeline && data.timeline.length > 0 && (
                         <div className="space-y-2">
@@ -74,11 +74,11 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
                                         <AccordionTrigger className="text-sm hover:no-underline text-left px-3 py-2">
                                             <div className="flex items-center gap-2 min-w-0">
                                                 <span className="font-mono">{item.startTime.split('.')[0]}</span>
-                                                <p className="truncate">{item.subtitle}</p> 
+                                                <p className="break-keep [word-break:keep-all]">{item.subtitle}</p> 
                                             </div>
                                         </AccordionTrigger>
                                         <AccordionContent className="px-3 pb-3">
-                                            <p className="text-sm text-foreground whitespace-pre-line break-words">{item.description}</p>
+                                            <p className="text-sm text-foreground whitespace-pre-line break-keep [word-break:keep-all]">{item.description}</p>
                                         </AccordionContent>
                                     </AccordionItem>
                                 ))}
@@ -91,7 +91,9 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
     } catch(e) {
         return (
             <ScrollArea className="h-full w-full">
-                <p className="text-sm text-muted-foreground whitespace-pre-line break-words">{episode.aiGeneratedContent}</p>
+                <div className="p-5 pr-6">
+                    <p className="text-sm text-muted-foreground whitespace-pre-line break-keep [word-break:keep-all]">{episode.aiGeneratedContent}</p>
+                </div>
             </ScrollArea>
         )
     }
@@ -160,8 +162,8 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
 
     return (
         <div className="flex-1 flex flex-col gap-4 min-h-0">
-            <ScrollArea className="flex-grow" viewportRef={chatScrollAreaRef}>
-                <div className="space-y-4">
+            <ScrollArea className="flex-grow -mx-4" viewportRef={chatScrollAreaRef}>
+                <div className="space-y-4 px-4">
                   {isLoading ? (
                       <div className="flex items-center justify-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>
                   ) : messages.length === 0 ? (
@@ -204,7 +206,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
 
 const TextbookView = () => (
     <ScrollArea className="h-full">
-        <div className="text-center flex flex-col items-center h-full justify-center">
+        <div className="text-center flex flex-col items-center h-full justify-center p-5 pr-6">
             <Image src="https://picsum.photos/seed/textbook/200/280" width={150} height={210} alt="교재 이미지" className="rounded-md shadow-md" />
             <p className="text-sm text-muted-foreground mt-4">교재 정보는 현재 준비 중입니다.</p>
             <Button className="mt-4 bg-orange-500 hover:bg-orange-600 text-white font-bold">교재 구매하기</Button>
@@ -288,7 +290,7 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
     
     return (
         <ScrollArea className="h-full">
-            <div className="space-y-4">
+            <div className="space-y-4 p-5 pr-6">
                 <div className="space-y-2">
                     <Textarea 
                         placeholder="북마크에 메모를 추가하세요 (선택)"
@@ -437,7 +439,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[95vw] md:h-[90vh] md:rounded-2xl"
+        className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[96vw] md:h-[92vh] md:rounded-2xl"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onInteractOutside={(e) => {
           if (videoRef.current?.contains(e.target as Node)) {
@@ -445,12 +447,17 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
           }
         }}
       >
-        <DialogHeader className="flex-shrink-0 flex items-center px-4 md:px-6 py-2 border-b bg-background rounded-t-lg md:rounded-t-2xl pr-12">
+        <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between px-4 md:px-6 py-2 border-b bg-background rounded-t-lg md:rounded-t-2xl">
             <div className="flex items-center gap-2 text-sm md:text-base font-medium text-foreground truncate min-w-0">
                 {courseLoading ? <Loader className="h-4 w-4 animate-spin"/> : <span className="font-bold truncate">{course?.name}</span>}
                 <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-muted-foreground truncate">{episode.title}</span>
             </div>
+             <DialogClose asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0">
+                    <X className="h-4 w-4" />
+                </Button>
+            </DialogClose>
         </DialogHeader>
 
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:p-6 overflow-hidden bg-background md:bg-muted/50">
@@ -480,7 +487,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             </Card>
 
             {/* Sidebar Section */}
-            <Card className="col-span-10 md:col-span-3 flex flex-col md:bg-card md:rounded-xl shadow-lg border-border overflow-hidden min-h-0">
+            <Card className="col-span-10 md:col-span-3 flex flex-col md:bg-card md:rounded-xl shadow-lg border-border overflow-hidden min-h-0 min-w-0">
                 <Tabs defaultValue="syllabus" className="flex-1 flex flex-col min-h-0">
                     <TabsList className="grid w-full grid-cols-4 flex-shrink-0 rounded-none h-auto p-0 bg-gray-50 border-b">
                         <TabsTrigger value="syllabus" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">강의목차</TabsTrigger>
@@ -488,16 +495,16 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <TabsTrigger value="textbook" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">교재정보</TabsTrigger>
                         <TabsTrigger value="bookmark" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">북마크</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="syllabus" className="mt-0 flex flex-col flex-grow min-h-0 bg-white p-4">
+                    <TabsContent value="syllabus" className="mt-0 flex-grow min-h-0 bg-white">
                         <SyllabusView episode={episode} />
                     </TabsContent>
                     <TabsContent value="qna" className="mt-0 flex flex-col flex-grow min-h-0 bg-white p-4">
                         {user ? <ChatView episode={episode} user={user} /> : <div className="text-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
-                    <TabsContent value="textbook" className="mt-0 flex-grow min-h-0 bg-white p-4">
+                    <TabsContent value="textbook" className="mt-0 flex-grow min-h-0 bg-white">
                         <TextbookView />
                     </TabsContent>
-                    <TabsContent value="bookmark" className="mt-0 flex-grow min-h-0 bg-white p-4">
+                    <TabsContent value="bookmark" className="mt-0 flex-grow min-h-0 bg-white">
                         {user ? <BookmarkView episode={episode} user={user} videoRef={videoRef}/> : <div className="text-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
                 </Tabs>
