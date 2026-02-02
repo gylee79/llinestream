@@ -47,7 +47,7 @@ interface ChatLog {
 const SyllabusView = ({ episode }: { episode: Episode }) => {
     if (!episode.aiGeneratedContent) {
         return (
-            <div className="flex-grow flex flex-col items-center justify-center text-center">
+            <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
                 <FileText className="h-12 w-12 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground mt-2">
                     {episode.aiProcessingStatus === 'completed'
@@ -159,8 +159,8 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
     };
 
     return (
-        <div className="flex flex-col h-full">
-            <ScrollArea className="flex-grow" viewportRef={chatScrollAreaRef}>
+        <div className="flex flex-col h-full p-4">
+            <ScrollArea className="flex-grow -mx-4 px-4" viewportRef={chatScrollAreaRef}>
                 <div className="space-y-4">
                   {isLoading ? (
                       <div className="flex items-center justify-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>
@@ -437,7 +437,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
           }
         }}
       >
-        <div className="flex-shrink-0 flex items-center justify-between p-4 border-b">
+        <div className="flex-shrink-0 flex items-center justify-between p-1 border-b">
              <div className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8">
                 {courseLoading ? (
                     <Skeleton className="h-5 w-48" />
@@ -449,7 +449,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     </>
                 )}
              </div>
-             {/* The main DialogContent will have its own close button, so we don't add one here */}
         </div>
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:px-6 md:pb-6 overflow-hidden bg-muted/50">
             {/* Video Player Section */}
@@ -491,7 +490,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                             <SyllabusView episode={episode} />
                         </ScrollArea>
                     </TabsContent>
-                    <TabsContent value="qna" className="mt-0 flex-grow min-h-0 bg-white flex flex-col p-4">
+                    <TabsContent value="qna" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
                         {user ? <ChatView episode={episode} user={user} /> : <div className="flex-grow flex items-center justify-center text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
                     <TabsContent value="textbook" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
