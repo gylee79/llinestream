@@ -14,7 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getPublicUrl } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
-import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp, doc, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp, doc } from 'firebase/firestore';
 import { toDisplayDate } from '@/lib/date-helpers';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import Image from 'next/image';
@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card } from '../ui/card';
 import Link from 'next/link';
 import { Skeleton } from '../ui/skeleton';
+import { addBookmark, deleteBookmark } from '@/lib/actions/bookmark-actions';
 
 // ========= TYPES AND SUB-COMPONENTS (Self-contained) =========
 
@@ -254,47 +255,46 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
                 title: '오류',
                 description: '이미 같은 시간에 북마크가 존재합니다.',
             });
-            if (videoRef.current) {
-                videoRef.current.play();
-            }
+            if (videoRef.current) videoRef.current.play();
             return;
         }
 
         setIsSaving(true);
-        const dataToSave = {
+        addBookmark({
             userId: user.id,
             episodeId: episode.id,
+            courseId: episode.courseId,
             timestamp: currentTime,
             note: note.trim(),
-            createdAt: FirebaseTimestamp.now(),
-        };
-
-        addDoc(collection(firestore, 'users', user.id, 'bookmarks'), dataToSave)
-            .then(() => {
+        }).then((result) => {
+            if (result.success) {
                 toast({ title: '성공', description: '북마크가 추가되었습니다.' });
                 setNote('');
-            })
-            .catch((error) => {
-                console.error("Bookmark save error:", error);
-                toast({ variant: 'destructive', title: '오류', description: '북마크 추가에 실패했습니다.' });
-            })
-            .finally(() => {
-                setIsSaving(false);
-                if (videoRef.current) {
-                    videoRef.current.play();
-                }
-            });
+            } else {
+                toast({ variant: 'destructive', title: '오류', description: result.message });
+            }
+        }).catch(error => {
+            toast({ variant: 'destructive', title: '오류', description: '북마크 추가 중 예외가 발생했습니다.' });
+            console.error(error);
+        }).finally(() => {
+            setIsSaving(false);
+            if (videoRef.current) videoRef.current.play();
+        });
     };
 
-    const handleDeleteBookmark = async (bookmarkId: string) => {
+    const handleDeleteBookmark = (bookmarkId: string) => {
         if (!user || !firestore) return;
-        try {
-            await deleteDoc(doc(firestore, 'users', user.id, 'bookmarks', bookmarkId));
-            toast({ title: '성공', description: '북마크가 삭제되었습니다.' });
-        } catch (error) {
+
+        deleteBookmark(user.id, bookmarkId).then(result => {
+            if (result.success) {
+                toast({ title: '성공', description: '북마크가 삭제되었습니다.' });
+            } else {
+                toast({ variant: 'destructive', title: '오류', description: result.message });
+            }
+        }).catch(error => {
+            toast({ variant: 'destructive', title: '오류', description: '북마크 삭제 중 예외가 발생했습니다.' });
             console.error(error);
-            toast({ variant: 'destructive', title: '오류', description: '북마크 삭제에 실패했습니다.' });
-        }
+        });
     };
     
     const handleSeekTo = (time: number) => {

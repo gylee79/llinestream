@@ -14,6 +14,7 @@ import {
   Users,
   History,
   ShieldAlert,
+  Bookmark,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -31,6 +32,7 @@ const adminNavLinks = [
   { href: '/admin/revenue', label: '매출 관리', icon: BarChart3 },
   { href: '/admin/view-history', label: '시청 기록', icon: History },
   { href: '/admin/chats', label: 'AI 채팅 기록', icon: MessageSquare },
+  { href: '/admin/bookmarks', label: '북마크 관리', icon: Bookmark },
   { href: '/admin/settings', label: '설정', icon: Cog },
 ];
 

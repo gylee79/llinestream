@@ -55,9 +55,13 @@
         "id": { "type": "string" },
         "userId": { "type": "string" },
         "episodeId": { "type": "string" },
+        "courseId": { "type": "string", "description": "Denormalized course ID for context." },
         "timestamp": { "type": "number", "description": "The video time in seconds." },
         "note": { "type": "string", "description": "An optional user note for the bookmark." },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "userName": { "type": "string", "description": "Denormalized user name for admin view." },
+        "userEmail": { "type": "string", "format": "email", "description": "Denormalized user email for admin view." },
+        "episodeTitle": { "type": "string", "description": "Denormalized episode title for admin view." }
       },
       "required": ["userId", "episodeId", "timestamp", "createdAt"]
     },
@@ -572,6 +576,17 @@
           "description": "Stores a user's personal bookmarks for video episodes. Readable and writable only by the owning user.",
           "params": [
             { "name": "userId", "description": "The unique identifier of the user." },
+            { "name": "bookmarkId", "description": "The unique identifier of the bookmark." }
+          ]
+        }
+      },
+      {
+        "path": "/bookmarks/{bookmarkId}",
+        "definition": {
+          "entityName": "Bookmark",
+          "schema": { "$ref": "#/backend/entities/Bookmark" },
+          "description": "A global collection of all user bookmarks for admin auditing. Writable by server action, readable only by admins.",
+          "params": [
             { "name": "bookmarkId", "description": "The unique identifier of the bookmark." }
           ]
         }
