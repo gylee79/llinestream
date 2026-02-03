@@ -9,9 +9,8 @@ import { Textarea } from '../ui/textarea';
 import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark as BookmarkIcon, Trash2 } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
-import { cn } from '@/lib/utils';
+import { cn, getPublicUrl, formatDuration } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
-import { getPublicUrl } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp, doc } from 'firebase/firestore';
@@ -252,16 +251,10 @@ const BookmarkItem = ({ bookmark, onSeek, onDelete }: { bookmark: Bookmark, onSe
         }, 1500); // 1.5-second debounce
     };
 
-    const formatTime = (seconds: number) => {
-        const date = new Date(0);
-        date.setSeconds(seconds);
-        return date.toISOString().substr(14, 5); // MM:SS
-    };
-
     return (
         <li className="group flex items-center gap-2 p-2 bg-white rounded-md border">
-            <Button variant="ghost" size="sm" onClick={() => onSeek(bookmark.timestamp)} className="font-mono text-primary font-semibold">
-                [{formatTime(bookmark.timestamp)}]
+            <Button variant="ghost" size="sm" onClick={() => onSeek(bookmark.timestamp)} className="font-mono text-primary font-semibold px-0">
+                [{formatDuration(bookmark.timestamp)}]
             </Button>
             <Input
                 value={note}
