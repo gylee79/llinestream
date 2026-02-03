@@ -418,7 +418,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const { toast } = useToast();
   const firestore = useFirestore();
   
-  const [vttSrc, setVttSrc] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [playerError, setPlayerError] = useState<string | null>(null);
 
@@ -460,28 +459,30 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     });
   };
 
-    const onPlayerError = useCallback((error: any) => {
-        const shakaError = error instanceof shaka.util.Error ? error : error.detail;
-        console.error("Shaka Player Error Details:", JSON.stringify(shakaError, Object.getOwnPropertyNames(shakaError)));
-        
-        let message = `알 수 없는 플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
-        if (shakaError && shakaError.category) {
-            switch (shakaError.category) {
-                case shaka.util.Error.Category.NETWORK:
-                    message = "네트워크 오류로 비디오를 불러올 수 없습니다. 브라우저 콘솔(F12)에서 CORS 관련 오류 메시지가 있는지 확인해주세요. (참고: `gcloud storage buckets update gs://<버킷이름> --cors-file=cors.json`)";
-                    break;
-                case shaka.util.Error.Category.DRM:
-                    message = "DRM 라이선스 요청에 실패했습니다. 키 서버 URL 또는 DRM 관련 설정이 올바른지 확인해주세요.";
-                    break;
-                case shaka.util.Error.Category.MEDIA:
-                    message = `미디어 파일을 재생할 수 없습니다 (코드: ${shakaError.code}). 파일이 손상되었거나 지원되지 않는 형식일 수 있습니다.`;
-                    break;
-                default:
-                    message = `플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
-            }
+  const onPlayerError = useCallback((error: any) => {
+    const shakaError = error instanceof shaka.util.Error ? error : error.detail;
+    console.error("Shaka Player Error Details:", JSON.stringify(shakaError, Object.getOwnPropertyNames(shakaError), 2));
+    
+    let message = `알 수 없는 플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
+    if (shakaError && shakaError.category) {
+        switch (shakaError.category) {
+            case shaka.util.Error.Category.NETWORK:
+                message = "네트워크 오류로 비디오를 불러올 수 없습니다. 브라우저 콘솔(F12)에서 CORS 관련 오류 메시지가 있는지 확인해주세요. (참고: `gcloud storage buckets update gs://<버킷이름> --cors-file=cors.json`)";
+                break;
+            case shaka.util.Error.Category.DRM:
+                message = `DRM 라이선스 요청에 실패했습니다 (코드: ${shakaError.code}). 키 서버 URL 또는 DRM 관련 설정이 올바른지 확인해주세요.`;
+                break;
+            case shaka.util.Error.Category.MEDIA:
+                message = `미디어 파일을 재생할 수 없습니다 (코드: ${shakaError.code}). 파일이 손상되었거나 지원되지 않는 형식일 수 있습니다.`;
+                break;
+            default:
+                message = `플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
         }
-        setPlayerError(message);
-    }, []);
+    }
+    setPlayerError(message);
+    setIsLoading(false);
+}, []);
+
 
     useEffect(() => {
         if (isOpen) {
@@ -527,14 +528,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 await player.attach(videoRef.current);
                 
                 player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
-                    if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
-                        const keyUri = request.uris[0];
-                        if (keyUri.startsWith('gs://')) {
-                             if (episode.keyServerUrl && episode.packagingStatus === 'completed') {
-                                request.uris[0] = episode.keyServerUrl;
-                            } else {
-                                console.error("[Shaka-Filter] 키 요청을 가로챘으나, keyServerUrl이 없거나 비디오 처리가 완료되지 않았습니다.");
-                            }
+                    if (type === shaka.net.NetworkingEngine.RequestType.KEY) {
+                        console.log(`[Shaka-Filter] Intercepted KEY request. Original URI: ${request.uris[0]}`);
+                        if (episode.keyServerUrl) {
+                            console.log(`[Shaka-Filter] Replacing with signed keyServerUrl.`);
+                            request.uris[0] = episode.keyServerUrl;
+                        } else {
+                            console.error('[Shaka-Filter] KEY request intercepted, but no keyServerUrl is available. Aborting request.');
+                            request.uris = []; 
                         }
                     }
                 });
@@ -585,6 +586,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         }}
       >
         <DialogHeader className="p-1 border-b flex-shrink-0 flex flex-row items-center justify-between min-h-[41px]">
+            <DialogTitle className="sr-only">{`영상 플레이어: ${episode.title}`}</DialogTitle>
+            <DialogDescription className="sr-only">{`'${episode.title}' 영상을 재생하고 관련 학습 활동을 할 수 있는 다이얼로그입니다.`}</DialogDescription>
             <div className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8">
                 {courseLoading ? (
                     <Skeleton className="h-5 w-48" />
@@ -604,9 +607,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     <X className="h-4 w-4" />
                 </DialogClose>
              </div>
-             {/* Screen-reader only title */}
-            <DialogTitle className="sr-only">{`영상 플레이어: ${episode.title}`}</DialogTitle>
-            <DialogDescription className="sr-only">{`'${episode.title}' 영상을 재생하고 관련 학습 활동을 할 수 있는 다이얼로그입니다.`}</DialogDescription>
         </DialogHeader>
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:px-6 md:pb-6 overflow-hidden bg-muted/50">
             {/* Video Player Section */}
@@ -614,8 +614,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 <div className="w-full flex-grow relative" ref={videoContainerRef}>
                     {(isLoading || playerError) && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/50 p-4 text-center">
-                            {isLoading && <Loader className="h-12 w-12 text-white animate-spin mb-4" />}
-                            {playerError && <div>{playerError}</div>}
+                            {isLoading && !playerError && <Loader className="h-12 w-12 text-white animate-spin mb-4" />}
+                            {playerError ? (
+                                <div className="text-sm max-w-md">{playerError}</div>
+                            ) : (
+                                isLoading && <div>플레이어 로딩 중...</div>
+                            )}
                         </div>
                     )}
                     <video ref={videoRef} className="w-full h-full" autoPlay playsInline />
