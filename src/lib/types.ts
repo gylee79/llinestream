@@ -101,6 +101,7 @@ export interface Episode {
   manifestUrl?: string; // For DRM Streaming (DASH/HLS)
   keyServerUrl?: string; // Signed URL for the HLS AES key
   packagingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  packagingError?: string | null;
   
   createdAt: Timestamp;
 }
