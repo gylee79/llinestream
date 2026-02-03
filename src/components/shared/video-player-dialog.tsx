@@ -425,10 +425,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const startTimeRef = useRef<Date | null>(null);
   const viewLoggedRef = useRef(false);
 
-  const shakaPlayerRef = useRef<{ player: shaka.Player; videoElement: HTMLVideoElement } | null>(null);
+  const shakaPlayerRef = useRef<shaka.Player | null>(null);
+  const uiRef = useRef<shaka.ui.Overlay | null>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
@@ -460,129 +460,117 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     });
   };
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    let unmounted = false;
-    async function loadSources() {
-        if (unmounted) return;
-        setIsLoading(true);
-        setPlayerError(null);
-        setVttSrc(null);
-
-        try {
-            const bucketName = firebaseConfig.storageBucket;
-            if (!bucketName) {
-                throw new Error("Firebase Storage bucket 설정이 누락되었습니다.");
+    const onPlayerError = useCallback((error: any) => {
+        const shakaError = error instanceof shaka.util.Error ? error : error.detail;
+        console.error("Shaka Player Error Details:", JSON.stringify(shakaError, Object.getOwnPropertyNames(shakaError)));
+        
+        let message = `알 수 없는 플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
+        if (shakaError && shakaError.category) {
+            switch (shakaError.category) {
+                case shaka.util.Error.Category.NETWORK:
+                    message = "네트워크 오류로 비디오를 불러올 수 없습니다. 브라우저 콘솔(F12)에서 CORS 관련 오류 메시지가 있는지 확인해주세요. (참고: `gcloud storage buckets update gs://<버킷이름> --cors-file=cors.json`)";
+                    break;
+                case shaka.util.Error.Category.DRM:
+                    message = "DRM 라이선스 요청에 실패했습니다. 키 서버 URL 또는 DRM 관련 설정이 올바른지 확인해주세요.";
+                    break;
+                case shaka.util.Error.Category.MEDIA:
+                    message = `미디어 파일을 재생할 수 없습니다 (코드: ${shakaError.code}). 파일이 손상되었거나 지원되지 않는 형식일 수 있습니다.`;
+                    break;
+                default:
+                    message = `플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
             }
-
-            if (episode.vttPath) {
-              const publicVttUrl = getPublicUrl(bucketName, episode.vttPath);
-              if (unmounted) return;
-              setVttSrc(publicVttUrl);
-            }
-        } catch(e: any) {
-            if (unmounted) return;
-            setPlayerError(e.message || '소스 로딩 중 오류 발생');
-        } finally {
-            if (unmounted) return;
-            setIsLoading(false);
-        }
-    }
-
-    loadSources();
-    startTimeRef.current = new Date();
-    viewLoggedRef.current = false;
-
-    return () => { 
-        unmounted = true; 
-        logView();
-    };
-}, [isOpen, episode, logView]);
-
-
-const onPlayerError = useCallback((error: any) => {
-    const shakaError = error instanceof shaka.util.Error ? error : error.detail;
-    
-    // Log the full error for debugging
-    console.error("Shaka Player Error Details:", JSON.stringify(shakaError, Object.getOwnPropertyNames(shakaError)));
-    
-    if (shakaError && shakaError.code) {
-        let message = `플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
-        if (shakaError.category === shaka.util.Error.Category.DRM) {
-            message = "콘텐츠 라이선스를 가져오는 데 실패했습니다. DRM 설정을 확인해주세요.";
-        } else if (shakaError.category === shaka.util.Error.Category.NETWORK) {
-            message = "네트워크 오류로 인해 비디오를 불러올 수 없습니다.";
-        } else if (episode.packagingStatus === 'pending' || episode.packagingStatus === 'processing') {
-            message = "비디오를 암호화하고 재생 가능하도록 준비 중입니다. 잠시 후 다시 시도해주세요.";
-        } else if (episode.packagingStatus === 'failed') {
-            message = "비디오 처리 중 오류가 발생했습니다. 관리자에게 문의해주세요.";
         }
         setPlayerError(message);
-    } else {
-        setPlayerError("알 수 없는 플레이어 오류가 발생했습니다. 매니페스트 URL과 네트워크를 확인해주세요.");
-    }
-}, [episode.packagingStatus]);
+    }, []);
 
-useEffect(() => {
-    const manifestUrl = episode.manifestUrl;
-    if (!isOpen || !manifestUrl || !videoRef.current || !videoContainerRef.current) {
-        if (isOpen && episode.packagingStatus !== 'completed') {
-            setPlayerError("비디오를 암호화하고 재생 가능하도록 준비 중입니다. 잠시 후 다시 시도해주세요.");
+    useEffect(() => {
+        if (isOpen) {
+            startTimeRef.current = new Date();
+            viewLoggedRef.current = false;
         }
-        return;
-    }
+        return () => {
+            if (isOpen) logView();
+        };
+    }, [isOpen, logView]);
 
-    const video = videoRef.current;
-    const videoContainer = videoContainerRef.current;
-    const player = new shaka.Player();
 
-    async function setupPlayer() {
-        try {
-            await player.attach(video);
+    useEffect(() => {
+        let isMounted = true;
+        
+        async function setupPlayer() {
+            if (!videoRef.current || !videoContainerRef.current) return;
             
-            player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
-                // For HLS with AES-128, key requests are of type 'SEGMENT'.
-                if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
-                    const keyUri = request.uris[0];
-                    // The Transcoder API writes the gs:// URI of the key into the HLS manifest.
-                    // We can identify the key request by checking for this specific protocol.
-                    if (keyUri.startsWith('gs://')) {
-                        console.log(`[Shaka-Filter] Intercepted AES key request for URI: ${keyUri}.`);
-                        if (episode.keyServerUrl) {
-                            console.log(`[Shaka-Filter] Replacing URI with signed keyServerUrl.`);
-                            request.uris[0] = episode.keyServerUrl;
-                        } else {
-                            console.error("[Shaka-Filter] Key request intercepted, but no keyServerUrl is available for the episode. Playback will fail.");
+            setIsLoading(true);
+            setPlayerError(null);
+
+            if (episode.packagingStatus !== 'completed') {
+                const statusMessage = episode.packagingStatus === 'failed'
+                    ? '비디오 처리 중 오류가 발생했습니다. 관리자에게 문의해주세요.'
+                    : '영상을 재생 가능하도록 암호화하고 있습니다. 잠시 후 다시 시도해주세요.';
+                setPlayerError(statusMessage);
+                setIsLoading(false);
+                return;
+            }
+            
+            if (!episode.manifestUrl) {
+                setPlayerError('재생할 영상 주소(manifestUrl)가 없습니다.');
+                setIsLoading(false);
+                return;
+            }
+
+            const player = new shaka.Player();
+            const ui = new shaka.ui.Overlay(player, videoContainerRef.current, videoRef.current);
+            shakaPlayerRef.current = player;
+            uiRef.current = ui;
+
+            try {
+                await player.attach(videoRef.current);
+                
+                player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
+                    if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
+                        const keyUri = request.uris[0];
+                        if (keyUri.startsWith('gs://')) {
+                             if (episode.keyServerUrl && episode.packagingStatus === 'completed') {
+                                request.uris[0] = episode.keyServerUrl;
+                            } else {
+                                console.error("[Shaka-Filter] 키 요청을 가로챘으나, keyServerUrl이 없거나 비디오 처리가 완료되지 않았습니다.");
+                            }
                         }
                     }
+                });
+
+                player.addEventListener('error', onPlayerError);
+                await player.load(episode.manifestUrl);
+                
+                const bucketName = firebaseConfig.storageBucket;
+                if (episode.vttPath && bucketName) {
+                    const publicVttUrl = getPublicUrl(bucketName, episode.vttPath);
+                    await player.addTextTrackAsync(publicVttUrl, 'ko', 'subtitle', 'text/vtt');
+                    player.setTextTrackVisibility(true);
                 }
-            });
 
-            player.addEventListener('error', onPlayerError);
-            const ui = new shaka.ui.Overlay(player, videoContainer, video);
-            shakaPlayerRef.current = { player, videoElement: video };
-            await player.load(manifestUrl);
-
-            if (vttSrc) {
-                await player.addTextTrackAsync(vttSrc, 'ko', 'subtitle', 'text/vtt');
-                player.setTextTrackVisibility(true);
+                if(isMounted) setIsLoading(false);
+            } catch (e: any) {
+                if(isMounted) onPlayerError(e);
             }
-        } catch (e: any) {
-            onPlayerError(e);
         }
-    }
 
-    setupPlayer();
-
-    return () => {
-        if (player) {
-            player.removeEventListener('error', onPlayerError);
-            player.destroy();
+        if (isOpen) {
+            setupPlayer();
         }
-        shakaPlayerRef.current = null;
-    };
-}, [isOpen, episode.manifestUrl, episode.packagingStatus, episode.keyServerUrl, vttSrc, onPlayerError]);
+
+        return () => {
+            isMounted = false;
+            if (uiRef.current) {
+                uiRef.current.destroy();
+                uiRef.current = null;
+            }
+            if (shakaPlayerRef.current) {
+                shakaPlayerRef.current.destroy();
+                shakaPlayerRef.current = null;
+            }
+        };
+    }, [isOpen, episode, onPlayerError]);
 
 
   return (
@@ -591,12 +579,12 @@ useEffect(() => {
         className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[96vw] md:h-[92vh] md:rounded-2xl"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onInteractOutside={(e) => {
-          if (shakaPlayerRef.current?.videoElement.contains(e.target as Node)) {
+          if (videoContainerRef.current && videoContainerRef.current.contains(e.target as Node)) {
             e.preventDefault();
           }
         }}
       >
-        <DialogHeader className="p-1 border-b flex flex-row items-center justify-between">
+        <DialogHeader className="p-1 border-b flex-shrink-0 flex flex-row items-center justify-between min-h-[41px]">
             <div className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8">
                 {courseLoading ? (
                     <Skeleton className="h-5 w-48" />
@@ -617,25 +605,20 @@ useEffect(() => {
                 </DialogClose>
              </div>
              {/* Screen-reader only title */}
-             <DialogTitle className="sr-only">{episode.title}</DialogTitle>
-             <DialogDescription className="sr-only">{`'${episode.title}' 영상 재생 및 학습 활동`}</DialogDescription>
+            <DialogTitle className="sr-only">{`영상 플레이어: ${episode.title}`}</DialogTitle>
+            <DialogDescription className="sr-only">{`'${episode.title}' 영상을 재생하고 관련 학습 활동을 할 수 있는 다이얼로그입니다.`}</DialogDescription>
         </DialogHeader>
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:px-6 md:pb-6 overflow-hidden bg-muted/50">
             {/* Video Player Section */}
             <Card className="col-span-10 md:col-span-7 flex flex-col bg-black md:rounded-xl overflow-hidden shadow-lg border-border">
                 <div className="w-full flex-grow relative" ref={videoContainerRef}>
-                    <div className="absolute inset-0 flex items-center justify-center text-white bg-black/50 p-4 rounded-lg">
-                        {isLoading && <Loader className="h-12 w-12 text-white animate-spin" />}
-                        {playerError && !isLoading && <div>{playerError}</div>}
-                    </div>
-                    {!isLoading && !playerError && (
-                         <video
-                            ref={videoRef}
-                            className="w-full h-full"
-                            autoPlay
-                            playsInline
-                        />
+                    {(isLoading || playerError) && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/50 p-4 text-center">
+                            {isLoading && <Loader className="h-12 w-12 text-white animate-spin mb-4" />}
+                            {playerError && <div>{playerError}</div>}
+                        </div>
                     )}
+                    <video ref={videoRef} className="w-full h-full" autoPlay playsInline />
                 </div>
             </Card>
 
@@ -660,7 +643,7 @@ useEffect(() => {
                         <TextbookView />
                     </TabsContent>
                     <TabsContent value="bookmark" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
-                        {user ? <ScrollArea className="h-full w-full"><BookmarkView episode={episode} user={user} videoElement={shakaPlayerRef.current?.videoElement ?? null}/></ScrollArea> : <div className="flex-grow flex items-center justify-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
+                        {user ? <ScrollArea className="h-full w-full"><BookmarkView episode={episode} user={user} videoElement={shakaPlayerRef.current?.getMediaElement() ?? null}/></ScrollArea> : <div className="flex-grow flex items-center justify-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
                 </Tabs>
             </Card>
