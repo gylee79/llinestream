@@ -9,7 +9,7 @@ import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/fire
 import * as admin from "firebase-admin";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
-import { TranscoderServiceClient } from '@google-cloud/video-transcoder').v1;
+import { TranscoderServiceClient } from '@google-cloud/video-transcoder';
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
