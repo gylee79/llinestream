@@ -1,7 +1,7 @@
-
 import * as admin from 'firebase-admin';
 import { getApps, App } from 'firebase-admin/app';
 import { firebaseConfig } from '@/firebase/config';
+import serviceAccount from './service-account.json';
 
 // This is a global variable to hold the initialized Firebase Admin app instance.
 // It ensures that we only initialize the app once per server instance.
@@ -27,36 +27,25 @@ export function initializeAdminApp(): App {
     return adminApp;
   }
 
-  // Retrieve credentials from environment variables.
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const projectId = firebaseConfig.projectId;
-  const storageBucket = firebaseConfig.storageBucket;
-
-  // Check if all necessary environment variables are set. This is a critical check.
-  if (!privateKey || !clientEmail || !projectId || !storageBucket) {
-    const errorMessage = 'Firebase Admin SDK is not configured. Missing required environment variables: FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL, NEXT_PUBLIC_FIREBASE_PROJECT_ID, or NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET.';
-    console.error(errorMessage);
-    // In a production environment, this should throw an error to prevent the app from running in a misconfigured state.
-    throw new Error(errorMessage);
-  }
+  // Explicitly use the imported service account credentials
+  const serviceAccountCredentials = {
+    projectId: serviceAccount.project_id,
+    clientEmail: serviceAccount.client_email,
+    privateKey: serviceAccount.private_key,
+  };
   
   // Try to initialize the Admin SDK with the retrieved credentials.
   try {
     const newAdminApp = admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId,
-        clientEmail,
-        privateKey,
-      }),
-      storageBucket: storageBucket,
+      credential: admin.credential.cert(serviceAccountCredentials),
+      storageBucket: firebaseConfig.storageBucket,
     });
 
-    console.log('Firebase Admin SDK initialized successfully.');
+    console.log('Firebase Admin SDK initialized successfully using service-account.json.');
     adminApp = newAdminApp; // Store the new instance in our global variable.
     return adminApp;
   } catch (error) {
-    console.error('Error initializing Firebase Admin SDK:', error);
+    console.error('Error initializing Firebase Admin SDK from service-account.json:', error);
     // If initialization fails, throw an error with a clear message.
     throw new Error('Could not initialize Firebase Admin SDK. Please check your service account credentials.');
   }
