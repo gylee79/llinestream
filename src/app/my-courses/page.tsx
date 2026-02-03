@@ -125,8 +125,8 @@ const MyCoursesPage = () => {
                 <Card className="overflow-hidden">
                   <AccordionTrigger className="w-full text-left p-4 hover:no-underline bg-muted/50">
                     <div className="flex items-center gap-4">
-                        <div className="relative w-24 aspect-video flex-shrink-0">
-                            <Image src={course.thumbnailUrl} alt={course.name} fill sizes="96px" className="object-cover rounded-md" />
+                        <div className="relative w-20 aspect-video flex-shrink-0">
+                            <Image src={course.thumbnailUrl} alt={course.name} fill sizes="80px" className="object-cover rounded-md" />
                         </div>
                         <div className="flex-1">
                             <h2 className="font-bold text-lg">{course.name}</h2>
