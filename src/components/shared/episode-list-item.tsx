@@ -13,9 +13,9 @@ import { doc } from 'firebase/firestore';
 import { toJSDate } from '@/lib/date-helpers';
 import dynamic from 'next/dynamic';
 
-const VideoPlayerDialog = dynamic(() => import('@/components/shared/video-player-dialog'));
-const PaymentDialog = dynamic(() => import('@/components/shared/payment-dialog'));
-const EpisodeCommentDialog = dynamic(() => import('@/components/shared/episode-comment-dialog'));
+const VideoPlayerDialog = dynamic(() => import('@/components/shared/video-player-dialog'), { ssr: false });
+const PaymentDialog = dynamic(() => import('@/components/shared/payment-dialog'), { ssr: false });
+const EpisodeCommentDialog = dynamic(() => import('@/components/shared/episode-comment-dialog'), { ssr: false });
 
 
 const formatDuration = (seconds: number) => {
