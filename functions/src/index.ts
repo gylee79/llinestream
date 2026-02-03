@@ -7,6 +7,7 @@
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
+import { getApps } from 'firebase-admin/app';
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
 import { TranscoderServiceClient } from '@google-cloud/video-transcoder';
@@ -16,11 +17,10 @@ import * as fs from "fs";
 import * as crypto from "crypto";
 
 // 0. Firebase Admin & Global Options 초기화
-// Use a named app instance to avoid conflicts with other initializations.
-if (admin.apps.length === 0) {
-    admin.initializeApp();
+// Initialize the default app if it hasn't been initialized yet.
+if (!getApps().length) {
+  admin.initializeApp();
 }
-
 
 setGlobalOptions({
   region: "us-central1",
