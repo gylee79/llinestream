@@ -130,6 +130,7 @@ const MyCoursesPage = () => {
                         </div>
                         <div className="flex-1">
                             <h2 className="font-bold text-lg">{course.name}</h2>
+                            <p className="text-sm text-muted-foreground line-clamp-1">{course.description}</p>
                         </div>
                     </div>
                   </AccordionTrigger>
