@@ -1,3 +1,4 @@
+
 /// <reference types="shaka-player" />
 
 'use client';
@@ -519,7 +520,7 @@ useEffect(() => {
     const manifestUrl = episode.manifestUrl;
     if (!isOpen || !manifestUrl || !videoRef.current || !videoContainerRef.current) {
         if (isOpen && episode.packagingStatus !== 'completed') {
-            onPlayerError({} as shaka.util.Error); // Trigger a user-friendly message
+            onPlayerError({} as shaka.util.Error);
         }
         return;
     }
@@ -532,28 +533,36 @@ useEffect(() => {
         try {
             await player.attach(video);
             
-            player.configure({
-                drm: {
-                    servers: {
-                    'com.widevine.alpha': process.env.NEXT_PUBLIC_WIDEVINE_LICENSE_URL || ''
-                    }
-                },
-                streaming: {
-                    rebufferingGoal: 2,
-                    bufferingGoal: 10,
-                },
+            // HLS AES-128: The key URI in the manifest might not be directly fetchable.
+            // This filter intercepts the key request and replaces the URI with a working, signed URL.
+            player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
+              if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT || type === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
+                  // For AES-128, the key is often referenced in the manifest and fetched like a segment.
+                  // The URI in the manifest might be a placeholder or a non-public URI.
+                  const keyUri = request.uris[0];
+                  
+                  // This is our hook. If the player is trying to fetch the key...
+                  if (keyUri && (keyUri.startsWith('gs://') || keyUri.endsWith('enc.key'))) {
+                      // ...and we have a signed URL from Firestore...
+                      if (episode.keyServerUrl) {
+                          // ...we replace the URI with the valid, signed URL.
+                          request.uris[0] = episode.keyServerUrl;
+                      } else {
+                           // If we don't have a key URL, we must fail the request.
+                           return Promise.reject(new shaka.util.Error(
+                              shaka.util.Error.Severity.CRITICAL,
+                              shaka.util.Error.Category.NETWORK,
+                              shaka.util.Error.Code.BAD_HTTP_STATUS,
+                              '암호화된 콘텐츠이지만 키 URL이 제공되지 않았습니다.'
+                          ));
+                      }
+                  }
+              }
             });
 
             player.addEventListener('error', (event: any) => onPlayerError(event.detail));
-
             const ui = new shaka.ui.Overlay(player, videoContainer, video);
-            const controls = ui.getControls();
-            if (controls) {
-              (controls as any).getPlayer = () => player; 
-            }
-
             shakaPlayerRef.current = { player, videoElement: video };
-
             await player.load(manifestUrl);
 
             if (vttSrc) {
@@ -571,7 +580,7 @@ useEffect(() => {
         player?.destroy();
         shakaPlayerRef.current = null;
     };
-}, [isOpen, episode.manifestUrl, episode.packagingStatus, vttSrc]);
+}, [isOpen, episode.manifestUrl, episode.packagingStatus, episode.keyServerUrl, vttSrc]);
 
 
   return (

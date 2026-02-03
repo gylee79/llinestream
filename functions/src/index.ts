@@ -2,7 +2,7 @@
 /**
  * @fileoverview Video Analysis with Gemini & Transcoder API using Firebase Cloud Functions v2.
  * Gemini Model: gemini-2.5-flash
- * Transcoder API for DRM packaging.
+ * Transcoder API for HLS Packaging with AES-128 encryption.
  */
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
@@ -13,6 +13,7 @@ import { TranscoderServiceClient } from '@google-cloud/video-transcoder').v1;
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
+import * as crypto from "crypto";
 
 // 0. Firebase Admin & Global Options 초기화
 if (!admin.apps.length) {
@@ -62,16 +63,39 @@ function initializeTools() {
 }
 
 
-// 3. DRM Packaging with Transcoder API
-async function createDrmPackagingJob(episodeId: string, inputUri: string, docRef: admin.firestore.DocumentReference): Promise<void> {
+// 3. HLS Packaging with Transcoder API (AES-128)
+async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef: admin.firestore.DocumentReference): Promise<void> {
     const { transcoderClient: client } = initializeTools();
     const projectId = await client.getProjectId();
-    const location = 'us-central1'; // Or your preferred location
+    const location = 'us-central1';
 
     const outputFolder = `episodes/${episodeId}/packaged/`;
     const outputUri = `gs://${bucket.name}/${outputFolder}`;
 
-    console.log(`[${episodeId}] Starting Transcoder job for ${inputUri}`);
+    // --- AES-128 Encryption Key Generation & Upload ---
+    // 1. Generate a random 16-byte (128-bit) key.
+    const aesKey = crypto.randomBytes(16);
+    
+    // 2. Define the path where the key will be stored securely.
+    const keyFileName = 'enc.key';
+    const keyStoragePath = `episodes/${episodeId}/keys/${keyFileName}`;
+    const keyFile = bucket.file(keyStoragePath);
+    
+    // 3. Upload the raw key to Firebase Storage. This file should have restrictive permissions.
+    await keyFile.save(aesKey);
+    console.log(`[${episodeId}] AES-128 key uploaded to ${keyStoragePath}`);
+    
+    // 4. Create the full gs:// URI for the key, which the Transcoder API needs.
+    const keyStorageUri = `gs://${bucket.name}/${keyStoragePath}`;
+    
+    // 5. Generate a short-lived signed URL for the key. The client player will use this.
+    const signedUrlExpireTime = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days validity
+    const [signedKeyUrl] = await keyFile.getSignedUrl({
+        action: 'read',
+        expires: signedUrlExpireTime
+    });
+
+    console.log(`[${episodeId}] Starting HLS packaging job for ${inputUri}`);
     await docRef.update({ packagingStatus: "processing" });
 
     const request = {
@@ -82,59 +106,43 @@ async function createDrmPackagingJob(episodeId: string, inputUri: string, docRef
             config: {
                 muxStreams: [
                     {
-                        key: 'sd-video',
-                        container: 'mp4',
+                        key: 'sd-hls',
+                        container: 'ts',
                         elementaryStreams: ['sd-video-stream', 'audio-stream'],
                         segmentSettings: {
-                          individualSegments: true,
-                          segmentDuration: { seconds: 4 },
+                            individualSegments: true,
+                            segmentDuration: { seconds: 4 },
                         },
+                        encryptionId: 'aes-128-encryption',
                     },
                 ],
                 elementaryStreams: [
                     {
                         key: 'sd-video-stream',
                         videoStream: {
-                            h264: {
-                                heightPixels: 480,
-                                widthPixels: 854,
-                                bitrateBps: 1000000,
-                                frameRate: 30,
-                            },
+                            h264: { heightPixels: 480, widthPixels: 854, bitrateBps: 1000000, frameRate: 30 },
                         },
                     },
                     {
                         key: 'audio-stream',
-                        audioStream: {
-                            codec: 'aac',
-                            bitrateBps: 128000,
-                        },
+                        audioStream: { codec: 'aac', bitrateBps: 128000 },
                     },
                 ],
                 manifests: [
                     {
-                        fileName: 'manifest.mpd',
-                        type: 'DASH',
-                        muxStreams: ['sd-video'],
+                        fileName: 'manifest.m3u8',
+                        type: 'HLS',
+                        muxStreams: ['sd-hls'],
                     },
                 ],
-                 encryptions: [
+                encryptions: [
                     {
-                        id: 'widevine-drm',
-                        drmSystems: {
-                            widevine: {
-                                // This uses Common Encryption (CENC), the standard for multi-DRM.
-                                // The key itself is defined below in 'secretManagerKeySource'.
-                            },
+                        id: 'aes-128-encryption',
+                        aes128: {
+                            // The Transcoder service reads this key to encrypt the video content.
+                            uri: keyStorageUri,
                         },
-                        // The Transcoder will use the key stored in Google Secret Manager to encrypt the video.
-                        // Your chosen DRM provider (e.g., PallyCon, EZDRM) must be configured with this same key
-                        // so it can issue valid licenses to users.
-                        // The secret named 'drm-aes-key' should contain a 32-byte hexadecimal string.
-                        secretManagerKeySource: {
-                            secretVersion: `projects/${projectId}/secrets/drm-aes-key/versions/1`,
-                        }
-                    }
+                    },
                 ],
             },
         },
@@ -144,9 +152,8 @@ async function createDrmPackagingJob(episodeId: string, inputUri: string, docRef
         const [response] = await client.createJob(request);
         console.log(`[${episodeId}] Transcoder job created: ${response.name}`);
         
-        // Polling for job completion
         let jobSucceeded = false;
-        for (let i = 0; i < 60; i++) { // Poll for up to 10 minutes
+        for (let i = 0; i < 60; i++) {
             await new Promise(resolve => setTimeout(resolve, 10000)); 
             const [job] = await client.getJob({ name: response.name });
 
@@ -154,7 +161,8 @@ async function createDrmPackagingJob(episodeId: string, inputUri: string, docRef
                 console.log(`[${episodeId}] Transcoder job succeeded.`);
                 await docRef.update({
                     packagingStatus: 'completed',
-                    manifestUrl: `${outputUri}manifest.mpd`,
+                    manifestUrl: `${outputUri}manifest.m3u8`.replace(`gs://${bucket.name}/`, `https://storage.googleapis.com/${bucket.name}/`),
+                    keyServerUrl: signedKeyUrl, // Save the signed URL for the client player
                 });
                 jobSucceeded = true;
                 break;
@@ -168,8 +176,8 @@ async function createDrmPackagingJob(episodeId: string, inputUri: string, docRef
         }
 
     } catch (error: any) {
-        console.error(`[${episodeId}] DRM packaging failed:`, error);
-        await docRef.update({ packagingStatus: "failed", aiProcessingError: error.message || 'DRM packaging failed.' });
+        console.error(`[${episodeId}] HLS packaging failed:`, error);
+        await docRef.update({ packagingStatus: "failed", aiProcessingError: error.message || 'HLS packaging failed.' });
     }
 }
 
@@ -181,7 +189,6 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
     const change = event.data;
     if (!change) return;
 
-    // 문서가 삭제되었거나, 데이터가 없는 경우는 무시
     if (!change.after.exists) {
       console.log(`[${event.params.episodeId}] Document deleted, skipping.`);
       return;
@@ -190,7 +197,6 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
     const afterData = change.after.data() as EpisodeData;
     const beforeData = change.before.exists ? change.before.data() as EpisodeData : null;
 
-    // === 트리거 로직: 'pending' 상태일 때만 실행 ===
     if (afterData.aiProcessingStatus !== 'pending' || (beforeData && beforeData.aiProcessingStatus === 'pending')) {
       return;
     }
@@ -200,7 +206,6 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
     
     console.log(`✨ [${episodeId}] New analysis job detected. Starting...`);
 
-    // 즉시 'processing'으로 상태 변경하여 중복 실행 방지
     await docRef.update({ aiProcessingStatus: "processing" });
     
     const filePath = afterData.filePath;
@@ -210,15 +215,15 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
     }
     const inputUriForTranscoder = `gs://${bucket.name}/${filePath}`;
     
+    // 비디오 AI 분석과 HLS 패키징을 병렬로 실행합니다.
     const aiAnalysisPromise = runAiAnalysis(episodeId, filePath, docRef);
-    const drmPackagingPromise = createDrmPackagingJob(episodeId, inputUriForTranscoder, docRef);
+    const hlsPackagingPromise = createHlsPackagingJob(episodeId, inputUriForTranscoder, docRef);
 
     try {
-        await Promise.all([aiAnalysisPromise, drmPackagingPromise]);
-        console.log(`✅ [${episodeId}] All jobs (AI & DRM) completed successfully!`);
+        await Promise.all([aiAnalysisPromise, hlsPackagingPromise]);
+        console.log(`✅ [${episodeId}] All jobs (AI & HLS) completed successfully!`);
     } catch(error: any) {
         console.error(`❌ [${episodeId}] One of the processing jobs failed.`, error);
-        // Error is already set within individual functions
     }
 });
 
@@ -324,7 +329,7 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
           courseId: afterData.courseId,
           classificationId: courseDoc.data()!.classificationId,
           fieldId,
-          content: analysisJsonString, // Store full analysis as JSON string
+          content: analysisJsonString,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
@@ -334,7 +339,7 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
         aiProcessingStatus: "completed",
         aiModel: modelName,
         transcript: output.transcript || "",
-        aiGeneratedContent: analysisJsonString, // Store full analysis as JSON string
+        aiGeneratedContent: analysisJsonString,
         vttPath: vttPath,
         aiProcessingError: null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -354,7 +359,7 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
         aiProcessingStatus: "failed",
         aiProcessingError: error.message || String(error)
       });
-      throw error; // Propagate error to Promise.all
+      throw error;
     } finally {
       if (fs.existsSync(tempFilePath)) { try { fs.unlinkSync(tempFilePath); } catch (e) {} }
       if (uploadedFile) { try { await localFileManager.deleteFile(uploadedFile.name); } catch (e) {} }
@@ -372,12 +377,7 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
     const data = snap.data() as EpisodeData;
     if (!data) return;
     
-    // Delete packaged content folder
-    const packagedPath = `episodes/${episodeId}/packaged/`;
-    await bucket.deleteFiles({ prefix: packagedPath }).catch(() => {});
-    
-    const paths = [data.filePath, data.defaultThumbnailPath, data.customThumbnailPath, data.vttPath];
-    await Promise.all(paths.filter(Boolean).map(p => bucket.file(p!).delete().catch(() => {})));
+    await bucket.deleteFiles({ prefix: `episodes/${episodeId}/` }).catch(() => {});
     
     const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
     await aiChunkRef.delete().catch(() => {});
