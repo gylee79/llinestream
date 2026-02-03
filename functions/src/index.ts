@@ -1,4 +1,3 @@
-
 /**
  * @fileoverview Video Analysis with Gemini & Transcoder API using Firebase Cloud Functions v2.
  * Gemini Model: gemini-2.5-flash

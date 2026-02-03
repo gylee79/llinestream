@@ -3,9 +3,8 @@
 import * as admin from 'firebase-admin';
 import { getApps, App } from 'firebase-admin/app';
 import { firebaseConfig } from '@/firebase/config';
-import serviceAccountFromFile from './service-account.json';
 
-const ADMIN_APP_NAME = 'firebase-admin-app-rsc'; // Unique name for RSC environment
+const ADMIN_APP_NAME = 'firebase-admin-app-rsc';
 
 /**
  * Initializes and/or returns the singleton instance of the Firebase Admin SDK for RSC.
@@ -22,15 +21,15 @@ export async function initializeAdminApp(): Promise<App> {
     return existingApp;
   }
 
-  // Prioritize environment variables for credentials
+  // Use environment variables for credentials
   const credentials = {
-    projectId: process.env.FIREBASE_PROJECT_ID || serviceAccountFromFile.project_id,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL || serviceAccountFromFile.client_email,
-    privateKey: (process.env.FIREBASE_PRIVATE_KEY || serviceAccountFromFile.private_key).replace(/\\n/g, '\n'),
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
   };
 
   if (!credentials.projectId || !credentials.clientEmail || !credentials.privateKey) {
-    throw new Error('Firebase Admin SDK credentials are not set. Please check your .env file or service-account.json.');
+    throw new Error('Firebase Admin SDK credentials (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY) are not set in environment variables.');
   }
   
   // Try to initialize the Admin SDK with the retrieved credentials and a unique name.

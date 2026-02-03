@@ -120,6 +120,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             customThumbnailPath: customThumbnailPath || '',
             createdAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
             aiProcessingStatus: 'pending', // Set initial status to 'pending'
+            packagingStatus: 'pending', // Also set packaging status
             aiProcessingError: null,
             aiGeneratedContent: null,
             transcript: null,
@@ -216,6 +217,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             dataToUpdate.vttUrl = admin.firestore.FieldValue.delete();
             dataToUpdate.vttPath = admin.firestore.FieldValue.delete();
             dataToUpdate.aiProcessingStatus = 'pending';
+            dataToUpdate.packagingStatus = 'pending'; // Also reset packaging status
             dataToUpdate.aiProcessingError = null;
         }
 

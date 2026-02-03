@@ -244,17 +244,15 @@ const BookmarkItem = ({ bookmark, onSeek, onDelete }: { bookmark: Bookmark, onSe
         
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         
-        timeoutRef.current = setTimeout(() => {
+        timeoutRef.current = setTimeout(async () => {
             if (!user) return;
-            updateBookmarkNote({ userId: user.id, bookmarkId: bookmark.id, note: newNote })
-                .then(result => {
-                    if (!result.success) {
-                        toast({ variant: 'destructive', title: '메모 저장 실패', description: result.message });
-                    }
-                })
-                .finally(() => {
-                    setIsSaving(false);
-                });
+            try {
+                await updateBookmarkNote({ userId: user.id, bookmarkId: bookmark.id, note: newNote });
+            } catch (error) {
+                 toast({ variant: 'destructive', title: '메모 저장 실패', description: error instanceof Error ? error.message : '알 수 없는 오류' });
+            } finally {
+                setIsSaving(false);
+            }
         }, 1500); // 1.5-second debounce
     };
 
@@ -274,7 +272,7 @@ const BookmarkItem = ({ bookmark, onSeek, onDelete }: { bookmark: Bookmark, onSe
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={() => onDelete(bookmark.id)}
+              onClick={async () => await onDelete(bookmark.id)}
             >
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
@@ -290,8 +288,7 @@ const BookmarkView = ({ episode, user, videoElement }: { episode: Episode; user:
     const bookmarksQuery = useMemoFirebase(() => {
         if (!user || !firestore) return null;
         return query(
-            collection(firestore, 'bookmarks'),
-            where('userId', '==', user.id),
+            collection(firestore, 'users', user.id, 'bookmarks'),
             where('episodeId', '==', episode.id),
             orderBy('timestamp', 'asc')
         );
@@ -313,7 +310,7 @@ const BookmarkView = ({ episode, user, videoElement }: { episode: Episode; user:
         }
     }, [bookmarksError, toast]);
 
-    const handleAddBookmark = () => {
+    const handleAddBookmark = async () => {
         if (!videoElement || !user || !firestore) return;
         
         videoElement.pause();
@@ -326,40 +323,42 @@ const BookmarkView = ({ episode, user, videoElement }: { episode: Episode; user:
         }
 
         setIsSaving(true);
-        addBookmark({
-            userId: user.id,
-            episodeId: episode.id,
-            courseId: episode.courseId,
-            timestamp: currentTime,
-            note: '',
-        }).then((result) => {
+        try {
+            const result = await addBookmark({
+                userId: user.id,
+                episodeId: episode.id,
+                courseId: episode.courseId,
+                timestamp: currentTime,
+                note: '',
+            });
             if (result.success) {
                 toast({ title: '성공', description: '책갈피가 추가되었습니다.' });
             } else {
                 toast({ variant: 'destructive', title: '오류', description: result.message });
             }
-        }).catch(error => {
+        } catch (error) {
             toast({ variant: 'destructive', title: '오류', description: '책갈피 추가 중 예외가 발생했습니다.' });
             console.error(error);
-        }).finally(() => {
+        } finally {
             setIsSaving(false);
             videoElement.play();
-        });
+        }
     };
 
-    const handleDeleteBookmark = (bookmarkId: string) => {
+    const handleDeleteBookmark = async (bookmarkId: string) => {
         if (!user || !firestore) return;
 
-        deleteBookmark(user.id, bookmarkId).then(result => {
-            if (result.success) {
+        try {
+            const result = await deleteBookmark(user.id, bookmarkId);
+             if (result.success) {
                 toast({ title: '성공', description: '북마크가 삭제되었습니다.' });
             } else {
                 toast({ variant: 'destructive', title: '오류', description: result.message });
             }
-        }).catch(error => {
+        } catch(error) {
             toast({ variant: 'destructive', title: '오류', description: '북마크 삭제 중 예외가 발생했습니다.' });
             console.error(error);
-        });
+        }
     };
     
     const handleSeekTo = (time: number) => {
@@ -432,14 +431,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
 
-  const logView = React.useCallback(() => {
+  const logView = React.useCallback(async () => {
     if (!user || !startTimeRef.current || viewLoggedRef.current) return;
     viewLoggedRef.current = true;
     const endTime = new Date();
     const durationWatched = (endTime.getTime() - startTimeRef.current.getTime()) / 1000;
 
     if (durationWatched > 1) {
-      logEpisodeView({
+      await logEpisodeView({
         userId: user.id,
         userName: user.name,
         userEmail: user.email,
@@ -506,7 +505,22 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             setPlayerError(null);
 
             if (episode.packagingStatus !== 'completed') {
-                const statusMessage = `영상을 재생 가능하도록 암호화하고 있습니다. 이 작업은 영상 길이에 따라 몇 분 정도 소요될 수 있습니다.\n잠시 후 다시 시도해주세요. (상태: ${episode.packagingStatus || 'unknown'})`;
+                const status = episode.packagingStatus || 'unknown';
+                let statusMessage: string;
+
+                switch (status) {
+                    case 'processing':
+                    case 'pending':
+                        statusMessage = `영상을 재생할 수 있도록 처리하고 있습니다. 이 작업은 영상 길이에 따라 몇 분 정도 소요될 수 있습니다.\n잠시 후 다시 시도해 주세요. (상태: ${status})`;
+                        break;
+                    case 'failed':
+                        statusMessage = `영상 처리 중 오류가 발생했습니다. 관리자에게 문의해 주세요. (오류: ${episode.packagingError || '알 수 없음'})`;
+                        break;
+                    default: // 'unknown' or any other unexpected value
+                        statusMessage = '영상이 아직 처리 중이거나 상태를 알 수 없습니다. 잠시 후 다시 시도해 주세요.';
+                        break;
+                }
+
                 setPlayerError(statusMessage);
                 setIsLoading(false);
                 return;
