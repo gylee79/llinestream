@@ -13,7 +13,6 @@ import { TranscoderServiceClient } from '@google-cloud/video-transcoder').v1;
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
-import { v4 as uuidv4 } from 'uuid';
 
 // 0. Firebase Admin & Global Options 초기화
 if (!admin.apps.length) {
@@ -72,12 +71,6 @@ async function createDrmPackagingJob(episodeId: string, inputUri: string, docRef
     const outputFolder = `episodes/${episodeId}/packaged/`;
     const outputUri = `gs://${bucket.name}/${outputFolder}`;
 
-    // IMPORTANT: In a real production environment, these keys should be securely generated
-    // and managed by your DRM provider (e.g., PallyCon, EZDRM).
-    // This example uses placeholder keys for demonstration purposes.
-    const keyId = Buffer.from(uuidv4().replace(/-/g, ''), 'hex').toString('base64');
-    const keyValue = Buffer.from(uuidv4().replace(/-/g, ''), 'hex').toString('base64');
-
     console.log(`[${episodeId}] Starting Transcoder job for ${inputUri}`);
     await docRef.update({ packagingStatus: "processing" });
 
@@ -130,12 +123,16 @@ async function createDrmPackagingJob(episodeId: string, inputUri: string, docRef
                         id: 'widevine-drm',
                         drmSystems: {
                             widevine: {
-                                keyProvider: 'common-system', // Use CENC Common System
+                                // This uses Common Encryption (CENC), the standard for multi-DRM.
+                                // The key itself is defined below in 'secretManagerKeySource'.
                             },
                         },
+                        // The Transcoder will use the key stored in Google Secret Manager to encrypt the video.
+                        // Your chosen DRM provider (e.g., PallyCon, EZDRM) must be configured with this same key
+                        // so it can issue valid licenses to users.
+                        // The secret named 'drm-aes-key' should contain a 32-byte hexadecimal string.
                         secretManagerKeySource: {
                             secretVersion: `projects/${projectId}/secrets/drm-aes-key/versions/1`,
-                            // The secret should contain a 32-byte string for AES-128 key
                         }
                     }
                 ],
