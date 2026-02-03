@@ -253,7 +253,7 @@ const BookmarkItem = ({ bookmark, onSeek, onDelete }: { bookmark: Bookmark, onSe
 
     return (
         <li className="group flex items-center gap-2 p-2 bg-white rounded-md border">
-            <Button variant="ghost" onClick={() => onSeek(bookmark.timestamp)} className="font-mono text-primary font-semibold px-0 h-8 text-xs">
+            <Button variant="ghost" onClick={() => onSeek(bookmark.timestamp)} className="basis-1/5 flex-shrink-0 flex-grow-0 font-mono text-primary font-semibold px-0 h-8 text-xs">
                 [{formatDuration(bookmark.timestamp)}]
             </Button>
             <Input
