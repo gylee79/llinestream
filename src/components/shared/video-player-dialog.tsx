@@ -1,3 +1,4 @@
+/// <reference types="shaka-player" />
 
 'use client';
 
@@ -7,7 +8,7 @@ import { Button } from '../ui/button';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
-import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark as BookmarkIcon, Trash2 } from 'lucide-react';
+import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark as BookmarkIcon, Trash2, Download } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { cn, getPublicUrl, formatDuration } from '@/lib/utils';
@@ -25,6 +26,10 @@ import Link from 'next/link';
 import { Skeleton } from '../ui/skeleton';
 import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/bookmark-actions';
 import { Input } from '../ui/input';
+
+// Import Shaka Player
+import shaka from 'shaka-player/dist/shaka-player.ui.js';
+import 'shaka-player/dist/controls.css';
 
 // ========= TYPES AND SUB-COMPONENTS (Self-contained) =========
 
@@ -117,8 +122,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
         }
 
         const q = query(
-            collection(firestore, 'chat_logs'), 
-            where('userId', '==', user.id),
+            collection(firestore, 'users', user.id, 'chats'), 
             where('episodeId', '==', episode.id), 
             orderBy('createdAt', 'asc')
         );
@@ -153,7 +157,8 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
         setUserQuestion('');
         startTransition(async () => {
             try {
-                await askVideoTutor({ episodeId: episode.id, question: questionContent, userId: user.id });
+                const result = await askVideoTutor({ episodeId: episode.id, question: questionContent, userId: user.id });
+                // The onSnapshot listener will automatically add the new message from the database
             } catch (error) {
                 setMessages(prev => [...prev, { id: uuidv4(), role: 'model', content: "죄송합니다, 답변 생성 중 오류가 발생했습니다.", createdAt: new Date() }]);
             }
@@ -276,7 +281,7 @@ const BookmarkItem = ({ bookmark, onSeek, onDelete }: { bookmark: Bookmark, onSe
     );
 }
 
-const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: User, videoRef: React.RefObject<HTMLVideoElement> }) => {
+const BookmarkView = ({ episode, user, videoElement }: { episode: Episode; user: User, videoElement: HTMLVideoElement | null }) => {
     const firestore = useFirestore();
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
@@ -308,14 +313,14 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
     }, [bookmarksError, toast]);
 
     const handleAddBookmark = () => {
-        if (!videoRef.current || !user || !firestore) return;
+        if (!videoElement || !user || !firestore) return;
         
-        videoRef.current.pause();
-        const currentTime = Math.floor(videoRef.current.currentTime);
+        videoElement.pause();
+        const currentTime = Math.floor(videoElement.currentTime);
 
         if (bookmarks?.some(b => b.timestamp === currentTime)) {
             toast({ variant: 'destructive', title: '오류', description: '이미 같은 시간에 책갈피가 존재합니다.' });
-            if (videoRef.current) videoRef.current.play();
+            videoElement.play();
             return;
         }
 
@@ -337,7 +342,7 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
             console.error(error);
         }).finally(() => {
             setIsSaving(false);
-            if (videoRef.current) videoRef.current.play();
+            videoElement.play();
         });
     };
 
@@ -357,9 +362,9 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
     };
     
     const handleSeekTo = (time: number) => {
-        if (videoRef.current) {
-            videoRef.current.currentTime = time;
-            videoRef.current.play();
+        if (videoElement) {
+            videoElement.currentTime = time;
+            videoElement.play();
         }
     };
     
@@ -409,15 +414,20 @@ interface VideoPlayerDialogProps {
 
 export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
   const { user } = useUser();
+  const { toast } = useToast();
   const firestore = useFirestore();
-  const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [manifestSrc, setManifestSrc] = useState<string | null>(null);
   const [vttSrc, setVttSrc] = useState<string | null>(null);
   const [isLoadingSrc, setIsLoadingSrc] = useState(true);
-  const [srcError, setSrcError] = useState<string | null>(null);
+  const [playerError, setPlayerError] = useState<string | null>(null);
 
   const startTimeRef = useRef<Date | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const viewLoggedRef = useRef(false);
+
+  const shakaPlayerRef = useRef<{ player: shaka.Player; videoElement: HTMLVideoElement } | null>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
@@ -442,6 +452,13 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     }
   }, [user, episode]);
 
+  const handleDownload = () => {
+    toast({
+        title: "다운로드 기능 준비 중",
+        description: "DRM 콘텐츠 오프라인 저장은 Shaka Player의 Storage API를 통해 구현됩니다. 이 기능은 현재 개발 중입니다."
+    });
+  };
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -449,8 +466,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     async function loadSources() {
         if (unmounted) return;
         setIsLoadingSrc(true);
-        setSrcError(null);
-        setVideoSrc(null);
+        setPlayerError(null);
+        setManifestSrc(null);
         setVttSrc(null);
 
         try {
@@ -458,13 +475,17 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             if (!bucketName) {
                 throw new Error("Firebase Storage bucket 설정이 누락되었습니다.");
             }
+
             if (episode.filePath) {
-              const publicVideoUrl = getPublicUrl(bucketName, episode.filePath);
+              const manifestPath = episode.filePath.replace(/\.[^/.]+$/, "") + ".mpd";
+              const publicManifestUrl = getPublicUrl(bucketName, manifestPath);
               if (unmounted) return;
-              setVideoSrc(publicVideoUrl);
+              setManifestSrc(publicManifestUrl);
             } else {
-              throw new Error("비디오 파일 경로를 찾을 수 없습니다.");
+              setManifestSrc(episode.videoUrl); // Fallback for non-packaged content
+              console.warn("No filePath found for episode. DRM will not be applied. Falling back to videoUrl.");
             }
+
             if (episode.vttPath) {
               const publicVttUrl = getPublicUrl(bucketName, episode.vttPath);
               if (unmounted) return;
@@ -472,7 +493,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             }
         } catch(e: any) {
             if (unmounted) return;
-            setSrcError(e.message || '소스 로딩 중 오류 발생');
+            setPlayerError(e.message || '소스 로딩 중 오류 발생');
         } finally {
             if (unmounted) return;
             setIsLoadingSrc(false);
@@ -483,12 +504,78 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     startTimeRef.current = new Date();
     viewLoggedRef.current = false;
 
-    // This cleanup runs when the dialog closes (isOpen becomes false) or the component unmounts
     return () => { 
         unmounted = true; 
         logView();
     };
 }, [isOpen, episode, logView]);
+
+const playerConfiguration = {
+  drm: {
+    servers: {
+      'com.widevine.alpha': process.env.NEXT_PUBLIC_WIDEVINE_LICENSE_URL || ''
+    }
+  },
+  streaming: {
+    rebufferingGoal: 2,
+    bufferingGoal: 10,
+  },
+};
+
+const onPlayerError = (error: shaka.util.Error) => {
+    console.error("Shaka Player Error:", error.code, error);
+    let message = `플레이어 오류가 발생했습니다 (코드: ${error.code}).`;
+    if (error.category === shaka.util.Error.Category.DRM) {
+        message = "콘텐츠 라이선스를 가져오는 데 실패했습니다. DRM 설정을 확인해주세요.";
+    } else if (error.category === shaka.util.Error.Category.NETWORK) {
+        message = "네트워크 오류로 인해 비디오를 불러올 수 없습니다.";
+    }
+    setPlayerError(message);
+};
+
+useEffect(() => {
+    if (!isOpen || !manifestSrc || !videoRef.current || !videoContainerRef.current) {
+        return;
+    }
+
+    const video = videoRef.current;
+    const videoContainer = videoContainerRef.current;
+    const player = new shaka.Player();
+
+    async function setupPlayer() {
+        try {
+            await player.attach(video);
+            
+            player.configure(playerConfiguration);
+            player.addEventListener('error', (event: any) => onPlayerError(event.detail));
+
+            const ui = new shaka.ui.Overlay(player, videoContainer, video);
+            const controls = ui.getControls();
+            if (controls) {
+              (controls as any).getPlayer = () => player; 
+            }
+
+            shakaPlayerRef.current = { player, videoElement: video };
+
+            await player.load(manifestSrc);
+
+            if (vttSrc) {
+                const tracks = await player.addTextTrackAsync(vttSrc, 'ko', 'subtitle', 'text/vtt');
+                player.setTextTrackVisibility(true);
+            }
+        } catch (e: any) {
+            onPlayerError(e);
+        }
+    }
+
+    setupPlayer();
+
+    return () => {
+        player?.destroy();
+        shakaPlayerRef.current = null;
+    };
+}, [isOpen, manifestSrc, vttSrc]);
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -496,7 +583,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[96vw] md:h-[92vh] md:rounded-2xl"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onInteractOutside={(e) => {
-          if (videoRef.current?.contains(e.target as Node)) {
+          if (shakaPlayerRef.current?.videoElement.contains(e.target as Node)) {
             e.preventDefault();
           }
         }}
@@ -513,29 +600,30 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     </>
                 )}
              </div>
+             <div className="flex items-center gap-1">
+                 <Button variant="ghost" size="icon" onClick={handleDownload} className="w-8 h-8">
+                     <Download className="h-4 w-4" />
+                 </Button>
+                <DialogClose className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-muted">
+                    <X className="h-4 w-4" />
+                </DialogClose>
+             </div>
         </div>
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:px-6 md:pb-6 overflow-hidden bg-muted/50">
             {/* Video Player Section */}
             <Card className="col-span-10 md:col-span-7 flex flex-col bg-black md:rounded-xl overflow-hidden shadow-lg border-border">
-                <div className="w-full flex-grow relative">
-                    <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-full flex-grow relative" ref={videoContainerRef}>
+                    <div className="absolute inset-0 flex items-center justify-center text-white bg-black/50 p-4 rounded-lg">
                         {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
-                        {srcError && <div className="text-white bg-black/50 p-4 rounded-lg">{srcError}</div>}
+                        {playerError && !isLoadingSrc && <div>{playerError}</div>}
                     </div>
-                    {videoSrc && !isLoadingSrc && !srcError && (
-                        <video
+                    {!isLoadingSrc && !playerError && (
+                         <video
                             ref={videoRef}
-                            key={episode.id}
-                            controls
-                            playsInline
-                            webkit-playsinline="true"
+                            className="w-full h-full"
                             autoPlay
-                            className="w-full h-full object-contain"
-                            crossOrigin="anonymous"
-                        >
-                            <source src={videoSrc} type="video/mp4" />
-                            {vttSrc && <track src={vttSrc} kind="subtitles" srcLang="ko" label="한국어" default />}
-                        </video>
+                            playsInline
+                        />
                     )}
                 </div>
             </Card>
@@ -561,7 +649,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <TextbookView />
                     </TabsContent>
                     <TabsContent value="bookmark" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
-                        {user ? <ScrollArea className="h-full w-full"><BookmarkView episode={episode} user={user} videoRef={videoRef}/></ScrollArea> : <div className="flex-grow flex items-center justify-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
+                        {user ? <ScrollArea className="h-full w-full"><BookmarkView episode={episode} user={user} videoElement={shakaPlayerRef.current?.videoElement ?? null}/></ScrollArea> : <div className="flex-grow flex items-center justify-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
                     </TabsContent>
                 </Tabs>
             </Card>
