@@ -39,7 +39,7 @@ const VideoTutorOutputSchema = z.object({
 export type VideoTutorOutput = z.infer<typeof VideoTutorOutputSchema>;
 
 export async function askVideoTutor(input: VideoTutorInput): Promise<VideoTutorOutput> {
-  return videoTutorFlow(input);
+  return await videoTutorFlow(input);
 }
 
 const videoTutorFlow = ai.defineFlow(
