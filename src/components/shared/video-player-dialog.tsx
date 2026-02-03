@@ -461,7 +461,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
   const onPlayerError = useCallback((error: any) => {
     const shakaError = error instanceof shaka.util.Error ? error : error.detail;
-    // Enhanced Debugging: Use console.dir for a detailed, expandable object view.
     console.error("Shaka Player Error Details:");
     console.dir(shakaError);
     
@@ -524,7 +523,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 return;
             }
 
-            // Key URL must be present for encrypted content.
             if (!episode.keyServerUrl) {
                  setPlayerError('암호화된 영상을 재생하는 데 필요한 키 서버 URL이 없습니다. 에피소드 데이터나 백엔드 로직을 확인해주세요.');
                  setIsLoading(false);
@@ -539,9 +537,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             try {
                 await player.attach(videoRef.current);
                 
-                // Optimized Request Filter: Intercept any request for a 'gs://' URI.
-                // This is more robust for HLS, where key URIs might not be strictly typed as 'KEY'.
                 player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
+                    // Intercept any request URI that starts with gs://, as this is the placeholder for our key.
                     if (request.uris[0].startsWith('gs://')) {
                          console.log(`[Shaka-Filter] 가로챈 URI: ${request.uris[0]}`);
                          console.log(`[Shaka-Filter] 서명된 keyServerUrl로 교체합니다.`);
@@ -571,7 +568,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
         return () => {
             isMounted = false;
-            // Enhanced Cleanup: Destroy both the UI overlay and the player instance.
             if (uiRef.current) {
                 uiRef.current.destroy();
                 uiRef.current = null;
@@ -596,8 +592,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         }}
       >
         <DialogHeader className="p-1 border-b flex-shrink-0 flex flex-row items-center justify-between min-h-[41px]">
-            <DialogTitle className="sr-only">{`영상 플레이어: ${episode.title}`}</DialogTitle>
-            <DialogDescription className="sr-only">{`'${episode.title}' 영상을 재생하고 관련 학습 활동을 할 수 있는 다이얼로그입니다.`}</DialogDescription>
             <div className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8">
                 {courseLoading ? (
                     <Skeleton className="h-5 w-48" />
@@ -617,6 +611,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     <X className="h-4 w-4" />
                 </DialogClose>
              </div>
+             <DialogTitle className="sr-only">{`영상 플레이어: ${episode.title}`}</DialogTitle>
+             <DialogDescription className="sr-only">{`'${episode.title}' 영상을 재생하고 관련 학습 활동을 할 수 있는 다이얼로그입니다.`}</DialogDescription>
         </DialogHeader>
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:px-6 md:pb-6 overflow-hidden bg-muted/50">
             {/* Video Player Section */}
