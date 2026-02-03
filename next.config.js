@@ -1,3 +1,4 @@
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
@@ -13,6 +14,7 @@ const nextConfig = {
   },
   images: {
     remotePatterns: [
+      // Allow images from Unsplash
       {
         protocol: "https",
         hostname: "images.unsplash.com",
@@ -21,10 +23,12 @@ const nextConfig = {
         protocol: "https",
         hostname: "unsplash.com",
       },
+      // Allow placeholder images
       {
         protocol: "https",
         hostname: "picsum.photos",
       },
+      // Allow images from Firebase Storage
       {
         protocol: "https",
         hostname: "firebasestorage.googleapis.com",

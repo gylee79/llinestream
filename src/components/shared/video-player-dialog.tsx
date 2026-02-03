@@ -462,6 +462,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const onPlayerError = React.useCallback((error: any) => {
     const shakaError = error instanceof shaka.util.Error ? error : error.detail;
     console.error('[Shaka-Player-ERROR] A player error occurred. Details below:');
+    console.error('[Shaka-Player-ERROR-RAW]', error);
+    console.error('[Shaka-Player-ERROR-DETAIL]', error.detail);
     console.dir(shakaError);
     
     let message = `알 수 없는 플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
@@ -518,12 +520,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 return;
             }
 
-            if (!episode.keyServerUrl) {
-                 setPlayerError('암호화된 영상을 재생하는 데 필요한 키 서버 URL이 없습니다. 에피소드 데이터나 백엔드 로직을 확인해주세요.');
-                 setIsLoading(false);
-                 return;
-            }
-
             const player = new shaka.Player();
             const ui = new shaka.ui.Overlay(player, videoContainerRef.current, videoRef.current);
             shakaPlayerRef.current = player;
@@ -531,43 +527,54 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             try {
                 await player.attach(videoRef.current);
-                console.log('[Shaka-Setup] Registering network request filter...');
+                console.log('[Shaka-Setup] Player attached.');
 
                 player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
-                     // Log all intercepted requests for debugging
                     console.log(`[Shaka-Filter] Intercepted request: Type=${shaka.net.NetworkingEngine.RequestType[type]}, URI=${request.uris[0]}`);
 
-                    // The key request in HLS AES-128 can sometimes be identified as a SEGMENT.
-                    // The most reliable way is to check the URI pattern.
-                    if (request.uris[0].startsWith('gs://')) {
-                         console.log('[Shaka-Filter] Matched key URI. Attempting to substitute...');
-                        if (!episode.keyServerUrl) {
-                            throw new shaka.util.Error(
-                                shaka.util.Error.Severity.CRITICAL,
-                                shaka.util.Error.Category.DRM,
-                                shaka.util.Error.Code.LICENSE_REQUEST_FAILED,
-                                '에피소드 데이터에 암호화 키 URL(keyServerUrl)이 없습니다.'
-                            );
+                    for (let i = 0; i < request.uris.length; i++) {
+                        if (request.uris[i].startsWith('gs://')) {
+                            console.log(`[Shaka-Filter] Matched key URI at index ${i}: ${request.uris[i]}`);
+                            if (!episode.keyServerUrl) {
+                                throw new shaka.util.Error(
+                                    shaka.util.Error.Severity.CRITICAL,
+                                    shaka.util.Error.Category.DRM,
+                                    shaka.util.Error.Code.LICENSE_REQUEST_FAILED,
+                                    '에피소드 데이터에 암호화 키 URL(keyServerUrl)이 없습니다.'
+                                );
+                            }
+                            console.log(`[Shaka-Filter] Substituting with keyServerUrl: ${episode.keyServerUrl}`);
+                            request.uris[i] = episode.keyServerUrl;
+                            return; 
                         }
-                        console.log(`[Shaka-Filter] keyServerUrl from episode data: ${episode.keyServerUrl}`);
-                        request.uris[0] = episode.keyServerUrl;
-                        console.log(`[Shaka-Filter] URI substituted. New URI: ${request.uris[0]}`);
                     }
                 });
 
+                console.log('[Shaka-Setup] Network filter registered.');
+
                 player.addEventListener('error', onPlayerError);
+                console.log('[Shaka-Setup] Error listener attached.');
+
+                console.log(`[Shaka-Setup] Loading manifest: ${episode.manifestUrl}`);
                 await player.load(episode.manifestUrl);
+                console.log('[Shaka-Setup] Manifest loaded successfully.');
                 
                 const bucketName = firebaseConfig.storageBucket;
                 if (episode.vttPath && bucketName) {
                     const publicVttUrl = getPublicUrl(bucketName, episode.vttPath);
+                    console.log(`[Shaka-Setup] Adding text track from: ${publicVttUrl}`);
                     await player.addTextTrackAsync(publicVttUrl, 'ko', 'subtitle', 'text/vtt');
                     player.setTextTrackVisibility(true);
+                    console.log('[Shaka-Setup] Text track added.');
                 }
 
                 if(isMounted) setIsLoading(false);
             } catch (e: any) {
-                if(isMounted) onPlayerError(e);
+                if(isMounted) {
+                    console.error('[Shaka-Setup] Error during setup/load phase:');
+                    console.dir(e);
+                    onPlayerError(e);
+                }
             }
         }
 
@@ -577,7 +584,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
         return () => {
             isMounted = false;
-            // Ensure both player and UI are destroyed
             if (uiRef.current) {
                 uiRef.current.destroy();
                 uiRef.current = null;
@@ -601,21 +607,23 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
           }
         }}
       >
-        <DialogHeader className="p-1 border-b flex-shrink-0 flex flex-row items-center justify-between min-h-[41px]">
-            <div className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8">
-                {courseLoading ? (
-                    <Skeleton className="h-5 w-48" />
-                ) : (
-                    <>
-                    <Link href={`/courses/${episode.courseId}`} className="hover:underline">{course?.name}</Link>
-                    <ChevronRight className="h-4 w-4 inline-block mx-1" />
-                    <span>{episode.title}</span>
-                    </>
-                )}
-            </div>
-             <DialogDescription className="sr-only">{`'${episode.title}' 영상을 재생하고 관련 학습 활동을 할 수 있는 다이얼로그입니다.`}</DialogDescription>
+        <DialogHeader className="p-1 border-b flex-shrink-0 flex flex-row justify-between items-center min-h-[41px]">
+             <DialogTitle>
+                <div className="text-sm font-medium text-muted-foreground line-clamp-1 pl-4">
+                    {courseLoading ? (
+                        <Skeleton className="h-5 w-48" />
+                    ) : (
+                        <>
+                        <Link href={`/courses/${episode.courseId}`} className="hover:underline">{course?.name}</Link>
+                        <ChevronRight className="h-4 w-4 inline-block mx-1" />
+                        <span>{episode.title}</span>
+                        </>
+                    )}
+                </div>
+            </DialogTitle>
+            <DialogDescription className="sr-only">{`'${episode.title}' 영상을 재생하고 관련 학습 활동을 할 수 있는 다이얼로그입니다.`}</DialogDescription>
 
-             <div className="flex items-center gap-1">
+             <div className="flex items-center gap-1 pr-2">
                  <Button variant="ghost" size="icon" onClick={handleDownload} className="w-8 h-8">
                      <Download className="h-4 w-4" />
                  </Button>
