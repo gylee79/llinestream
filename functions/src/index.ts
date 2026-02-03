@@ -79,10 +79,11 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
     const keyFile = bucket.file(keyStoragePath);
     
     console.log(`[${episodeId}] HLS Job: Uploading AES-128 key to ${keyStoragePath}`);
-    await keyFile.save(aesKey);
+    await keyFile.save(aesKey, { contentType: 'application/octet-stream' });
     console.log(`[${episodeId}] HLS Job: AES-128 key uploaded.`);
     
-    const keyStorageUri = `gs://${bucket.name}/${keyStoragePath}`;
+    // This gs:// URI will be intercepted by the client and replaced with the signed URL.
+    const keyStorageUriForManifest = `gs://${bucket.name}/${keyStoragePath}`;
     
     const signedUrlExpireTime = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days validity
     const [signedKeyUrl] = await keyFile.getSignedUrl({
@@ -135,7 +136,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                     {
                         id: 'aes-128-encryption',
                         aes128: {
-                            uri: keyStorageUri,
+                            uri: keyStorageUriForManifest, // Use gs:// URI in the manifest
                         },
                     },
                 ],
@@ -194,7 +195,8 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
     const afterData = change.after.data() as EpisodeData;
     const beforeData = change.before.exists ? change.before.data() as EpisodeData : null;
 
-    if (afterData.aiProcessingStatus !== 'pending' || (beforeData && beforeData.aiProcessingStatus === 'pending')) {
+    // Only trigger if status is changing TO 'pending' or is newly created as 'pending'
+    if (afterData.aiProcessingStatus !== 'pending' || (beforeData && beforeData.aiProcessingStatus === afterData.aiProcessingStatus)) {
       return;
     }
 
@@ -220,9 +222,11 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
         await Promise.all([aiAnalysisPromise, hlsPackagingPromise]);
         console.log(`✅ [${episodeId}] All jobs (AI & HLS) completed successfully!`);
     } catch(error: any) {
-        // This catch block will now only be hit by unexpected exceptions,
-        // as individual job failures are handled within the functions themselves.
         console.error(`❌ [${episodeId}] A critical unexpected error occurred in Promise.all.`, error);
+        await docRef.update({ 
+            aiProcessingStatus: "failed", 
+            aiProcessingError: `A critical error occurred: ${error.message || 'Unknown'}`
+        });
     }
 });
 

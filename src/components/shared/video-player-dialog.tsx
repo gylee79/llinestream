@@ -4,7 +4,7 @@
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark } from '@/lib/types';
-import React, { useEffect, useRef, useState, useTransition, useCallback, useMemo } from 'react';
+import React, from 'react';
 import { Button } from '../ui/button';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
@@ -57,7 +57,7 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
         return (
             <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
                 <FileText className="h-12 w-12 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mt-2">
+                <p className="text-sm text-muted-foreground mt-2 whitespace-normal break-keep [word-break:keep-all]">
                     {episode.aiProcessingStatus === 'completed'
                         ? '분석된 내용이 없습니다.'
                         : 'AI 분석이 완료되면 강의 요약 내용이 여기에 표시됩니다.'}
@@ -83,7 +83,7 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
                                     <AccordionTrigger className="text-sm hover:no-underline text-left px-3 py-2">
                                         <div className="flex items-center gap-2 min-w-0">
                                             <span className="font-mono">{item.startTime.split('.')[0]}</span>
-                                            <p className="break-keep [word-break:keep-all]">{item.subtitle}</p> 
+                                            <p className="whitespace-normal break-keep [word-break:keep-all]">{item.subtitle}</p> 
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent className="px-3 pb-3">
@@ -107,15 +107,15 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
 
 const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
     const firestore = useFirestore();
-    const [isPending, startTransition] = useTransition();
-    const [userQuestion, setUserQuestion] = useState('');
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const chatScrollAreaRef = useRef<HTMLDivElement>(null);
+    const [isPending, startTransition] = React.useTransition();
+    const [userQuestion, setUserQuestion] = React.useState('');
+    const [messages, setMessages] = React.useState<ChatMessage[]>([]);
+    const [isLoading, setIsLoading] = React.useState(true);
+    const chatScrollAreaRef = React.useRef<HTMLDivElement>(null);
 
     const isAIAvailable = episode.aiProcessingStatus === 'completed';
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (!user || !firestore) {
             setIsLoading(false);
             setMessages([]);
@@ -147,7 +147,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
         return () => unsubscribe();
     }, [user, episode.id, firestore]);
 
-    useEffect(() => {
+    React.useEffect(() => {
         chatScrollAreaRef.current?.scrollTo({ top: chatScrollAreaRef.current.scrollHeight, behavior: 'smooth' });
     }, [messages, isPending]);
 
@@ -229,11 +229,11 @@ const TextbookView = () => (
 const BookmarkItem = ({ bookmark, onSeek, onDelete }: { bookmark: Bookmark, onSeek: (time: number) => void, onDelete: (id: string) => void }) => {
     const { user } = useUser();
     const { toast } = useToast();
-    const [note, setNote] = useState(bookmark.note || '');
-    const [isSaving, setIsSaving] = useState(false);
-    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const [note, setNote] = React.useState(bookmark.note || '');
+    const [isSaving, setIsSaving] = React.useState(false);
+    const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
-    useEffect(() => {
+    React.useEffect(() => {
         setNote(bookmark.note || '');
     }, [bookmark.note]);
 
@@ -285,7 +285,7 @@ const BookmarkItem = ({ bookmark, onSeek, onDelete }: { bookmark: Bookmark, onSe
 const BookmarkView = ({ episode, user, videoElement }: { episode: Episode; user: User, videoElement: HTMLVideoElement | null }) => {
     const firestore = useFirestore();
     const { toast } = useToast();
-    const [isSaving, setIsSaving] = useState(false);
+    const [isSaving, setIsSaving] = React.useState(false);
 
     const bookmarksQuery = useMemoFirebase(() => {
         if (!user || !firestore) return null;
@@ -299,7 +299,7 @@ const BookmarkView = ({ episode, user, videoElement }: { episode: Episode; user:
 
     const { data: bookmarks, isLoading, error: bookmarksError } = useCollection<Bookmark>(bookmarksQuery);
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (bookmarksError) {
             console.error("Firestore query error for bookmarks:", bookmarksError);
             if (bookmarksError.message.includes("indexes")) {
@@ -418,21 +418,21 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const { toast } = useToast();
   const firestore = useFirestore();
   
-  const [isLoading, setIsLoading] = useState(true);
-  const [playerError, setPlayerError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [playerError, setPlayerError] = React.useState<string | null>(null);
 
-  const startTimeRef = useRef<Date | null>(null);
-  const viewLoggedRef = useRef(false);
+  const startTimeRef = React.useRef<Date | null>(null);
+  const viewLoggedRef = React.useRef(false);
 
-  const shakaPlayerRef = useRef<shaka.Player | null>(null);
-  const uiRef = useRef<shaka.ui.Overlay | null>(null);
-  const videoContainerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const shakaPlayerRef = React.useRef<shaka.Player | null>(null);
+  const uiRef = React.useRef<shaka.ui.Overlay | null>(null);
+  const videoContainerRef = React.useRef<HTMLDivElement>(null);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
 
-  const logView = useCallback(() => {
+  const logView = React.useCallback(() => {
     if (!user || !startTimeRef.current || viewLoggedRef.current) return;
     viewLoggedRef.current = true;
     const endTime = new Date();
@@ -459,19 +459,19 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     });
   };
 
-  const onPlayerError = useCallback((error: any) => {
+  const onPlayerError = React.useCallback((error: any) => {
     const shakaError = error instanceof shaka.util.Error ? error : error.detail;
-    console.error("Shaka Player Error Details:");
+    console.error('[Shaka-Player-ERROR] A player error occurred. Details below:');
     console.dir(shakaError);
     
     let message = `알 수 없는 플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
     if (shakaError && shakaError.category) {
         switch (shakaError.category) {
             case shaka.util.Error.Category.NETWORK:
-                message = `네트워크 오류로 비디오를 불러올 수 없습니다.\n브라우저 콘솔(F12)에서 CORS 관련 오류 메시지가 있는지 확인해주세요.\n만약 CORS 오류가 발생했다면, 터미널에서 다음 명령어를 실행하여 스토리지 설정을 업데이트해야 합니다:\ngcloud storage buckets update gs://<YOUR_BUCKET_NAME> --cors-file=cors.json`;
+                message = `네트워크 오류로 비디오를 불러올 수 없습니다.\n브라우저 콘솔(F12)에서 CORS 관련 오류 메시지가 있는지 확인해주세요.\n\n만약 CORS 오류가 발생했다면, 클라우드 터미널에서 다음 명령어를 실행하여 스토리지 설정을 업데이트해야 합니다:\ngcloud storage buckets update gs://<YOUR_BUCKET_NAME> --cors-file=cors.json`;
                 break;
             case shaka.util.Error.Category.DRM:
-                message = `DRM 라이선스 요청에 실패했습니다 (코드: ${shakaError.code}). 키 서버 URL 또는 DRM 관련 설정이 올바른지 확인해주세요.`;
+                message = `DRM 라이선스 요청에 실패했습니다 (코드: ${shakaError.code}). 암호화 키 서버 URL 또는 DRM 관련 설정이 올바른지 확인해주세요.`;
                 break;
             case shaka.util.Error.Category.MEDIA:
                 message = `미디어 파일을 재생할 수 없습니다 (코드: ${shakaError.code}). 파일이 손상되었거나 지원되지 않는 형식일 수 있습니다.`;
@@ -485,7 +485,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   }, []);
 
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (isOpen) {
             startTimeRef.current = new Date();
             viewLoggedRef.current = false;
@@ -496,7 +496,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     }, [isOpen, logView]);
 
 
-    useEffect(() => {
+    React.useEffect(() => {
         let isMounted = true;
         
         async function setupPlayer() {
@@ -506,9 +506,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             setPlayerError(null);
 
             if (episode.packagingStatus !== 'completed') {
-                const statusMessage = episode.packagingStatus === 'failed'
-                    ? '비디오 처리 중 오류가 발생했습니다. 관리자에게 문의해주세요.'
-                    : '영상을 재생 가능하도록 암호화하고 있습니다. 잠시 후 다시 시도해주세요.';
+                const statusMessage = `영상을 재생 가능하도록 암호화하고 있습니다. 잠시 후 다시 시도해주세요. (상태: ${episode.packagingStatus || 'unknown'})`;
                 setPlayerError(statusMessage);
                 setIsLoading(false);
                 return;
@@ -533,25 +531,27 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             try {
                 await player.attach(videoRef.current);
-                
+                console.log('[Shaka-Setup] Registering network request filter...');
+
                 player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
-                    // For HLS AES-128, the key request URI is in the manifest.
-                    // Shaka Player makes a request for this URI. We intercept any request
-                    // whose URI starts with 'gs://' (our placeholder for the key path in GCS)
-                    // and replace it with the short-lived signed URL we generated.
+                     // Log all intercepted requests for debugging
+                    console.log(`[Shaka-Filter] Intercepted request: Type=${shaka.net.NetworkingEngine.RequestType[type]}, URI=${request.uris[0]}`);
+
+                    // The key request in HLS AES-128 can sometimes be identified as a SEGMENT.
+                    // The most reliable way is to check the URI pattern.
                     if (request.uris[0].startsWith('gs://')) {
-                        console.log(`[Shaka-Filter] 가로챈 URI (${shaka.net.NetworkingEngine.RequestType[type]}): ${request.uris[0]}`);
+                         console.log('[Shaka-Filter] Matched key URI. Attempting to substitute...');
                         if (!episode.keyServerUrl) {
-                            // This is a critical failure, as we cannot get the decryption key.
                             throw new shaka.util.Error(
                                 shaka.util.Error.Severity.CRITICAL,
                                 shaka.util.Error.Category.DRM,
                                 shaka.util.Error.Code.LICENSE_REQUEST_FAILED,
-                                '에피소드 데이터에 암호화 키 URL(keyServerUrl)이 없습니다. 영상이 올바르게 처리되었는지 확인해주세요.'
+                                '에피소드 데이터에 암호화 키 URL(keyServerUrl)이 없습니다.'
                             );
                         }
+                        console.log(`[Shaka-Filter] keyServerUrl from episode data: ${episode.keyServerUrl}`);
                         request.uris[0] = episode.keyServerUrl;
-                        console.log(`[Shaka-Filter] 서명된 keyServerUrl로 교체 완료.`);
+                        console.log(`[Shaka-Filter] URI substituted. New URI: ${request.uris[0]}`);
                     }
                 });
 
@@ -577,6 +577,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
         return () => {
             isMounted = false;
+            // Ensure both player and UI are destroyed
             if (uiRef.current) {
                 uiRef.current.destroy();
                 uiRef.current = null;
@@ -601,7 +602,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         }}
       >
         <DialogHeader className="p-1 border-b flex-shrink-0 flex flex-row items-center justify-between min-h-[41px]">
-            <DialogTitle className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8">
+            <div className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8">
                 {courseLoading ? (
                     <Skeleton className="h-5 w-48" />
                 ) : (
@@ -611,8 +612,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     <span>{episode.title}</span>
                     </>
                 )}
-            </DialogTitle>
-            <DialogDescription className="sr-only">{`'${episode.title}' 영상을 재생하고 관련 학습 활동을 할 수 있는 다이얼로그입니다.`}</DialogDescription>
+            </div>
+             <DialogDescription className="sr-only">{`'${episode.title}' 영상을 재생하고 관련 학습 활동을 할 수 있는 다이얼로그입니다.`}</DialogDescription>
 
              <div className="flex items-center gap-1">
                  <Button variant="ghost" size="icon" onClick={handleDownload} className="w-8 h-8">
