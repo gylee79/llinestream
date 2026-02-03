@@ -103,14 +103,11 @@ const CollapsibleUserPanel = ({ user, isMobile }: { user: User, isMobile: boolea
                             >
                                 <p className="font-bold">{user.name}님</p>
                                 <div className={cn("flex items-center text-sm", isMobile ? 'gap-1' : 'gap-3')}>
-                                    <Link href="/pricing" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">수강신청</Link>
-                                    <span className="opacity-50">·</span>
                                     <Link href="/my-courses" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">나의 강의실</Link>
                                     <span className="opacity-50">·</span>
-                                    <button onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity relative">
-                                        알림
-                                        <Badge variant="destructive" className="absolute -right-3 -top-1.5 h-4 w-4 justify-center rounded-full p-0 text-[9px]">0</Badge>
-                                    </button>
+                                    <Link href="/my-bookmarks" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">책 갈피</Link>
+                                    <span className="opacity-50">·</span>
+                                    <Link href="/downloads" onClick={(e) => e.stopPropagation()} className="hover:opacity-80 transition-opacity">다운로드함</Link>
                                 </div>
                             </motion.div>
                         )}
