@@ -462,8 +462,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const onPlayerError = React.useCallback((error: any) => {
     const shakaError = error instanceof shaka.util.Error ? error : error.detail;
     console.error('[Shaka-Player-ERROR] A player error occurred. Details below:');
-    console.error('[Shaka-Player-ERROR-RAW]', error);
-    console.error('[Shaka-Player-ERROR-DETAIL]', error.detail);
     console.dir(shakaError);
     
     let message = `알 수 없는 플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
@@ -473,7 +471,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 message = `네트워크 오류로 비디오를 불러올 수 없습니다.\n브라우저 콘솔(F12)에서 CORS 관련 오류 메시지가 있는지 확인해주세요.\n\n만약 CORS 오류가 발생했다면, 클라우드 터미널에서 다음 명령어를 실행하여 스토리지 설정을 업데이트해야 합니다:\ngcloud storage buckets update gs://<YOUR_BUCKET_NAME> --cors-file=cors.json`;
                 break;
             case shaka.util.Error.Category.DRM:
-                message = `DRM 라이선스 요청에 실패했습니다 (코드: ${shakaError.code}). 암호화 키 서버 URL 또는 DRM 관련 설정이 올바른지 확인해주세요.`;
+                 message = `DRM 라이선스 요청에 실패했습니다 (코드: ${shakaError.code}).\n암호화 키 서버 URL(${episode.keyServerUrl}) 또는 DRM 관련 설정이 올바른지 확인해주세요.`;
                 break;
             case shaka.util.Error.Category.MEDIA:
                 message = `미디어 파일을 재생할 수 없습니다 (코드: ${shakaError.code}). 파일이 손상되었거나 지원되지 않는 형식일 수 있습니다.`;
@@ -484,7 +482,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     }
     setPlayerError(message);
     setIsLoading(false);
-  }, []);
+  }, [episode.keyServerUrl]);
 
 
     React.useEffect(() => {
@@ -527,54 +525,37 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             try {
                 await player.attach(videoRef.current);
-                console.log('[Shaka-Setup] Player attached.');
 
                 player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
-                    console.log(`[Shaka-Filter] Intercepted request: Type=${shaka.net.NetworkingEngine.RequestType[type]}, URI=${request.uris[0]}`);
-
-                    for (let i = 0; i < request.uris.length; i++) {
-                        if (request.uris[i].startsWith('gs://')) {
-                            console.log(`[Shaka-Filter] Matched key URI at index ${i}: ${request.uris[i]}`);
-                            if (!episode.keyServerUrl) {
-                                throw new shaka.util.Error(
-                                    shaka.util.Error.Severity.CRITICAL,
-                                    shaka.util.Error.Category.DRM,
-                                    shaka.util.Error.Code.LICENSE_REQUEST_FAILED,
-                                    '에피소드 데이터에 암호화 키 URL(keyServerUrl)이 없습니다.'
-                                );
-                            }
-                            console.log(`[Shaka-Filter] Substituting with keyServerUrl: ${episode.keyServerUrl}`);
-                            request.uris[i] = episode.keyServerUrl;
-                            return; 
+                    const keyUriIndex = request.uris.findIndex(uri => uri.startsWith('gs://'));
+                    
+                    if (keyUriIndex !== -1) {
+                        if (!episode.keyServerUrl) {
+                            throw new shaka.util.Error(
+                                shaka.util.Error.Severity.CRITICAL,
+                                shaka.util.Error.Category.DRM,
+                                shaka.util.Error.Code.LICENSE_REQUEST_FAILED,
+                                '에피소드 데이터에 암호화 키 URL(keyServerUrl)이 없습니다.'
+                            );
                         }
+                        request.uris[keyUriIndex] = episode.keyServerUrl;
                     }
                 });
 
-                console.log('[Shaka-Setup] Network filter registered.');
-
                 player.addEventListener('error', onPlayerError);
-                console.log('[Shaka-Setup] Error listener attached.');
-
-                console.log(`[Shaka-Setup] Loading manifest: ${episode.manifestUrl}`);
+                
                 await player.load(episode.manifestUrl);
-                console.log('[Shaka-Setup] Manifest loaded successfully.');
                 
                 const bucketName = firebaseConfig.storageBucket;
                 if (episode.vttPath && bucketName) {
                     const publicVttUrl = getPublicUrl(bucketName, episode.vttPath);
-                    console.log(`[Shaka-Setup] Adding text track from: ${publicVttUrl}`);
                     await player.addTextTrackAsync(publicVttUrl, 'ko', 'subtitle', 'text/vtt');
                     player.setTextTrackVisibility(true);
-                    console.log('[Shaka-Setup] Text track added.');
                 }
 
                 if(isMounted) setIsLoading(false);
             } catch (e: any) {
-                if(isMounted) {
-                    console.error('[Shaka-Setup] Error during setup/load phase:');
-                    console.dir(e);
-                    onPlayerError(e);
-                }
+                if(isMounted) onPlayerError(e);
             }
         }
 
@@ -608,7 +589,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         }}
       >
         <DialogHeader className="p-1 border-b flex-shrink-0 flex flex-row justify-between items-center min-h-[41px]">
-             <DialogTitle>
+             <div className="flex-1 min-w-0">
+                <DialogTitle className="sr-only">{episode.title}</DialogTitle>
+                <DialogDescription className="sr-only">{`'${episode.title}' 영상을 재생하고 관련 학습 활동을 할 수 있는 다이얼로그입니다.`}</DialogDescription>
                 <div className="text-sm font-medium text-muted-foreground line-clamp-1 pl-4">
                     {courseLoading ? (
                         <Skeleton className="h-5 w-48" />
@@ -620,16 +603,13 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         </>
                     )}
                 </div>
-            </DialogTitle>
-            <DialogDescription className="sr-only">{`'${episode.title}' 영상을 재생하고 관련 학습 활동을 할 수 있는 다이얼로그입니다.`}</DialogDescription>
+            </div>
 
              <div className="flex items-center gap-1 pr-2">
                  <Button variant="ghost" size="icon" onClick={handleDownload} className="w-8 h-8">
                      <Download className="h-4 w-4" />
                  </Button>
-                <DialogClose className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-muted">
-                    <X className="h-4 w-4" />
-                </DialogClose>
+                {/* This is the automatically included close button from DialogContent */}
              </div>
         </DialogHeader>
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:px-6 md:pb-6 overflow-hidden bg-muted/50">
@@ -641,7 +621,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                              {isLoading && !playerError && (
                                 <>
                                     <Loader className="h-12 w-12 text-white animate-spin mb-4" />
-                                    <div>{episode.packagingStatus !== 'completed' ? '영상을 재생 가능하도록 암호화하고 있습니다. 잠시 후 다시 시도해주세요.' : '플레이어 로딩 중...'}</div>
+                                    <div className="whitespace-pre-wrap">{episode.packagingStatus !== 'completed' ? '영상을 재생 가능하도록 암호화하고 있습니다.\n잠시 후 다시 시도해주세요.' : '플레이어 로딩 중...'}</div>
                                 </>
                             )}
                             {playerError && (
@@ -683,3 +663,5 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
+
+    
