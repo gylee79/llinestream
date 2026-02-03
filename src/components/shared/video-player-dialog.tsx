@@ -99,7 +99,7 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
     } catch(e) {
         return (
             <div className="p-5 pr-6">
-                <p className="text-sm text-muted-foreground whitespace-pre-line break-keep [word-break:keep-all]">{episode.aiGeneratedContent}</p>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap break-keep [word-break:keep-all]">{episode.aiGeneratedContent}</p>
             </div>
         )
     }
@@ -461,13 +461,18 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
   const onPlayerError = useCallback((error: any) => {
     const shakaError = error instanceof shaka.util.Error ? error : error.detail;
-    console.error("Shaka Player Error Details:", JSON.stringify(shakaError, Object.getOwnPropertyNames(shakaError), 2));
+    // Enhanced Debugging: Use console.dir for a detailed, expandable object view.
+    console.error("Shaka Player Error Details:");
+    console.dir(shakaError);
     
     let message = `알 수 없는 플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
     if (shakaError && shakaError.category) {
         switch (shakaError.category) {
             case shaka.util.Error.Category.NETWORK:
-                message = "네트워크 오류로 비디오를 불러올 수 없습니다. 브라우저 콘솔(F12)에서 CORS 관련 오류 메시지가 있는지 확인해주세요. (참고: `gcloud storage buckets update gs://<버킷이름> --cors-file=cors.json`)";
+                message = `네트워크 오류로 비디오를 불러올 수 없습니다.
+                브라우저 콘솔(F12)에서 CORS 관련 오류 메시지가 있는지 확인해주세요.
+                만약 CORS 오류가 발생했다면, 터미널에서 다음 명령어를 실행하여 스토리지 설정을 업데이트해야 합니다:
+                gcloud storage buckets update gs://<YOUR_BUCKET_NAME> --cors-file=cors.json`;
                 break;
             case shaka.util.Error.Category.DRM:
                 message = `DRM 라이선스 요청에 실패했습니다 (코드: ${shakaError.code}). 키 서버 URL 또는 DRM 관련 설정이 올바른지 확인해주세요.`;
@@ -476,12 +481,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 message = `미디어 파일을 재생할 수 없습니다 (코드: ${shakaError.code}). 파일이 손상되었거나 지원되지 않는 형식일 수 있습니다.`;
                 break;
             default:
-                message = `플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
+                message = `플레이어 오류가 발생했습니다 (코드: ${shakaError.code}). 자세한 내용은 콘솔을 확인해주세요.`;
         }
     }
     setPlayerError(message);
     setIsLoading(false);
-}, []);
+  }, []);
 
 
     useEffect(() => {
@@ -519,6 +524,13 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 return;
             }
 
+            // Key URL must be present for encrypted content.
+            if (!episode.keyServerUrl) {
+                 setPlayerError('암호화된 영상을 재생하는 데 필요한 키 서버 URL이 없습니다. 에피소드 데이터나 백엔드 로직을 확인해주세요.');
+                 setIsLoading(false);
+                 return;
+            }
+
             const player = new shaka.Player();
             const ui = new shaka.ui.Overlay(player, videoContainerRef.current, videoRef.current);
             shakaPlayerRef.current = player;
@@ -527,16 +539,13 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             try {
                 await player.attach(videoRef.current);
                 
+                // Optimized Request Filter: Intercept any request for a 'gs://' URI.
+                // This is more robust for HLS, where key URIs might not be strictly typed as 'KEY'.
                 player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
-                    if (type === shaka.net.NetworkingEngine.RequestType.KEY) {
-                        console.log(`[Shaka-Filter] Intercepted KEY request. Original URI: ${request.uris[0]}`);
-                        if (episode.keyServerUrl) {
-                            console.log(`[Shaka-Filter] Replacing with signed keyServerUrl.`);
-                            request.uris[0] = episode.keyServerUrl;
-                        } else {
-                            console.error('[Shaka-Filter] KEY request intercepted, but no keyServerUrl is available. Aborting request.');
-                            request.uris = []; 
-                        }
+                    if (request.uris[0].startsWith('gs://')) {
+                         console.log(`[Shaka-Filter] 가로챈 URI: ${request.uris[0]}`);
+                         console.log(`[Shaka-Filter] 서명된 keyServerUrl로 교체합니다.`);
+                         request.uris[0] = episode.keyServerUrl!;
                     }
                 });
 
@@ -562,6 +571,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
         return () => {
             isMounted = false;
+            // Enhanced Cleanup: Destroy both the UI overlay and the player instance.
             if (uiRef.current) {
                 uiRef.current.destroy();
                 uiRef.current = null;
@@ -614,11 +624,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 <div className="w-full flex-grow relative" ref={videoContainerRef}>
                     {(isLoading || playerError) && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/50 p-4 text-center">
-                            {isLoading && !playerError && <Loader className="h-12 w-12 text-white animate-spin mb-4" />}
-                            {playerError ? (
-                                <div className="text-sm max-w-md">{playerError}</div>
-                            ) : (
-                                isLoading && <div>플레이어 로딩 중...</div>
+                             {isLoading && !playerError && (
+                                <>
+                                    <Loader className="h-12 w-12 text-white animate-spin mb-4" />
+                                    <div>{episode.packagingStatus !== 'completed' ? '영상을 재생 가능하도록 암호화하고 있습니다. 잠시 후 다시 시도해주세요.' : '플레이어 로딩 중...'}</div>
+                                </>
+                            )}
+                            {playerError && (
+                                <div className="text-sm max-w-md whitespace-pre-line">{playerError}</div>
                             )}
                         </div>
                     )}
