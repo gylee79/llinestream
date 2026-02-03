@@ -34,7 +34,7 @@ export async function updateUserProfileAndLog(payload: UpdateProfilePayload): Pr
     }
 
     try {
-        const adminApp = initializeAdminApp();
+        const adminApp = await initializeAdminApp();
         const db = admin.firestore(adminApp);
         const userRef = db.collection('users').doc(userId);
         

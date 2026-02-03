@@ -57,7 +57,7 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
   }
 
   try {
-    const adminApp = initializeAdminApp();
+    const adminApp = await initializeAdminApp();
     const db = admin.firestore(adminApp);
     const storage = admin.storage(adminApp);
     const bucketName = firebaseConfig.storageBucket;

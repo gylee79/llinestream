@@ -92,7 +92,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
     }
 
     try {
-        const adminApp = initializeAdminApp();
+        const adminApp = await initializeAdminApp();
         const db = admin.firestore(adminApp);
 
         // Get the current number of episodes in the course to set the orderIndex
@@ -154,7 +154,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
     }
 
     try {
-        const adminApp = initializeAdminApp();
+        const adminApp = await initializeAdminApp();
         const db = admin.firestore(adminApp);
         const storage = admin.storage(adminApp);
         const episodeRef = db.collection('episodes').doc(episodeId);

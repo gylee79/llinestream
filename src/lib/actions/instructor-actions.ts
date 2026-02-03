@@ -23,7 +23,7 @@ export async function updateInstructor(payload: UpdateInstructorPayload): Promis
   }
 
   try {
-    const adminApp = initializeAdminApp();
+    const adminApp = await initializeAdminApp();
     const db = admin.firestore(adminApp);
     const instructorRef = db.collection('instructors').doc(id);
 

@@ -14,7 +14,7 @@ export async function deleteChatLog(userId: string, chatId: string): Promise<{ s
   }
 
   try {
-    const adminApp = initializeAdminApp();
+    const adminApp = await initializeAdminApp();
     const db = admin.firestore(adminApp);
     
     // Create a batch to delete from both locations atomically

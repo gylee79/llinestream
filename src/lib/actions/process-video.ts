@@ -21,7 +21,7 @@ export async function resetAIEpisodeStatus(episodeId: string): Promise<{ success
   }
 
   try {
-    const adminApp = initializeAdminApp();
+    const adminApp = await initializeAdminApp();
     const db = admin.firestore(adminApp);
     const episodeRef = db.collection('episodes').doc(episodeId);
 

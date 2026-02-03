@@ -1,3 +1,5 @@
+'use server';
+
 import * as admin from 'firebase-admin';
 import { getApps, App } from 'firebase-admin/app';
 import { firebaseConfig } from '@/firebase/config';
@@ -10,10 +12,10 @@ const ADMIN_APP_NAME = 'firebase-admin-app-rsc'; // Unique name for RSC environm
  * This function is safe to call from any server-side module and prevents re-initialization.
  * It uses a named app instance to avoid conflicts with default initializations by other libraries.
  * 
- * @returns {App} The initialized Firebase Admin App instance.
+ * @returns {Promise<App>} A promise that resolves with the initialized Firebase Admin App instance.
  * @throws {Error} If the required Firebase service account credentials are not set in environment variables.
  */
-export function initializeAdminApp(): App {
+export async function initializeAdminApp(): Promise<App> {
   // Find the named app if it already exists.
   const existingApp = getApps().find(app => app.name === ADMIN_APP_NAME);
   if (existingApp) {

@@ -24,7 +24,7 @@ export async function addBookmark(payload: AddBookmarkPayload): Promise<{ succes
     }
 
     try {
-        const adminApp = initializeAdminApp();
+        const adminApp = await initializeAdminApp();
         const db = admin.firestore(adminApp);
         
         const userDoc = await db.collection('users').doc(userId).get();
@@ -78,7 +78,7 @@ export async function deleteBookmark(userId: string, bookmarkId: string): Promis
     }
 
     try {
-        const adminApp = initializeAdminApp();
+        const adminApp = await initializeAdminApp();
         const db = admin.firestore(adminApp);
         const batch = db.batch();
         
@@ -108,7 +108,7 @@ export async function updateBookmarkNote(payload: { userId: string; bookmarkId: 
     }
 
     try {
-        const adminApp = initializeAdminApp();
+        const adminApp = await initializeAdminApp();
         const db = admin.firestore(adminApp);
         
         const batch = db.batch();

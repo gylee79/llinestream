@@ -53,7 +53,7 @@ async function cancelPayment(paymentId: string, reason: string): Promise<void> {
 async function verifyAndProcessPayment(paymentId: string): Promise<{ success: boolean, message: string }> {
     console.log(`[DEBUG] 3a. Starting verifyAndProcessPayment for paymentId: ${paymentId}`);
     try {
-        const adminApp = initializeAdminApp();
+        const adminApp = await initializeAdminApp();
         const firestore = admin.firestore(adminApp);
 
         const portone = PortOne.PortOneClient({ secret: process.env.PORTONE_V2_API_SECRET! });

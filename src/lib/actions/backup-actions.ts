@@ -9,7 +9,7 @@ import * as admin from 'firebase-admin';
 export async function createFullBackup(): Promise<{ success: boolean; data?: string; message: string }> {
   console.log('Starting full data backup...');
   try {
-    const adminApp = initializeAdminApp();
+    const adminApp = await initializeAdminApp();
     const db = admin.firestore(adminApp);
     const backupData: { [key: string]: any[] } = {};
 

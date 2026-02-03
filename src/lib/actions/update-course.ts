@@ -82,7 +82,7 @@ export async function updateCourse(payload: UpdateCoursePayload): Promise<Update
   }
 
   try {
-    const adminApp = initializeAdminApp();
+    const adminApp = await initializeAdminApp();
     const db = admin.firestore(adminApp);
     const storage = admin.storage(adminApp);
 

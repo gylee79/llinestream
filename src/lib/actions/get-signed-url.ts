@@ -7,7 +7,7 @@ export async function getSignedUrl(filePath: string): Promise<{ signedURL: strin
         return { error: '파일 경로가 필요합니다.' };
     }
     try {
-        initializeAdminApp();
+        await initializeAdminApp();
         const storage = admin.storage();
         const bucket = storage.bucket();
 

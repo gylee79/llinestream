@@ -17,7 +17,7 @@ export async function reorderHierarchyItems(
   }
 
   try {
-    const adminApp = initializeAdminApp();
+    const adminApp = await initializeAdminApp();
     const db = admin.firestore(adminApp);
     const batch = db.batch();
 

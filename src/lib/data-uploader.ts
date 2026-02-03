@@ -35,7 +35,7 @@ async function ensureAuthUser(auth: admin.auth.Auth, user: Omit<User, 'id'|'acti
 export async function uploadMockData() {
   console.log('Starting data upload...');
   
-  const adminApp = initializeAdminApp();
+  const adminApp = await initializeAdminApp();
   const firestore = admin.firestore(adminApp);
   const auth = admin.auth(adminApp);
   

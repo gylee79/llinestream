@@ -88,7 +88,7 @@ export async function deleteHierarchyItem(
 
   try {
     console.log(`[INIT DELETE] Deleting ${collectionName} with id: ${id}`);
-    const adminApp = initializeAdminApp();
+    const adminApp = await initializeAdminApp();
     const db = admin.firestore(adminApp);
     const storage = admin.storage(adminApp);
     

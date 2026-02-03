@@ -51,7 +51,7 @@ const videoTutorFlow = ai.defineFlow(
   async ({ episodeId, question, userId }) => {
     console.log(`[Tutor-Flow] Starting for episode ${episodeId} with question: "${question}"`);
 
-    const adminApp = initializeAdminApp();
+    const adminApp = await initializeAdminApp();
     const db = admin.firestore(adminApp);
     
     // This helper function processes the raw analysis JSON string to remove milliseconds from timestamps
