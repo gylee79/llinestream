@@ -99,7 +99,7 @@ export interface Episode {
   aiModel?: string; // The model used for the last AI analysis
 
   manifestUrl?: string; // For DRM Streaming (DASH/HLS)
-  packagedStatus?: 'pending' | 'completed' | 'failed';
+  packagingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
   
   createdAt: Timestamp;
 }

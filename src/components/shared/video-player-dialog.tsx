@@ -416,9 +416,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const { user } = useUser();
   const { toast } = useToast();
   const firestore = useFirestore();
-  const [manifestSrc, setManifestSrc] = useState<string | null>(null);
+  
   const [vttSrc, setVttSrc] = useState<string | null>(null);
-  const [isLoadingSrc, setIsLoadingSrc] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [playerError, setPlayerError] = useState<string | null>(null);
 
   const startTimeRef = useRef<Date | null>(null);
@@ -465,25 +465,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     let unmounted = false;
     async function loadSources() {
         if (unmounted) return;
-        setIsLoadingSrc(true);
+        setIsLoading(true);
         setPlayerError(null);
-        setManifestSrc(null);
         setVttSrc(null);
 
         try {
             const bucketName = firebaseConfig.storageBucket;
             if (!bucketName) {
                 throw new Error("Firebase Storage bucket 설정이 누락되었습니다.");
-            }
-
-            if (episode.filePath) {
-              const manifestPath = episode.filePath.replace(/\.[^/.]+$/, "") + ".mpd";
-              const publicManifestUrl = getPublicUrl(bucketName, manifestPath);
-              if (unmounted) return;
-              setManifestSrc(publicManifestUrl);
-            } else {
-              setManifestSrc(episode.videoUrl); // Fallback for non-packaged content
-              console.warn("No filePath found for episode. DRM will not be applied. Falling back to videoUrl.");
             }
 
             if (episode.vttPath) {
@@ -496,7 +485,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             setPlayerError(e.message || '소스 로딩 중 오류 발생');
         } finally {
             if (unmounted) return;
-            setIsLoadingSrc(false);
+            setIsLoading(false);
         }
     }
 
@@ -510,17 +499,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     };
 }, [isOpen, episode, logView]);
 
-const playerConfiguration = {
-  drm: {
-    servers: {
-      'com.widevine.alpha': process.env.NEXT_PUBLIC_WIDEVINE_LICENSE_URL || ''
-    }
-  },
-  streaming: {
-    rebufferingGoal: 2,
-    bufferingGoal: 10,
-  },
-};
 
 const onPlayerError = (error: shaka.util.Error) => {
     console.error("Shaka Player Error:", error.code, error);
@@ -529,12 +507,20 @@ const onPlayerError = (error: shaka.util.Error) => {
         message = "콘텐츠 라이선스를 가져오는 데 실패했습니다. DRM 설정을 확인해주세요.";
     } else if (error.category === shaka.util.Error.Category.NETWORK) {
         message = "네트워크 오류로 인해 비디오를 불러올 수 없습니다.";
+    } else if (episode.packagingStatus === 'pending' || episode.packagingStatus === 'processing') {
+        message = "비디오를 암호화하고 재생 가능하도록 준비 중입니다. 잠시 후 다시 시도해주세요.";
+    } else if (episode.packagingStatus === 'failed') {
+        message = "비디오 처리 중 오류가 발생했습니다. 관리자에게 문의해주세요.";
     }
     setPlayerError(message);
 };
 
 useEffect(() => {
-    if (!isOpen || !manifestSrc || !videoRef.current || !videoContainerRef.current) {
+    const manifestUrl = episode.manifestUrl;
+    if (!isOpen || !manifestUrl || !videoRef.current || !videoContainerRef.current) {
+        if (isOpen && episode.packagingStatus !== 'completed') {
+            onPlayerError({} as shaka.util.Error); // Trigger a user-friendly message
+        }
         return;
     }
 
@@ -546,7 +532,18 @@ useEffect(() => {
         try {
             await player.attach(video);
             
-            player.configure(playerConfiguration);
+            player.configure({
+                drm: {
+                    servers: {
+                    'com.widevine.alpha': process.env.NEXT_PUBLIC_WIDEVINE_LICENSE_URL || ''
+                    }
+                },
+                streaming: {
+                    rebufferingGoal: 2,
+                    bufferingGoal: 10,
+                },
+            });
+
             player.addEventListener('error', (event: any) => onPlayerError(event.detail));
 
             const ui = new shaka.ui.Overlay(player, videoContainer, video);
@@ -557,10 +554,10 @@ useEffect(() => {
 
             shakaPlayerRef.current = { player, videoElement: video };
 
-            await player.load(manifestSrc);
+            await player.load(manifestUrl);
 
             if (vttSrc) {
-                const tracks = await player.addTextTrackAsync(vttSrc, 'ko', 'subtitle', 'text/vtt');
+                await player.addTextTrackAsync(vttSrc, 'ko', 'subtitle', 'text/vtt');
                 player.setTextTrackVisibility(true);
             }
         } catch (e: any) {
@@ -574,7 +571,7 @@ useEffect(() => {
         player?.destroy();
         shakaPlayerRef.current = null;
     };
-}, [isOpen, manifestSrc, vttSrc]);
+}, [isOpen, episode.manifestUrl, episode.packagingStatus, vttSrc]);
 
 
   return (
@@ -614,10 +611,10 @@ useEffect(() => {
             <Card className="col-span-10 md:col-span-7 flex flex-col bg-black md:rounded-xl overflow-hidden shadow-lg border-border">
                 <div className="w-full flex-grow relative" ref={videoContainerRef}>
                     <div className="absolute inset-0 flex items-center justify-center text-white bg-black/50 p-4 rounded-lg">
-                        {isLoadingSrc && <Loader className="h-12 w-12 text-white animate-spin" />}
-                        {playerError && !isLoadingSrc && <div>{playerError}</div>}
+                        {isLoading && <Loader className="h-12 w-12 text-white animate-spin" />}
+                        {playerError && !isLoading && <div>{playerError}</div>}
                     </div>
-                    {!isLoadingSrc && !playerError && (
+                    {!isLoading && !playerError && (
                          <video
                             ref={videoRef}
                             className="w-full h-full"

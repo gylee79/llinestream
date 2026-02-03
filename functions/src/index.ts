@@ -1,16 +1,19 @@
 
 /**
- * @fileoverview Video Analysis with Gemini using Firebase Cloud Functions v2.
- * Model: gemini-2.5-flash
+ * @fileoverview Video Analysis with Gemini & Transcoder API using Firebase Cloud Functions v2.
+ * Gemini Model: gemini-2.5-flash
+ * Transcoder API for DRM packaging.
  */
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
+import { TranscoderServiceClient } from '@google-cloud/video-transcoder').v1;
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
+import { v4 as uuidv4 } from 'uuid';
 
 // 0. Firebase Admin & Global Options 초기화
 if (!admin.apps.length) {
@@ -20,9 +23,13 @@ if (!admin.apps.length) {
 setGlobalOptions({
   region: "us-central1",
   secrets: ["GOOGLE_GENAI_API_KEY"],
-  timeoutSeconds: 540,
-  memory: "2GiB", // Gen 2 uses GiB
+  timeoutSeconds: 1200, // Increased timeout for polling
+  memory: "2GiB",
 });
+
+const db = admin.firestore();
+const storage = admin.storage();
+const bucket = storage.bucket();
 
 
 // 1. MIME Type 도우미
@@ -42,17 +49,133 @@ function getMimeType(filePath: string): string {
 // 2. 지연 초기화 (Lazy Initialization)
 let genAI: GoogleGenerativeAI | null = null;
 let fileManager: GoogleAIFileManager | null = null;
+let transcoderClient: TranscoderServiceClient | null = null;
 
 function initializeTools() {
-  if (genAI && fileManager) return { genAI, fileManager };
-  
   const apiKey = process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) throw new Error("GOOGLE_GENAI_API_KEY is missing!");
 
-  genAI = new GoogleGenerativeAI(apiKey);
-  fileManager = new GoogleAIFileManager(apiKey);
-  return { genAI, fileManager };
+  if (!genAI) genAI = new GoogleGenerativeAI(apiKey);
+  if (!fileManager) fileManager = new GoogleAIFileManager(apiKey);
+  if (!transcoderClient) transcoderClient = new TranscoderServiceClient();
+  
+  return { genAI, fileManager, transcoderClient };
 }
+
+
+// 3. DRM Packaging with Transcoder API
+async function createDrmPackagingJob(episodeId: string, inputUri: string, docRef: admin.firestore.DocumentReference): Promise<void> {
+    const { transcoderClient: client } = initializeTools();
+    const projectId = await client.getProjectId();
+    const location = 'us-central1'; // Or your preferred location
+
+    const outputFolder = `episodes/${episodeId}/packaged/`;
+    const outputUri = `gs://${bucket.name}/${outputFolder}`;
+
+    // IMPORTANT: In a real production environment, these keys should be securely generated
+    // and managed by your DRM provider (e.g., PallyCon, EZDRM).
+    // This example uses placeholder keys for demonstration purposes.
+    const keyId = Buffer.from(uuidv4().replace(/-/g, ''), 'hex').toString('base64');
+    const keyValue = Buffer.from(uuidv4().replace(/-/g, ''), 'hex').toString('base64');
+
+    console.log(`[${episodeId}] Starting Transcoder job for ${inputUri}`);
+    await docRef.update({ packagingStatus: "processing" });
+
+    const request = {
+        parent: `projects/${projectId}/locations/${location}`,
+        job: {
+            inputUri,
+            outputUri,
+            config: {
+                muxStreams: [
+                    {
+                        key: 'sd-video',
+                        container: 'mp4',
+                        elementaryStreams: ['sd-video-stream', 'audio-stream'],
+                        segmentSettings: {
+                          individualSegments: true,
+                          segmentDuration: { seconds: 4 },
+                        },
+                    },
+                ],
+                elementaryStreams: [
+                    {
+                        key: 'sd-video-stream',
+                        videoStream: {
+                            h264: {
+                                heightPixels: 480,
+                                widthPixels: 854,
+                                bitrateBps: 1000000,
+                                frameRate: 30,
+                            },
+                        },
+                    },
+                    {
+                        key: 'audio-stream',
+                        audioStream: {
+                            codec: 'aac',
+                            bitrateBps: 128000,
+                        },
+                    },
+                ],
+                manifests: [
+                    {
+                        fileName: 'manifest.mpd',
+                        type: 'DASH',
+                        muxStreams: ['sd-video'],
+                    },
+                ],
+                 encryptions: [
+                    {
+                        id: 'widevine-drm',
+                        drmSystems: {
+                            widevine: {
+                                keyProvider: 'common-system', // Use CENC Common System
+                            },
+                        },
+                        secretManagerKeySource: {
+                            secretVersion: `projects/${projectId}/secrets/drm-aes-key/versions/1`,
+                            // The secret should contain a 32-byte string for AES-128 key
+                        }
+                    }
+                ],
+            },
+        },
+    };
+
+    try {
+        const [response] = await client.createJob(request);
+        console.log(`[${episodeId}] Transcoder job created: ${response.name}`);
+        
+        // Polling for job completion
+        let jobSucceeded = false;
+        for (let i = 0; i < 60; i++) { // Poll for up to 10 minutes
+            await new Promise(resolve => setTimeout(resolve, 10000)); 
+            const [job] = await client.getJob({ name: response.name });
+
+            if (job.state === 'SUCCEEDED') {
+                console.log(`[${episodeId}] Transcoder job succeeded.`);
+                await docRef.update({
+                    packagingStatus: 'completed',
+                    manifestUrl: `${outputUri}manifest.mpd`,
+                });
+                jobSucceeded = true;
+                break;
+            } else if (job.state === 'FAILED') {
+                throw new Error(`Transcoder job failed: ${JSON.stringify(job.error)}`);
+            }
+        }
+
+        if (!jobSucceeded) {
+             throw new Error('Transcoder job timed out.');
+        }
+
+    } catch (error: any) {
+        console.error(`[${episodeId}] DRM packaging failed:`, error);
+        await docRef.update({ packagingStatus: "failed", aiProcessingError: error.message || 'DRM packaging failed.' });
+    }
+}
+
 
 // ==========================================
 // [Trigger] 메인 분석 함수 (v2 onDocumentWritten)
@@ -77,8 +200,7 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
 
     const { episodeId } = event.params;
     const docRef = change.after.ref;
-    const db = admin.firestore();
-
+    
     console.log(`✨ [${episodeId}] New analysis job detected. Starting...`);
 
     // 즉시 'processing'으로 상태 변경하여 중복 실행 방지
@@ -89,14 +211,27 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
       await docRef.update({ aiProcessingStatus: "failed", aiProcessingError: "No filePath" });
       return;
     }
+    const inputUriForTranscoder = `gs://${bucket.name}/${filePath}`;
+    
+    const aiAnalysisPromise = runAiAnalysis(episodeId, filePath, docRef);
+    const drmPackagingPromise = createDrmPackagingJob(episodeId, inputUriForTranscoder, docRef);
 
+    try {
+        await Promise.all([aiAnalysisPromise, drmPackagingPromise]);
+        console.log(`✅ [${episodeId}] All jobs (AI & DRM) completed successfully!`);
+    } catch(error: any) {
+        console.error(`❌ [${episodeId}] One of the processing jobs failed.`, error);
+        // Error is already set within individual functions
+    }
+});
+
+async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.firestore.DocumentReference) {
     const modelName = "gemini-2.5-flash";
-    console.log(`🚀 [${episodeId}] Processing started (Target: ${modelName}).`);
+    console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
     let uploadedFile: any = null;
-    const bucket = admin.storage().bucket();
 
     try {
       await bucket.file(filePath).download({ destination: tempFilePath });
@@ -106,17 +241,17 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
         displayName: episodeId,
       });
       uploadedFile = uploadResponse.file;
-      console.log(`[${episodeId}] Uploaded: ${uploadedFile.uri}`);
+      console.log(`[${episodeId}] Uploaded to Google AI: ${uploadedFile.uri}`);
 
       let state = uploadedFile.state;
       while (state === FileState.PROCESSING) {
         await new Promise((resolve) => setTimeout(resolve, 5000));
         const freshFile = await localFileManager.getFile(uploadedFile.name);
         state = freshFile.state;
-        console.log(`... processing status: ${state}`);
+        console.log(`... AI processing status: ${state}`);
       }
 
-      if (state === FileState.FAILED) throw new Error("Google AI processing failed.");
+      if (state === FileState.FAILED) throw new Error("Google AI file processing failed.");
 
       console.log(`[${episodeId}] Calling Gemini model...`);
       
@@ -180,7 +315,7 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
       }
 
       const analysisJsonString = JSON.stringify(output);
-
+      const afterData = (await docRef.get()).data() as EpisodeData;
       const courseDoc = await db.collection('courses').doc(afterData.courseId).get();
       if (!courseDoc.exists) throw new Error(`Course not found for episode ${episodeId}`);
       const classificationDoc = await db.collection('classifications').doc(courseDoc.data()!.classificationId).get();
@@ -213,22 +348,21 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
 
       await batch.commit();
 
-      console.log(`✅ [${episodeId}] Success!`);
+      console.log(`[${episodeId}] AI analysis succeeded!`);
 
     } catch (error: any) {
       const detailedError = JSON.stringify(error, Object.getOwnPropertyNames(error), 2);
-      console.error(`❌ [${episodeId}] Analysis failed. Detailed error:`, detailedError);
-      
+      console.error(`❌ [${episodeId}] AI analysis failed. Detailed error:`, detailedError);
       await docRef.update({
         aiProcessingStatus: "failed",
         aiProcessingError: error.message || String(error)
       });
-
+      throw error; // Propagate error to Promise.all
     } finally {
       if (fs.existsSync(tempFilePath)) { try { fs.unlinkSync(tempFilePath); } catch (e) {} }
       if (uploadedFile) { try { await localFileManager.deleteFile(uploadedFile.name); } catch (e) {} }
     }
-});
+}
 
 // ==========================================
 // [Trigger] 파일 삭제 함수 (v2 onDocumentDeleted)
@@ -240,9 +374,10 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
     const { episodeId } = event.params;
     const data = snap.data() as EpisodeData;
     if (!data) return;
-
-    const db = admin.firestore();
-    const bucket = admin.storage().bucket();
+    
+    // Delete packaged content folder
+    const packagedPath = `episodes/${episodeId}/packaged/`;
+    await bucket.deleteFiles({ prefix: packagedPath }).catch(() => {});
     
     const paths = [data.filePath, data.defaultThumbnailPath, data.customThumbnailPath, data.vttPath];
     await Promise.all(paths.filter(Boolean).map(p => bucket.file(p!).delete().catch(() => {})));
@@ -257,6 +392,7 @@ interface EpisodeData {
   filePath: string;
   courseId: string;
   aiProcessingStatus?: string;
+  packagingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
   defaultThumbnailPath?: string;
   customThumbnailPath?: string;
   vttPath?: string;
