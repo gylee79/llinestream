@@ -107,14 +107,20 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                         { key: 'sd-video-stream', videoStream: { h264: { heightPixels: 480, widthPixels: 854, bitrateBps: 1000000, frameRate: 30 }}},
                         { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
                     ],
-                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS', muxStreams: ['sd-hls'] }],
+                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['sd-hls'] }],
                     encryptions: [{ id: 'aes-128-encryption', aes128: { uri: keyStorageUriForManifest } }],
                 },
             },
         };
         
         console.log(`[${episodeId}] HLS Job: Creating Transcoder job with request:`, JSON.stringify(request, null, 2));
-        const [response] = await client.createJob(request);
+        
+        const createJobResponse = await client.createJob(request);
+        const response = createJobResponse[0];
+
+        if (!response.name) {
+            throw new Error('Transcoder job creation failed, no job name returned.');
+        }
         const jobName = response.name;
         console.log(`[${episodeId}] HLS Job: Transcoder job created successfully. Job name: ${jobName}`);
 
@@ -124,7 +130,10 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
 
         for (let i = 0; i < MAX_POLLS; i++) {
             await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
-            const [job] = await client.getJob({ name: jobName });
+            
+            const getJobResponse = await client.getJob({ name: jobName });
+            const job = getJobResponse[0];
+            
             console.log(`[${episodeId}] HLS Job: Polling job status... (Attempt ${i+1}/${MAX_POLLS}). Current state: ${job.state}`);
 
             if (job.state === 'SUCCEEDED') {
