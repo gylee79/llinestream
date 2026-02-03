@@ -501,26 +501,35 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 }, [isOpen, episode, logView]);
 
 
-const onPlayerError = (error: shaka.util.Error) => {
-    console.error("Shaka Player Error:", error.code, error);
-    let message = `플레이어 오류가 발생했습니다 (코드: ${error.code}).`;
-    if (error.category === shaka.util.Error.Category.DRM) {
-        message = "콘텐츠 라이선스를 가져오는 데 실패했습니다. DRM 설정을 확인해주세요.";
-    } else if (error.category === shaka.util.Error.Category.NETWORK) {
-        message = "네트워크 오류로 인해 비디오를 불러올 수 없습니다.";
-    } else if (episode.packagingStatus === 'pending' || episode.packagingStatus === 'processing') {
-        message = "비디오를 암호화하고 재생 가능하도록 준비 중입니다. 잠시 후 다시 시도해주세요.";
-    } else if (episode.packagingStatus === 'failed') {
-        message = "비디오 처리 중 오류가 발생했습니다. 관리자에게 문의해주세요.";
+const onPlayerError = useCallback((error: any) => {
+    // The error event might be a shaka.util.Error, or it might be a CustomEvent containing the error in its 'detail'
+    const shakaError = error instanceof shaka.util.Error ? error : error.detail;
+    
+    if (shakaError && shakaError.code) { // Check if it's a valid Shaka error
+        console.error("Shaka Player Error:", shakaError);
+        let message = `플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
+        if (shakaError.category === shaka.util.Error.Category.DRM) {
+            message = "콘텐츠 라이선스를 가져오는 데 실패했습니다. DRM 설정을 확인해주세요.";
+        } else if (shakaError.category === shaka.util.Error.Category.NETWORK) {
+            message = "네트워크 오류로 인해 비디오를 불러올 수 없습니다.";
+        } else if (episode.packagingStatus === 'pending' || episode.packagingStatus === 'processing') {
+            message = "비디오를 암호화하고 재생 가능하도록 준비 중입니다. 잠시 후 다시 시도해주세요.";
+        } else if (episode.packagingStatus === 'failed') {
+            message = "비디오 처리 중 오류가 발생했습니다. 관리자에게 문의해주세요.";
+        }
+        setPlayerError(message);
+    } else {
+        // Handle cases where the error is not a Shaka error object
+        console.error("An unknown player error occurred:", error);
+        setPlayerError("알 수 없는 플레이어 오류가 발생했습니다. 매니페스트 URL과 네트워크를 확인해주세요.");
     }
-    setPlayerError(message);
-};
+}, [episode.packagingStatus]);
 
 useEffect(() => {
     const manifestUrl = episode.manifestUrl;
     if (!isOpen || !manifestUrl || !videoRef.current || !videoContainerRef.current) {
         if (isOpen && episode.packagingStatus !== 'completed') {
-            onPlayerError({} as shaka.util.Error);
+            setPlayerError("비디오를 암호화하고 재생 가능하도록 준비 중입니다. 잠시 후 다시 시도해주세요.");
         }
         return;
     }
@@ -533,22 +542,14 @@ useEffect(() => {
         try {
             await player.attach(video);
             
-            // HLS AES-128: The key URI in the manifest might not be directly fetchable.
-            // This filter intercepts the key request and replaces the URI with a working, signed URL.
             player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
               if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT || type === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
-                  // For AES-128, the key is often referenced in the manifest and fetched like a segment.
-                  // The URI in the manifest might be a placeholder or a non-public URI.
                   const keyUri = request.uris[0];
                   
-                  // This is our hook. If the player is trying to fetch the key...
                   if (keyUri && (keyUri.startsWith('gs://') || keyUri.endsWith('enc.key'))) {
-                      // ...and we have a signed URL from Firestore...
                       if (episode.keyServerUrl) {
-                          // ...we replace the URI with the valid, signed URL.
                           request.uris[0] = episode.keyServerUrl;
                       } else {
-                           // If we don't have a key URL, we must fail the request.
                            return Promise.reject(new shaka.util.Error(
                               shaka.util.Error.Severity.CRITICAL,
                               shaka.util.Error.Category.NETWORK,
@@ -560,7 +561,7 @@ useEffect(() => {
               }
             });
 
-            player.addEventListener('error', (event: any) => onPlayerError(event.detail));
+            player.addEventListener('error', onPlayerError);
             const ui = new shaka.ui.Overlay(player, videoContainer, video);
             shakaPlayerRef.current = { player, videoElement: video };
             await player.load(manifestUrl);
@@ -577,10 +578,13 @@ useEffect(() => {
     setupPlayer();
 
     return () => {
-        player?.destroy();
+        if (player) {
+            player.removeEventListener('error', onPlayerError);
+            player.destroy();
+        }
         shakaPlayerRef.current = null;
     };
-}, [isOpen, episode.manifestUrl, episode.packagingStatus, episode.keyServerUrl, vttSrc]);
+}, [isOpen, episode.manifestUrl, episode.packagingStatus, episode.keyServerUrl, vttSrc, onPlayerError]);
 
 
   return (
@@ -595,7 +599,16 @@ useEffect(() => {
         }}
       >
         <div className="flex-shrink-0 flex items-center justify-between p-1 border-b">
-             <div className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8">
+            {/* Visually hidden for accessibility */}
+            <DialogHeader className="sr-only">
+                <DialogTitle>{episode.title}</DialogTitle>
+                <DialogDescription>
+                    {`'${episode.title}' 영상 재생 및 학습 활동`}
+                </DialogDescription>
+            </DialogHeader>
+
+            {/* Visible Title */}
+            <div className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8" aria-hidden="true">
                 {courseLoading ? (
                     <Skeleton className="h-5 w-48" />
                 ) : (
@@ -605,7 +618,7 @@ useEffect(() => {
                     <span>{episode.title}</span>
                     </>
                 )}
-             </div>
+            </div>
              <div className="flex items-center gap-1">
                  <Button variant="ghost" size="icon" onClick={handleDownload} className="w-8 h-8">
                      <Download className="h-4 w-4" />

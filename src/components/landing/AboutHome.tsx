@@ -92,6 +92,7 @@ export default function AboutHome() {
                 fill
                 sizes="100vw"
                 className="object-cover"
+                priority
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
           </>
