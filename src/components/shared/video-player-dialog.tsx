@@ -502,11 +502,11 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
 
 const onPlayerError = useCallback((error: any) => {
-    // The error event might be a shaka.util.Error, or it might be a CustomEvent containing the error in its 'detail'
     const shakaError = error instanceof shaka.util.Error ? error : error.detail;
     
-    if (shakaError && shakaError.code) { // Check if it's a valid Shaka error
-        console.error("Shaka Player Error:", shakaError);
+    console.error("Shaka Player Error:", JSON.stringify(shakaError, Object.getOwnPropertyNames(shakaError)));
+    
+    if (shakaError && shakaError.code) {
         let message = `플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
         if (shakaError.category === shaka.util.Error.Category.DRM) {
             message = "콘텐츠 라이선스를 가져오는 데 실패했습니다. DRM 설정을 확인해주세요.";
@@ -519,8 +519,6 @@ const onPlayerError = useCallback((error: any) => {
         }
         setPlayerError(message);
     } else {
-        // Handle cases where the error is not a Shaka error object
-        console.error("An unknown player error occurred:", error);
         setPlayerError("알 수 없는 플레이어 오류가 발생했습니다. 매니페스트 URL과 네트워크를 확인해주세요.");
     }
 }, [episode.packagingStatus]);
@@ -543,10 +541,9 @@ useEffect(() => {
             await player.attach(video);
             
             player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
-              if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT || type === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
+              if (type === shaka.net.NetworkingEngine.RequestType.KEY) {
                   const keyUri = request.uris[0];
-                  
-                  if (keyUri && (keyUri.startsWith('gs://') || keyUri.endsWith('enc.key'))) {
+                  if (keyUri && keyUri.endsWith('enc.key')) {
                       if (episode.keyServerUrl) {
                           request.uris[0] = episode.keyServerUrl;
                       } else {
@@ -598,16 +595,13 @@ useEffect(() => {
           }
         }}
       >
+        <DialogHeader className="sr-only">
+            <DialogTitle>{episode.title}</DialogTitle>
+            <DialogDescription>
+                {`'${episode.title}' 영상 재생 및 학습 활동`}
+            </DialogDescription>
+        </DialogHeader>
         <div className="flex-shrink-0 flex items-center justify-between p-1 border-b">
-            {/* Visually hidden for accessibility */}
-            <DialogHeader className="sr-only">
-                <DialogTitle>{episode.title}</DialogTitle>
-                <DialogDescription>
-                    {`'${episode.title}' 영상 재생 및 학습 활동`}
-                </DialogDescription>
-            </DialogHeader>
-
-            {/* Visible Title */}
             <div className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8" aria-hidden="true">
                 {courseLoading ? (
                     <Skeleton className="h-5 w-48" />
