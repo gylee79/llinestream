@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark } from '@/lib/types';
@@ -299,7 +300,7 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
                  toast({
                     variant: "destructive",
                     title: "색인 필요",
-                    description: "북마크를 불러오려면 Firestore 색인 생성이 필요합니다. 브라우저 콘솔의 링크를 클릭하여 색인을 생성해주세요.",
+                    description: "책갈피를 불러오려면 Firestore 색인 생성이 필요합니다. 브라우저 콘솔의 링크를 클릭하여 색인을 생성해주세요.",
                     duration: 10000,
                 });
             }
@@ -313,7 +314,7 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
         const currentTime = Math.floor(videoRef.current.currentTime);
 
         if (bookmarks?.some(b => b.timestamp === currentTime)) {
-            toast({ variant: 'destructive', title: '오류', description: '이미 같은 시간에 북마크가 존재합니다.' });
+            toast({ variant: 'destructive', title: '오류', description: '이미 같은 시간에 책갈피가 존재합니다.' });
             if (videoRef.current) videoRef.current.play();
             return;
         }
@@ -327,12 +328,12 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
             note: '',
         }).then((result) => {
             if (result.success) {
-                toast({ title: '성공', description: '북마크가 추가되었습니다.' });
+                toast({ title: '성공', description: '책갈피가 추가되었습니다.' });
             } else {
                 toast({ variant: 'destructive', title: '오류', description: result.message });
             }
         }).catch(error => {
-            toast({ variant: 'destructive', title: '오류', description: '북마크 추가 중 예외가 발생했습니다.' });
+            toast({ variant: 'destructive', title: '오류', description: '책갈피 추가 중 예외가 발생했습니다.' });
             console.error(error);
         }).finally(() => {
             setIsSaving(false);
@@ -345,12 +346,12 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
 
         deleteBookmark(user.id, bookmarkId).then(result => {
             if (result.success) {
-                toast({ title: '성공', description: '북마크가 삭제되었습니다.' });
+                toast({ title: '성공', description: '책갈피가 삭제되었습니다.' });
             } else {
                 toast({ variant: 'destructive', title: '오류', description: result.message });
             }
         }).catch(error => {
-            toast({ variant: 'destructive', title: '오류', description: '북마크 삭제 중 예외가 발생했습니다.' });
+            toast({ variant: 'destructive', title: '오류', description: '책갈피 삭제 중 예외가 발생했습니다.' });
             console.error(error);
         });
     };
@@ -370,14 +371,14 @@ const BookmarkView = ({ episode, user, videoRef }: { episode: Episode; user: Use
                 disabled={isSaving}
             >
               <BookmarkIcon className="mr-2 h-4 w-4" /> 
-              {isSaving ? '저장 중...' : '현재 시간 북마크'}
+              {isSaving ? '저장 중...' : '현재 시간 책갈피'}
             </Button>
             
             <div className="mt-4 space-y-2">
-                {isLoading && <p className="text-center text-sm text-muted-foreground">북마크 로딩 중...</p>}
+                {isLoading && <p className="text-center text-sm text-muted-foreground">책갈피 로딩 중...</p>}
                 
                 {!isLoading && bookmarks && bookmarks.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center pt-4">저장된 북마크가 없습니다.</p>
+                    <p className="text-sm text-muted-foreground text-center pt-4">저장된 책갈피가 없습니다.</p>
                 )}
 
                 {!isLoading && bookmarks && bookmarks.length > 0 && (
