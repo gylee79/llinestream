@@ -160,7 +160,7 @@ const videoTutorFlow = ai.defineFlow(
         The user is currently watching the episode titled '${episodeData.title}'.
 
         Based ONLY on the provided JSON context, answer the user's question.
-        - When referencing information from the *currently playing video*, simply state "이 영상에서는..." or "현재 영상에서는...". You MUST cite the specific timestamp from the 'timeline' if available.
+        - When referencing information from the *currently playing video*, simply state "이 영상에서는..." or "현재 영상에서는...". **Do NOT mention the title of the current video**, as the user is already watching it. For example, instead of saying "현재 영상인 '영상 제목'에서는...", you MUST say "이 영상에서는...".
         - IMPORTANT: When citing timestamps, you MUST format them as HH:MM:SS and exclude any milliseconds. For example, use "00:01:23초" instead of "00:01:23.456초". For a time range, use a format like "00:01:23초 - 00:01:45초".
         - When referencing information from a *different video*, you MUST state the name of that video using the 'episodeTitle' field. For example: "네, 관련 내용이 '${"다른 영상 제목"}' 편에 있습니다."
         - Analyze the structured data, especially the 'timeline' for time-specific events and descriptions.
