@@ -138,8 +138,8 @@ const MyCoursesPage = () => {
                       {courseEpisodes.length > 0 ? courseEpisodes.map(episode => (
                         <div key={episode.id} className="p-3 hover:bg-muted/50 cursor-pointer" onClick={() => setPlayingEpisode(episode)}>
                            <div className="flex gap-4 items-center">
-                              <div className="relative h-14 w-24 flex-shrink-0 bg-muted rounded-md overflow-hidden">
-                                  <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="96px" className="object-cover" />
+                              <div className="relative h-12 w-20 flex-shrink-0 bg-muted rounded-md overflow-hidden">
+                                  <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="80px" className="object-cover" />
                                   <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
                                       <Play className="h-6 w-6 text-white" />
                                   </div>
