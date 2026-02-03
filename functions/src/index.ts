@@ -16,9 +16,11 @@ import * as fs from "fs";
 import * as crypto from "crypto";
 
 // 0. Firebase Admin & Global Options 초기화
-if (!admin.apps.length) {
-  admin.initializeApp();
+// Use a named app instance to avoid conflicts with other initializations.
+if (admin.apps.length === 0) {
+    admin.initializeApp();
 }
+
 
 setGlobalOptions({
   region: "us-central1",
@@ -115,24 +117,22 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         
         console.log(`[${episodeId}] HLS Job: Creating Transcoder job with request:`, JSON.stringify(request, null, 2));
         
-        const createJobResponse = await client.createJob(request);
-        const response = createJobResponse[0];
-
-        if (!response.name) {
+        const [createJobResponse] = await client.createJob(request);
+        
+        if (!createJobResponse.name) {
             throw new Error('Transcoder job creation failed, no job name returned.');
         }
-        const jobName = response.name;
+        const jobName = createJobResponse.name;
         console.log(`[${episodeId}] HLS Job: Transcoder job created successfully. Job name: ${jobName}`);
 
-        const POLLING_INTERVAL = 15000;
-        const MAX_POLLS = 72; // 18 minutes timeout
+        const POLLING_INTERVAL = 15000; // 15 seconds
+        const MAX_POLLS = 35; // 35 * 15s = 525s (8.75 minutes) < 540s timeout
         let jobSucceeded = false;
 
         for (let i = 0; i < MAX_POLLS; i++) {
             await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
             
-            const getJobResponse = await client.getJob({ name: jobName });
-            const job = getJobResponse[0];
+            const [job] = await client.getJob({ name: jobName });
             
             console.log(`[${episodeId}] HLS Job: Polling job status... (Attempt ${i+1}/${MAX_POLLS}). Current state: ${job.state}`);
 
@@ -384,5 +384,3 @@ interface EpisodeData {
   vttPath?: string;
   [key: string]: any;
 }
-
-    

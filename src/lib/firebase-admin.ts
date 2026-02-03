@@ -3,13 +3,15 @@ import { getApps, App } from 'firebase-admin/app';
 import { firebaseConfig } from '@/firebase/config';
 import serviceAccount from './service-account.json';
 
-// This is a global variable to hold the initialized Firebase Admin app instance.
-// It ensures that we only initialize the app once per server instance.
+const ADMIN_APP_NAME = 'firebase-admin-app-rsc'; // Unique name for RSC environment
+
+// This is a global or module-level variable to hold the app instance.
 let adminApp: App | null = null;
 
 /**
- * Initializes and/or returns the singleton instance of the Firebase Admin SDK.
+ * Initializes and/or returns the singleton instance of the Firebase Admin SDK for RSC.
  * This function is safe to call from any server-side module and prevents re-initialization.
+ * It uses a named app instance to avoid conflicts with default initializations by other libraries.
  * 
  * @returns {App} The initialized Firebase Admin App instance.
  * @throws {Error} If the required Firebase service account credentials are not set in environment variables.
@@ -19,11 +21,11 @@ export function initializeAdminApp(): App {
   if (adminApp) {
     return adminApp;
   }
-
-  // Check if getApps() can find an already initialized app. This is a robust check.
-  const existingApps = getApps();
-  if (existingApps.length > 0) {
-    adminApp = existingApps[0];
+  
+  // Find the named app if it already exists.
+  const existingApp = getApps().find(app => app.name === ADMIN_APP_NAME);
+  if (existingApp) {
+    adminApp = existingApp;
     return adminApp;
   }
 
@@ -34,18 +36,17 @@ export function initializeAdminApp(): App {
     privateKey: serviceAccount.private_key,
   };
   
-  // Try to initialize the Admin SDK with the retrieved credentials.
+  // Try to initialize the Admin SDK with the retrieved credentials and a unique name.
   try {
-    const newAdminApp = admin.initializeApp({
+    adminApp = admin.initializeApp({
       credential: admin.credential.cert(serviceAccountCredentials),
       storageBucket: firebaseConfig.storageBucket,
-    });
+    }, ADMIN_APP_NAME); // <-- Give the app a unique name
 
-    console.log('Firebase Admin SDK initialized successfully using service-account.json.');
-    adminApp = newAdminApp; // Store the new instance in our global variable.
+    console.log(`Firebase Admin SDK ('${ADMIN_APP_NAME}') initialized successfully for RSC.`);
     return adminApp;
   } catch (error) {
-    console.error('Error initializing Firebase Admin SDK from service-account.json:', error);
+    console.error(`Error initializing Firebase Admin SDK ('${ADMIN_APP_NAME}'):`, error);
     // If initialization fails, throw an error with a clear message.
     throw new Error('Could not initialize Firebase Admin SDK. Please check your service account credentials.');
   }
