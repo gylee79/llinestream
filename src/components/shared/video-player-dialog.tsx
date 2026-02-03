@@ -352,12 +352,12 @@ const BookmarkView = ({ episode, user, videoElement }: { episode: Episode; user:
 
         deleteBookmark(user.id, bookmarkId).then(result => {
             if (result.success) {
-                toast({ title: '성공', description: '책갈피가 삭제되었습니다.' });
+                toast({ title: '성공', description: '북마크가 삭제되었습니다.' });
             } else {
                 toast({ variant: 'destructive', title: '오류', description: result.message });
             }
         }).catch(error => {
-            toast({ variant: 'destructive', title: '오류', description: '책갈피 삭제 중 예외가 발생했습니다.' });
+            toast({ variant: 'destructive', title: '오류', description: '북마크 삭제 중 예외가 발생했습니다.' });
             console.error(error);
         });
     };
@@ -542,17 +542,21 @@ useEffect(() => {
             await player.attach(video);
             
             player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
-              // This filter intercepts the request for the decryption key.
-              if (type === shaka.net.NetworkingEngine.RequestType.KEY) {
-                  const keyUri = request.uris[0];
-                  console.log(`[Shaka-Filter] Intercepted key request for URI: ${keyUri}.`);
-                  if (episode.keyServerUrl) {
-                      console.log(`[Shaka-Filter] Replacing URI with signed keyServerUrl.`);
-                      request.uris[0] = episode.keyServerUrl;
-                  } else {
-                       console.error("[Shaka-Filter] Intercepted key request but no keyServerUrl is available for the episode. Playback will fail.");
-                  }
-              }
+                // For HLS with AES-128, key requests are of type 'SEGMENT'.
+                if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
+                    const keyUri = request.uris[0];
+                    // The Transcoder API writes the gs:// URI of the key into the HLS manifest.
+                    // We can identify the key request by checking for this specific protocol.
+                    if (keyUri.startsWith('gs://')) {
+                        console.log(`[Shaka-Filter] Intercepted AES key request for URI: ${keyUri}.`);
+                        if (episode.keyServerUrl) {
+                            console.log(`[Shaka-Filter] Replacing URI with signed keyServerUrl.`);
+                            request.uris[0] = episode.keyServerUrl;
+                        } else {
+                            console.error("[Shaka-Filter] Key request intercepted, but no keyServerUrl is available for the episode. Playback will fail.");
+                        }
+                    }
+                }
             });
 
             player.addEventListener('error', onPlayerError);
@@ -593,7 +597,7 @@ useEffect(() => {
         }}
       >
         <DialogHeader className="p-1 border-b flex flex-row items-center justify-between">
-            <div className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8" aria-hidden="true">
+            <div className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8">
                 {courseLoading ? (
                     <Skeleton className="h-5 w-48" />
                 ) : (

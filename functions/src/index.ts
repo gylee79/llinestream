@@ -94,6 +94,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         action: 'read',
         expires: signedUrlExpireTime
     });
+    console.log(`[${episodeId}] Generated Signed URL for key (valid for 7 days): ${signedKeyUrl.substring(0, 80)}...`);
 
     console.log(`[${episodeId}] Starting HLS packaging job for ${inputUri}`);
     await docRef.update({ packagingStatus: "processing" });
@@ -140,6 +141,8 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                         id: 'aes-128-encryption',
                         aes128: {
                             // The Transcoder service reads this key to encrypt the video content.
+                            // The gs:// URI is also written into the manifest, which is what allows
+                            // the client-side player to identify the key request and replace it.
                             uri: keyStorageUri,
                         },
                     },
@@ -147,6 +150,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
             },
         },
     };
+    console.log(`[${episodeId}] Transcoder job request payload:`, JSON.stringify(request, null, 2));
 
     try {
         const [response] = await client.createJob(request);
@@ -156,9 +160,10 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         for (let i = 0; i < 60; i++) {
             await new Promise(resolve => setTimeout(resolve, 10000)); 
             const [job] = await client.getJob({ name: response.name });
+            console.log(`[${episodeId}] Polling job status... Current state: ${job.state}`);
 
             if (job.state === 'SUCCEEDED') {
-                console.log(`[${episodeId}] Transcoder job succeeded.`);
+                console.log(`[${episodeId}] Transcoder job succeeded. Manifest URL: ${outputUri}manifest.m3u8`);
                 await docRef.update({
                     packagingStatus: 'completed',
                     manifestUrl: `${outputUri}manifest.m3u8`.replace(`gs://${bucket.name}/`, `https://storage.googleapis.com/${bucket.name}/`),
