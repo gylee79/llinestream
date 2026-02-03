@@ -115,18 +115,46 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         
         console.log(`[${episodeId}] HLS Job: Creating Transcoder job with request:`, JSON.stringify(request, null, 2));
         
-        const [operation] = await client.createJob(request);
-
-        if (!operation.name) {
+        const [createJobResponse] = await client.createJob(request);
+        
+        if (!createJobResponse.name) {
             throw new Error('Transcoder job creation failed, no job name returned.');
         }
-        const jobName = operation.name;
+        const jobName = createJobResponse.name;
         console.log(`[${episodeId}] HLS Job: Transcoder job created successfully. Job name: ${jobName}`);
-        
-        // Polling logic is removed as we let the function run and trust the timeout.
-        // For production, a more robust solution would be to use Cloud Tasks or Pub/Sub
-        // to handle the long-running operation without blocking the function.
-        // However, for this context, we will rely on the function timeout.
+
+        const POLLING_INTERVAL = 15000; // 15 seconds
+        const MAX_POLLS = 35; // 35 * 15s = 525s (8.75 minutes) < 540s timeout
+        let jobSucceeded = false;
+
+        for (let i = 0; i < MAX_POLLS; i++) {
+            await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
+            
+            const [job] = await client.getJob({ name: jobName });
+            
+            console.log(`[${episodeId}] HLS Job: Polling job status... (Attempt ${i+1}/${MAX_POLLS}). Current state: ${job.state}`);
+
+            if (job.state === 'SUCCEEDED') {
+                console.log(`[${episodeId}] HLS Job: Transcoder job SUCCEEDED. Manifest will be at: ${outputUri}manifest.m3u8`);
+                await docRef.update({
+                    packagingStatus: 'completed',
+                    manifestUrl: `${outputUri}manifest.m3u8`.replace(`gs://${bucket.name}/`, `https://storage.googleapis.com/${bucket.name}/`),
+                    keyServerUrl: signedKeyUrl,
+                    packagingError: null,
+                });
+                console.log(`[${episodeId}] HLS Job: Firestore document updated to 'completed'.`);
+                jobSucceeded = true;
+                break;
+            } else if (job.state === 'FAILED') {
+                const errorMessage = `Transcoder job failed: ${JSON.stringify(job.error, null, 2)}`;
+                console.error(`[${episodeId}] HLS Job: FAILED state detected. Error:`, job.error);
+                throw new Error(errorMessage);
+            }
+        }
+
+        if (!jobSucceeded) {
+             throw new Error(`Transcoder job timed out after ${MAX_POLLS * POLLING_INTERVAL / 1000 / 60} minutes.`);
+        }
 
     } catch (error: any) {
         console.error(`[${episodeId}] HLS packaging process failed critically. Error:`, error);
@@ -175,7 +203,6 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
     }
     const inputUriForTranscoder = `gs://${bucket.name}/${filePath}`;
     
-    // We run these in parallel. If one fails, the other can still succeed.
     const aiAnalysisPromise = runAiAnalysis(episodeId, filePath, docRef);
     const hlsPackagingPromise = createHlsPackagingJob(episodeId, inputUriForTranscoder, docRef);
 

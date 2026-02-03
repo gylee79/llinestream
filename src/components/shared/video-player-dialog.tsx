@@ -506,7 +506,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             setPlayerError(null);
 
             if (episode.packagingStatus !== 'completed') {
-                const statusMessage = `영상을 재생 가능하도록 암호화하고 있습니다. 이 작업은 영상 길이에 따라 몇 분 정도 소요될 수 있습니다. 잠시 후 다시 시도해주세요. (상태: ${episode.packagingStatus || 'unknown'})`;
+                const statusMessage = `영상을 재생 가능하도록 암호화하고 있습니다. 이 작업은 영상 길이에 따라 몇 분 정도 소요될 수 있습니다.\n잠시 후 다시 시도해주세요. (상태: ${episode.packagingStatus || 'unknown'})`;
                 setPlayerError(statusMessage);
                 setIsLoading(false);
                 return;
@@ -527,7 +527,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 await player.attach(videoRef.current);
 
                 player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
-                    const keyUriIndex = request.uris.findIndex(uri => uri.startsWith('gs://'));
+                    const keyUriIndex = request.uris.findIndex(uri => uri.includes('gs://'));
                     
                     if (keyUriIndex !== -1) {
                          console.log(`[Shaka-Filter] Matched key URI: ${request.uris[keyUriIndex]}`);

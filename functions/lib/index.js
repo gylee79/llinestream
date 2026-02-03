@@ -56,7 +56,7 @@ if (!admin.apps.length) {
 (0, v2_1.setGlobalOptions)({
     region: "us-central1",
     secrets: ["GOOGLE_GENAI_API_KEY"],
-    timeoutSeconds: 1200, // Increased timeout for polling
+    timeoutSeconds: 540, // Set to maximum allowed timeout (9 minutes)
     memory: "2GiB",
 });
 const db = admin.firestore();
