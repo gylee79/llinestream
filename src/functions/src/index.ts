@@ -9,7 +9,7 @@ import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/fire
 import * as admin from "firebase-admin";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
-import { TranscoderServiceClient } from '@google-cloud/video-transcoder').v1;
+import { TranscoderServiceClient } from '@google-cloud/video-transcoder';
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
@@ -65,121 +65,107 @@ function initializeTools() {
 
 // 3. HLS Packaging with Transcoder API (AES-128)
 async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef: admin.firestore.DocumentReference): Promise<void> {
-    const { transcoderClient: client } = initializeTools();
-    const projectId = await client.getProjectId();
-    const location = 'us-central1';
+    try {
+        await docRef.update({ packagingStatus: "processing", packagingError: null });
+        console.log(`[${episodeId}] HLS Job: Set status to 'processing'.`);
 
-    const outputFolder = `episodes/${episodeId}/packaged/`;
-    const outputUri = `gs://${bucket.name}/${outputFolder}`;
+        const { transcoderClient: client } = initializeTools();
+        const projectId = await client.getProjectId();
+        const location = 'us-central1';
 
-    // --- AES-128 Encryption Key Generation & Upload ---
-    const aesKey = crypto.randomBytes(16);
-    const keyFileName = 'enc.key';
-    const keyStoragePath = `episodes/${episodeId}/keys/${keyFileName}`;
-    const keyFile = bucket.file(keyStoragePath);
-    
-    console.log(`[${episodeId}] HLS Job: Uploading AES-128 key to ${keyStoragePath}`);
-    await keyFile.save(aesKey, { contentType: 'application/octet-stream' });
-    console.log(`[${episodeId}] HLS Job: AES-128 key uploaded.`);
-    
-    const keyStorageUriForManifest = `gs://${bucket.name}/${keyStoragePath}`;
-    
-    const signedUrlExpireTime = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days validity
-    const [signedKeyUrl] = await keyFile.getSignedUrl({
-        action: 'read',
-        expires: signedUrlExpireTime
-    });
-    console.log(`[${episodeId}] HLS Job: Generated Signed URL for key.`);
+        const outputFolder = `episodes/${episodeId}/packaged/`;
+        const outputUri = `gs://${bucket.name}/${outputFolder}`;
 
-    console.log(`[${episodeId}] HLS Job: Starting HLS packaging job for ${inputUri}`);
-    await docRef.update({ packagingStatus: "processing" });
+        const aesKey = crypto.randomBytes(16);
+        const keyFileName = 'enc.key';
+        const keyStoragePath = `episodes/${episodeId}/keys/${keyFileName}`;
+        const keyFile = bucket.file(keyStoragePath);
+        
+        console.log(`[${episodeId}] HLS Job: Uploading AES-128 key to ${keyStoragePath}`);
+        await keyFile.save(aesKey, { contentType: 'application/octet-stream' });
+        
+        const keyStorageUriForManifest = `gs://${bucket.name}/${keyStoragePath}`;
+        
+        const signedUrlExpireTime = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days validity
+        const [signedKeyUrl] = await keyFile.getSignedUrl({ action: 'read', expires: signedUrlExpireTime });
+        console.log(`[${episodeId}] HLS Job: Generated Signed URL for key. Expiration: ${new Date(signedUrlExpireTime).toISOString()}`);
 
-    const request = {
-        parent: `projects/${projectId}/locations/${location}`,
-        job: {
-            inputUri,
-            outputUri,
-            config: {
-                muxStreams: [
-                    {
+        const request = {
+            parent: `projects/${projectId}/locations/${location}`,
+            job: {
+                inputUri,
+                outputUri,
+                config: {
+                    muxStreams: [{
                         key: 'sd-hls',
                         container: 'ts',
                         elementaryStreams: ['sd-video-stream', 'audio-stream'],
-                        segmentSettings: {
-                            individualSegments: true,
-                            segmentDuration: { seconds: 4 },
-                        },
+                        segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
                         encryptionId: 'aes-128-encryption',
-                    },
-                ],
-                elementaryStreams: [
-                    {
-                        key: 'sd-video-stream',
-                        videoStream: {
-                            h264: { heightPixels: 480, widthPixels: 854, bitrateBps: 1000000, frameRate: 30 },
-                        },
-                    },
-                    {
-                        key: 'audio-stream',
-                        audioStream: { codec: 'aac', bitrateBps: 128000 },
-                    },
-                ],
-                manifests: [
-                    {
-                        fileName: 'manifest.m3u8',
-                        type: 'HLS',
-                        muxStreams: ['sd-hls'],
-                    },
-                ],
-                encryptions: [
-                    {
-                        id: 'aes-128-encryption',
-                        aes128: {
-                            uri: keyStorageUriForManifest, 
-                        },
-                    },
-                ],
+                    }],
+                    elementaryStreams: [
+                        { key: 'sd-video-stream', videoStream: { h264: { heightPixels: 480, widthPixels: 854, bitrateBps: 1000000, frameRate: 30 }}},
+                        { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
+                    ],
+                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['sd-hls'] }],
+                    encryptions: [{ id: 'aes-128-encryption', aes128: { uri: keyStorageUriForManifest } }],
+                },
             },
-        },
-    };
-    console.log(`[${episodeId}] HLS Job: Transcoder job request payload prepared.`);
-
-    try {
-        const [response] = await client.createJob(request);
-        console.log(`[${episodeId}] HLS Job: Transcoder job created: ${response.name}`);
+        };
         
+        console.log(`[${episodeId}] HLS Job: Creating Transcoder job with request:`, JSON.stringify(request, null, 2));
+        
+        const createJobResponse = await client.createJob(request);
+        const response = createJobResponse[0];
+
+        if (!response.name) {
+            throw new Error('Transcoder job creation failed, no job name returned.');
+        }
+        const jobName = response.name;
+        console.log(`[${episodeId}] HLS Job: Transcoder job created successfully. Job name: ${jobName}`);
+
+        const POLLING_INTERVAL = 15000;
+        const MAX_POLLS = 72; // 18 minutes timeout
         let jobSucceeded = false;
-        // Increased polling timeout to 18 minutes (108 * 10s = 1080s)
-        for (let i = 0; i < 108; i++) {
-            await new Promise(resolve => setTimeout(resolve, 10000)); 
-            const [job] = await client.getJob({ name: response.name });
-            console.log(`[${episodeId}] HLS Job: Polling job status... Current state: ${job.state}`);
+
+        for (let i = 0; i < MAX_POLLS; i++) {
+            await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
+            
+            const getJobResponse = await client.getJob({ name: jobName });
+            const job = getJobResponse[0];
+            
+            console.log(`[${episodeId}] HLS Job: Polling job status... (Attempt ${i+1}/${MAX_POLLS}). Current state: ${job.state}`);
 
             if (job.state === 'SUCCEEDED') {
-                console.log(`[${episodeId}] HLS Job: Transcoder job SUCCEEDED. Manifest URL: ${outputUri}manifest.m3u8`);
+                console.log(`[${episodeId}] HLS Job: Transcoder job SUCCEEDED. Manifest will be at: ${outputUri}manifest.m3u8`);
                 await docRef.update({
                     packagingStatus: 'completed',
                     manifestUrl: `${outputUri}manifest.m3u8`.replace(`gs://${bucket.name}/`, `https://storage.googleapis.com/${bucket.name}/`),
                     keyServerUrl: signedKeyUrl,
+                    packagingError: null,
                 });
+                console.log(`[${episodeId}] HLS Job: Firestore document updated to 'completed'.`);
                 jobSucceeded = true;
                 break;
             } else if (job.state === 'FAILED') {
-                throw new Error(`Transcoder job failed: ${JSON.stringify(job.error)}`);
+                const errorMessage = `Transcoder job failed: ${JSON.stringify(job.error, null, 2)}`;
+                console.error(`[${episodeId}] HLS Job: FAILED state detected. Error:`, job.error);
+                throw new Error(errorMessage);
             }
         }
 
         if (!jobSucceeded) {
-             throw new Error('Transcoder job timed out after 18 minutes.');
+             throw new Error(`Transcoder job timed out after ${MAX_POLLS * POLLING_INTERVAL / 1000 / 60} minutes.`);
         }
 
     } catch (error: any) {
-        console.error(`[${episodeId}] HLS packaging failed:`, error);
-        await docRef.update({ packagingStatus: "failed", aiProcessingError: error.message || 'HLS packaging failed.' });
-        // Do not re-throw, allow AI analysis to potentially succeed independently.
+        console.error(`[${episodeId}] HLS packaging process failed critically. Error:`, error);
+        await docRef.update({ 
+            packagingStatus: "failed", 
+            packagingError: error.message || 'An unknown error occurred during HLS packaging.' 
+        });
     }
 }
-
 
 // ==========================================
 // [Trigger] 메인 분석 함수 (v2 onDocumentWritten)
@@ -205,35 +191,28 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
     
     console.log(`✨ [${episodeId}] New analysis job detected. Starting...`);
 
-    // Set initial processing statuses for both tasks
-    await docRef.update({ aiProcessingStatus: "processing", packagingStatus: "pending" });
+    await docRef.update({ aiProcessingStatus: "processing" });
     
     const filePath = afterData.filePath;
     if (!filePath) {
       await docRef.update({ 
           aiProcessingStatus: "failed", 
           packagingStatus: "failed", 
-          aiProcessingError: "No filePath found in document." 
+          aiProcessingError: "No filePath found in document.",
+          packagingError: "No filePath found in document."
       });
       return;
     }
     const inputUriForTranscoder = `gs://${bucket.name}/${filePath}`;
     
-    // 비디오 AI 분석과 HLS 패키징을 병렬로 실행합니다.
     const aiAnalysisPromise = runAiAnalysis(episodeId, filePath, docRef);
     const hlsPackagingPromise = createHlsPackagingJob(episodeId, inputUriForTranscoder, docRef);
 
     try {
-        await Promise.all([aiAnalysisPromise, hlsPackagingPromise]);
-        console.log(`✅ [${episodeId}] All jobs (AI & HLS) finished processing.`);
+        await Promise.allSettled([aiAnalysisPromise, hlsPackagingPromise]);
+        console.log(`✅ [${episodeId}] All jobs (AI & HLS) have finished their execution.`);
     } catch(error: any) {
-        // This catch block is a fallback. Individual promises handle their own errors.
-        console.error(`❌ [${episodeId}] A critical unexpected error occurred in Promise.all.`, error);
-        await docRef.update({ 
-            aiProcessingStatus: "failed",
-            packagingStatus: "failed",
-            aiProcessingError: `A critical error occurred: ${error.message || 'Unknown'}`
-        });
+        console.error(`❌ [${episodeId}] A critical unexpected error occurred in Promise.all. This should not happen.`, error);
     }
 });
 
@@ -369,7 +348,6 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
         aiProcessingStatus: "failed",
         aiProcessingError: error.message || String(error)
       });
-      // Do not re-throw, allow HLS packaging to continue.
     } finally {
       if (fs.existsSync(tempFilePath)) { try { fs.unlinkSync(tempFilePath); } catch (e) {} }
       if (uploadedFile) { try { await localFileManager.deleteFile(uploadedFile.name); } catch (e) {} }
@@ -387,7 +365,6 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
     const data = snap.data() as EpisodeData;
     if (!data) return;
     
-    // This will delete the entire folder for the episode including video, thumbnails, keys, and packaged content.
     await bucket.deleteFiles({ prefix: `episodes/${episodeId}/` }).catch(() => {});
     
     const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
@@ -401,6 +378,7 @@ interface EpisodeData {
   courseId: string;
   aiProcessingStatus?: string;
   packagingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  packagingError?: string | null;
   defaultThumbnailPath?: string;
   customThumbnailPath?: string;
   vttPath?: string;
