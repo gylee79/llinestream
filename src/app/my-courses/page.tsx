@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -124,12 +125,11 @@ const MyCoursesPage = () => {
                 <Card className="overflow-hidden">
                   <AccordionTrigger className="w-full text-left p-4 hover:no-underline bg-muted/50">
                     <div className="flex items-center gap-4">
-                        <div className="relative h-16 w-16 flex-shrink-0">
-                            <Image src={course.thumbnailUrl} alt={course.name} fill sizes="64px" className="object-cover rounded-md" />
+                        <div className="relative w-24 aspect-video flex-shrink-0">
+                            <Image src={course.thumbnailUrl} alt={course.name} fill sizes="96px" className="object-cover rounded-md" />
                         </div>
                         <div className="flex-1">
                             <h2 className="font-bold text-lg">{course.name}</h2>
-                            <p className="text-sm text-muted-foreground line-clamp-1">{course.description}</p>
                         </div>
                     </div>
                   </AccordionTrigger>
