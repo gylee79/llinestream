@@ -504,7 +504,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 const onPlayerError = useCallback((error: any) => {
     const shakaError = error instanceof shaka.util.Error ? error : error.detail;
     
-    console.error("Shaka Player Error:", JSON.stringify(shakaError, Object.getOwnPropertyNames(shakaError)));
+    // Log the full error for debugging
+    console.error("Shaka Player Error Details:", JSON.stringify(shakaError, Object.getOwnPropertyNames(shakaError)));
     
     if (shakaError && shakaError.code) {
         let message = `플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
@@ -541,19 +542,15 @@ useEffect(() => {
             await player.attach(video);
             
             player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
+              // This filter intercepts the request for the decryption key.
               if (type === shaka.net.NetworkingEngine.RequestType.KEY) {
                   const keyUri = request.uris[0];
-                  if (keyUri && keyUri.endsWith('enc.key')) {
-                      if (episode.keyServerUrl) {
-                          request.uris[0] = episode.keyServerUrl;
-                      } else {
-                           return Promise.reject(new shaka.util.Error(
-                              shaka.util.Error.Severity.CRITICAL,
-                              shaka.util.Error.Category.NETWORK,
-                              shaka.util.Error.Code.BAD_HTTP_STATUS,
-                              '암호화된 콘텐츠이지만 키 URL이 제공되지 않았습니다.'
-                          ));
-                      }
+                  console.log(`[Shaka-Filter] Intercepted key request for URI: ${keyUri}.`);
+                  if (episode.keyServerUrl) {
+                      console.log(`[Shaka-Filter] Replacing URI with signed keyServerUrl.`);
+                      request.uris[0] = episode.keyServerUrl;
+                  } else {
+                       console.error("[Shaka-Filter] Intercepted key request but no keyServerUrl is available for the episode. Playback will fail.");
                   }
               }
             });
@@ -595,13 +592,7 @@ useEffect(() => {
           }
         }}
       >
-        <DialogHeader className="sr-only">
-            <DialogTitle>{episode.title}</DialogTitle>
-            <DialogDescription>
-                {`'${episode.title}' 영상 재생 및 학습 활동`}
-            </DialogDescription>
-        </DialogHeader>
-        <div className="flex-shrink-0 flex items-center justify-between p-1 border-b">
+        <DialogHeader className="p-1 border-b flex flex-row items-center justify-between">
             <div className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8" aria-hidden="true">
                 {courseLoading ? (
                     <Skeleton className="h-5 w-48" />
@@ -621,7 +612,10 @@ useEffect(() => {
                     <X className="h-4 w-4" />
                 </DialogClose>
              </div>
-        </div>
+             {/* Screen-reader only title */}
+             <DialogTitle className="sr-only">{episode.title}</DialogTitle>
+             <DialogDescription className="sr-only">{`'${episode.title}' 영상 재생 및 학습 활동`}</DialogDescription>
+        </DialogHeader>
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:px-6 md:pb-6 overflow-hidden bg-muted/50">
             {/* Video Player Section */}
             <Card className="col-span-10 md:col-span-7 flex flex-col bg-black md:rounded-xl overflow-hidden shadow-lg border-border">
