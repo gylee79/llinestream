@@ -1,4 +1,3 @@
-
 'use server';
 
 import { config } from 'dotenv';
@@ -160,5 +159,3 @@ export async function deleteHierarchyItem(
     return { success: false, message: `삭제 실패: ${errorMessage}` };
   }
 }
-
-    

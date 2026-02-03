@@ -1,4 +1,3 @@
-
 'use server';
 
 import { config } from 'dotenv';
@@ -54,5 +53,3 @@ export async function logEpisodeView(payload: LogViewPayload): Promise<{ success
     return { success: false, message: `시청 기록 저장 실패: ${errorMessage}` };
   }
 }
-
-    
