@@ -301,12 +301,12 @@ const BookmarkView = ({ episode, user, videoElement }: { episode: Episode; user:
 
     useEffect(() => {
         if (bookmarksError) {
-            console.error("Firestore query error:", bookmarksError);
+            console.error("Firestore query error for bookmarks:", bookmarksError);
             if (bookmarksError.message.includes("indexes")) {
                  toast({
                     variant: "destructive",
                     title: "색인 필요",
-                    description: "책갈피를 불러오려면 Firestore 색인 생성이 필요합니다. 브라우저 콘솔의 링크를 클릭하여 색인을 생성해주세요.",
+                    description: "책갈피를 불러오려면 Firestore 색인 생성이 필요합니다. 브라우저 콘솔(F12)의 링크를 클릭하여 색인을 생성해주세요.",
                     duration: 10000,
                 });
             }
@@ -468,10 +468,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     if (shakaError && shakaError.category) {
         switch (shakaError.category) {
             case shaka.util.Error.Category.NETWORK:
-                message = `네트워크 오류로 비디오를 불러올 수 없습니다.
-                브라우저 콘솔(F12)에서 CORS 관련 오류 메시지가 있는지 확인해주세요.
-                만약 CORS 오류가 발생했다면, 터미널에서 다음 명령어를 실행하여 스토리지 설정을 업데이트해야 합니다:
-                gcloud storage buckets update gs://<YOUR_BUCKET_NAME> --cors-file=cors.json`;
+                message = `네트워크 오류로 비디오를 불러올 수 없습니다.\n브라우저 콘솔(F12)에서 CORS 관련 오류 메시지가 있는지 확인해주세요.\n만약 CORS 오류가 발생했다면, 터미널에서 다음 명령어를 실행하여 스토리지 설정을 업데이트해야 합니다:\ngcloud storage buckets update gs://<YOUR_BUCKET_NAME> --cors-file=cors.json`;
                 break;
             case shaka.util.Error.Category.DRM:
                 message = `DRM 라이선스 요청에 실패했습니다 (코드: ${shakaError.code}). 키 서버 URL 또는 DRM 관련 설정이 올바른지 확인해주세요.`;
@@ -538,11 +535,23 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 await player.attach(videoRef.current);
                 
                 player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
-                    // Intercept any request URI that starts with gs://, as this is the placeholder for our key.
+                    // For HLS AES-128, the key request URI is in the manifest.
+                    // Shaka Player makes a request for this URI. We intercept any request
+                    // whose URI starts with 'gs://' (our placeholder for the key path in GCS)
+                    // and replace it with the short-lived signed URL we generated.
                     if (request.uris[0].startsWith('gs://')) {
-                         console.log(`[Shaka-Filter] 가로챈 URI: ${request.uris[0]}`);
-                         console.log(`[Shaka-Filter] 서명된 keyServerUrl로 교체합니다.`);
-                         request.uris[0] = episode.keyServerUrl!;
+                        console.log(`[Shaka-Filter] 가로챈 URI (${shaka.net.NetworkingEngine.RequestType[type]}): ${request.uris[0]}`);
+                        if (!episode.keyServerUrl) {
+                            // This is a critical failure, as we cannot get the decryption key.
+                            throw new shaka.util.Error(
+                                shaka.util.Error.Severity.CRITICAL,
+                                shaka.util.Error.Category.DRM,
+                                shaka.util.Error.Code.LICENSE_REQUEST_FAILED,
+                                '에피소드 데이터에 암호화 키 URL(keyServerUrl)이 없습니다. 영상이 올바르게 처리되었는지 확인해주세요.'
+                            );
+                        }
+                        request.uris[0] = episode.keyServerUrl;
+                        console.log(`[Shaka-Filter] 서명된 keyServerUrl로 교체 완료.`);
                     }
                 });
 
@@ -592,7 +601,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         }}
       >
         <DialogHeader className="p-1 border-b flex-shrink-0 flex flex-row items-center justify-between min-h-[41px]">
-            <div className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8">
+            <DialogTitle className="text-sm font-medium text-muted-foreground line-clamp-1 pr-8">
                 {courseLoading ? (
                     <Skeleton className="h-5 w-48" />
                 ) : (
@@ -602,7 +611,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     <span>{episode.title}</span>
                     </>
                 )}
-            </div>
+            </DialogTitle>
+            <DialogDescription className="sr-only">{`'${episode.title}' 영상을 재생하고 관련 학습 활동을 할 수 있는 다이얼로그입니다.`}</DialogDescription>
+
              <div className="flex items-center gap-1">
                  <Button variant="ghost" size="icon" onClick={handleDownload} className="w-8 h-8">
                      <Download className="h-4 w-4" />
@@ -611,8 +622,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     <X className="h-4 w-4" />
                 </DialogClose>
              </div>
-             <DialogTitle className="sr-only">{`영상 플레이어: ${episode.title}`}</DialogTitle>
-             <DialogDescription className="sr-only">{`'${episode.title}' 영상을 재생하고 관련 학습 활동을 할 수 있는 다이얼로그입니다.`}</DialogDescription>
         </DialogHeader>
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:px-6 md:pb-6 overflow-hidden bg-muted/50">
             {/* Video Player Section */}
