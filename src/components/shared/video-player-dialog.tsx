@@ -506,14 +506,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             setPlayerError(null);
 
             if (episode.packagingStatus !== 'completed') {
-                const statusMessage = `영상을 재생 가능하도록 암호화하고 있습니다. 잠시 후 다시 시도해주세요. (상태: ${episode.packagingStatus || 'unknown'})`;
+                const statusMessage = `영상을 재생 가능하도록 암호화하고 있습니다. 이 작업은 영상 길이에 따라 몇 분 정도 소요될 수 있습니다. 잠시 후 다시 시도해주세요. (상태: ${episode.packagingStatus || 'unknown'})`;
                 setPlayerError(statusMessage);
                 setIsLoading(false);
                 return;
             }
             
-            if (!episode.manifestUrl) {
-                setPlayerError('재생할 영상 주소(manifestUrl)가 없습니다.');
+            if (!episode.manifestUrl || !episode.keyServerUrl) {
+                setPlayerError('재생에 필요한 영상 주소(manifestUrl) 또는 키 서버 주소(keyServerUrl)가 없습니다.');
                 setIsLoading(false);
                 return;
             }
@@ -530,15 +530,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     const keyUriIndex = request.uris.findIndex(uri => uri.startsWith('gs://'));
                     
                     if (keyUriIndex !== -1) {
-                        if (!episode.keyServerUrl) {
-                            throw new shaka.util.Error(
-                                shaka.util.Error.Severity.CRITICAL,
-                                shaka.util.Error.Category.DRM,
-                                shaka.util.Error.Code.LICENSE_REQUEST_FAILED,
-                                '에피소드 데이터에 암호화 키 URL(keyServerUrl)이 없습니다.'
-                            );
-                        }
-                        request.uris[keyUriIndex] = episode.keyServerUrl;
+                         console.log(`[Shaka-Filter] Matched key URI: ${request.uris[keyUriIndex]}`);
+                        request.uris[keyUriIndex] = episode.keyServerUrl!;
                     }
                 });
 
@@ -609,7 +602,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                  <Button variant="ghost" size="icon" onClick={handleDownload} className="w-8 h-8">
                      <Download className="h-4 w-4" />
                  </Button>
-                {/* This is the automatically included close button from DialogContent */}
+                <DialogClose className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground w-8 h-8">
+                    <X className="h-4 w-4 mx-auto" />
+                    <span className="sr-only">Close</span>
+                </DialogClose>
              </div>
         </DialogHeader>
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:px-6 md:pb-6 overflow-hidden bg-muted/50">
@@ -621,7 +617,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                              {isLoading && !playerError && (
                                 <>
                                     <Loader className="h-12 w-12 text-white animate-spin mb-4" />
-                                    <div className="whitespace-pre-wrap">{episode.packagingStatus !== 'completed' ? '영상을 재생 가능하도록 암호화하고 있습니다.\n잠시 후 다시 시도해주세요.' : '플레이어 로딩 중...'}</div>
+                                    <div className="whitespace-pre-wrap">{episode.packagingStatus !== 'completed' ? '영상을 재생 가능하도록 암호화하고 있습니다.\n이 작업은 영상 길이에 따라 몇 분 정도 소요될 수 있습니다.\n잠시 후 다시 시도해주세요.' : '플레이어 로딩 중...'}</div>
                                 </>
                             )}
                             {playerError && (
@@ -663,5 +659,3 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
-
-    
