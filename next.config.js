@@ -5,11 +5,14 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '500mb',
     },
-    serverExternalPackages: [
+    serverComponentsExternalPackages: [
       "genkit",
       "@genkit-ai/firebase",
       "@genkit-ai/google-genai",
       "firebase-admin",
+      "@opentelemetry/instrumentation",
+      "@opentelemetry/sdk-node",
+      "require-in-the-middle",
     ],
   },
   images: {
