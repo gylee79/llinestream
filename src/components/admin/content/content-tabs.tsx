@@ -1,27 +1,10 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from '@/components/ui/skeleton';
-
-const TabSkeleton = () => (
-    <div className="mt-4">
-        <Skeleton className="h-[70vh] w-full" />
-    </div>
-);
-
-const HierarchyManager = dynamic(() => import('@/components/admin/content/hierarchy-manager'), { 
-    loading: () => <TabSkeleton />,
-});
-const PricingManager = dynamic(() => import('@/components/admin/content/pricing-manager'), { 
-    loading: () => <TabSkeleton />,
-});
-const VideoManager = dynamic(() => import('@/components/admin/content/video-manager'), {
-    loading: () => <TabSkeleton />,
-});
-const InstructorManager = dynamic(() => import('@/components/admin/content/instructor-manager'), { 
-    loading: () => <TabSkeleton />,
-});
+import HierarchyManager from '@/components/admin/content/hierarchy-manager';
+import PricingManager from '@/components/admin/content/pricing-manager';
+import VideoManager from '@/components/admin/content/video-manager';
+import InstructorManager from '@/components/admin/content/instructor-manager';
 
 
 export default function ContentTabs() {
