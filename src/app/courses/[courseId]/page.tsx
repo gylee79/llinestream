@@ -1,7 +1,6 @@
-
 'use client';
 import Image from 'next/image';
-import { notFound, useParams } from 'next/navigation';
+import { notFound, useParams, useSearchParams } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import type { Course, Episode, Instructor, EpisodeComment, CarouselApi, EpisodeViewLog } from '@/lib/types';
@@ -20,9 +19,13 @@ import { DotButton, useDotButton } from '@/components/ui/dot-button';
 import { Button } from '@/components/ui/button';
 import EpisodeCommentDialog from '@/components/shared/episode-comment-dialog';
 import CourseImagesDialog from '@/components/shared/course-images-dialog';
+import dynamic from 'next/dynamic';
+
+const VideoPlayerDialog = dynamic(() => import('@/components/shared/video-player-dialog'), { ssr: false });
 
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
+  const searchParams = useSearchParams();
   const firestore = useFirestore();
   const { user } = useUser();
 
@@ -33,6 +36,8 @@ export default function CourseDetailPage() {
   const { selectedIndex, scrollSnaps, onDotButtonClick } = useDotButton(api);
   const [isAllReviewsOpen, setAllReviewsOpen] = useState(false);
   const [isImagesDialogOpen, setImagesDialogOpen] = useState(false);
+
+  const [playingEpisode, setPlayingEpisode] = useState<Episode | null>(null);
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', params.courseId) : null), [firestore, params.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
@@ -56,6 +61,17 @@ export default function CourseDetailPage() {
     if (!viewLogs) return new Set<string>();
     return new Set(viewLogs.map(log => log.episodeId));
   }, [viewLogs]);
+
+  useEffect(() => {
+    const episodeIdFromQuery = searchParams.get('episode');
+    if (episodeIdFromQuery && episodes) {
+        const foundEpisode = episodes.find(e => e.id === episodeIdFromQuery);
+        if (foundEpisode) {
+            setPlayingEpisode(foundEpisode);
+        }
+    }
+  }, [searchParams, episodes]);
+
 
   useEffect(() => {
     if (!firestore || !episodes || episodes.length === 0) {
@@ -193,6 +209,7 @@ export default function CourseDetailPage() {
                         user={user}
                         comments={episodeComments}
                         hasBeenWatched={watchedEpisodeIds.has(episode.id)}
+                        onPlay={() => setPlayingEpisode(episode)}
                     />
                   );
               })
@@ -219,6 +236,15 @@ export default function CourseDetailPage() {
         images={introImages}
         courseName={course.name}
       />
+
+      {playingEpisode && (
+        <VideoPlayerDialog
+            isOpen={!!playingEpisode}
+            onOpenChange={(open) => { if(!open) setPlayingEpisode(null) }}
+            episode={playingEpisode}
+            instructor={instructors?.find(i => i.id === playingEpisode.instructorId) || null}
+        />
+      )}
     </>
   );
 }

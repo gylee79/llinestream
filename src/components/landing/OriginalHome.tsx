@@ -9,7 +9,7 @@ import { Card, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
-import { BookUser, ShoppingCart, Bell, Search, BookOpen, ImageIcon, ChevronDown, ChevronUp } from 'lucide-react';
+import { BookUser, Search, BookOpen, ImageIcon, ChevronDown, ChevronUp, Bookmark, Download } from 'lucide-react';
 import ContentCarousel from '@/components/shared/content-carousel';
 import { motion, AnimatePresence, useMotionValue, animate, useTransform } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -123,27 +123,24 @@ const CollapsibleUserPanel = ({ user, isMobile }: { user: User, isMobile: boolea
                 >
                     <div ref={contentWrapperRef} className="pb-4">
                       <div className="p-4 bg-primary-foreground/20 rounded-lg flex justify-around">
-                          <Link href="/pricing" className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
-                              <div className="h-12 w-12 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-                                  <ShoppingCart className="h-6 w-6" />
-                              </div>
-                              <span>수강신청</span>
-                          </Link>
                           <Link href="/my-courses" className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
                               <div className="h-12 w-12 rounded-full bg-primary-foreground/20 flex items-center justify-center">
                                   <BookUser className="h-6 w-6" />
                               </div>
                               <span>나의 강의실</span>
                           </Link>
-                          <button className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
+                          <Link href="/my-bookmarks" className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
                               <div className="h-12 w-12 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-                                  <div className="relative">
-                                      <Bell className="h-6 w-6" />
-                                      <Badge variant="destructive" className="absolute -right-2 -top-2 h-4 w-4 justify-center rounded-full p-0 text-[10px]">0</Badge>
-                                  </div>
+                                  <Bookmark className="h-6 w-6" />
                               </div>
-                              <span>알림</span>
-                          </button>
+                              <span>책 갈피</span>
+                          </Link>
+                          <Link href="/downloads" className="flex flex-col items-center gap-2 text-sm font-medium hover:text-primary-foreground/80 transition-colors">
+                              <div className="h-12 w-12 rounded-full bg-primary-foreground/20 flex items-center justify-center">
+                                  <Download className="h-6 w-6" />
+                              </div>
+                              <span>다운로드함</span>
+                          </Link>
                       </div>
                     </div>
                 </motion.div>

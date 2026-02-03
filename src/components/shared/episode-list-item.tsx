@@ -13,7 +13,6 @@ import { doc } from 'firebase/firestore';
 import { toJSDate } from '@/lib/date-helpers';
 import dynamic from 'next/dynamic';
 
-const VideoPlayerDialog = dynamic(() => import('@/components/shared/video-player-dialog'), { ssr: false });
 const PaymentDialog = dynamic(() => import('@/components/shared/payment-dialog'), { ssr: false });
 const EpisodeCommentDialog = dynamic(() => import('@/components/shared/episode-comment-dialog'), { ssr: false });
 
@@ -30,11 +29,11 @@ interface EpisodeListItemProps {
     user: User | null;
     comments: EpisodeComment[];
     hasBeenWatched?: boolean;
+    onPlay: () => void;
 }
 
-export default function EpisodeListItem({ episode, instructor, user, comments, hasBeenWatched = false }: EpisodeListItemProps) {
+export default function EpisodeListItem({ episode, instructor, user, comments, hasBeenWatched = false, onPlay }: EpisodeListItemProps) {
     const firestore = useFirestore();
-    const [isPlayerOpen, setPlayerOpen] = useState(false);
     const [isPaymentOpen, setPaymentOpen] = useState(false);
     const [isCommentOpen, setCommentOpen] = useState(false);
     
@@ -60,7 +59,7 @@ export default function EpisodeListItem({ episode, instructor, user, comments, h
     const handlePlayClick = () => {
         if (courseLoading) return;
         if (isPlayable) {
-            setPlayerOpen(true);
+            onPlay();
         } else if (user) { // Only open payment dialog if user is logged in
             setPaymentOpen(true);
         } else {
@@ -131,15 +130,6 @@ export default function EpisodeListItem({ episode, instructor, user, comments, h
                     </div>
                 </CardContent>
             </Card>
-
-            {isPlayerOpen && (
-                <VideoPlayerDialog 
-                    isOpen={isPlayerOpen}
-                    onOpenChange={setPlayerOpen}
-                    episode={episode}
-                    instructor={instructor || null}
-                />
-            )}
 
             {isCommentOpen && user && (
                 <EpisodeCommentDialog 
