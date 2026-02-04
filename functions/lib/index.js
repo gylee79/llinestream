@@ -58,6 +58,7 @@ if (!admin.apps.length) {
     secrets: ["GOOGLE_GENAI_API_KEY"],
     timeoutSeconds: 540, // Set to maximum allowed timeout (9 minutes)
     memory: "2GiB",
+    serviceAccount: "firebase-adminsdk-fbsvc@studio-6929130257-b96ff.iam.gserviceaccount.com",
 });
 const db = admin.firestore();
 const storage = admin.storage();
@@ -110,7 +111,7 @@ async function createHlsPackagingJob(episodeId, inputUri, docRef) {
         const keyStorageUriForManifest = `gs://${bucket.name}/${keyStoragePath}`;
         const signedUrlExpireTime = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days validity
         const [signedKeyUrl] = await keyFile.getSignedUrl({ action: 'read', expires: signedUrlExpireTime });
-        console.log(`[${episodeId}] HLS Job: Generated Signed URL for key. Expiration: ${new Date(signedUrlExpireTime).toISOString()}`);
+        console.log(`[${episodeId}] HLS Job: Generated Signed URL for key.`);
         const request = {
             parent: `projects/${projectId}/locations/${location}`,
             job: {
@@ -119,15 +120,15 @@ async function createHlsPackagingJob(episodeId, inputUri, docRef) {
                 config: {
                     muxStreams: [
                         {
-                            key: 'video-sd-fmp4',
-                            container: 'fmp4',
+                            key: 'video-sd-ts',
+                            container: 'ts',
                             elementaryStreams: ['sd-video-stream'],
                             segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
                             encryptionId: 'aes-128-encryption',
                         },
                         {
-                            key: 'audio-fmp4',
-                            container: 'fmp4',
+                            key: 'audio-ts',
+                            container: 'ts',
                             elementaryStreams: ['audio-stream'],
                             segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
                             encryptionId: 'aes-128-encryption',
@@ -143,14 +144,10 @@ async function createHlsPackagingJob(episodeId, inputUri, docRef) {
                                 } } },
                         { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
                     ],
-                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS', muxStreams: ['video-sd-fmp4', 'audio-fmp4'] }],
+                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS', muxStreams: ['video-sd-ts', 'audio-ts'] }],
                     encryptions: [{
                             id: 'aes-128-encryption',
                             aes128: { uri: keyStorageUriForManifest },
-                            drmSystems: {
-                                clearkey: {}
-                            },
-                            encryptionMode: 'cenc'
                         }],
                 },
             },
@@ -374,16 +371,26 @@ async function runAiAnalysis(episodeId, filePath, docRef) {
 // [Trigger] 파일 삭제 함수 (v2 onDocumentDeleted)
 // ==========================================
 exports.deleteFilesOnEpisodeDelete = (0, firestore_1.onDocumentDeleted)("episodes/{episodeId}", async (event) => {
-    const snap = event.data;
-    if (!snap)
-        return;
     const { episodeId } = event.params;
-    const data = snap.data();
-    if (!data)
-        return;
-    await bucket.deleteFiles({ prefix: `episodes/${episodeId}/` }).catch(() => { });
-    const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
-    await aiChunkRef.delete().catch(() => { });
-    console.log(`[DELETE SUCCESS] Cleaned up files and AI chunk for deleted episode ${episodeId}`);
+    const prefix = `episodes/${episodeId}/`;
+    console.log(`[DELETE TRIGGER] Cleaning up for episode ${episodeId}. Deleting files with prefix: ${prefix}`);
+    // Delete all files in the episode's storage folder
+    try {
+        await bucket.deleteFiles({ prefix });
+        console.log(`[DELETE SUCCESS] Storage files with prefix "${prefix}" deleted.`);
+    }
+    catch (error) {
+        console.error(`[DELETE FAILED] Could not delete storage files for episode ${episodeId}. This might happen if the folder is already empty.`, error);
+    }
+    // Delete the corresponding document from the AI chunks collection
+    try {
+        const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
+        await aiChunkRef.delete();
+        console.log(`[DELETE SUCCESS] AI chunk for episode ${episodeId} deleted.`);
+    }
+    catch (error) {
+        console.error(`[DELETE FAILED] Could not delete AI chunk for episode ${episodeId}.`, error);
+    }
+    console.log(`[DELETE FINISHED] Cleanup process finished for episode ${episodeId}.`);
 });
 //# sourceMappingURL=index.js.map

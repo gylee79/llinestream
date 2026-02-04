@@ -123,15 +123,10 @@ export async function deleteHierarchyItem(
 
     // No dependencies, proceed with deletion
     if (collectionName === 'episodes') {
-        const episode = item as Episode;
-        await deleteStorageFileByPath(storage, episode.filePath);
-        await deleteStorageFileByPath(storage, episode.defaultThumbnailPath);
-        await deleteStorageFileByPath(storage, episode.customThumbnailPath);
-        if (episode.vttPath) {
-          await deleteStorageFileByPath(storage, episode.vttPath);
-        }
-        // Also delete from the centralized AI chunks collection
-        await db.collection('episode_ai_chunks').doc(id).delete().catch(() => {});
+        // The onDocumentDeleted trigger in Cloud Functions will handle deleting
+        // all associated storage files (video, thumbnails, VTT, packaged content)
+        // and the corresponding AI chunk document. We only need to delete the main episode doc here.
+        console.log(`[DELETE ACTION] Deleting episode document ${id}. Cloud Function will handle cleanup.`);
     } else if (collectionName === 'courses') {
         const course = item as Course;
         if (course.thumbnailPath) await deleteStorageFileByPath(storage, course.thumbnailPath);

@@ -24,7 +24,6 @@ setGlobalOptions({
   secrets: ["GOOGLE_GENAI_API_KEY"],
   timeoutSeconds: 540, // Set to maximum allowed timeout (9 minutes)
   memory: "2GiB",
-  // ✅ 요청하신대로, Firebase Admin SDK의 기본 서비스 계정으로 명확하게 통일합니다.
   serviceAccount: "firebase-adminsdk-fbsvc@studio-6929130257-b96ff.iam.gserviceaccount.com",
 });
 
@@ -99,15 +98,15 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                 config: {
                     muxStreams: [
                         {
-                            key: 'video-sd-fmp4',
-                            container: 'fmp4',
+                            key: 'video-sd-ts',
+                            container: 'ts',
                             elementaryStreams: ['sd-video-stream'],
                             segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
                             encryptionId: 'aes-128-encryption',
                         },
                         {
-                            key: 'audio-fmp4',
-                            container: 'fmp4',
+                            key: 'audio-ts',
+                            container: 'ts',
                             elementaryStreams: ['audio-stream'],
                             segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
                             encryptionId: 'aes-128-encryption',
@@ -123,20 +122,17 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                         }}},
                         { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
                     ],
-                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['video-sd-fmp4', 'audio-fmp4'] }],
+                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['video-sd-ts', 'audio-ts'] }],
                     encryptions: [{ 
                         id: 'aes-128-encryption', 
                         aes128: { uri: keyStorageUriForManifest },
-                        drmSystems: {
-                            clearkey: {}
-                        },
-                        encryptionMode: 'cenc' 
                     }],
                 },
             },
         };
         
         console.log(`[${episodeId}] HLS Job: Creating Transcoder job with request:`, JSON.stringify(request, null, 2));
+        
         const [createJobResponse] = await client.createJob(request);
         
         if (!createJobResponse.name) {
@@ -145,13 +141,15 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         const jobName = createJobResponse.name;
         console.log(`[${episodeId}] HLS Job: Transcoder job created successfully. Job name: ${jobName}`);
 
-        const POLLING_INTERVAL = 15000;
-        const MAX_POLLS = 35;
+        const POLLING_INTERVAL = 15000; // 15 seconds
+        const MAX_POLLS = 35; // 35 * 15s = 525s (8.75 minutes) < 540s timeout
         let jobSucceeded = false;
 
         for (let i = 0; i < MAX_POLLS; i++) {
             await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
+            
             const [job] = await client.getJob({ name: jobName });
+            
             console.log(`[${episodeId}] HLS Job: Polling job status... (Attempt ${i+1}/${MAX_POLLS}). Current state: ${job.state}`);
 
             if (job.state === 'SUCCEEDED') {
@@ -162,6 +160,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                     keyServerUrl: signedKeyUrl,
                     packagingError: null,
                 });
+                console.log(`[${episodeId}] HLS Job: Firestore document updated to 'completed'.`);
                 jobSucceeded = true;
                 break;
             } else if (job.state === 'FAILED') {
@@ -376,23 +375,44 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
 // ==========================================
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
     const snap = event.data;
-    if (!snap) return;
+    // The snapshot is undefined if the document did not exist (e.g. was already deleted).
+    if (!snap) {
+        console.log(`[DELETE SKIP] No data found for deleted episode ${event.params.episodeId}, function may have already run or doc was empty.`);
+        return;
+    }
 
     const { episodeId } = event.params;
     const data = snap.data() as EpisodeData;
-    if (!data) return;
-    
-    await bucket.deleteFiles({ prefix: `episodes/${episodeId}/` }).catch(() => {});
-    
-    const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
-    await aiChunkRef.delete().catch(() => {});
 
-    console.log(`[DELETE SUCCESS] Cleaned up files and AI chunk for deleted episode ${episodeId}`);
+    console.log(`[DELETE TRIGGER] Cleaning up for episode: ${episodeId} (${data.title || 'No Title'})`);
+    
+    const prefix = `episodes/${episodeId}/`;
+
+    try {
+        console.log(`[DELETE ACTION] Deleting all files with prefix: ${prefix}`);
+        await bucket.deleteFiles({ prefix });
+        console.log(`[DELETE SUCCESS] All storage files for episode ${episodeId} have been deleted.`);
+    } catch (error) {
+        console.error(`[DELETE FAILED] Storage cleanup for episode ${episodeId} failed. This might happen if the folder is already empty or due to permissions.`, error);
+        // We don't re-throw, to allow AI chunk deletion to proceed.
+    }
+    
+    // Also delete the corresponding document from the AI chunks collection
+    try {
+        const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
+        await aiChunkRef.delete();
+        console.log(`[DELETE SUCCESS] AI chunk for episode ${episodeId} deleted.`);
+    } catch (error) {
+        console.error(`[DELETE FAILED] Could not delete AI chunk for episode ${episodeId}.`, error);
+    }
+    
+    console.log(`[DELETE FINISHED] Cleanup process finished for episode ${episodeId}.`);
 });
 
 interface EpisodeData {
   filePath: string;
   courseId: string;
+  title?: string;
   aiProcessingStatus?: string;
   packagingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
   packagingError?: string | null;
