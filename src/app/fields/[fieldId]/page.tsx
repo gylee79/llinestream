@@ -93,7 +93,7 @@ export default function FieldDetailPage() {
                 <Tabs defaultValue={structuredData[0]?.classification.id} className="w-full">
                   <TabsList className="h-auto bg-transparent p-0 space-x-2">
                     {structuredData.map(({ classification }) => (
-                      <TabsTrigger key={classification.id} value={classification.id} className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                      <TabsTrigger key={classification.id} value={classification.id} className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-lg">
                         {classification.name}
                       </TabsTrigger>
                     ))}
@@ -108,7 +108,7 @@ export default function FieldDetailPage() {
                                     courseData.map(({ course, instructor }, index) => (
                                         <Link href={`/courses/${course.id}`} key={course.id} className="block group hover:bg-muted/50 transition-colors">
                                             <div className="p-4 flex items-center gap-4 border-b last:border-b-0">
-                                                <Avatar className="h-16 w-16 rounded-full">
+                                                <Avatar className="h-20 w-20 rounded-full">
                                                 {course.thumbnailUrl ? (
                                                     <AvatarImage src={course.thumbnailUrl} alt={course.name} className="object-cover" />
                                                 ) : (
