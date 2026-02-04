@@ -58,6 +58,7 @@ if (!admin.apps.length) {
     secrets: ["GOOGLE_GENAI_API_KEY"],
     timeoutSeconds: 540, // Set to maximum allowed timeout (9 minutes)
     memory: "2GiB",
+    serviceAccount: "firebase-adminsdk@studio-6929130257-b96ff.iam.gserviceaccount.com",
 });
 const db = admin.firestore();
 const storage = admin.storage();
@@ -129,25 +130,30 @@ async function createHlsPackagingJob(episodeId, inputUri, docRef) {
                         { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
                     ],
                     manifests: [{ fileName: 'manifest.m3u8', type: 'HLS', muxStreams: ['sd-hls'] }],
-                    encryptions: [{ id: 'aes-128-encryption', aes128: { uri: keyStorageUriForManifest } }],
+                    // ✅ 핵심 수정 사항: drmSystems: { clearkey: {} } 블록을 추가하여 API 유효성 검사 통과
+                    encryptions: [{
+                            id: 'aes-128-encryption',
+                            aes128: { uri: keyStorageUriForManifest },
+                            drmSystems: {
+                                clearkey: {}
+                            }
+                        }],
                 },
             },
         };
         console.log(`[${episodeId}] HLS Job: Creating Transcoder job with request:`, JSON.stringify(request, null, 2));
-        const createJobResponse = await client.createJob(request);
-        const response = createJobResponse[0];
-        if (!response.name) {
+        const [createJobResponse] = await client.createJob(request);
+        if (!createJobResponse.name) {
             throw new Error('Transcoder job creation failed, no job name returned.');
         }
-        const jobName = response.name;
+        const jobName = createJobResponse.name;
         console.log(`[${episodeId}] HLS Job: Transcoder job created successfully. Job name: ${jobName}`);
-        const POLLING_INTERVAL = 15000;
-        const MAX_POLLS = 72; // 18 minutes timeout
+        const POLLING_INTERVAL = 15000; // 15 seconds
+        const MAX_POLLS = 35; // 35 * 15s = 525s (8.75 minutes) < 540s timeout
         let jobSucceeded = false;
         for (let i = 0; i < MAX_POLLS; i++) {
             await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
-            const getJobResponse = await client.getJob({ name: jobName });
-            const job = getJobResponse[0];
+            const [job] = await client.getJob({ name: jobName });
             console.log(`[${episodeId}] HLS Job: Polling job status... (Attempt ${i + 1}/${MAX_POLLS}). Current state: ${job.state}`);
             if (job.state === 'SUCCEEDED') {
                 console.log(`[${episodeId}] HLS Job: Transcoder job SUCCEEDED. Manifest will be at: ${outputUri}manifest.m3u8`);

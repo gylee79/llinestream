@@ -1,4 +1,3 @@
-
 /**
  * @fileoverview Video Analysis with Gemini & Transcoder API using Firebase Cloud Functions v2.
  * Gemini Model: gemini-2.5-flash
@@ -25,7 +24,6 @@ setGlobalOptions({
   secrets: ["GOOGLE_GENAI_API_KEY"],
   timeoutSeconds: 540, // Set to maximum allowed timeout (9 minutes)
   memory: "2GiB",
-  serviceAccount: "firebase-adminsdk@studio-6929130257-b96ff.iam.gserviceaccount.com",
 });
 
 const db = admin.firestore();
@@ -109,7 +107,14 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                         { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
                     ],
                     manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['sd-hls'] }],
-                    encryptions: [{ id: 'aes-128-encryption', aes128: { uri: keyStorageUriForManifest } }],
+                    // ✅ 핵심 수정 사항: drmSystems: { clearkey: {} } 블록을 추가하여 API 유효성 검사 통과
+                    encryptions: [{ 
+                        id: 'aes-128-encryption', 
+                        aes128: { uri: keyStorageUriForManifest },
+                        drmSystems: {
+                            clearkey: {}
+                        }
+                    }],
                 },
             },
         };
