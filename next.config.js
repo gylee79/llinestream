@@ -21,10 +21,12 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "images.unsplash.com",
+        pathname: "**",
       },
       {
         protocol: "https",
         hostname: "unsplash.com",
+        pathname: "**",
       },
       // Allow placeholder images
       {
