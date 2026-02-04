@@ -109,7 +109,13 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                         { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
                     ],
                     manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['sd-hls'] }],
-                    encryptions: [{ id: 'aes-128-encryption', aes128: { uri: keyStorageUriForManifest } }],
+                    encryptions: [{
+                        id: 'aes-128-encryption',
+                        aes128: { uri: keyStorageUriForManifest },
+                        drmSystems: {
+                            clearkey: {}
+                        }
+                    }],
                 },
             },
         };
