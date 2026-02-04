@@ -24,6 +24,8 @@ setGlobalOptions({
   secrets: ["GOOGLE_GENAI_API_KEY"],
   timeoutSeconds: 540, // Set to maximum allowed timeout (9 minutes)
   memory: "2GiB",
+  // ✅ 요청하신대로, Firebase Admin SDK의 기본 서비스 계정으로 명확하게 통일합니다.
+  serviceAccount: "firebase-adminsdk-fbsvc@studio-6929130257-b96ff.iam.gserviceaccount.com",
 });
 
 const db = admin.firestore();
@@ -87,7 +89,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         
         const signedUrlExpireTime = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days validity
         const [signedKeyUrl] = await keyFile.getSignedUrl({ action: 'read', expires: signedUrlExpireTime });
-        console.log(`[${episodeId}] HLS Job: Generated Signed URL for key. Expiration: ${new Date(signedUrlExpireTime).toISOString()}`);
+        console.log(`[${episodeId}] HLS Job: Generated Signed URL for key.`);
 
         const request = {
             parent: `projects/${projectId}/locations/${location}`,
@@ -128,14 +130,12 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                         drmSystems: {
                             clearkey: {}
                         },
-                        encryptionMode: 'cenc' 
                     }],
                 },
             },
         };
         
         console.log(`[${episodeId}] HLS Job: Creating Transcoder job with request:`, JSON.stringify(request, null, 2));
-        
         const [createJobResponse] = await client.createJob(request);
         
         if (!createJobResponse.name) {
@@ -144,15 +144,13 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         const jobName = createJobResponse.name;
         console.log(`[${episodeId}] HLS Job: Transcoder job created successfully. Job name: ${jobName}`);
 
-        const POLLING_INTERVAL = 15000; // 15 seconds
-        const MAX_POLLS = 35; // 35 * 15s = 525s (8.75 minutes) < 540s timeout
+        const POLLING_INTERVAL = 15000;
+        const MAX_POLLS = 35;
         let jobSucceeded = false;
 
         for (let i = 0; i < MAX_POLLS; i++) {
             await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
-            
             const [job] = await client.getJob({ name: jobName });
-            
             console.log(`[${episodeId}] HLS Job: Polling job status... (Attempt ${i+1}/${MAX_POLLS}). Current state: ${job.state}`);
 
             if (job.state === 'SUCCEEDED') {
@@ -163,7 +161,6 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                     keyServerUrl: signedKeyUrl,
                     packagingError: null,
                 });
-                console.log(`[${episodeId}] HLS Job: Firestore document updated to 'completed'.`);
                 jobSucceeded = true;
                 break;
             } else if (job.state === 'FAILED') {
