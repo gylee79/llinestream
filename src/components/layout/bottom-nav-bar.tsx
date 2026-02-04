@@ -10,7 +10,7 @@ import { useUser } from '@/firebase';
 const navItems = [
   { href: '/my-courses', icon: BookUser, label: '나의 강의실' },
   { href: '/my-bookmarks', icon: Bookmark, label: '책갈피' },
-  { href: '/', icon: Home, label: '홈', isCentral: true },
+  { href: '/', icon: Home, label: '홈' },
   { href: '/contents', icon: Clapperboard, label: '최근 영상' },
   { href: '/downloads', icon: Download, label: '다운로드함' },
 ];
@@ -37,16 +37,8 @@ export default function BottomNavBar() {
                 isActive && 'text-primary'
               )}
             >
-              {item.isCentral ? (
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg -translate-y-3">
-                  <Home className="h-6 w-6" />
-                </div>
-              ) : (
-                <>
-                  <item.icon className="h-5 w-5" />
-                  <span className="text-[10px]">{item.label}</span>
-                </>
-              )}
+              <item.icon className="h-5 w-5" />
+              <span className="text-[10px]">{item.label}</span>
             </Link>
           );
         })}
