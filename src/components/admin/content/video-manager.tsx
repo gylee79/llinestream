@@ -165,6 +165,7 @@ export default function VideoManager() {
   const [isThumbnailDialogOpen, setThumbnailDialogOpen] = useState(false);
   const [isPlayerDialogOpen, setPlayerDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [openAccordionItems, setOpenAccordionItems] = useState<string[]>([]);
   
   // Selected items for dialogs
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
@@ -318,6 +319,13 @@ useEffect(() => {
       });
   };
 
+  const handleUploadSuccess = (courseId: string) => {
+    if (!openAccordionItems.includes(courseId)) {
+      setOpenAccordionItems(prev => [...prev, courseId]);
+    }
+  };
+
+
   const isLoading = episodesLoading || coursesLoading || classLoading || fieldsLoading || instructorsLoading;
 
   return (
@@ -342,7 +350,12 @@ useEffect(() => {
                     <Skeleton className="h-12 w-full" />
                 </div>
             ) : Object.keys(orderedEpisodes).length > 0 ? (
-                <Accordion type="multiple" className="w-full space-y-2">
+                <Accordion 
+                    type="multiple" 
+                    className="w-full space-y-2"
+                    value={openAccordionItems}
+                    onValueChange={setOpenAccordionItems}
+                >
                     {Object.entries(orderedEpisodes).map(([courseId, episodeList]) => {
                         const courseName = getFullCoursePath(courseId);
                         const isChanged = changedCourses.has(courseId);
@@ -427,6 +440,7 @@ useEffect(() => {
             open={isUploadDialogOpen} 
             onOpenChange={setUploadDialogOpen} 
             episode={selectedEpisode}
+            onSuccess={handleUploadSuccess}
           />
       )}
 

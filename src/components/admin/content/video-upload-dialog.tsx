@@ -59,6 +59,7 @@ interface VideoUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   episode: Episode | null;
+  onSuccess?: (courseId: string) => void;
 }
 
 type HierarchyDialogState = {
@@ -67,7 +68,7 @@ type HierarchyDialogState = {
   type: '분야' | '큰분류' | '상세분류';
 };
 
-export default function VideoUploadDialog({ open, onOpenChange, episode }: VideoUploadDialogProps) {
+export default function VideoUploadDialog({ open, onOpenChange, episode, onSuccess }: VideoUploadDialogProps) {
   const firestore = useFirestore();
   const storage = useStorage();
   const { toast } = useToast();
@@ -361,6 +362,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             const result = await updateEpisode(sanitize(payload));
             if (!result.success) throw new Error(result.message);
             toast({ title: '수정 완료', description: `'${title}' 에피소드 정보가 업데이트되었습니다.` });
+            onSuccess?.(selectedCourseId);
 
         } else { // Create mode
             if (!videoFile || !newVideoUploadResult || !newDefaultThumbUploadResult) {
@@ -380,6 +382,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode }: Video
             const result = await saveEpisodeMetadata(sanitize(payload));
             if (!result.success) throw new Error(result.message);
             toast({ title: '업로드 성공', description: result.message });
+            onSuccess?.(selectedCourseId);
         }
         handleSafeClose();
     } catch (error: any) {
