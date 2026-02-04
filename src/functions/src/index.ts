@@ -126,6 +126,9 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                     encryptions: [{ 
                         id: 'aes-128-encryption', 
                         aes128: { uri: keyStorageUriForManifest },
+                        drmSystems: {
+                            clearkey: {}
+                        }
                     }],
                 },
             },
@@ -421,3 +424,5 @@ interface EpisodeData {
   vttPath?: string;
   [key: string]: any;
 }
+
+    
