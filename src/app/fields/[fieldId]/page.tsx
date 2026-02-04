@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from '@/components/ui/card';
 import { useMemo } from 'react';
 import { Star } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function FieldDetailPage() {
     const params = useParams<{ fieldId: string }>();
@@ -95,10 +96,14 @@ export default function FieldDetailPage() {
                         <Tabs defaultValue={structuredData[0]?.classification.id} className="w-full">
                           <TabsList className="h-auto bg-transparent p-0 space-x-2 mb-4">
                             {structuredData.map(({ classification }) => (
-                              <TabsTrigger 
+                               <TabsTrigger 
                                 key={classification.id} 
                                 value={classification.id} 
-                                className="border bg-secondary text-secondary-foreground rounded-full px-4 py-1 text-sm transition-colors hover:bg-secondary/80 data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:shadow-sm"
+                                className={cn(
+                                    "border rounded-full px-4 py-1 text-sm transition-colors hover:bg-secondary/80",
+                                    "data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:shadow-sm",
+                                    "data-[state=inactive]:bg-secondary data-[state=inactive]:text-secondary-foreground data-[state=inactive]:border-transparent"
+                                )}
                               >
                                 {classification.name}
                               </TabsTrigger>
@@ -112,11 +117,11 @@ export default function FieldDetailPage() {
                                     courseData.map(({ course, instructor }, index) => (
                                         <Link href={`/courses/${course.id}`} key={course.id} className="block group hover:bg-muted/50 transition-colors">
                                             <div className="p-4 flex items-center gap-4 border-b last:border-b-0">
-                                                <Avatar className="h-10 w-10 rounded-md">
+                                                <Avatar className="h-12 w-12 border">
                                                 {course.thumbnailUrl ? (
                                                     <AvatarImage src={course.thumbnailUrl} alt={course.name} className="object-cover" />
                                                 ) : (
-                                                    <AvatarFallback className="text-xl font-bold bg-muted rounded-md">?</AvatarFallback>
+                                                    <AvatarFallback className="text-xl font-bold bg-muted">?</AvatarFallback>
                                                 )}
                                                 </Avatar>
                                                 <div className="flex-1 min-w-0">
