@@ -117,13 +117,22 @@ async function createHlsPackagingJob(episodeId, inputUri, docRef) {
                 inputUri,
                 outputUri,
                 config: {
-                    muxStreams: [{
-                            key: 'sd-hls',
+                    muxStreams: [
+                        {
+                            key: 'video-sd-fmp4',
                             container: 'fmp4',
-                            elementaryStreams: ['sd-video-stream', 'audio-stream'],
+                            elementaryStreams: ['sd-video-stream'],
                             segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
                             encryptionId: 'aes-128-encryption',
-                        }],
+                        },
+                        {
+                            key: 'audio-fmp4',
+                            container: 'fmp4',
+                            elementaryStreams: ['audio-stream'],
+                            segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
+                            encryptionId: 'aes-128-encryption',
+                        }
+                    ],
                     elementaryStreams: [
                         { key: 'sd-video-stream', videoStream: { h264: {
                                     heightPixels: 480,
@@ -134,7 +143,7 @@ async function createHlsPackagingJob(episodeId, inputUri, docRef) {
                                 } } },
                         { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
                     ],
-                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS', muxStreams: ['sd-hls'] }],
+                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS', muxStreams: ['video-sd-fmp4', 'audio-fmp4'] }],
                     encryptions: [{
                             id: 'aes-128-encryption',
                             aes128: { uri: keyStorageUriForManifest },
