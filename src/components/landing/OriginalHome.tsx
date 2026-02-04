@@ -5,11 +5,11 @@ import { Course, Classification, Episode, Field, EpisodeViewLog, Instructor, Use
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Card, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { Badge } from '@/components/ui/badge';
-import { BookUser, Search, BookOpen, ImageIcon, ChevronDown, ChevronUp, Bookmark, Download } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { BookUser, Search, BookOpen, ImageIcon, ChevronDown, ChevronUp, Bookmark, Download, ChevronRight } from 'lucide-react';
 import ContentCarousel from '@/components/shared/content-carousel';
 import { motion, AnimatePresence, useMotionValue, animate, useTransform } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -175,6 +175,9 @@ export default function OriginalHome() {
   const fieldsQuery = useMemoFirebase(() => (firestore ? query(collection(firestore, 'fields'), orderBy('orderIndex')) : null), [firestore]);
   const { data: sortedFields, isLoading: fieldsLoading } = useCollection<Field>(fieldsQuery);
   
+  const classificationsQuery = useMemoFirebase(() => (firestore ? collection(firestore, 'classifications') : null), [firestore]);
+  const { data: classifications, isLoading: classificationsLoading } = useCollection<Classification>(classificationsQuery);
+
   const viewLogsQuery = useMemoFirebase(() => {
       if (!user || !firestore) return null;
       return query(
@@ -195,17 +198,42 @@ export default function OriginalHome() {
       return uniqueEpisodeIds.map(episodeId => episodeMap.get(episodeId)).filter(Boolean) as Episode[];
   }, [viewLogs, allEpisodes]);
 
+  const classificationsByField = useMemo(() => {
+    if (!classifications) {
+      return new Map<string, string[]>();
+    }
+    const grouped = new Map<string, Classification[]>();
+    classifications.forEach(classification => {
+        const items = grouped.get(classification.fieldId) || [];
+        items.push(classification);
+        grouped.set(classification.fieldId, items);
+    });
 
-  const isLoading = fieldsLoading || (user && (historyLoading || episodesLoading));
+    // Sort classifications within each group by orderIndex
+    for (const group of grouped.values()) {
+        group.sort((a, b) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
+    }
+
+    const result = new Map<string, string[]>();
+    grouped.forEach((value, key) => {
+        result.set(key, value.map(c => c.name));
+    });
+
+    return result;
+  }, [classifications]);
+
+
+  const isLoading = fieldsLoading || classificationsLoading || (user && (historyLoading || episodesLoading));
   
   if (isLoading) {
       return (
           <div className="container space-y-8 pb-8">
             <Skeleton className="h-40 w-full rounded-lg" />
             <Skeleton className="h-8 w-1/3" />
-            <div className="grid grid-cols-2 gap-4">
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
+            <div className="space-y-2">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
             </div>
             <Skeleton className="h-64 w-full" />
           </div>
@@ -240,30 +268,37 @@ export default function OriginalHome() {
           <h2 className="font-body text-xl font-bold tracking-tight mb-4">
             분야별 강좌 <span className="text-lg text-muted-foreground">({sortedFields?.length || 0})</span>
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {sortedFields?.map((field) => (
-              <Link href={`/fields/${field.id}`} key={field.id} className="block group">
-                <Card className="flex flex-col items-center justify-center text-center p-4 h-full hover:bg-secondary/70 transition-colors">
-                   <div className="relative h-16 w-16 md:h-20 md:w-20 flex-shrink-0 overflow-hidden rounded-md bg-muted border">
-                      {field.thumbnailUrl ? (
-                          <Image
-                              src={field.thumbnailUrl}
-                              alt={field.name}
-                              fill
-                              sizes="(max-width: 768px) 64px, 80px"
-                              className="object-cover"
-                          />
-                      ) : (
-                          <div className="flex items-center justify-center h-full w-full">
-                              <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                          </div>
-                      )}
-                    </div>
-                    <p className="mt-2 font-semibold text-sm md:text-base line-clamp-2">{field.name}</p>
-                </Card>
-              </Link>
-            ))}
-          </div>
+          <Card>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {sortedFields?.map((field) => {
+                  const fieldClassifications = classificationsByField.get(field.id) || [];
+                  return (
+                    <Link href={`/fields/${field.id}`} key={field.id} className="block group hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-4 p-4">
+                        <Avatar className="h-14 w-14 border">
+                          {field.thumbnailUrl ? (
+                              <AvatarImage src={field.thumbnailUrl} alt={field.name} className="object-cover" />
+                          ) : (
+                              <AvatarFallback>
+                                <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                              </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-base leading-tight truncate group-hover:text-primary transition-colors">{field.name}</p>
+                          <p className="text-sm text-muted-foreground mt-1 truncate">
+                            {fieldClassifications.join(' · ')}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         </section>
 
       </div>
