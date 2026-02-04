@@ -96,13 +96,22 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                 inputUri,
                 outputUri,
                 config: {
-                    muxStreams: [{
-                        key: 'sd-hls',
-                        container: 'fmp4',
-                        elementaryStreams: ['sd-video-stream', 'audio-stream'],
-                        segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
-                        encryptionId: 'aes-128-encryption',
-                    }],
+                    muxStreams: [
+                        {
+                            key: 'video-sd-fmp4',
+                            container: 'fmp4',
+                            elementaryStreams: ['sd-video-stream'],
+                            segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
+                            encryptionId: 'aes-128-encryption',
+                        },
+                        {
+                            key: 'audio-fmp4',
+                            container: 'fmp4',
+                            elementaryStreams: ['audio-stream'],
+                            segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
+                            encryptionId: 'aes-128-encryption',
+                        }
+                    ],
                     elementaryStreams: [
                         { key: 'sd-video-stream', videoStream: { h264: { 
                             heightPixels: 480, 
@@ -113,7 +122,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                         }}},
                         { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
                     ],
-                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['sd-hls'] }],
+                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['video-sd-fmp4', 'audio-fmp4'] }],
                     encryptions: [{ 
                         id: 'aes-128-encryption', 
                         aes128: { uri: keyStorageUriForManifest },
