@@ -108,9 +108,12 @@ async function createHlsPackagingJob(episodeId, inputUri, docRef) {
         const keyFile = bucket.file(keyStoragePath);
         console.log(`[${episodeId}] HLS Job: Uploading AES-128 key to ${keyStoragePath}`);
         await keyFile.save(aesKey, { contentType: 'application/octet-stream' });
-        const signedUrlExpireTime = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days validity
-        const [signedKeyUrl] = await keyFile.getSignedUrl({ action: 'read', expires: signedUrlExpireTime });
-        console.log(`[${episodeId}] HLS Job: Generated Signed URL for key.`);
+        // IMPORTANT: Make the key public for direct access from the manifest
+        await keyFile.makePublic();
+        console.log(`[${episodeId}] HLS Job: Made key file public.`);
+        // Construct the permanent public URL for the key
+        const keyPublicUrl = `https://storage.googleapis.com/${bucket.name}/${keyStoragePath}`;
+        console.log(`[${episodeId}] HLS Job: Public key URL is ${keyPublicUrl}`);
         const request = {
             parent: `projects/${projectId}/locations/${location}`,
             job: {
@@ -127,7 +130,7 @@ async function createHlsPackagingJob(episodeId, inputUri, docRef) {
                                 segmentDuration: { seconds: 4 },
                                 encryption: {
                                     aes128: {
-                                        uri: signedKeyUrl
+                                        uri: keyPublicUrl // Use the permanent public URL
                                     }
                                 }
                             },
@@ -141,7 +144,7 @@ async function createHlsPackagingJob(episodeId, inputUri, docRef) {
                                 segmentDuration: { seconds: 4 },
                                 encryption: {
                                     aes128: {
-                                        uri: signedKeyUrl
+                                        uri: keyPublicUrl // Use the permanent public URL
                                     }
                                 }
                             },
@@ -180,7 +183,7 @@ async function createHlsPackagingJob(episodeId, inputUri, docRef) {
                 await docRef.update({
                     packagingStatus: 'completed',
                     manifestUrl: `${outputUri}manifest.m3u8`.replace(`gs://${bucket.name}/`, `https://storage.googleapis.com/${bucket.name}/`),
-                    keyServerUrl: signedKeyUrl,
+                    // keyServerUrl field is no longer needed
                     packagingError: null,
                 });
                 console.log(`[${episodeId}] HLS Job: Firestore document updated to 'completed'.`);

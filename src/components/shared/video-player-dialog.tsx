@@ -9,7 +9,7 @@ import { Button } from '../ui/button';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
-import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark as BookmarkIcon, Trash2, Download } from 'lucide-react';
+import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark as BookmarkIcon, Trash2, Download, AlertTriangle } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { cn, getPublicUrl, formatDuration } from '@/lib/utils';
@@ -403,6 +403,55 @@ const BookmarkView = ({ episode, user, videoElement }: { episode: Episode; user:
     );
 };
 
+const PlayerStatusOverlay = ({ episode, isLoading, playerError }: { episode: Episode, isLoading: boolean, playerError: string | null }) => {
+    if (playerError) {
+        return (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 p-4 text-center text-white">
+                <AlertTriangle className="h-10 w-10 text-destructive mb-4" />
+                <h3 className="font-bold text-lg">재생 오류</h3>
+                <p className="text-sm max-w-md whitespace-pre-line mt-2">{playerError}</p>
+            </div>
+        );
+    }
+
+    if (episode.packagingStatus === 'failed') {
+        return (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 p-4 text-center text-white">
+                <AlertTriangle className="h-10 w-10 text-destructive mb-4" />
+                <h3 className="font-bold text-lg">영상 처리 실패</h3>
+                <p className="text-sm max-w-md whitespace-pre-line mt-2">
+                    영상 암호화 과정에서 오류가 발생했습니다. 관리자에게 문의해주세요.
+                </p>
+                {episode.packagingError && <p className="text-xs mt-4 bg-red-900/50 p-2 rounded-md font-mono">오류: {episode.packagingError}</p>}
+            </div>
+        );
+    }
+
+    if (episode.packagingStatus === 'pending' || episode.packagingStatus === 'processing') {
+         return (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 p-4 text-center text-white">
+                <Loader className="h-10 w-10 text-white animate-spin mb-4" />
+                <h3 className="font-bold text-lg">영상 처리 중...</h3>
+                <p className="text-sm max-w-md mt-2">
+                    영상을 안전하게 재생할 수 있도록 암호화하고 있습니다. <br/> 이 작업은 영상 길이에 따라 몇 분 정도 소요될 수 있습니다.
+                </p>
+            </div>
+        );
+    }
+    
+    if (isLoading) {
+         return (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 p-4 text-center text-white">
+                <Loader className="h-10 w-10 text-white animate-spin mb-4" />
+                <h3 className="font-bold text-lg">플레이어 로딩 중...</h3>
+            </div>
+        );
+    }
+
+    return null;
+}
+
+
 // ========= MAIN COMPONENT =========
 
 interface VideoPlayerDialogProps {
@@ -501,33 +550,18 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         async function setupPlayer() {
             if (!videoRef.current || !videoContainerRef.current) return;
             
-            setIsLoading(true);
-            setPlayerError(null);
-
+            // This component will now show status based on episode props.
+            // We only try to load the player if packaging is complete.
             if (episode.packagingStatus !== 'completed') {
-                const status = episode.packagingStatus || 'unknown';
-                let statusMessage: string;
-
-                switch (status) {
-                    case 'processing':
-                    case 'pending':
-                        statusMessage = `영상을 재생할 수 있도록 처리하고 있습니다. 이 작업은 영상 길이에 따라 몇 분 정도 소요될 수 있습니다.\n잠시 후 다시 시도해 주세요. (상태: ${status})`;
-                        break;
-                    case 'failed':
-                        statusMessage = `영상 처리 중 오류가 발생했습니다. 관리자에게 문의해 주세요. (오류: ${episode.packagingError || '알 수 없음'})`;
-                        break;
-                    default: // 'unknown' or any other unexpected value
-                        statusMessage = '영상이 아직 처리 중이거나 상태를 알 수 없습니다. 잠시 후 다시 시도해 주세요.';
-                        break;
-                }
-
-                setPlayerError(statusMessage);
-                setIsLoading(false);
+                setIsLoading(false); // Not loading the player, so set to false. The overlay will show the status.
                 return;
             }
+
+            setIsLoading(true);
+            setPlayerError(null);
             
             if (!episode.manifestUrl) {
-                setPlayerError('재생에 필요한 영상 주소(manifestUrl)가 없습니다.');
+                setPlayerError('재생에 필요한 영상 주소(manifestUrl)가 없습니다. 관리자에게 문의하세요.');
                 setIsLoading(false);
                 return;
             }
@@ -616,19 +650,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             {/* Video Player Section */}
             <Card className="col-span-10 md:col-span-7 flex flex-col bg-black md:rounded-xl overflow-hidden shadow-lg border-border">
                 <div className="w-full flex-grow relative" ref={videoContainerRef}>
-                    {(isLoading || playerError) && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/50 p-4 text-center">
-                             {isLoading && !playerError && (
-                                <>
-                                    <Loader className="h-12 w-12 text-white animate-spin mb-4" />
-                                    <div className="whitespace-pre-wrap">{episode.packagingStatus !== 'completed' ? '영상을 재생 가능하도록 암호화하고 있습니다.\n이 작업은 영상 길이에 따라 몇 분 정도 소요될 수 있습니다.\n잠시 후 다시 시도해주세요.' : '플레이어 로딩 중...'}</div>
-                                </>
-                            )}
-                            {playerError && (
-                                <div className="text-sm max-w-md whitespace-pre-line">{playerError}</div>
-                            )}
-                        </div>
-                    )}
+                    <PlayerStatusOverlay episode={episode} isLoading={isLoading} playerError={playerError} />
                     <video ref={videoRef} className="w-full h-full" autoPlay playsInline />
                 </div>
             </Card>
