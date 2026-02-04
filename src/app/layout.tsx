@@ -26,11 +26,19 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   const { preference } = useLandingPage();
   const { user } = useUser();
 
-  const isHomePageVersion = preference === 'about';
-  const isHomePage = pathname === '/';
-  
-  const showBottomNav = isHomePageVersion && !isHomePage && !!user;
-  const showFooter = !showBottomNav;
+  const isAdminPage = pathname.startsWith('/admin');
+  const isLoginPage = pathname === '/login';
+
+  // Determine if the current page is the marketing/intro page
+  const isMarketingPage =
+    (pathname === '/' && preference === 'about') ||
+    (pathname === '/about' && preference === 'original');
+
+  // Show bottom nav if it's not a marketing page, not an admin page, not login page, and user is logged in.
+  const showBottomNav = !isMarketingPage && !isAdminPage && !isLoginPage && !!user;
+
+  // Show footer if it's NOT an app page with a bottom nav, and not an admin page.
+  const showFooter = !showBottomNav && !isAdminPage;
 
   return (
     <>
