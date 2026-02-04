@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Video Analysis with Gemini & Transcoder API using Firebase Cloud Functions v2.
  * Gemini Model: gemini-2.5-flash
@@ -103,11 +104,16 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                         encryptionId: 'aes-128-encryption',
                     }],
                     elementaryStreams: [
-                        { key: 'sd-video-stream', videoStream: { h264: { heightPixels: 480, widthPixels: 854, bitrateBps: 1000000, frameRate: 30 }}},
+                        { key: 'sd-video-stream', videoStream: { h264: { 
+                            heightPixels: 480, 
+                            widthPixels: 854, 
+                            bitrateBps: 1000000, 
+                            frameRate: 30,
+                            gopDuration: { seconds: 2 }
+                        }}},
                         { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
                     ],
                     manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['sd-hls'] }],
-                    // ✅ 핵심 수정 사항: drmSystems: { clearkey: {} } 블록을 추가하여 API 유효성 검사 통과
                     encryptions: [{ 
                         id: 'aes-128-encryption', 
                         aes128: { uri: keyStorageUriForManifest },

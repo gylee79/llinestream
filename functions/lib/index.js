@@ -58,7 +58,6 @@ if (!admin.apps.length) {
     secrets: ["GOOGLE_GENAI_API_KEY"],
     timeoutSeconds: 540, // Set to maximum allowed timeout (9 minutes)
     memory: "2GiB",
-    serviceAccount: "firebase-adminsdk@studio-6929130257-b96ff.iam.gserviceaccount.com",
 });
 const db = admin.firestore();
 const storage = admin.storage();
