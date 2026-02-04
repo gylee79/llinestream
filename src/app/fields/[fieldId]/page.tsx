@@ -90,37 +90,37 @@ export default function FieldDetailPage() {
             )}
 
             {!isLoading && structuredData.length > 0 && (
-                <Tabs defaultValue={structuredData[0]?.classification.id} className="w-full">
-                  <TabsList className="h-auto bg-transparent p-0 space-x-2">
-                    {structuredData.map(({ classification }) => (
-                      <TabsTrigger 
-                        key={classification.id} 
-                        value={classification.id} 
-                        className="border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-full px-4 py-1 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary"
-                      >
-                        {classification.name}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                  
-                  {structuredData.map(({ classification, courses: courseData }) => (
-                    <TabsContent key={classification.id} value={classification.id} className="mt-6">
-                        <Card>
-                            <CardContent className="p-0">
+                <Card>
+                    <CardContent className="p-4">
+                        <Tabs defaultValue={structuredData[0]?.classification.id} className="w-full">
+                          <TabsList className="h-auto bg-transparent p-0 space-x-2 mb-4">
+                            {structuredData.map(({ classification }) => (
+                              <TabsTrigger 
+                                key={classification.id} 
+                                value={classification.id} 
+                                className="border bg-secondary text-secondary-foreground rounded-full px-4 py-1 text-sm transition-colors hover:bg-secondary/80 data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:shadow-sm"
+                              >
+                                {classification.name}
+                              </TabsTrigger>
+                            ))}
+                          </TabsList>
+                          
+                          {structuredData.map(({ classification, courses: courseData }) => (
+                            <TabsContent key={classification.id} value={classification.id} className="mt-0">
                                 <div>
                                 {courseData.length > 0 ? (
                                     courseData.map(({ course, instructor }, index) => (
                                         <Link href={`/courses/${course.id}`} key={course.id} className="block group hover:bg-muted/50 transition-colors">
                                             <div className="p-4 flex items-center gap-4 border-b last:border-b-0">
-                                                <Avatar className="h-12 w-12 rounded-full">
+                                                <Avatar className="h-10 w-10 rounded-md">
                                                 {course.thumbnailUrl ? (
                                                     <AvatarImage src={course.thumbnailUrl} alt={course.name} className="object-cover" />
                                                 ) : (
-                                                    <AvatarFallback className="text-xl font-bold bg-muted">?</AvatarFallback>
+                                                    <AvatarFallback className="text-xl font-bold bg-muted rounded-md">?</AvatarFallback>
                                                 )}
                                                 </Avatar>
                                                 <div className="flex-1 min-w-0">
-                                                <h3 className="font-semibold text-base leading-tight group-hover:text-primary transition-colors">{course.name}</h3>
+                                                <h3 className="font-semibold text-base leading-tight group-hover:text-primary transition-colors line-clamp-1">{course.name}</h3>
                                                 <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
                                                 <div className="flex items-center text-xs mt-2 gap-2">
                                                     <div className="flex items-center gap-1">
@@ -142,11 +142,11 @@ export default function FieldDetailPage() {
                                     </div>
                                 )}
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                  ))}
-                </Tabs>
+                            </TabsContent>
+                          ))}
+                        </Tabs>
+                    </CardContent>
+                </Card>
             )}
              {!isLoading && structuredData.length === 0 && (
                  <div className="text-center py-16 border rounded-lg bg-muted/50">
