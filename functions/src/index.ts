@@ -24,6 +24,7 @@ setGlobalOptions({
   secrets: ["GOOGLE_GENAI_API_KEY"],
   timeoutSeconds: 540, // Set to maximum allowed timeout (9 minutes)
   memory: "2GiB",
+  serviceAccount: "firebase-adminsdk-fbsvc@studio-6929130257-b96ff.iam.gserviceaccount.com",
 });
 
 const db = admin.firestore();
@@ -87,7 +88,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         
         const signedUrlExpireTime = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days validity
         const [signedKeyUrl] = await keyFile.getSignedUrl({ action: 'read', expires: signedUrlExpireTime });
-        console.log(`[${episodeId}] HLS Job: Generated Signed URL for key. Expiration: ${new Date(signedUrlExpireTime).toISOString()}`);
+        console.log(`[${episodeId}] HLS Job: Generated Signed URL for key.`);
 
         const request = {
             parent: `projects/${projectId}/locations/${location}`,
@@ -377,19 +378,29 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
 // [Trigger] 파일 삭제 함수 (v2 onDocumentDeleted)
 // ==========================================
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
-    const snap = event.data;
-    if (!snap) return;
-
     const { episodeId } = event.params;
-    const data = snap.data() as EpisodeData;
-    if (!data) return;
+    const prefix = `episodes/${episodeId}/`;
     
-    await bucket.deleteFiles({ prefix: `episodes/${episodeId}/` }).catch(() => {});
-    
-    const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
-    await aiChunkRef.delete().catch(() => {});
+    console.log(`[DELETE TRIGGER] Cleaning up for episode ${episodeId}. Deleting files with prefix: ${prefix}`);
 
-    console.log(`[DELETE SUCCESS] Cleaned up files and AI chunk for deleted episode ${episodeId}`);
+    // Delete all files in the episode's storage folder
+    try {
+        await bucket.deleteFiles({ prefix });
+        console.log(`[DELETE SUCCESS] Storage files with prefix "${prefix}" deleted.`);
+    } catch (error) {
+        console.error(`[DELETE FAILED] Could not delete storage files for episode ${episodeId}. This might happen if the folder is already empty.`, error);
+    }
+    
+    // Delete the corresponding document from the AI chunks collection
+    try {
+        const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
+        await aiChunkRef.delete();
+        console.log(`[DELETE SUCCESS] AI chunk for episode ${episodeId} deleted.`);
+    } catch (error) {
+        console.error(`[DELETE FAILED] Could not delete AI chunk for episode ${episodeId}.`, error);
+    }
+    
+    console.log(`[DELETE FINISHED] Cleanup process finished for episode ${episodeId}.`);
 });
 
 interface EpisodeData {
