@@ -149,7 +149,8 @@ async function createHlsPackagingJob(episodeId, inputUri, docRef) {
                             aes128: { uri: keyStorageUriForManifest },
                             drmSystems: {
                                 clearkey: {}
-                            }
+                            },
+                            encryptionMode: 'cenc'
                         }],
                 },
             },

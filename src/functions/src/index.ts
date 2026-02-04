@@ -24,7 +24,6 @@ setGlobalOptions({
   secrets: ["GOOGLE_GENAI_API_KEY"],
   timeoutSeconds: 540, // Set to maximum allowed timeout (9 minutes)
   memory: "2GiB",
-  serviceAccount: "firebase-adminsdk@studio-6929130257-b96ff.iam.gserviceaccount.com",
 });
 
 const db = admin.firestore();
@@ -76,13 +75,11 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         const outputFolder = `episodes/${episodeId}/packaged/`;
         const outputUri = `gs://${bucket.name}/${outputFolder}`;
 
-        // [1단계: 키 생성]
         const aesKey = crypto.randomBytes(16);
         const keyFileName = 'enc.key';
         const keyStoragePath = `episodes/${episodeId}/keys/${keyFileName}`;
         const keyFile = bucket.file(keyStoragePath);
         
-        // [2단계: 키 보관]
         console.log(`[${episodeId}] HLS Job: Uploading AES-128 key to ${keyStoragePath}`);
         await keyFile.save(aesKey, { contentType: 'application/octet-stream' });
         
@@ -90,16 +87,14 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         
         const signedUrlExpireTime = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days validity
         const [signedKeyUrl] = await keyFile.getSignedUrl({ action: 'read', expires: signedUrlExpireTime });
-        console.log(`[${episodeId}] HLS Job: Generated Signed URL for key.`);
+        console.log(`[${episodeId}] HLS Job: Generated Signed URL for key. Expiration: ${new Date(signedUrlExpireTime).toISOString()}`);
 
-        // [3단계: 작업 지시서 작성]
         const request = {
             parent: `projects/${projectId}/locations/${location}`,
             job: {
                 inputUri,
                 outputUri,
                 config: {
-                    // [포장: 비디오/오디오 분리 담기]
                     muxStreams: [
                         {
                             key: 'video-sd-fmp4',
@@ -116,69 +111,74 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                             encryptionId: 'aes-128-encryption',
                         }
                     ],
-                    // [재료: 해상도 및 GOP 설정]
                     elementaryStreams: [
                         { key: 'sd-video-stream', videoStream: { h264: { 
                             heightPixels: 480, 
                             widthPixels: 854, 
                             bitrateBps: 1000000, 
                             frameRate: 30,
-                            gopDuration: { seconds: 2 } // 수학적 정렬 (4초 / 2초 = 정수)
+                            gopDuration: { seconds: 2 }
                         }}},
                         { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
                     ],
-                    // [최종 목록: HLS 마스터 파일]
                     manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['video-sd-fmp4', 'audio-fmp4'] }],
-                    // [자물쇠: AES-128 + ClearKey + CENC 모드]
                     encryptions: [{ 
                         id: 'aes-128-encryption', 
                         aes128: { uri: keyStorageUriForManifest },
                         drmSystems: {
                             clearkey: {}
                         },
-                        // ✅ 이번 에러의 핵심 해결책: fmp4를 위한 암호화 모드 설정
                         encryptionMode: 'cenc' 
                     }],
                 },
             },
         };
         
-        console.log(`[${episodeId}] HLS Job: Creating Transcoder job...`);
+        console.log(`[${episodeId}] HLS Job: Creating Transcoder job with request:`, JSON.stringify(request, null, 2));
+        
         const [createJobResponse] = await client.createJob(request);
         
         if (!createJobResponse.name) {
             throw new Error('Transcoder job creation failed, no job name returned.');
         }
         const jobName = createJobResponse.name;
-        console.log(`[${episodeId}] HLS Job Created: ${jobName}`);
+        console.log(`[${episodeId}] HLS Job: Transcoder job created successfully. Job name: ${jobName}`);
 
         const POLLING_INTERVAL = 15000; // 15 seconds
-        const MAX_POLLS = 35; // 35 * 15s = 525s
+        const MAX_POLLS = 35; // 35 * 15s = 525s (8.75 minutes) < 540s timeout
         let jobSucceeded = false;
 
         for (let i = 0; i < MAX_POLLS; i++) {
             await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
+            
             const [job] = await client.getJob({ name: jobName });
-            console.log(`[${episodeId}] Polling status: ${job.state}`);
+            
+            console.log(`[${episodeId}] HLS Job: Polling job status... (Attempt ${i+1}/${MAX_POLLS}). Current state: ${job.state}`);
 
             if (job.state === 'SUCCEEDED') {
+                console.log(`[${episodeId}] HLS Job: Transcoder job SUCCEEDED. Manifest will be at: ${outputUri}manifest.m3u8`);
                 await docRef.update({
                     packagingStatus: 'completed',
                     manifestUrl: `${outputUri}manifest.m3u8`.replace(`gs://${bucket.name}/`, `https://storage.googleapis.com/${bucket.name}/`),
                     keyServerUrl: signedKeyUrl,
                     packagingError: null,
                 });
+                console.log(`[${episodeId}] HLS Job: Firestore document updated to 'completed'.`);
                 jobSucceeded = true;
                 break;
             } else if (job.state === 'FAILED') {
-                throw new Error(`Transcoder job failed: ${JSON.stringify(job.error, null, 2)}`);
+                const errorMessage = `Transcoder job failed: ${JSON.stringify(job.error, null, 2)}`;
+                console.error(`[${episodeId}] HLS Job: FAILED state detected. Error:`, job.error);
+                throw new Error(errorMessage);
             }
         }
 
-        if (!jobSucceeded) throw new Error('Transcoder job timed out.');
+        if (!jobSucceeded) {
+             throw new Error(`Transcoder job timed out after ${MAX_POLLS * POLLING_INTERVAL / 1000 / 60} minutes.`);
+        }
 
     } catch (error: any) {
-        console.error(`[${episodeId}] Packaging Critical Error:`, error);
+        console.error(`[${episodeId}] HLS packaging process failed critically. Error:`, error);
         await docRef.update({ 
             packagingStatus: "failed", 
             packagingError: error.message || 'An unknown error occurred during HLS packaging.' 
