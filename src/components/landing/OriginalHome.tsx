@@ -1,3 +1,4 @@
+
 'use client';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, orderBy } from 'firebase/firestore';
@@ -270,18 +271,18 @@ export default function OriginalHome() {
           </h2>
           <Card>
             <CardContent className="p-0">
-              <div>
+              <div className="divide-y">
                 {sortedFields?.map((field) => {
                   const fieldClassifications = classificationsByField.get(field.id) || [];
                   return (
                     <Link href={`/fields/${field.id}`} key={field.id} className="block group hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-4 p-4">
-                        <Avatar className="h-14 w-14 border">
+                        <Avatar className="h-11 w-11 border">
                           {field.thumbnailUrl ? (
                               <AvatarImage src={field.thumbnailUrl} alt={field.name} className="object-cover" />
                           ) : (
                               <AvatarFallback>
-                                <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                                <ImageIcon className="h-5 w-5 text-muted-foreground" />
                               </AvatarFallback>
                           )}
                         </Avatar>
