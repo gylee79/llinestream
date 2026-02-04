@@ -270,7 +270,7 @@ export default function OriginalHome() {
           </h2>
           <Card>
             <CardContent className="p-0">
-              <div className="divide-y">
+              <div>
                 {sortedFields?.map((field) => {
                   const fieldClassifications = classificationsByField.get(field.id) || [];
                   return (
@@ -291,7 +291,6 @@ export default function OriginalHome() {
                             {fieldClassifications.join(' · ')}
                           </p>
                         </div>
-                        <ChevronRight className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
                       </div>
                     </Link>
                   );
