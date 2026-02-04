@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Video Analysis with Gemini & Transcoder API using Firebase Cloud Functions v2.
  * Gemini Model: gemini-2.5-flash
@@ -84,11 +85,11 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         console.log(`[${episodeId}] HLS Job: Uploading AES-128 key to ${keyStoragePath}`);
         await keyFile.save(aesKey, { contentType: 'application/octet-stream' });
         
-        const keyStorageUriForManifest = `gs://${bucket.name}/${keyStoragePath}`;
-        
         const signedUrlExpireTime = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days validity
         const [signedKeyUrl] = await keyFile.getSignedUrl({ action: 'read', expires: signedUrlExpireTime });
         console.log(`[${episodeId}] HLS Job: Generated Signed URL for key.`);
+
+        const keyStorageUriForManifest = `gs://${bucket.name}/${keyStoragePath}`;
 
         const request = {
             parent: `projects/${projectId}/locations/${location}`,
@@ -98,18 +99,32 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                 config: {
                     muxStreams: [
                         {
-                            key: 'video-sd',
-                            container: 'fmp4',
+                            key: 'video-sd-ts',
+                            container: 'ts',
                             elementaryStreams: ['sd-video-stream'],
-                            segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
-                            encryptionId: 'aes-128-encryption',
+                            segmentSettings: {
+                                individualSegments: true,
+                                segmentDuration: { seconds: 4 },
+                                encryption: {
+                                    aes128: {
+                                        uri: keyStorageUriForManifest
+                                    }
+                                }
+                            },
                         },
                         {
-                            key: 'audio',
-                            container: 'fmp4',
+                            key: 'audio-ts',
+                            container: 'ts',
                             elementaryStreams: ['audio-stream'],
-                            segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
-                            encryptionId: 'aes-128-encryption',
+                            segmentSettings: {
+                                individualSegments: true,
+                                segmentDuration: { seconds: 4 },
+                                encryption: {
+                                    aes128: {
+                                        uri: keyStorageUriForManifest
+                                    }
+                                }
+                            },
                         }
                     ],
                     elementaryStreams: [
@@ -122,13 +137,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                         }}},
                         { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
                     ],
-                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['video-sd', 'audio'] }],
-                    encryptions: [{ 
-                        id: 'aes-128-encryption', 
-                        aes128: { uri: keyStorageUriForManifest },
-                        drmSystems: { clearkey: {} },
-                        encryptionMode: 'cenc' 
-                    }],
+                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['video-sd-ts', 'audio-ts'] }],
                 },
             },
         };
@@ -412,3 +421,5 @@ interface EpisodeData {
   vttPath?: string;
   [key: string]: any;
 }
+
+    

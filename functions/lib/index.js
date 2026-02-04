@@ -108,7 +108,6 @@ async function createHlsPackagingJob(episodeId, inputUri, docRef) {
         const keyFile = bucket.file(keyStoragePath);
         console.log(`[${episodeId}] HLS Job: Uploading AES-128 key to ${keyStoragePath}`);
         await keyFile.save(aesKey, { contentType: 'application/octet-stream' });
-        const keyStorageUriForManifest = `gs://${bucket.name}/${keyStoragePath}`;
         const signedUrlExpireTime = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days validity
         const [signedKeyUrl] = await keyFile.getSignedUrl({ action: 'read', expires: signedUrlExpireTime });
         console.log(`[${episodeId}] HLS Job: Generated Signed URL for key.`);
@@ -123,15 +122,29 @@ async function createHlsPackagingJob(episodeId, inputUri, docRef) {
                             key: 'video-sd-ts',
                             container: 'ts',
                             elementaryStreams: ['sd-video-stream'],
-                            segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
-                            encryptionId: 'aes-128-encryption',
+                            segmentSettings: {
+                                individualSegments: true,
+                                segmentDuration: { seconds: 4 },
+                                encryption: {
+                                    aes128: {
+                                        uri: signedKeyUrl
+                                    }
+                                }
+                            },
                         },
                         {
                             key: 'audio-ts',
                             container: 'ts',
                             elementaryStreams: ['audio-stream'],
-                            segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
-                            encryptionId: 'aes-128-encryption',
+                            segmentSettings: {
+                                individualSegments: true,
+                                segmentDuration: { seconds: 4 },
+                                encryption: {
+                                    aes128: {
+                                        uri: signedKeyUrl
+                                    }
+                                }
+                            },
                         }
                     ],
                     elementaryStreams: [
@@ -145,10 +158,6 @@ async function createHlsPackagingJob(episodeId, inputUri, docRef) {
                         { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
                     ],
                     manifests: [{ fileName: 'manifest.m3u8', type: 'HLS', muxStreams: ['video-sd-ts', 'audio-ts'] }],
-                    encryptions: [{
-                            id: 'aes-128-encryption',
-                            aes128: { uri: keyStorageUriForManifest },
-                        }],
                 },
             },
         };
