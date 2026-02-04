@@ -101,43 +101,45 @@ export default function FieldDetailPage() {
                   
                   {structuredData.map(({ classification, courses: courseData }) => (
                     <TabsContent key={classification.id} value={classification.id} className="mt-6">
-                        <div className="space-y-4">
-                            {courseData.length > 0 ? (
-                                courseData.map(({ course, instructor }, index) => (
-                                    <Link href={`/courses/${course.id}`} key={course.id} className="block group">
-                                      <Card className="hover:bg-muted/50 transition-colors">
-                                        <CardContent className="p-4 flex items-center gap-4">
-                                          <Avatar className="h-16 w-16 rounded-full">
-                                            {course.thumbnailUrl ? (
-                                              <AvatarImage src={course.thumbnailUrl} alt={course.name} className="object-cover" />
-                                            ) : (
-                                              <AvatarFallback className="text-2xl font-bold bg-muted">?</AvatarFallback>
-                                            )}
-                                          </Avatar>
-                                          <div className="flex-1">
-                                            <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">{course.name}</h3>
-                                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
-                                            <div className="flex items-center text-xs mt-2 gap-2">
-                                                <div className="flex items-center gap-1">
-                                                    <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                                                    <span className="font-bold text-sm">{(course.rating || 0).toFixed(1)}</span>
-                                                    <span className="text-muted-foreground">({course.reviewCount || 0})</span>
+                        <Card>
+                            <CardContent className="p-0">
+                                <div>
+                                {courseData.length > 0 ? (
+                                    courseData.map(({ course, instructor }, index) => (
+                                        <Link href={`/courses/${course.id}`} key={course.id} className="block group hover:bg-muted/50 transition-colors">
+                                            <div className="p-4 flex items-center gap-4 border-b last:border-b-0">
+                                                <Avatar className="h-16 w-16 rounded-full">
+                                                {course.thumbnailUrl ? (
+                                                    <AvatarImage src={course.thumbnailUrl} alt={course.name} className="object-cover" />
+                                                ) : (
+                                                    <AvatarFallback className="text-2xl font-bold bg-muted">?</AvatarFallback>
+                                                )}
+                                                </Avatar>
+                                                <div className="flex-1">
+                                                <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">{course.name}</h3>
+                                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
+                                                <div className="flex items-center text-xs mt-2 gap-2">
+                                                    <div className="flex items-center gap-1">
+                                                        <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                                        <span className="font-bold text-sm">{(course.rating || 0).toFixed(1)}</span>
+                                                        <span className="text-muted-foreground">({course.reviewCount || 0})</span>
+                                                    </div>
+                                                    <p className="text-muted-foreground font-semibold">
+                                                        {classification.name}・{index + 1}위
+                                                    </p>
                                                 </div>
-                                                <p className="text-muted-foreground font-semibold">
-                                                    {classification.name}・{index + 1}위
-                                                </p>
+                                                </div>
                                             </div>
-                                          </div>
-                                        </CardContent>
-                                      </Card>
-                                    </Link>
-                                ))
-                            ) : (
-                                <div className="text-center py-16 border rounded-lg bg-muted/50">
-                                    <p className="text-muted-foreground">이 분류에는 아직 등록된 강좌가 없습니다.</p>
+                                        </Link>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-16">
+                                        <p className="text-muted-foreground">이 분류에는 아직 등록된 강좌가 없습니다.</p>
+                                    </div>
+                                )}
                                 </div>
-                            )}
-                        </div>
+                            </CardContent>
+                        </Card>
                     </TabsContent>
                   ))}
                 </Tabs>
