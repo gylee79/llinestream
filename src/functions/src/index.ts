@@ -98,15 +98,15 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                 config: {
                     muxStreams: [
                         {
-                            key: 'video-sd-ts',
-                            container: 'ts',
+                            key: 'video-sd',
+                            container: 'fmp4',
                             elementaryStreams: ['sd-video-stream'],
                             segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
                             encryptionId: 'aes-128-encryption',
                         },
                         {
-                            key: 'audio-ts',
-                            container: 'ts',
+                            key: 'audio',
+                            container: 'fmp4',
                             elementaryStreams: ['audio-stream'],
                             segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
                             encryptionId: 'aes-128-encryption',
@@ -122,13 +122,12 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                         }}},
                         { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
                     ],
-                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['video-sd-ts', 'audio-ts'] }],
+                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['video-sd', 'audio'] }],
                     encryptions: [{ 
                         id: 'aes-128-encryption', 
                         aes128: { uri: keyStorageUriForManifest },
-                        drmSystems: {
-                            clearkey: {}
-                        }
+                        drmSystems: { clearkey: {} },
+                        encryptionMode: 'cenc' 
                     }],
                 },
             },
@@ -377,30 +376,20 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
 // [Trigger] 파일 삭제 함수 (v2 onDocumentDeleted)
 // ==========================================
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
-    const snap = event.data;
-    // The snapshot is undefined if the document did not exist (e.g. was already deleted).
-    if (!snap) {
-        console.log(`[DELETE SKIP] No data found for deleted episode ${event.params.episodeId}, function may have already run or doc was empty.`);
-        return;
-    }
-
     const { episodeId } = event.params;
-    const data = snap.data() as EpisodeData;
-
-    console.log(`[DELETE TRIGGER] Cleaning up for episode: ${episodeId} (${data.title || 'No Title'})`);
-    
     const prefix = `episodes/${episodeId}/`;
+    
+    console.log(`[DELETE TRIGGER] Cleaning up for episode ${episodeId}. Deleting files with prefix: ${prefix}`);
 
+    // Delete all files in the episode's storage folder
     try {
-        console.log(`[DELETE ACTION] Deleting all files with prefix: ${prefix}`);
         await bucket.deleteFiles({ prefix });
-        console.log(`[DELETE SUCCESS] All storage files for episode ${episodeId} have been deleted.`);
+        console.log(`[DELETE SUCCESS] Storage files with prefix "${prefix}" deleted.`);
     } catch (error) {
-        console.error(`[DELETE FAILED] Storage cleanup for episode ${episodeId} failed. This might happen if the folder is already empty or due to permissions.`, error);
-        // We don't re-throw, to allow AI chunk deletion to proceed.
+        console.error(`[DELETE FAILED] Could not delete storage files for episode ${episodeId}. This might happen if the folder is already empty.`, error);
     }
     
-    // Also delete the corresponding document from the AI chunks collection
+    // Delete the corresponding document from the AI chunks collection
     try {
         const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
         await aiChunkRef.delete();
@@ -415,7 +404,6 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
 interface EpisodeData {
   filePath: string;
   courseId: string;
-  title?: string;
   aiProcessingStatus?: string;
   packagingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
   packagingError?: string | null;
@@ -424,5 +412,3 @@ interface EpisodeData {
   vttPath?: string;
   [key: string]: any;
 }
-
-    
