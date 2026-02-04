@@ -470,7 +470,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 message = `네트워크 오류로 비디오를 불러올 수 없습니다.\n브라우저 콘솔(F12)에서 CORS 관련 오류 메시지가 있는지 확인해주세요.\n\n만약 CORS 오류가 발생했다면, 클라우드 터미널에서 다음 명령어를 실행하여 스토리지 설정을 업데이트해야 합니다:\ngcloud storage buckets update gs://<YOUR_BUCKET_NAME> --cors-file=cors.json`;
                 break;
             case shaka.util.Error.Category.DRM:
-                 message = `DRM 라이선스 요청에 실패했습니다 (코드: ${shakaError.code}).\n암호화 키 서버 URL(${episode.keyServerUrl}) 또는 DRM 관련 설정이 올바른지 확인해주세요.`;
+                 message = `DRM 라이선스 요청에 실패했습니다 (코드: ${shakaError.code}).\n암호화 키 서버 URL 또는 DRM 관련 설정이 올바른지 확인해주세요.`;
                 break;
             case shaka.util.Error.Category.MEDIA:
                 message = `미디어 파일을 재생할 수 없습니다 (코드: ${shakaError.code}). 파일이 손상되었거나 지원되지 않는 형식일 수 있습니다.`;
@@ -481,7 +481,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     }
     setPlayerError(message);
     setIsLoading(false);
-  }, [episode.keyServerUrl]);
+  }, []);
 
 
     React.useEffect(() => {
@@ -526,8 +526,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 return;
             }
             
-            if (!episode.manifestUrl || !episode.keyServerUrl) {
-                setPlayerError('재생에 필요한 영상 주소(manifestUrl) 또는 키 서버 주소(keyServerUrl)가 없습니다.');
+            if (!episode.manifestUrl) {
+                setPlayerError('재생에 필요한 영상 주소(manifestUrl)가 없습니다.');
                 setIsLoading(false);
                 return;
             }
@@ -539,16 +539,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             try {
                 await player.attach(videoRef.current);
-
-                player.getNetworkingEngine()?.registerRequestFilter((type, request) => {
-                    const keyUriIndex = request.uris.findIndex(uri => uri.includes('gs://'));
-                    
-                    if (keyUriIndex !== -1) {
-                         console.log(`[Shaka-Filter] Matched key URI: ${request.uris[keyUriIndex]}`);
-                        request.uris[keyUriIndex] = episode.keyServerUrl!;
-                    }
-                });
-
                 player.addEventListener('error', onPlayerError);
                 
                 await player.load(episode.manifestUrl);
