@@ -89,6 +89,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         const [signedKeyUrl] = await keyFile.getSignedUrl({ action: 'read', expires: signedUrlExpireTime });
         console.log(`[${episodeId}] HLS Job: Generated Signed URL for key.`);
 
+        // The URI for the key that will be written into the manifest file.
         const keyStorageUriForManifest = `gs://${bucket.name}/${keyStoragePath}`;
 
         const request = {
@@ -386,19 +387,21 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
 // ==========================================
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
     const { episodeId } = event.params;
-    const prefix = `episodes/${episodeId}/`;
-    
-    console.log(`[DELETE TRIGGER] Cleaning up for episode ${episodeId}. Deleting files with prefix: ${prefix}`);
+    const deletedData = event.data?.data() as EpisodeData | undefined;
 
-    // Delete all files in the episode's storage folder
+    console.log(`[DELETE TRIGGER] Cleaning up for episode ${episodeId}.`);
+
+    // 1. Delete all files in the episode's main storage folder
+    const prefix = `episodes/${episodeId}/`;
     try {
+        console.log(`[DELETE ACTION] Deleting all files with prefix: ${prefix}`);
         await bucket.deleteFiles({ prefix });
-        console.log(`[DELETE SUCCESS] Storage files with prefix "${prefix}" deleted.`);
+        console.log(`[DELETE SUCCESS] All storage files with prefix "${prefix}" deleted.`);
     } catch (error) {
-        console.error(`[DELETE FAILED] Could not delete storage files for episode ${episodeId}. This might happen if the folder is already empty.`, error);
+        console.error(`[DELETE FAILED] Could not delete storage files for episode ${episodeId}.`, error);
     }
     
-    // Delete the corresponding document from the AI chunks collection
+    // 2. Delete the corresponding document from the AI chunks collection
     try {
         const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
         await aiChunkRef.delete();
@@ -406,12 +409,46 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
     } catch (error) {
         console.error(`[DELETE FAILED] Could not delete AI chunk for episode ${episodeId}.`, error);
     }
+
+    // 3. (Optional but good practice) Explicitly delete specific files if paths were stored
+    if (deletedData) {
+        console.log(`[ADDITIONAL CLEANUP] Using data from deleted doc for explicit cleanup.`);
+        await deleteStorageFileByPath(storage, deletedData.filePath);
+        await deleteStorageFileByPath(storage, deletedData.defaultThumbnailPath);
+        await deleteStorageFileByPath(storage, deletedData.customThumbnailPath);
+        await deleteStorageFileByPath(storage, deletedData.vttPath);
+    }
     
     console.log(`[DELETE FINISHED] Cleanup process finished for episode ${episodeId}.`);
 });
 
+const deleteStorageFileByPath = async (storage: admin.storage.Storage, filePath: string | undefined) => {
+    if (!filePath) {
+        console.warn(`[SKIP DELETE] No file path provided.`);
+        return;
+    }
+    try {
+        const file = storage.bucket().file(filePath);
+        const [exists] = await file.exists();
+        if (exists) {
+            console.log(`[ATTEMPT DELETE] Deleting storage file at path: ${filePath}`);
+            await file.delete();
+            console.log(`[DELETE SUCCESS] File deleted: ${filePath}`);
+        } else {
+            console.log(`[SKIP DELETE] File does not exist, skipping deletion: ${filePath}`);
+        }
+    } catch (error: any) {
+        // Suppress "Not Found" errors during cleanup, as they are not critical.
+        if (error.code === 404) {
+             console.log(`[SKIP DELETE] File not found during cleanup, which is acceptable: ${filePath}`);
+             return;
+        }
+        console.error(`[DELETE FAILED] Could not delete storage file at path ${filePath}. Error: ${error.message}`);
+    }
+};
+
 interface EpisodeData {
-  filePath: string;
+  filePath?: string;
   courseId: string;
   aiProcessingStatus?: string;
   packagingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
