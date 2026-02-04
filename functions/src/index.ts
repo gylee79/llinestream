@@ -98,7 +98,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                 config: {
                     muxStreams: [{
                         key: 'sd-hls',
-                        container: 'ts',
+                        container: 'fmp4',
                         elementaryStreams: ['sd-video-stream', 'audio-stream'],
                         segmentSettings: { individualSegments: true, segmentDuration: { seconds: 4 } },
                         encryptionId: 'aes-128-encryption',
