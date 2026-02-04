@@ -93,7 +93,11 @@ export default function FieldDetailPage() {
                 <Tabs defaultValue={structuredData[0]?.classification.id} className="w-full">
                   <TabsList className="h-auto bg-transparent p-0 space-x-2">
                     {structuredData.map(({ classification }) => (
-                      <TabsTrigger key={classification.id} value={classification.id} className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-lg">
+                      <TabsTrigger 
+                        key={classification.id} 
+                        value={classification.id} 
+                        className="border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-full px-4 py-1 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary"
+                      >
                         {classification.name}
                       </TabsTrigger>
                     ))}
@@ -108,15 +112,15 @@ export default function FieldDetailPage() {
                                     courseData.map(({ course, instructor }, index) => (
                                         <Link href={`/courses/${course.id}`} key={course.id} className="block group hover:bg-muted/50 transition-colors">
                                             <div className="p-4 flex items-center gap-4 border-b last:border-b-0">
-                                                <Avatar className="h-20 w-20 rounded-full">
+                                                <Avatar className="h-12 w-12 rounded-full">
                                                 {course.thumbnailUrl ? (
                                                     <AvatarImage src={course.thumbnailUrl} alt={course.name} className="object-cover" />
                                                 ) : (
-                                                    <AvatarFallback className="text-2xl font-bold bg-muted">?</AvatarFallback>
+                                                    <AvatarFallback className="text-xl font-bold bg-muted">?</AvatarFallback>
                                                 )}
                                                 </Avatar>
-                                                <div className="flex-1">
-                                                <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">{course.name}</h3>
+                                                <div className="flex-1 min-w-0">
+                                                <h3 className="font-semibold text-base leading-tight group-hover:text-primary transition-colors">{course.name}</h3>
                                                 <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
                                                 <div className="flex items-center text-xs mt-2 gap-2">
                                                     <div className="flex items-center gap-1">
