@@ -14,7 +14,7 @@
     "node": "20"
   },
   "dependencies": {
-    "@google-cloud/video-transcoder": "^4.5.0",
+    "@google-cloud/video-transcoder": "4.5.0",
     "@google/generative-ai": "^0.21.0",
     "firebase-admin": "^12.2.0",
     "firebase-functions": "^5.0.1"
