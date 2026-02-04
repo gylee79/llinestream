@@ -130,6 +130,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                         drmSystems: {
                             clearkey: {}
                         },
+                        encryptionMode: 'cenc' 
                     }],
                 },
             },
