@@ -26,7 +26,6 @@ import Link from 'next/link';
 import { Skeleton } from '../ui/skeleton';
 import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/bookmark-actions';
 import { Input } from '../ui/input';
-import { getHlsPlaybackUrls } from '@/lib/actions/get-hls-playback-urls';
 
 // ========= TYPES AND INTERFACES =========
 
@@ -309,7 +308,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         return;
     }
     
-    if (episode.packagingStatus !== 'completed' || !episode.manifestUrl) {
+    if (episode.packagingStatus !== 'completed' || !episode.manifestPath) {
         setIsLoading(false); // Let the overlay handle the status message
         return;
     }
@@ -318,31 +317,20 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         if (!videoRef.current || !videoContainerRef.current) return;
         
         try {
-            const playbackUrls = await getHlsPlaybackUrls(episode.id);
-            if ('error' in playbackUrls) {
-                throw new Error(playbackUrls.error);
-            }
-            if (!isMounted) return;
-
-            const { manifestUrl, keyUrl } = playbackUrls;
-            const keyPlaceholderUrl = `https://llinestream.internal/keys/${episode.id}`;
+            const manifestUrl = getPublicUrl(firebaseConfig.storageBucket, episode.manifestPath!);
 
             const player = new shaka.Player();
             shakaPlayerRef.current = player;
 
             player.configure({
               streaming: { bufferingGoal: 30 },
+              drm: {
+                  clearKeys: {
+                      // No longer need to fetch keys manually, as they are public in the manifest
+                  }
+              }
             });
             
-            // Set up request filter to replace placeholder key URL with the signed URL
-            player.getNetworkingEngine().registerRequestFilter((type, request) => {
-                if (type === shaka.net.NetworkingEngine.RequestType.KEY) {
-                    if (request.uris[0] === keyPlaceholderUrl) {
-                        request.uris[0] = keyUrl;
-                    }
-                }
-            });
-
             const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
             uiRef.current = ui;
             

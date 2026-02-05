@@ -98,7 +98,7 @@ export interface Episode {
   aiProcessingError?: string | null;
   aiModel?: string; // The model used for the last AI analysis
 
-  manifestUrl?: string; // For DRM Streaming (DASH/HLS)
+  manifestPath?: string; // Changed from manifestUrl
   packagingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
   packagingError?: string | null;
   
