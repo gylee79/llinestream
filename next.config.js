@@ -13,6 +13,7 @@ const nextConfig = {
       "@opentelemetry/instrumentation",
       "@opentelemetry/sdk-node",
       "require-in-the-middle",
+      "express",
     ],
   },
   images: {
