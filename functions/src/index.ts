@@ -1,7 +1,7 @@
 
 /**
  * @fileoverview Video Analysis with Gemini & Transcoder API using Firebase Cloud Functions v2.
- * Gemini Model: gemini-1.5-flash
+ * Gemini Model: gemini-2.5-flash
  * Transcoder API for HLS Packaging with AES-128 encryption.
  */
 import { setGlobalOptions } from "firebase-functions/v2";
@@ -240,7 +240,7 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
 });
 
 async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.firestore.DocumentReference) {
-    const modelName = "gemini-1.5-flash";
+    const modelName = "gemini-2.5-flash";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
@@ -453,3 +453,5 @@ interface EpisodeData {
   vttPath?: string;
   [key: string]: any;
 }
+
+    
