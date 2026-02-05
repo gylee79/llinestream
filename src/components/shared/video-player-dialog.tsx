@@ -320,12 +320,13 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             const player = new shaka.Player();
             shakaPlayerRef.current = player;
-            
-            player.getNetworkingEngine().registerRequestFilter((type, request) => {
-                // AES-128 HLS의 키 요청은 KEY 타입입니다.
-                if (type === shaka.net.NetworkingEngine.RequestType.KEY) {
-                    // 키 요청에는 인증 헤더가 필요 없습니다. URL 자체로 접근합니다.
-                }
+
+            player.configure({
+                manifest: {
+                    hls: {
+                        aes128EncryptionScheme: 'org.w3.clearkey',
+                    },
+                },
             });
             
             const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
