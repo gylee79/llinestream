@@ -265,7 +265,7 @@ const PlayerStatusOverlay = ({ episode, isLoading, playerError }: { episode: Epi
     return null;
 }
 
-// ========= MAIN COMPONENT (복구 완료) =========
+// ========= MAIN COMPONENT =========
 
 export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
   const { user } = useUser();
@@ -294,7 +294,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     let isMounted = true;
     const shaka = (window as any).shaka;
 
-    if (!isOpen || !videoRef.current || !videoContainerRef.current) return;
+    if (!isOpen) return;
     
     if (!shaka) {
         console.error("Shaka Player is not loaded yet.");
@@ -303,40 +303,53 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         return;
     }
     
-    if (episode.packagingStatus !== 'completed') {
+    if (episode.packagingStatus !== 'completed' || !episode.manifestUrl) {
         setIsLoading(false); // Let the overlay handle the status message
         return;
     }
+    
+    async function initPlayer() {
+      if (!videoRef.current || !videoContainerRef.current) return;
 
-    async function init() {
-        try {
-            const player = new shaka.Player();
-            shakaPlayerRef.current = player;
-            
-            player.configure({
-              streaming: { bufferingGoal: 30 },
-            });
+      try {
+        const player = new shaka.Player();
+        shakaPlayerRef.current = player;
+        
+        player.configure({
+          streaming: { bufferingGoal: 30 },
+        });
 
-            const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
-            uiRef.current = ui;
+        const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
+        uiRef.current = ui;
+        
+        await player.attach(videoRef.current!);
+        player.addEventListener('error', (e: any) => {
+          if (isMounted) {
+            console.error("Shaka Player Error:", e.detail);
+            setPlayerError(`코드: ${e.detail.code}, ${e.detail.message}`);
+          }
+        });
 
-            await player.attach(videoRef.current!);
-            player.addEventListener('error', (e: any) => isMounted && setPlayerError(`재생 에러: ${e.detail.code}`));
+        await player.load(episode.manifestUrl);
 
-            if (!episode.manifestUrl) throw new Error('재생 주소가 없습니다.');
-            await player.load(episode.manifestUrl);
-
-            if (episode.vttPath) {
-                const url = getPublicUrl(firebaseConfig.storageBucket, episode.vttPath);
-                await player.addTextTrackAsync(url, 'ko', 'subtitle', 'text/vtt');
-                player.setTextTrackVisibility(true);
-            }
-            if (isMounted) setIsLoading(false);
-        } catch (e: any) {
-            if (isMounted) { setPlayerError(e.message); setIsLoading(false); }
+        if (episode.vttPath) {
+            const url = getPublicUrl(firebaseConfig.storageBucket, episode.vttPath);
+            await player.addTextTrackAsync(url, 'ko', 'subtitle', 'text/vtt');
+            player.setTextTrackVisibility(true);
         }
+
+        if (isMounted) setIsLoading(false);
+      } catch (e: any) {
+        if (isMounted) {
+          console.error("Shaka Player Init Error:", e);
+          setPlayerError(e.message || "플레이어를 초기화할 수 없습니다.");
+          setIsLoading(false);
+        }
+      }
     }
-    init();
+
+    initPlayer();
+
     return () => { 
         isMounted = false; 
         if (uiRef.current) uiRef.current.destroy();
