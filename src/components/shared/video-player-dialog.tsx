@@ -1,4 +1,3 @@
-
 /// <reference types="shaka-player" />
 
 'use client';
@@ -320,13 +319,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             const player = new shaka.Player();
             shakaPlayerRef.current = player;
-
+            
             player.configure({
-                manifest: {
-                    hls: {
-                        aes128EncryptionScheme: 'org.w3.clearkey',
-                    },
-                },
+                drm: {
+                    clearKeys: {
+                        // 'org.w3.clearkey' is the key system for AES-128
+                        'org.w3.clearkey': getPublicUrl(firebaseConfig.storageBucket, `episodes/${episode.id}/keys/enc.key`)
+                    }
+                }
             });
             
             const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
