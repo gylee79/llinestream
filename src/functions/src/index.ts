@@ -63,8 +63,7 @@ function initializeTools() {
   return { genAI, fileManager, transcoderClient };
 }
 
-
-// 3. HLS Packaging with Transcoder API (AES-128)
+// 3. HLS Packaging with Transcoder API (AES-128) - Private Key with Placeholder URI
 async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef: admin.firestore.DocumentReference): Promise<void> {
     try {
         await docRef.update({ packagingStatus: "processing", packagingError: null });
@@ -77,21 +76,21 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         const outputFolder = `episodes/${episodeId}/packaged/`;
         const outputUri = `gs://${bucket.name}/${outputFolder}`;
 
+        // 1. Generate a 16-byte AES-128 key.
         const aesKey = crypto.randomBytes(16);
         const keyFileName = 'enc.key';
         const keyStoragePath = `episodes/${episodeId}/keys/${keyFileName}`;
         const keyFile = bucket.file(keyStoragePath);
         
-        console.log(`[${episodeId}] HLS Job: Uploading AES-128 key to ${keyStoragePath}`);
-        await keyFile.save(aesKey, { contentType: 'application/octet-stream' });
+        // 2. Save the key to a private location in Storage.
+        console.log(`[${episodeId}] HLS Job: Uploading private AES-128 key to ${keyStoragePath}`);
+        await keyFile.save(aesKey, { contentType: 'application/octet-stream', private: true });
         
-        const signedUrlExpireTime = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days validity
-        const [signedKeyUrl] = await keyFile.getSignedUrl({ action: 'read', expires: signedUrlExpireTime });
-        console.log(`[${episodeId}] HLS Job: Generated Signed URL for key.`);
+        // 3. Create a unique, non-public placeholder URI for the manifest.
+        const keyUriPlaceholder = `https://llinestream.internal/keys/${episodeId}`;
+        console.log(`[${episodeId}] HLS Job: Using placeholder URI for manifest: ${keyUriPlaceholder}`);
 
-        // The URI for the key that will be written into the manifest file.
-        const keyStorageUriForManifest = `gs://${bucket.name}/${keyStoragePath}`;
-
+        // 4. Configure the Transcoder job.
         const request = {
             parent: `projects/${projectId}/locations/${location}`,
             job: {
@@ -107,9 +106,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                                 individualSegments: true,
                                 segmentDuration: { seconds: 4 },
                                 encryption: {
-                                    aes128: {
-                                        uri: keyStorageUriForManifest
-                                    }
+                                    aes128: { uri: keyUriPlaceholder } // Use the placeholder URI
                                 }
                             },
                         },
@@ -121,9 +118,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                                 individualSegments: true,
                                 segmentDuration: { seconds: 4 },
                                 encryption: {
-                                    aes128: {
-                                        uri: keyStorageUriForManifest
-                                    }
+                                    aes128: { uri: keyUriPlaceholder } // Use the placeholder URI
                                 }
                             },
                         }
@@ -143,7 +138,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
             },
         };
         
-        console.log(`[${episodeId}] HLS Job: Creating Transcoder job with request:`, JSON.stringify(request, null, 2));
+        console.log(`[${episodeId}] HLS Job: Creating Transcoder job...`);
         
         const [createJobResponse] = await client.createJob(request);
         
@@ -153,8 +148,9 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         const jobName = createJobResponse.name;
         console.log(`[${episodeId}] HLS Job: Transcoder job created successfully. Job name: ${jobName}`);
 
-        const POLLING_INTERVAL = 15000; // 15 seconds
-        const MAX_POLLS = 35; // 35 * 15s = 525s (8.75 minutes) < 540s timeout
+        // 5. Poll for job completion.
+        const POLLING_INTERVAL = 15000;
+        const MAX_POLLS = 35;
         let jobSucceeded = false;
 
         for (let i = 0; i < MAX_POLLS; i++) {
@@ -165,11 +161,11 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
             console.log(`[${episodeId}] HLS Job: Polling job status... (Attempt ${i+1}/${MAX_POLLS}). Current state: ${job.state}`);
 
             if (job.state === 'SUCCEEDED') {
-                console.log(`[${episodeId}] HLS Job: Transcoder job SUCCEEDED. Manifest will be at: ${outputUri}manifest.m3u8`);
+                console.log(`[${episodeId}] HLS Job: SUCCEEDED.`);
+                // 6. On success, store the path to the manifest, NOT a full URL.
                 await docRef.update({
                     packagingStatus: 'completed',
-                    manifestUrl: `${outputUri}manifest.m3u8`.replace(`gs://${bucket.name}/`, `https://storage.googleapis.com/${bucket.name}/`),
-                    keyServerUrl: signedKeyUrl,
+                    manifestUrl: `${outputFolder}manifest.m3u8`, // Store the path only
                     packagingError: null,
                 });
                 console.log(`[${episodeId}] HLS Job: Firestore document updated to 'completed'.`);
@@ -177,7 +173,6 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                 break;
             } else if (job.state === 'FAILED') {
                 const errorMessage = `Transcoder job failed: ${JSON.stringify(job.error, null, 2)}`;
-                console.error(`[${episodeId}] HLS Job: FAILED state detected. Error:`, job.error);
                 throw new Error(errorMessage);
             }
         }
@@ -458,5 +453,3 @@ interface EpisodeData {
   vttPath?: string;
   [key: string]: any;
 }
-
-    
