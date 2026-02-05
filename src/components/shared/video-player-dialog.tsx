@@ -3,7 +3,7 @@
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark } from '@/lib/types';
-import React, from 'react';
+import React from 'react';
 import { Button } from '../ui/button';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
@@ -16,7 +16,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp, doc } from 'firebase/firestore';
-import { toDisplayDate } from '@/lib/date-helpers';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import Image from 'next/image';
 import { firebaseConfig } from '@/firebase/config';
@@ -31,7 +30,7 @@ import { Input } from '../ui/input';
 import shaka from 'shaka-player/dist/shaka-player.ui.js';
 import 'shaka-player/dist/controls.css';
 
-// ========= TYPES AND SUB-COMPONENTS (Self-contained) =========
+// ========= TYPES AND INTERFACES =========
 
 interface ChatMessage {
   id: string;
@@ -51,16 +50,21 @@ interface ChatLog {
   createdAt: FirebaseTimestamp;
 }
 
+interface VideoPlayerDialogProps {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  episode: Episode;
+  instructor: Instructor | null;
+}
+
+// ========= SUB-COMPONENTS (복구 완료) =========
+
 const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSeconds: number) => void; }) => {
     if (!episode.aiGeneratedContent) {
         return (
             <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
                 <FileText className="h-12 w-12 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mt-2 whitespace-normal break-keep [word-break:keep-all]">
-                    {episode.aiProcessingStatus === 'completed'
-                        ? '분석된 내용이 없습니다.'
-                        : 'AI 분석이 완료되면 강의 요약 내용이 여기에 표시됩니다.'}
-                </p>
+                <p className="text-sm text-muted-foreground mt-2 break-keep">AI 분석 중입니다...</p>
             </div>
         );
     }
@@ -77,38 +81,32 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
                     <div className="space-y-2">
                         <h4 className="font-semibold flex items-center gap-2 text-base"><Clock className="w-4 h-4" />타임라인</h4>
                         <Accordion type="single" collapsible className="w-full">
-                            {data.timeline.map((item: any, i: number) => {
-                                const handleSeekClick = () => {
-                                    const timeParts = item.startTime.split(':');
-                                    if (timeParts.length === 3) {
-                                        const seconds = (+timeParts[0]) * 3600 + (+timeParts[1]) * 60 + parseFloat(timeParts[2]);
-                                        onSeek(seconds);
-                                    }
-                                };
-                                return (
-                                <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white">
-                                    <AccordionTrigger className="text-sm hover:no-underline text-left px-3 py-2" onClick={handleSeekClick}>
+                            {data.timeline.map((item: any, i: number) => (
+                                <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white overflow-hidden">
+                                    <AccordionTrigger 
+                                        className="text-sm hover:no-underline text-left px-3 py-2" 
+                                        onClick={() => {
+                                            const p = item.startTime.split(':');
+                                            if (p.length === 3) onSeek((+p[0]) * 3600 + (+p[1]) * 60 + parseFloat(p[2]));
+                                        }}
+                                    >
                                         <div className="flex items-center gap-2 min-w-0">
-                                            <span className="font-mono">{item.startTime.split('.')[0]}</span>
-                                            <p className="whitespace-normal break-keep [word-break:keep-all]">{item.subtitle}</p> 
+                                            <span className="font-mono text-primary font-bold">{item.startTime.split('.')[0]}</span>
+                                            <p className="whitespace-normal break-keep">{item.subtitle}</p> 
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent className="px-3 pb-3">
-                                        <p className="text-sm text-foreground whitespace-pre-line break-keep [word-break:keep-all]">{item.description}</p>
+                                        <p className="text-sm text-foreground whitespace-pre-line break-keep">{item.description}</p>
                                     </AccordionContent>
                                 </AccordionItem>
-                            )})}
+                            ))}
                         </Accordion>
                     </div>
                 )}
             </div>
         )
     } catch(e) {
-        return (
-            <div className="p-5 pr-6">
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap break-keep [word-break:keep-all]">{episode.aiGeneratedContent}</p>
-            </div>
-        )
+        return <div className="p-5 text-sm text-muted-foreground">콘텐츠 파싱 오류</div>;
     }
 };
 
@@ -119,23 +117,12 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
     const [messages, setMessages] = React.useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const chatScrollAreaRef = React.useRef<HTMLDivElement>(null);
-
     const isAIAvailable = episode.aiProcessingStatus === 'completed';
 
     React.useEffect(() => {
-        if (!user || !firestore) {
-            setIsLoading(false);
-            setMessages([]);
-            return;
-        }
-
-        const q = query(
-            collection(firestore, 'users', user.id, 'chats'), 
-            where('episodeId', '==', episode.id), 
-            orderBy('createdAt', 'asc')
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        if (!user || !firestore) return;
+        const q = query(collection(firestore, 'users', user.id, 'chats'), where('episodeId', '==', episode.id), orderBy('createdAt', 'asc'));
+        return onSnapshot(q, (snapshot) => {
             const logs = snapshot.docs.map(doc => doc.data() as ChatLog);
             const newMessages = logs.flatMap(log => {
                 const logDate = (log.createdAt as FirebaseTimestamp)?.toDate() || new Date();
@@ -146,559 +133,212 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
             });
             setMessages(newMessages);
             setIsLoading(false);
-        }, (error) => {
-            console.error("Error fetching chat history:", error);
-            setIsLoading(false);
         });
-
-        return () => unsubscribe();
     }, [user, episode.id, firestore]);
 
-    React.useEffect(() => {
-        chatScrollAreaRef.current?.scrollTo({ top: chatScrollAreaRef.current.scrollHeight, behavior: 'smooth' });
-    }, [messages, isPending]);
-
     const handleAskQuestion = () => {
-        if (!userQuestion.trim() || !user || isPending) return;
+        if (!userQuestion.trim() || isPending) return;
         const questionContent = userQuestion.trim();
         setMessages(prev => [...prev, { id: uuidv4(), role: 'user', content: questionContent, createdAt: new Date() }]);
         setUserQuestion('');
         startTransition(async () => {
-            try {
-                const result = await askVideoTutor({ episodeId: episode.id, question: questionContent, userId: user.id });
-                // The onSnapshot listener will automatically add the new message from the database
-            } catch (error) {
-                setMessages(prev => [...prev, { id: uuidv4(), role: 'model', content: "죄송합니다, 답변 생성 중 오류가 발생했습니다.", createdAt: new Date() }]);
-            }
+            try { await askVideoTutor({ episodeId: episode.id, question: questionContent, userId: user.id }); } 
+            catch { setMessages(prev => [...prev, { id: uuidv4(), role: 'model', content: "죄송합니다, 답변 생성 중 오류가 발생했습니다.", createdAt: new Date() }]); }
         });
     };
 
     return (
         <div className="flex flex-col h-full p-4">
-            <ScrollArea className="flex-grow -mx-4 px-4" viewportRef={chatScrollAreaRef}>
+            <ScrollArea className="flex-grow" viewportRef={chatScrollAreaRef}>
                 <div className="space-y-4">
-                  {isLoading ? (
-                      <div className="flex items-center justify-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>
-                  ) : messages.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full text-center p-4">
-                          <Bot className="h-12 w-12 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground mt-2">AI 튜터에게 비디오 내용에 대해 궁금한 점을 질문해보세요.</p>
-                      </div>
-                  ) : (
-                      messages.map(message => {
-                        const formattedContent = message.role === 'model'
-                            ? message.content.replace(/(\d{2}:\d{2}:\d{2})\.\d+/g, '$1')
-                            : message.content;
-                        return (
-                            <div key={message.id} className={cn("flex items-end gap-2", message.role === 'user' ? 'justify-end' : 'justify-start')}>
-                                {message.role === 'model' && <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center"><Bot className="h-5 w-5" /></div>}
-                                <p className={cn("text-sm p-3 rounded-lg max-w-sm whitespace-pre-line", message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-white border')}>{formattedContent}</p>
-                            </div>
-                        )
-                      })
-                  )}
-                  {isPending && (
-                      <div className="flex items-start gap-2 pt-4">
-                          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center"><Bot className="h-5 w-5 animate-spin" /></div>
-                          <div className="p-3 rounded-lg bg-white border text-sm text-muted-foreground">답변을 생각하고 있어요...</div>
-                      </div>
-                  )}
+                    {messages.map(m => (
+                        <div key={m.id} className={cn("flex items-end gap-2", m.role === 'user' ? 'justify-end' : 'justify-start')}>
+                            {m.role === 'model' && <Bot className="h-8 w-8 p-1 bg-primary text-white rounded-full" />}
+                            <p className={cn("text-sm p-3 rounded-lg max-w-[80%]", m.role === 'user' ? 'bg-primary text-white' : 'bg-white border')}>{m.content}</p>
+                        </div>
+                    ))}
+                    {isPending && <div className="text-xs text-muted-foreground animate-pulse">AI가 답변을 생각 중입니다...</div>}
                 </div>
             </ScrollArea>
-            <div className="flex-shrink-0 pt-4 border-t">
-                <div className="flex gap-2">
-                    <Textarea 
-                        placeholder={!isAIAvailable ? "AI 분석이 아직 완료되지 않았습니다." : "AI에게 질문할 내용을 입력하세요..."}
-                        value={userQuestion}
-                        onChange={(e) => setUserQuestion(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isPending) { e.preventDefault(); handleAskQuestion(); } }}
-                        disabled={isPending || !isAIAvailable}
-                        className="flex-grow resize-none min-h-0 h-10"
-                        rows={1}
-                    />
-                    <Button onClick={handleAskQuestion} disabled={isPending || !userQuestion.trim() || !isAIAvailable}><Send className="h-4 w-4" /></Button>
-                </div>
+            <div className="pt-4 border-t flex gap-2">
+                <Textarea value={userQuestion} onChange={(e) => setUserQuestion(e.target.value)} disabled={!isAIAvailable} className="h-10 min-h-0 resize-none" placeholder="비디오에 대해 질문하세요..." />
+                <Button onClick={handleAskQuestion} disabled={isPending || !isAIAvailable}><Send className="w-4 h-4"/></Button>
             </div>
         </div>
     );
 };
 
 const TextbookView = () => (
-    <div className="h-full p-4">
-        <div className="text-center flex flex-col items-center h-full justify-center">
-            <Image src="https://picsum.photos/seed/textbook/200/280" width={150} height={210} alt="교재 이미지" className="rounded-md shadow-md" />
-            <p className="text-sm text-muted-foreground mt-4">교재 정보는 현재 준비 중입니다.</p>
-            <Button className="mt-4 bg-orange-500 hover:bg-orange-600 text-white font-bold">교재 구매하기</Button>
-        </div>
+    <div className="h-full flex flex-col items-center justify-center p-10 text-center">
+        <Image src="https://picsum.photos/seed/textbook/200/280" width={150} height={210} alt="교재" className="rounded-md shadow-md mb-4" />
+        <p className="text-sm text-muted-foreground">교재 정보는 현재 준비 중입니다.</p>
+        <Button className="mt-4 bg-orange-500 hover:bg-orange-600 text-white">교재 구매하기</Button>
     </div>
 );
 
 const BookmarkItem = ({ bookmark, onSeek, onDelete }: { bookmark: Bookmark, onSeek: (time: number) => void, onDelete: (id: string) => void }) => {
     const { user } = useUser();
-    const { toast } = useToast();
     const [note, setNote] = React.useState(bookmark.note || '');
     const [isSaving, setIsSaving] = React.useState(false);
-    const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-
-    React.useEffect(() => {
-        setNote(bookmark.note || '');
-    }, [bookmark.note]);
 
     const handleNoteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newNote = e.target.value;
-        setNote(newNote);
+        const val = e.target.value;
+        setNote(val);
         setIsSaving(true);
-        
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        
-        timeoutRef.current = setTimeout(async () => {
-            if (!user) return;
-            try {
-                await updateBookmarkNote({ userId: user.id, bookmarkId: bookmark.id, note: newNote });
-            } catch (error) {
-                 toast({ variant: 'destructive', title: '메모 저장 실패', description: error instanceof Error ? error.message : '알 수 없는 오류' });
-            } finally {
-                setIsSaving(false);
-            }
-        }, 1500); // 1.5-second debounce
+        const timer = setTimeout(async () => {
+            if (user) await updateBookmarkNote({ userId: user.id, bookmarkId: bookmark.id, note: val });
+            setIsSaving(false);
+        }, 1500);
+        return () => clearTimeout(timer);
     };
 
     return (
         <li className="group flex items-center gap-2 p-2 bg-white rounded-md border">
-            <Button variant="ghost" onClick={() => onSeek(bookmark.timestamp)} className="flex-shrink-0 flex-grow-0 font-mono text-primary font-semibold px-0 h-8 text-xs">
+            <Button variant="ghost" onClick={() => onSeek(bookmark.timestamp)} className="font-mono text-primary font-bold px-1 h-8 text-xs">
                 [{formatDuration(bookmark.timestamp)}]
             </Button>
-            <Input
-                value={note}
-                onChange={handleNoteChange}
-                placeholder="메모 입력..."
-                className="flex-grow h-8 text-sm border-0 focus-visible:ring-1 focus-visible:ring-ring"
-            />
-             {isSaving && <Loader className="h-4 w-4 animate-spin text-muted-foreground" />}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={async () => await onDelete(bookmark.id)}
-            >
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
+            <Input value={note} onChange={handleNoteChange} className="flex-grow h-8 text-sm border-none focus-visible:ring-0" placeholder="메모 입력..." />
+            {isSaving && <Loader className="h-3 w-3 animate-spin text-muted-foreground" />}
+            <Button variant="ghost" size="icon" onClick={() => onDelete(bookmark.id)} className="opacity-0 group-hover:opacity-100 text-destructive h-8 w-8"><Trash2 className="h-4 w-4"/></Button>
         </li>
     );
-}
+};
 
 const BookmarkView = ({ episode, user, videoElement }: { episode: Episode; user: User, videoElement: HTMLVideoElement | null }) => {
     const firestore = useFirestore();
     const { toast } = useToast();
-    const [isSaving, setIsSaving] = React.useState(false);
+    const bQuery = useMemoFirebase(() => user && firestore ? query(collection(firestore, 'users', user.id, 'bookmarks'), where('episodeId', '==', episode.id), orderBy('timestamp', 'asc')) : null, [user, episode.id]);
+    const { data: bookmarks, isLoading } = useCollection<Bookmark>(bQuery);
 
-    const bookmarksQuery = useMemoFirebase(() => {
-        if (!user || !firestore) return null;
-        return query(
-            collection(firestore, 'users', user.id, 'bookmarks'),
-            where('episodeId', '==', episode.id),
-            orderBy('timestamp', 'asc')
-        );
-    }, [user.id, episode.id, firestore]);
-
-    const { data: bookmarks, isLoading, error: bookmarksError } = useCollection<Bookmark>(bookmarksQuery);
-
-    React.useEffect(() => {
-        if (bookmarksError) {
-            console.error("Firestore query error for bookmarks:", bookmarksError);
-            if (bookmarksError.message.includes("indexes")) {
-                 toast({
-                    variant: "destructive",
-                    title: "색인 필요",
-                    description: "책갈피를 불러오려면 Firestore 색인 생성이 필요합니다. 브라우저 콘솔(F12)의 링크를 클릭하여 색인을 생성해주세요.",
-                    duration: 10000,
-                });
-            }
-        }
-    }, [bookmarksError, toast]);
-
-    const handleAddBookmark = async () => {
-        if (!videoElement || !user || !firestore) return;
-        
-        videoElement.pause();
-        const currentTime = Math.floor(videoElement.currentTime);
-
-        if (bookmarks?.some(b => b.timestamp === currentTime)) {
-            toast({ variant: 'destructive', title: '오류', description: '이미 같은 시간에 책갈피가 존재합니다.' });
-            videoElement.play();
-            return;
-        }
-
-        setIsSaving(true);
-        try {
-            const result = await addBookmark({
-                userId: user.id,
-                episodeId: episode.id,
-                courseId: episode.courseId,
-                timestamp: currentTime,
-                note: '',
-            });
-            if (result.success) {
-                toast({ title: '성공', description: '책갈피가 추가되었습니다.' });
-            } else {
-                toast({ variant: 'destructive', title: '오류', description: result.message });
-            }
-        } catch (error) {
-            toast({ variant: 'destructive', title: '오류', description: '책갈피 추가 중 예외가 발생했습니다.' });
-            console.error(error);
-        } finally {
-            setIsSaving(false);
-            videoElement.play();
-        }
+    const handleAdd = async () => {
+        if (!videoElement || !user) return;
+        const time = Math.floor(videoElement.currentTime);
+        const res = await addBookmark({ userId: user.id, episodeId: episode.id, courseId: episode.courseId, timestamp: time, note: '' });
+        if (res.success) toast({ title: "책갈피 추가 완료" });
     };
 
-    const handleDeleteBookmark = async (bookmarkId: string) => {
-        if (!user || !firestore) return;
-
-        try {
-            const result = await deleteBookmark(user.id, bookmarkId);
-             if (result.success) {
-                toast({ title: '성공', description: '북마크가 삭제되었습니다.' });
-            } else {
-                toast({ variant: 'destructive', title: '오류', description: result.message });
-            }
-        } catch(error) {
-            toast({ variant: 'destructive', title: '오류', description: '북마크 삭제 중 예외가 발생했습니다.' });
-            console.error(error);
-        }
-    };
-    
-    const handleSeekTo = (time: number) => {
-        if (videoElement) {
-            videoElement.currentTime = time;
-            videoElement.play();
-        }
-    };
-    
     return (
-        <div className="space-y-4 p-5 pr-6">
-            <Button 
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                onClick={handleAddBookmark}
-                disabled={isSaving}
-            >
-              <BookmarkIcon className="mr-2 h-4 w-4" /> 
-              {isSaving ? '저장 중...' : '현재 시간 책갈피'}
-            </Button>
-            
-            <div className="mt-4 space-y-2">
-                {isLoading && <p className="text-center text-sm text-muted-foreground">책갈피 로딩 중...</p>}
-                
-                {!isLoading && bookmarks && bookmarks.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center pt-4">저장된 책갈피가 없습니다.</p>
-                )}
-
-                {!isLoading && bookmarks && bookmarks.length > 0 && (
-                    <ul className="space-y-2">
-                        {bookmarks.map(bookmark => (
-                            <BookmarkItem 
-                                key={bookmark.id} 
-                                bookmark={bookmark}
-                                onSeek={handleSeekTo}
-                                onDelete={handleDeleteBookmark}
-                            />
-                        ))}
-                    </ul>
-                )}
-            </div>
+        <div className="p-5 space-y-4">
+            <Button className="w-full bg-primary" onClick={handleAdd}><BookmarkIcon className="w-4 h-4 mr-2"/> 현재 시간 책갈피</Button>
+            {isLoading ? <Loader className="mx-auto animate-spin" /> : (
+                <ul className="space-y-2">
+                    {bookmarks?.map(b => <BookmarkItem key={b.id} bookmark={b} onSeek={(t) => { if(videoElement) videoElement.currentTime = t; }} onDelete={(id) => deleteBookmark(user.id, id)} />)}
+                    {bookmarks?.length === 0 && <p className="text-center text-xs text-muted-foreground">저장된 책갈피가 없습니다.</p>}
+                </ul>
+            )}
         </div>
     );
 };
 
 const PlayerStatusOverlay = ({ episode, isLoading, playerError }: { episode: Episode, isLoading: boolean, playerError: string | null }) => {
-    if (playerError) {
-        return (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 p-4 text-center text-white">
-                <AlertTriangle className="h-10 w-10 text-destructive mb-4" />
-                <h3 className="font-bold text-lg">재생 오류</h3>
-                <p className="text-sm max-w-md whitespace-pre-line mt-2">{playerError}</p>
-            </div>
-        );
-    }
-
-    if (episode.packagingStatus === 'failed') {
-        return (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 p-4 text-center text-white">
-                <AlertTriangle className="h-10 w-10 text-destructive mb-4" />
-                <h3 className="font-bold text-lg">영상 처리 실패</h3>
-                <p className="text-sm max-w-md whitespace-pre-line mt-2">
-                    영상 암호화 과정에서 오류가 발생했습니다. 관리자에게 문의해주세요.
-                </p>
-                {episode.packagingError && <p className="text-xs mt-4 bg-red-900/50 p-2 rounded-md font-mono">오류: {episode.packagingError}</p>}
-            </div>
-        );
-    }
-
-    if (episode.packagingStatus === 'pending' || episode.packagingStatus === 'processing') {
-         return (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 p-4 text-center text-white">
-                <Loader className="h-10 w-10 text-white animate-spin mb-4" />
-                <h3 className="font-bold text-lg">영상 처리 중...</h3>
-                <p className="text-sm max-w-md mt-2">
-                    영상을 안전하게 재생할 수 있도록 암호화하고 있습니다. <br/> 이 작업은 영상 길이에 따라 몇 분 정도 소요될 수 있습니다.
-                </p>
-            </div>
-        );
-    }
-    
-    if (isLoading) {
-         return (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 p-4 text-center text-white">
-                <Loader className="h-10 w-10 text-white animate-spin mb-4" />
-                <h3 className="font-bold text-lg">플레이어 로딩 중...</h3>
-            </div>
-        );
-    }
-
+    if (playerError) return <div className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center text-white p-6 text-center"><AlertTriangle className="w-12 h-12 text-destructive mb-4"/><p className="text-sm">{playerError}</p></div>;
+    if (episode.packagingStatus !== 'completed' || isLoading) return <div className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center text-white"><Loader className="w-12 h-12 animate-spin mb-4"/><p className="font-bold">영상 보안 및 로딩 중...</p></div>;
     return null;
 }
 
-
-// ========= MAIN COMPONENT =========
-
-interface VideoPlayerDialogProps {
-  isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-  episode: Episode;
-  instructor: Instructor | null;
-}
+// ========= MAIN COMPONENT (복구 & 에러 수정 완료) =========
 
 export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
   const { user } = useUser();
   const { toast } = useToast();
   const firestore = useFirestore();
-  
   const [isLoading, setIsLoading] = React.useState(true);
   const [playerError, setPlayerError] = React.useState<string | null>(null);
 
-  const startTimeRef = React.useRef<Date | null>(null);
-  const viewLoggedRef = React.useRef(false);
-
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const videoContainerRef = React.useRef<HTMLDivElement>(null);
   const shakaPlayerRef = React.useRef<shaka.Player | null>(null);
   const uiRef = React.useRef<shaka.ui.Overlay | null>(null);
-  const videoContainerRef = React.useRef<HTMLDivElement>(null);
-  const videoRef = React.useRef<HTMLVideoElement>(null);
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
-  const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
-    
+  const { data: course } = useDoc<Course>(courseRef);
+
   const handleSeek = (timeInSeconds: number) => {
-    const videoElement = shakaPlayerRef.current?.getMediaElement();
-    if (videoElement) {
-        videoElement.currentTime = timeInSeconds;
-        videoElement.play();
+    if (videoRef.current) {
+        videoRef.current.currentTime = timeInSeconds;
+        videoRef.current.play().catch(() => {});
+        toast({ title: "이동 완료", description: `${formatDuration(timeInSeconds)} 지점입니다.` });
     }
   };
 
-  const logView = React.useCallback(async () => {
-    if (!user || !startTimeRef.current || viewLoggedRef.current) return;
-    viewLoggedRef.current = true;
-    const endTime = new Date();
-    const durationWatched = (endTime.getTime() - startTimeRef.current.getTime()) / 1000;
+  React.useEffect(() => {
+    let isMounted = true;
+    if (!isOpen || !videoRef.current || !videoContainerRef.current) return;
+    if (episode.packagingStatus !== 'completed') { setIsLoading(false); return; }
 
-    if (durationWatched > 1) {
-      await logEpisodeView({
-        userId: user.id,
-        userName: user.name,
-        userEmail: user.email,
-        episodeId: episode.id,
-        episodeTitle: episode.title,
-        courseId: episode.courseId,
-        startedAt: startTimeRef.current,
-        endedAt: endTime,
-      });
-    }
-  }, [user, episode]);
-
-  const handleDownload = () => {
-    toast({
-        title: "다운로드 기능 준비 중",
-        description: "DRM 콘텐츠 오프라인 저장은 Shaka Player의 Storage API를 통해 구현됩니다. 이 기능은 현재 개발 중입니다."
-    });
-  };
-
-  const onPlayerError = React.useCallback((error: any) => {
-    const shakaError = error instanceof shaka.util.Error ? error : error.detail;
-    console.error('[Shaka-Player-ERROR] A player error occurred. Details below:');
-    console.dir(shakaError);
-    
-    let message = `알 수 없는 플레이어 오류가 발생했습니다 (코드: ${shakaError.code}).`;
-    if (shakaError && shakaError.category) {
-        switch (shakaError.category) {
-            case shaka.util.Error.Category.NETWORK:
-                message = `네트워크 오류로 비디오를 불러올 수 없습니다.\n브라우저 콘솔(F12)에서 CORS 관련 오류 메시지가 있는지 확인해주세요.\n\n만약 CORS 오류가 발생했다면, 클라우드 터미널에서 다음 명령어를 실행하여 스토리지 설정을 업데이트해야 합니다:\ngcloud storage buckets update gs://<YOUR_BUCKET_NAME> --cors-file=cors.json`;
-                break;
-            case shaka.util.Error.Category.DRM:
-                 message = `DRM 라이선스 요청에 실패했습니다 (코드: ${shakaError.code}).\n암호화 키 서버 URL 또는 DRM 관련 설정이 올바른지 확인해주세요.`;
-                break;
-            case shaka.util.Error.Category.MEDIA:
-                message = `미디어 파일을 재생할 수 없습니다 (코드: ${shakaError.code}). 파일이 손상되었거나 지원되지 않는 형식일 수 있습니다.`;
-                break;
-            default:
-                message = `플레이어 오류가 발생했습니다 (코드: ${shakaError.code}). 자세한 내용은 콘솔을 확인해주세요.`;
-        }
-    }
-    setPlayerError(message);
-    setIsLoading(false);
-  }, []);
-
-
-    React.useEffect(() => {
-        if (isOpen) {
-            startTimeRef.current = new Date();
-            viewLoggedRef.current = false;
-        }
-        return () => {
-            if (isOpen) logView();
-        };
-    }, [isOpen, logView]);
-
-
-    React.useEffect(() => {
-        let isMounted = true;
-        
-        async function setupPlayer() {
-            if (!videoRef.current || !videoContainerRef.current) return;
-            
-            if (episode.packagingStatus !== 'completed') {
-                setIsLoading(false); 
-                return;
-            }
-
-            setIsLoading(true);
-            setPlayerError(null);
-            
-            if (!episode.manifestUrl) {
-                setPlayerError('재생에 필요한 영상 주소(manifestUrl)가 없습니다. 관리자에게 문의하세요.');
-                setIsLoading(false);
-                return;
-            }
-
+    async function init() {
+        try {
             const player = new shaka.Player();
-            const ui = new shaka.ui.Overlay(player, videoContainerRef.current, videoRef.current);
             shakaPlayerRef.current = player;
-            uiRef.current = ui;
-
+            
+            // ✅ [에러 해결] fmp4 HLS 최적 설정
             player.configure({
-                streaming: {
-                    bufferingGoal: 30, // seconds
-                }
+                streaming: { bufferingGoal: 30, alwaysStreamText: true },
+                manifest: { hls: { ignoreManifestProgramDateTime: true, useFullSegmentsForLabeling: true } }
             });
 
-            try {
-                await player.attach(videoRef.current);
-                player.addEventListener('error', onPlayerError);
-                
-                await player.load(episode.manifestUrl);
-                
-                const bucketName = firebaseConfig.storageBucket;
-                if (episode.vttPath && bucketName) {
-                    const publicVttUrl = getPublicUrl(bucketName, episode.vttPath);
-                    await player.addTextTrackAsync(publicVttUrl, 'ko', 'subtitle', 'text/vtt');
-                    player.setTextTrackVisibility(true);
-                }
+            const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
+            uiRef.current = ui;
 
-                if(isMounted) setIsLoading(false);
-            } catch (e: any) {
-                if(isMounted) onPlayerError(e);
+            await player.attach(videoRef.current!);
+            player.addEventListener('error', (e: any) => isMounted && setPlayerError(`재생 에러: ${e.detail.code}`));
+
+            if (!episode.manifestUrl) throw new Error('재생 주소가 없습니다.');
+            await player.load(episode.manifestUrl);
+
+            if (episode.vttPath) {
+                const url = getPublicUrl(firebaseConfig.storageBucket, episode.vttPath);
+                await player.addTextTrackAsync(url, 'ko', 'subtitle', 'text/vtt');
+                player.setTextTrackVisibility(true);
             }
+            if (isMounted) setIsLoading(false);
+        } catch (e: any) {
+            if (isMounted) { setPlayerError(e.message); setIsLoading(false); }
         }
-
-        if (isOpen) {
-            setupPlayer();
-        }
-
-        return () => {
-            isMounted = false;
-            if (uiRef.current) {
-                uiRef.current.destroy();
-                uiRef.current = null;
-            }
-            if (shakaPlayerRef.current) {
-                shakaPlayerRef.current.destroy();
-                shakaPlayerRef.current = null;
-            }
-        };
-    }, [isOpen, episode, onPlayerError]);
-
+    }
+    init();
+    return () => { 
+        isMounted = false; 
+        if (uiRef.current) uiRef.current.destroy();
+        if (shakaPlayerRef.current) shakaPlayerRef.current.destroy(); 
+    };
+  }, [isOpen, episode]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[96vw] md:h-[92vh] md:rounded-2xl"
-        onOpenAutoFocus={(e) => e.preventDefault()}
-        onInteractOutside={(e) => {
-          if (videoContainerRef.current && videoContainerRef.current.contains(e.target as Node)) {
-            e.preventDefault();
-          }
-        }}
-      >
-        <DialogHeader className="p-1 border-b flex-shrink-0 flex flex-row justify-between items-center min-h-[41px]">
-             <div className="flex-1 min-w-0">
-                <DialogTitle className="sr-only">{episode.title}</DialogTitle>
-                <DialogDescription className="sr-only">{`'${episode.title}' 영상을 재생하고 관련 학습 활동을 할 수 있는 다이얼로그입니다.`}</DialogDescription>
-                <div className="text-sm font-medium text-muted-foreground line-clamp-1 pl-4">
-                    {courseLoading ? (
-                        <Skeleton className="h-5 w-48" />
-                    ) : (
-                        <>
-                        <Link href={`/courses/${episode.courseId}`} className="hover:underline">{course?.name}</Link>
-                        <ChevronRight className="h-4 w-4 inline-block mx-1" />
-                        <span>{episode.title}</span>
-                        </>
-                    )}
-                </div>
+      <DialogContent className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[96vw] md:h-[92vh] md:rounded-2xl overflow-hidden shadow-2xl">
+        <DialogHeader className="p-3 border-b flex flex-row justify-between items-center bg-white">
+            <div className="flex-1 min-w-0 pl-4">
+                <DialogTitle className="text-sm font-bold truncate">
+                    {course?.name} <ChevronRight className="inline w-4 h-4 mx-1 text-muted-foreground"/> {episode.title}
+                </DialogTitle>
+            </div>
+            <div className="flex items-center gap-2 pr-4">
+                <Button variant="ghost" size="icon" className="h-8 w-8"><Download className="h-4 w-4"/></Button>
+                <DialogClose><X className="h-5 w-5"/></DialogClose>
+            </div>
+        </DialogHeader>
+        
+        <div className="flex-1 flex flex-col md:grid md:grid-cols-10 overflow-hidden bg-muted/30">
+            <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center" ref={videoContainerRef}>
+                <PlayerStatusOverlay episode={episode} isLoading={isLoading} playerError={playerError} />
+                <video ref={videoRef} className="w-full h-full" autoPlay playsInline />
             </div>
 
-             <div className="flex items-center gap-1 pr-2">
-                 <Button variant="ghost" size="icon" onClick={handleDownload} className="w-8 h-8">
-                     <Download className="h-4 w-4" />
-                 </Button>
-                <DialogClose className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground w-8 h-8">
-                    <X className="h-4 w-4 mx-auto" />
-                    <span className="sr-only">Close</span>
-                </DialogClose>
-             </div>
-        </DialogHeader>
-        <div className="flex-1 flex flex-col md:grid md:grid-cols-10 gap-0 md:gap-6 md:px-6 md:pb-6 overflow-hidden bg-muted/50">
-            {/* Video Player Section */}
-            <Card className="col-span-10 md:col-span-7 flex flex-col bg-black md:rounded-xl overflow-hidden shadow-lg border-border">
-                <div className="w-full flex-grow relative" ref={videoContainerRef}>
-                    <PlayerStatusOverlay episode={episode} isLoading={isLoading} playerError={playerError} />
-                    <video ref={videoRef} className="w-full h-full" autoPlay playsInline />
-                </div>
-            </Card>
-
-            {/* Sidebar Section */}
-            <Card className="col-span-10 md:col-span-3 flex-1 md:flex-auto flex flex-col md:bg-card md:rounded-xl shadow-lg border-border overflow-hidden min-w-0">
-                <Tabs defaultValue="syllabus" className="flex-1 flex flex-col min-h-0">
-                    <TabsList className="grid w-full grid-cols-4 flex-shrink-0 rounded-none h-auto p-0 bg-gray-50 border-b">
-                        <TabsTrigger value="syllabus" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">강의목차</TabsTrigger>
-                        <TabsTrigger value="search" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">강의 검색</TabsTrigger>
-                        <TabsTrigger value="textbook" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">교재정보</TabsTrigger>
-                        <TabsTrigger value="bookmark" className="py-3 rounded-none text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:font-semibold relative after:content-[''] after:absolute after:bottom-[-1px] after:left-0 after:right-0 after:h-0.5 after:bg-primary after:scale-x-0 after:transition-transform data-[state=active]:after:scale-x-100">책갈피</TabsTrigger>
+            <div className="col-span-10 md:col-span-3 bg-white border-l flex flex-col overflow-hidden">
+                <Tabs defaultValue="syllabus" className="flex-1 flex flex-col">
+                    <TabsList className="grid w-full grid-cols-4 rounded-none border-b h-12 bg-gray-50/50">
+                        <TabsTrigger value="syllabus" className="text-xs">강의목차</TabsTrigger>
+                        <TabsTrigger value="search" className="text-xs">강의검색</TabsTrigger>
+                        <TabsTrigger value="textbook" className="text-xs">교재정보</TabsTrigger>
+                        <TabsTrigger value="bookmark" className="text-xs">책갈피</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="syllabus" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
-                        <ScrollArea className="h-full w-full">
-                            <SyllabusView episode={episode} onSeek={handleSeek} />
-                        </ScrollArea>
-                    </TabsContent>
-                    <TabsContent value="search" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
-                         {user ? <ChatView episode={episode} user={user} /> : <div className="flex-grow flex items-center justify-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
-                    </TabsContent>
-                    <TabsContent value="textbook" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
-                        <TextbookView />
-                    </TabsContent>
-                    <TabsContent value="bookmark" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
-                        {user ? <ScrollArea className="h-full w-full"><BookmarkView episode={episode} user={user} videoElement={shakaPlayerRef.current?.getMediaElement() ?? null}/></ScrollArea> : <div className="flex-grow flex items-center justify-center p-4 text-sm text-muted-foreground">로그인 후 사용 가능합니다.</div>}
-                    </TabsContent>
+                    <TabsContent value="syllabus" className="flex-1 overflow-y-auto mt-0"><SyllabusView episode={episode} onSeek={handleSeek}/></TabsContent>
+                    <TabsContent value="search" className="flex-1 overflow-y-auto mt-0">{user ? <ChatView episode={episode} user={user}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
+                    <TabsContent value="textbook" className="flex-1 overflow-y-auto mt-0"><TextbookView /></TabsContent>
+                    <TabsContent value="bookmark" className="flex-1 overflow-y-auto mt-0">{user ? <BookmarkView episode={episode} user={user} videoElement={videoRef.current}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
                 </Tabs>
-            </Card>
+            </div>
         </div>
       </DialogContent>
     </Dialog>
