@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteFilesOnEpisodeDelete = exports.analyzeVideoOnWrite = void 0;
 /**
  * @fileoverview Video Analysis with Gemini & Transcoder API using Firebase Cloud Functions v2.
- * Gemini Model: gemini-1.5-flash
+ * Gemini Model: gemini-2.5-flash
  * Transcoder API for HLS Packaging with AES-128 encryption.
  */
 const v2_1 = require("firebase-functions/v2");
@@ -246,7 +246,7 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)("episodes/{epis
     }
 });
 async function runAiAnalysis(episodeId, filePath, docRef) {
-    const modelName = "gemini-1.5-flash";
+    const modelName = "gemini-2.5-flash";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
