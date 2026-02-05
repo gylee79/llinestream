@@ -1,7 +1,6 @@
 'use client';
 
-import { useParams, notFound } from 'next/navigation';
-import Link from 'next/link';
+import { useParams, notFound, useRouter } from 'next/navigation';
 import { useCollection, useDoc, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { collection, query, where, doc, orderBy } from 'firebase/firestore';
 import type { Course, Classification, Field, Instructor } from '@/lib/types';
@@ -15,6 +14,7 @@ import { cn } from '@/lib/utils';
 
 export default function FieldDetailPage() {
     const params = useParams<{ fieldId: string }>();
+    const router = useRouter();
     const fieldId = params.fieldId;
     const firestore = useFirestore();
 
@@ -115,7 +115,11 @@ export default function FieldDetailPage() {
                                 <div>
                                 {courseData.length > 0 ? (
                                     courseData.map(({ course, instructor }, index) => (
-                                        <Link href={`/courses/${course.id}`} key={course.id} className="block group hover:bg-muted/50 transition-colors">
+                                        <div 
+                                          key={course.id} 
+                                          className="block group hover:bg-muted/50 transition-colors cursor-pointer"
+                                          onClick={() => router.push(`/courses/${course.id}`)}
+                                        >
                                             <div className="p-4 flex items-center gap-4 border-b last:border-b-0">
                                                 <Avatar className="h-12 w-12 border">
                                                 {course.thumbnailUrl ? (
@@ -139,7 +143,7 @@ export default function FieldDetailPage() {
                                                 </div>
                                                 </div>
                                             </div>
-                                        </Link>
+                                        </div>
                                     ))
                                 ) : (
                                     <div className="text-center py-16">
