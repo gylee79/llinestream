@@ -302,14 +302,13 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     if (!isOpen) return;
     
     if (!shaka) {
-        console.error("Shaka Player is not loaded yet.");
         setPlayerError("플레이어 라이브러리를 로드하는 중입니다. 잠시 후 다시 시도해주세요.");
         setIsLoading(false);
         return;
     }
     
     if (episode.packagingStatus !== 'completed' || !episode.manifestPath) {
-        setIsLoading(false); // Let the overlay handle the status message
+        setIsLoading(false);
         return;
     }
     
@@ -321,14 +320,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             const player = new shaka.Player();
             shakaPlayerRef.current = player;
-
-            player.configure({
-              streaming: { bufferingGoal: 30 },
-              drm: {
-                  clearKeys: {
-                      // No longer need to fetch keys manually, as they are public in the manifest
-                  }
-              }
+            
+            player.getNetworkingEngine().registerRequestFilter((type, request) => {
+                // AES-128 HLS의 키 요청은 KEY 타입입니다.
+                if (type === shaka.net.NetworkingEngine.RequestType.KEY) {
+                    // 키 요청에는 인증 헤더가 필요 없습니다. URL 자체로 접근합니다.
+                }
             });
             
             const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
@@ -387,7 +384,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 overflow-hidden bg-muted/30">
             <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center" ref={videoContainerRef}>
                 <PlayerStatusOverlay episode={episode} isLoading={isLoading} playerError={playerError} />
-                <video ref={videoRef} className="w-full h-full" autoPlay playsInline playsInline/>
+                <video ref={videoRef} className="w-full h-full" autoPlay playsInline/>
             </div>
 
             <div className="col-span-10 md:col-span-3 bg-white border-l flex flex-col overflow-hidden">
