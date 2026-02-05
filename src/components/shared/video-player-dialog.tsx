@@ -336,7 +336,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             
             // Set up request filter to replace placeholder key URL with the signed URL
             player.getNetworkingEngine().registerRequestFilter((type, request) => {
-                if (type === shaka.net.NetworkingEngine.RequestType.LICENSE) {
+                if (type === shaka.net.NetworkingEngine.RequestType.KEY) {
                     if (request.uris[0] === keyPlaceholderUrl) {
                         request.uris[0] = keyUrl;
                     }
