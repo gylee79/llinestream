@@ -1,4 +1,3 @@
-
 /// <reference types="shaka-player" />
 
 'use client';
@@ -52,7 +51,7 @@ interface ChatLog {
   createdAt: FirebaseTimestamp;
 }
 
-const SyllabusView = ({ episode }: { episode: Episode }) => {
+const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSeconds: number) => void; }) => {
     if (!episode.aiGeneratedContent) {
         return (
             <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
@@ -78,9 +77,17 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
                     <div className="space-y-2">
                         <h4 className="font-semibold flex items-center gap-2 text-base"><Clock className="w-4 h-4" />타임라인</h4>
                         <Accordion type="single" collapsible className="w-full">
-                            {data.timeline.map((item: any, i: number) => (
+                            {data.timeline.map((item: any, i: number) => {
+                                const handleSeekClick = () => {
+                                    const timeParts = item.startTime.split(':');
+                                    if (timeParts.length === 3) {
+                                        const seconds = (+timeParts[0]) * 3600 + (+timeParts[1]) * 60 + parseFloat(timeParts[2]);
+                                        onSeek(seconds);
+                                    }
+                                };
+                                return (
                                 <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white">
-                                    <AccordionTrigger className="text-sm hover:no-underline text-left px-3 py-2">
+                                    <AccordionTrigger className="text-sm hover:no-underline text-left px-3 py-2" onClick={handleSeekClick}>
                                         <div className="flex items-center gap-2 min-w-0">
                                             <span className="font-mono">{item.startTime.split('.')[0]}</span>
                                             <p className="whitespace-normal break-keep [word-break:keep-all]">{item.subtitle}</p> 
@@ -90,7 +97,7 @@ const SyllabusView = ({ episode }: { episode: Episode }) => {
                                         <p className="text-sm text-foreground whitespace-pre-line break-keep [word-break:keep-all]">{item.description}</p>
                                     </AccordionContent>
                                 </AccordionItem>
-                            ))}
+                            )})}
                         </Accordion>
                     </div>
                 )}
@@ -479,6 +486,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
+    
+  const handleSeek = (timeInSeconds: number) => {
+    const videoElement = shakaPlayerRef.current?.getMediaElement();
+    if (videoElement) {
+        videoElement.currentTime = timeInSeconds;
+        videoElement.play();
+    }
+  };
 
   const logView = React.useCallback(async () => {
     if (!user || !startTimeRef.current || viewLoggedRef.current) return;
@@ -550,10 +565,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         async function setupPlayer() {
             if (!videoRef.current || !videoContainerRef.current) return;
             
-            // This component will now show status based on episode props.
-            // We only try to load the player if packaging is complete.
             if (episode.packagingStatus !== 'completed') {
-                setIsLoading(false); // Not loading the player, so set to false. The overlay will show the status.
+                setIsLoading(false); 
                 return;
             }
 
@@ -570,6 +583,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             const ui = new shaka.ui.Overlay(player, videoContainerRef.current, videoRef.current);
             shakaPlayerRef.current = player;
             uiRef.current = ui;
+
+            player.configure({
+                streaming: {
+                    bufferingGoal: 30, // seconds
+                }
+            });
 
             try {
                 await player.attach(videoRef.current);
@@ -666,7 +685,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     </TabsList>
                     <TabsContent value="syllabus" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
                         <ScrollArea className="h-full w-full">
-                            <SyllabusView episode={episode} />
+                            <SyllabusView episode={episode} onSeek={handleSeek} />
                         </ScrollArea>
                     </TabsContent>
                     <TabsContent value="search" className="mt-0 flex-grow min-h-0 bg-white flex flex-col">
