@@ -64,11 +64,11 @@ export default function ContentCarousel({ title, items, itemType }: ContentCarou
         className="w-full"
       >
         <CarouselContent className="-ml-2">
-          {items.map((item) => (
+          {items.map((item, index) => (
             <CarouselItem key={item.id} className={cn(getItemBasisClass(), "pl-2")}>
               <div className="h-full">
                 {itemType === 'course' && <CourseCard course={item as Course} />}
-                {itemType === 'episode' && <EpisodeCard episode={item as Episode} />}
+                {itemType === 'episode' && <EpisodeCard episode={item as Episode} index={index} />}
                 {itemType === 'classification' && <ClassificationCard classification={item as Classification} />}
               </div>
             </CarouselItem>

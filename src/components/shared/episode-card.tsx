@@ -7,9 +7,10 @@ import { ImageIcon } from 'lucide-react';
 
 interface EpisodeCardProps {
   episode: Episode;
+  index?: number;
 }
 
-export default function EpisodeCard({ episode }: EpisodeCardProps) {
+export default function EpisodeCard({ episode, index }: EpisodeCardProps) {
   return (
     <Link href={`/courses/${episode.courseId}?episode=${episode.id}`} className="block h-full">
       <Card className="h-full overflow-hidden transition-all duration-300 hover:shadow-lg bg-transparent border-none shadow-none rounded-lg">
@@ -21,6 +22,7 @@ export default function EpisodeCard({ episode }: EpisodeCardProps) {
               width={600}
               height={400}
               className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+              priority={index !== undefined && index < 4}
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-muted rounded-lg">
