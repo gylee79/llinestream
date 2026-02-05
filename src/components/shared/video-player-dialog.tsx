@@ -26,9 +26,7 @@ import { Skeleton } from '../ui/skeleton';
 import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/bookmark-actions';
 import { Input } from '../ui/input';
 
-// Import Shaka Player
-import shaka from 'shaka-player/dist/shaka-player.ui.js';
-import 'shaka-player/dist/controls.css';
+// Shaka Player is loaded globally via <script> tag in layout.tsx, so no direct import is needed.
 
 // ========= TYPES AND INTERFACES =========
 
@@ -231,12 +229,43 @@ const BookmarkView = ({ episode, user, videoElement }: { episode: Episode; user:
 };
 
 const PlayerStatusOverlay = ({ episode, isLoading, playerError }: { episode: Episode, isLoading: boolean, playerError: string | null }) => {
-    if (playerError) return <div className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center text-white p-6 text-center"><AlertTriangle className="w-12 h-12 text-destructive mb-4"/><p className="text-sm">{playerError}</p></div>;
-    if (episode.packagingStatus !== 'completed' || isLoading) return <div className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center text-white"><Loader className="w-12 h-12 animate-spin mb-4"/><p className="font-bold">영상 보안 및 로딩 중...</p></div>;
+    if (playerError) {
+        return (
+            <div className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center text-white p-6 text-center">
+                <AlertTriangle className="w-12 h-12 text-destructive mb-4"/>
+                <p className="font-semibold">재생 오류</p>
+                <p className="text-sm text-muted-foreground mt-1">{playerError}</p>
+            </div>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <div className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center text-white">
+                <Loader className="w-12 h-12 animate-spin mb-4"/>
+                <p className="font-bold">플레이어 로딩 중...</p>
+            </div>
+        );
+    }
+    
+    if (episode.packagingStatus !== 'completed') {
+        const statusText = episode.packagingStatus === 'failed' ? '영상 처리 실패' : '영상 처리 중...';
+        const Icon = episode.packagingStatus === 'failed' ? AlertTriangle : Loader;
+        const iconColor = episode.packagingStatus === 'failed' ? 'text-destructive' : '';
+        
+        return (
+            <div className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center text-white p-6 text-center">
+                <Icon className={cn("w-12 h-12 mb-4", episode.packagingStatus !== 'failed' && 'animate-spin', iconColor)} />
+                <p className="font-bold">{statusText}</p>
+                {episode.packagingError && <p className="text-xs text-muted-foreground mt-2 max-w-sm">{episode.packagingError}</p>}
+            </div>
+        );
+    }
+    
     return null;
 }
 
-// ========= MAIN COMPONENT (복구 & 에러 수정 완료) =========
+// ========= MAIN COMPONENT (복구 완료) =========
 
 export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
   const { user } = useUser();
@@ -263,18 +292,29 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
   React.useEffect(() => {
     let isMounted = true;
+    const shaka = (window as any).shaka;
+
     if (!isOpen || !videoRef.current || !videoContainerRef.current) return;
-    if (episode.packagingStatus !== 'completed') { setIsLoading(false); return; }
+    
+    if (!shaka) {
+        console.error("Shaka Player is not loaded yet.");
+        setPlayerError("플레이어 라이브러리를 로드하는 중입니다. 잠시 후 다시 시도해주세요.");
+        setIsLoading(false);
+        return;
+    }
+    
+    if (episode.packagingStatus !== 'completed') {
+        setIsLoading(false); // Let the overlay handle the status message
+        return;
+    }
 
     async function init() {
         try {
             const player = new shaka.Player();
             shakaPlayerRef.current = player;
             
-            // ✅ [에러 해결] fmp4 HLS 최적 설정
             player.configure({
-                streaming: { bufferingGoal: 30, alwaysStreamText: true },
-                manifest: { hls: { ignoreManifestProgramDateTime: true, useFullSegmentsForLabeling: true } }
+              streaming: { bufferingGoal: 30 },
             });
 
             const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);

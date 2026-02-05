@@ -79,7 +79,18 @@ export default function RootLayout({
           crossOrigin="anonymous"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
         />
+        {/* Shaka Player CSS */}
+        <link
+          rel="stylesheet"
+          type="text/css"
+          href="https://cdn.jsdelivr.net/npm/shaka-player@4.3.1/dist/controls.css"
+        />
         <title>LlineStream</title>
+        {/* Shaka Player JS - using defer to not block rendering */}
+        <script
+          defer
+          src="https://cdn.jsdelivr.net/npm/shaka-player@4.3.1/dist/shaka-player.ui.js"
+        ></script>
       </head>
       <body className={cn('min-h-screen bg-background font-body antialiased')}>
         <FirebaseClientProvider>
