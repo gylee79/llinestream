@@ -1,3 +1,4 @@
+
 /// <reference types="shaka-player" />
 
 'use client';
@@ -25,8 +26,7 @@ import Link from 'next/link';
 import { Skeleton } from '../ui/skeleton';
 import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/bookmark-actions';
 import { Input } from '../ui/input';
-
-// Shaka Player is loaded globally via <script> tag in layout.tsx, so no direct import is needed.
+import { getHlsPlaybackUrls } from '@/lib/actions/get-hls-playback-urls';
 
 // ========= TYPES AND INTERFACES =========
 
@@ -55,7 +55,7 @@ interface VideoPlayerDialogProps {
   instructor: Instructor | null;
 }
 
-// ========= SUB-COMPONENTS (복구 완료) =========
+// ========= SUB-COMPONENTS =========
 
 const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSeconds: number) => void; }) => {
     if (!episode.aiGeneratedContent) {
@@ -69,6 +69,15 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
     
     try {
         const data = JSON.parse(episode.aiGeneratedContent);
+        
+        const parseTimeToSeconds = (timeStr: string): number => {
+            const parts = timeStr.split(':').map(part => parseFloat(part.replace(',', '.')));
+            if (parts.length === 3) {
+                return parts[0] * 3600 + parts[1] * 60 + parts[2];
+            }
+            return 0;
+        };
+
         return (
             <div className="space-y-4 p-5 pr-6">
                 <div className="space-y-1">
@@ -83,10 +92,7 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
                                 <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white overflow-hidden">
                                     <AccordionTrigger 
                                         className="text-sm hover:no-underline text-left px-3 py-2" 
-                                        onClick={() => {
-                                            const p = item.startTime.split(':');
-                                            if (p.length === 3) onSeek((+p[0]) * 3600 + (+p[1]) * 60 + parseFloat(p[2]));
-                                        }}
+                                        onClick={() => onSeek(parseTimeToSeconds(item.startTime))}
                                     >
                                         <div className="flex items-center gap-2 min-w-0">
                                             <span className="font-mono text-primary font-bold">{item.startTime.split('.')[0]}</span>
@@ -309,43 +315,61 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     }
     
     async function initPlayer() {
-      if (!videoRef.current || !videoContainerRef.current) return;
-
-      try {
-        const player = new shaka.Player();
-        shakaPlayerRef.current = player;
+        if (!videoRef.current || !videoContainerRef.current) return;
         
-        player.configure({
-          streaming: { bufferingGoal: 30 },
-        });
+        try {
+            const playbackUrls = await getHlsPlaybackUrls(episode.id);
+            if ('error' in playbackUrls) {
+                throw new Error(playbackUrls.error);
+            }
+            if (!isMounted) return;
 
-        const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
-        uiRef.current = ui;
-        
-        await player.attach(videoRef.current!);
-        player.addEventListener('error', (e: any) => {
-          if (isMounted) {
-            console.error("Shaka Player Error:", e.detail);
-            setPlayerError(`코드: ${e.detail.code}, ${e.detail.message}`);
-          }
-        });
+            const { manifestUrl, keyUrl } = playbackUrls;
+            const keyPlaceholderUrl = `https://llinestream.internal/keys/${episode.id}`;
 
-        await player.load(episode.manifestUrl);
+            const player = new shaka.Player();
+            shakaPlayerRef.current = player;
 
-        if (episode.vttPath) {
-            const url = getPublicUrl(firebaseConfig.storageBucket, episode.vttPath);
-            await player.addTextTrackAsync(url, 'ko', 'subtitle', 'text/vtt');
-            player.setTextTrackVisibility(true);
+            player.configure({
+              streaming: { bufferingGoal: 30 },
+            });
+            
+            // Set up request filter to replace placeholder key URL with the signed URL
+            player.getNetworkingEngine().registerRequestFilter((type, request) => {
+                if (type === shaka.net.NetworkingEngine.RequestType.LICENSE) {
+                    if (request.uris[0] === keyPlaceholderUrl) {
+                        request.uris[0] = keyUrl;
+                    }
+                }
+            });
+
+            const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
+            uiRef.current = ui;
+            
+            await player.attach(videoRef.current!);
+            player.addEventListener('error', (e: any) => {
+              if (isMounted) {
+                console.error("Shaka Player Error:", e.detail);
+                setPlayerError(`코드: ${e.detail.code}, ${e.detail.message}`);
+              }
+            });
+
+            await player.load(manifestUrl);
+
+            if (episode.vttPath) {
+                const url = getPublicUrl(firebaseConfig.storageBucket, episode.vttPath);
+                await player.addTextTrackAsync(url, 'ko', 'subtitle', 'text/vtt');
+                player.setTextTrackVisibility(true);
+            }
+
+            if (isMounted) setIsLoading(false);
+        } catch (e: any) {
+            if (isMounted) {
+                console.error("Player Initialization Error:", e);
+                setPlayerError(e.message || "플레이어를 초기화할 수 없습니다.");
+                setIsLoading(false);
+            }
         }
-
-        if (isMounted) setIsLoading(false);
-      } catch (e: any) {
-        if (isMounted) {
-          console.error("Shaka Player Init Error:", e);
-          setPlayerError(e.message || "플레이어를 초기화할 수 없습니다.");
-          setIsLoading(false);
-        }
-      }
     }
 
     initPlayer();
@@ -375,7 +399,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 overflow-hidden bg-muted/30">
             <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center" ref={videoContainerRef}>
                 <PlayerStatusOverlay episode={episode} isLoading={isLoading} playerError={playerError} />
-                <video ref={videoRef} className="w-full h-full" autoPlay playsInline />
+                <video ref={videoRef} className="w-full h-full" autoPlay playsInline playsInline/>
             </div>
 
             <div className="col-span-10 md:col-span-3 bg-white border-l flex flex-col overflow-hidden">
