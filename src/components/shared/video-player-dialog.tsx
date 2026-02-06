@@ -119,7 +119,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
     const [userQuestion, setUserQuestion] = React.useState('');
     const [messages, setMessages] = React.useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
-    const isAIAvailable = episode.status.processing === 'completed';
+    const isAIAvailable = episode.aiProcessingStatus === 'completed';
 
     React.useEffect(() => {
         if (!user || !firestore) return;
@@ -254,16 +254,18 @@ const PlayerStatusOverlay = ({ episode, isLoading, playerError }: { episode: Epi
         );
     }
     
-    if (episode.status.processing !== 'completed') {
-        const statusText = episode.status.processing === 'failed' ? '영상 처리 실패' : '영상 처리 중...';
-        const Icon = episode.status.processing === 'failed' ? AlertTriangle : Loader;
-        const iconColor = episode.status.processing === 'failed' ? 'text-destructive' : '';
+    const episodeStatus = episode.status || { processing: 'pending', playable: false };
+
+    if (episodeStatus.processing !== 'completed') {
+        const statusText = episodeStatus.processing === 'failed' ? '영상 처리 실패' : '영상 처리 중...';
+        const Icon = episodeStatus.processing === 'failed' ? AlertTriangle : Loader;
+        const iconColor = episodeStatus.processing === 'failed' ? 'text-destructive' : '';
         
         return (
             <div className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center text-white p-6 text-center">
-                <Icon className={cn("w-12 h-12 mb-4", episode.status.processing !== 'failed' && 'animate-spin', iconColor)} />
+                <Icon className={cn("w-12 h-12 mb-4", episodeStatus.processing !== 'failed' && 'animate-spin', iconColor)} />
                 <p className="font-bold">{statusText}</p>
-                {episode.status.error && <p className="text-xs text-muted-foreground mt-2 max-w-sm">{episode.status.error}</p>}
+                {episodeStatus.error && <p className="text-xs text-muted-foreground mt-2 max-w-sm">{episodeStatus.error}</p>}
             </div>
         );
     }
@@ -362,7 +364,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     };
 
     let isMounted = true;
-    if (isOpen && episode.status.processing === 'completed' && episode.status.playable) {
+    if (isOpen && episode.status?.processing === 'completed' && episode.status?.playable) {
         setIsLoading(true);
         setPlayerError(null);
         
@@ -437,3 +439,5 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
+
+    
