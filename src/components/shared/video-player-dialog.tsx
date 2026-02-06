@@ -302,9 +302,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     const shaka = (window as any).shaka;
 
     async function initPlayer() {
-        if (!isMounted || !shaka || !videoRef.current || !videoContainerRef.current || !auth.currentUser) {
+        if (!isMounted || !shaka || !videoRef.current || !videoContainerRef.current) {
             setIsLoading(false);
-            if (!auth.currentUser) setPlayerError("로그인이 필요합니다.");
             return;
         }
         
@@ -319,20 +318,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             player = new shaka.Player();
             ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
-            
-            // Add request filter to add auth token to key requests
-            player.getNetworkingEngine().registerRequestFilter(async (type: any, request: any) => {
-                if (type === shaka.net.NetworkingEngine.RequestType.LICENSE) {
-                    if (auth.currentUser) {
-                        try {
-                            const token = await auth.currentUser.getIdToken();
-                            request.headers['Authorization'] = 'Bearer ' + token;
-                        } catch (error) {
-                            console.error("Error getting auth token for key request:", error);
-                        }
-                    }
-                }
-            });
             
             player.addEventListener('error', (e: any) => {
               if (isMounted) {
@@ -421,4 +406,3 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   );
 }
 
-    
