@@ -75,35 +75,37 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
         };
 
         return (
-            <div className="space-y-4 p-5 pr-6">
-                <div className="space-y-1">
-                    <h4 className="font-semibold text-base">강의 요약</h4>
-                    <p className="text-sm text-foreground whitespace-pre-line break-keep [word-break:keep-all]">{data.summary || '요약이 없습니다.'}</p>
-                </div>
-                {data.timeline && data.timeline.length > 0 && (
-                    <div className="space-y-2">
-                        <h4 className="font-semibold flex items-center gap-2 text-base"><Clock className="w-4 h-4" />타임라인</h4>
-                        <Accordion type="single" collapsible className="w-full">
-                            {data.timeline.map((item: any, i: number) => (
-                                <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white overflow-hidden">
-                                    <AccordionTrigger 
-                                        className="text-sm hover:no-underline text-left px-3 py-2" 
-                                        onClick={() => onSeek(parseTimeToSeconds(item.startTime))}
-                                    >
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <span className="font-mono text-primary font-bold">{item.startTime.split('.')[0]}</span>
-                                            <p className="whitespace-normal break-keep">{item.subtitle}</p> 
-                                        </div>
-                                    </AccordionTrigger>
-                                    <AccordionContent className="px-3 pb-3">
-                                        <p className="text-sm text-foreground whitespace-pre-line break-keep">{item.description}</p>
-                                    </AccordionContent>
-                                </AccordionItem>
-                            ))}
-                        </Accordion>
+            <ScrollArea className="h-full">
+                <div className="space-y-4 p-5 pr-6">
+                    <div className="space-y-1">
+                        <h4 className="font-semibold text-base">강의 요약</h4>
+                        <p className="text-sm text-foreground whitespace-pre-line break-keep [word-break:keep-all]">{data.summary || '요약이 없습니다.'}</p>
                     </div>
-                )}
-            </div>
+                    {data.timeline && data.timeline.length > 0 && (
+                        <div className="space-y-2">
+                            <h4 className="font-semibold flex items-center gap-2 text-base"><Clock className="w-4 h-4" />타임라인</h4>
+                            <Accordion type="single" collapsible className="w-full">
+                                {data.timeline.map((item: any, i: number) => (
+                                    <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white overflow-hidden">
+                                        <AccordionTrigger 
+                                            className="text-sm hover:no-underline text-left px-3 py-2" 
+                                            onClick={() => onSeek(parseTimeToSeconds(item.startTime))}
+                                        >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span className="font-mono text-primary font-bold">{item.startTime.split('.')[0]}</span>
+                                                <p className="whitespace-normal break-keep">{item.subtitle}</p> 
+                                            </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="px-3 pb-3">
+                                            <p className="text-sm text-foreground whitespace-pre-line break-keep">{item.description}</p>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                ))}
+                            </Accordion>
+                        </div>
+                    )}
+                </div>
+            </ScrollArea>
         )
     } catch(e) {
         return <div className="p-5 text-sm text-muted-foreground">콘텐츠 파싱 오류</div>;
@@ -359,15 +361,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[96vw] md:h-[92vh] md:rounded-2xl overflow-hidden shadow-2xl">
-        <div className="p-2 border-b flex items-center justify-between bg-white flex-shrink-0">
-            <DialogTitle className="text-sm font-bold truncate pl-2">
+        <div className="flex h-14 items-center justify-between border-b bg-white px-4 flex-shrink-0">
+            <DialogTitle className="text-lg font-bold truncate">
                 {course?.name} <ChevronRight className="inline w-4 h-4 mx-1 text-muted-foreground"/> {episode.title}
             </DialogTitle>
-            <div className="flex items-center">
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Download className="h-4 h-4"/>
-              </Button>
-              {/* The extra X button is now gone. The one from DialogContent will be used. */}
+            <div className="flex items-center gap-2 pr-10"> {/* Space for the absolute X button */}
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Download className="h-4 h-4"/>
+                </Button>
             </div>
         </div>
         
@@ -385,7 +386,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <TabsTrigger value="textbook" className="text-xs">교재정보</TabsTrigger>
                         <TabsTrigger value="bookmark" className="text-xs">책갈피</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="syllabus" className="flex-1 overflow-y-auto mt-0"><SyllabusView episode={episode} onSeek={handleSeek}/></TabsContent>
+                    <TabsContent value="syllabus" className="flex-1 mt-0">
+                        <SyllabusView episode={episode} onSeek={handleSeek}/>
+                    </TabsContent>
                     <TabsContent value="search" className="flex-1 overflow-y-auto mt-0">{user ? <ChatView episode={episode} user={user}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
                     <TabsContent value="textbook" className="flex-1 overflow-y-auto mt-0"><TextbookView /></TabsContent>
                     <TabsContent value="bookmark" className="flex-1 overflow-y-auto mt-0">{user ? <BookmarkView episode={episode} user={user} videoElement={videoRef.current}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
