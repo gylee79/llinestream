@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark } from '@/lib/types';
@@ -15,7 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp, doc } from 'firebase/firestore';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import Image from 'next/image';
 import { firebaseConfig } from '@/firebase/config';
 import { useToast } from '@/hooks/use-toast';
@@ -68,6 +67,7 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
         const data = JSON.parse(episode.aiGeneratedContent);
         
         const parseTimeToSeconds = (timeStr: string): number => {
+            if (!timeStr) return 0;
             const parts = timeStr.split(':').map(part => parseFloat(part.replace(',', '.')));
             if (parts.length === 3) {
                 return parts[0] * 3600 + parts[1] * 60 + parts[2];
@@ -76,37 +76,35 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
         };
 
         return (
-            <ScrollArea className="h-full">
-                <div className="space-y-4 p-5 pr-6">
-                    <div className="space-y-1">
-                        <h4 className="font-semibold text-base">강의 요약</h4>
-                        <p className="text-sm text-foreground whitespace-pre-line break-keep [word-break:keep-all]">{data.summary || '요약이 없습니다.'}</p>
-                    </div>
-                    {data.timeline && data.timeline.length > 0 && (
-                        <div className="space-y-2">
-                            <h4 className="font-semibold flex items-center gap-2 text-base"><Clock className="w-4 h-4" />타임라인</h4>
-                            <Accordion type="single" collapsible className="w-full">
-                                {data.timeline.map((item: any, i: number) => (
-                                    <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white overflow-hidden">
-                                        <AccordionTrigger 
-                                            className="text-sm hover:no-underline text-left px-3 py-2" 
-                                            onClick={() => onSeek(parseTimeToSeconds(item.startTime))}
-                                        >
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <span className="font-mono text-primary font-bold">{item.startTime.split('.')[0]}</span>
-                                                <p className="whitespace-normal break-keep">{item.subtitle}</p> 
-                                            </div>
-                                        </AccordionTrigger>
-                                        <AccordionContent className="px-3 pb-3">
-                                            <p className="text-sm text-foreground whitespace-pre-line break-keep">{item.description}</p>
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                ))}
-                            </Accordion>
-                        </div>
-                    )}
+            <div className="space-y-4 p-4 pr-6">
+                <div className="space-y-1">
+                    <h4 className="font-semibold text-base">강의 요약</h4>
+                    <p className="text-sm text-foreground whitespace-pre-line break-keep [word-break:keep-all]">{data.summary || '요약이 없습니다.'}</p>
                 </div>
-            </ScrollArea>
+                {data.timeline && data.timeline.length > 0 && (
+                    <div className="space-y-2">
+                        <h4 className="font-semibold flex items-center gap-2 text-base"><Clock className="w-4 h-4" />타임라인</h4>
+                        <Accordion type="single" collapsible className="w-full">
+                            {data.timeline.map((item: any, i: number) => (
+                                <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white overflow-hidden">
+                                    <AccordionTrigger 
+                                        className="text-sm hover:no-underline text-left px-3 py-2" 
+                                        onClick={() => onSeek(parseTimeToSeconds(item.startTime))}
+                                    >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="font-mono text-primary font-bold">{item.startTime?.split('.')[0] || '00:00:00'}</span>
+                                            <p className="whitespace-normal break-keep">{item.subtitle}</p> 
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="px-3 pb-3">
+                                        <p className="text-sm text-foreground whitespace-pre-line break-keep">{item.description}</p>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    </div>
+                )}
+            </div>
         )
     } catch(e) {
         return <div className="p-5 text-sm text-muted-foreground">콘텐츠 파싱 오류</div>;
@@ -119,13 +117,12 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
     const [userQuestion, setUserQuestion] = React.useState('');
     const [messages, setMessages] = React.useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
-    const chatScrollAreaRef = React.useRef<HTMLDivElement>(null);
     const isAIAvailable = episode.aiProcessingStatus === 'completed';
 
     React.useEffect(() => {
         if (!user || !firestore) return;
         const q = query(collection(firestore, 'users', user.id, 'chats'), where('episodeId', '==', episode.id), orderBy('createdAt', 'asc'));
-        return onSnapshot(q, (snapshot) => {
+        const unsubscribe = onSnapshot(q, (snapshot) => {
             const logs = snapshot.docs.map(doc => doc.data() as ChatLog);
             const newMessages = logs.flatMap(log => {
                 const logDate = (log.createdAt as FirebaseTimestamp)?.toDate() || new Date();
@@ -137,6 +134,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
             setMessages(newMessages);
             setIsLoading(false);
         });
+        return unsubscribe;
     }, [user, episode.id, firestore]);
 
     const handleAskQuestion = () => {
@@ -152,7 +150,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
 
     return (
         <div className="flex flex-col h-full p-4">
-            <ScrollArea className="flex-grow" viewportRef={chatScrollAreaRef}>
+            <ScrollArea className="flex-grow pr-4">
                 <div className="space-y-4">
                     {messages.map(m => (
                         <div key={m.id} className={cn("flex items-end gap-2", m.role === 'user' ? 'justify-end' : 'justify-start')}>
@@ -172,29 +170,28 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
 };
 
 const TextbookView = () => (
-    <ScrollArea className="h-full">
-        <div className="h-full flex flex-col items-center justify-center p-10 text-center">
-            <Image src="https://picsum.photos/seed/textbook/200/280" width={150} height={210} alt="교재" className="rounded-md shadow-md mb-4" />
-            <p className="text-sm text-muted-foreground">교재 정보는 현재 준비 중입니다.</p>
-            <Button className="mt-4 bg-orange-500 hover:bg-orange-600 text-white">교재 구매하기</Button>
-        </div>
-    </ScrollArea>
+    <div className="h-full flex flex-col items-center justify-center p-10 text-center">
+        <Image src="https://picsum.photos/seed/textbook/200/280" width={150} height={210} alt="교재" className="rounded-md shadow-md mb-4" />
+        <p className="text-sm text-muted-foreground">교재 정보는 현재 준비 중입니다.</p>
+        <Button className="mt-4 bg-orange-500 hover:bg-orange-600 text-white">교재 구매하기</Button>
+    </div>
 );
 
 const BookmarkItem = ({ bookmark, onSeek, onDelete }: { bookmark: Bookmark, onSeek: (time: number) => void, onDelete: (id: string) => void }) => {
     const { user } = useUser();
     const [note, setNote] = React.useState(bookmark.note || '');
     const [isSaving, setIsSaving] = React.useState(false);
+    const debounceTimer = React.useRef<NodeJS.Timeout | null>(null);
 
     const handleNoteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         setNote(val);
         setIsSaving(true);
-        const timer = setTimeout(async () => {
+        if (debounceTimer.current) clearTimeout(debounceTimer.current);
+        debounceTimer.current = setTimeout(async () => {
             if (user) await updateBookmarkNote({ userId: user.id, bookmarkId: bookmark.id, note: val });
             setIsSaving(false);
         }, 1500);
-        return () => clearTimeout(timer);
     };
 
     return (
@@ -223,17 +220,15 @@ const BookmarkView = ({ episode, user, videoElement }: { episode: Episode; user:
     };
 
     return (
-        <ScrollArea className="h-full">
-            <div className="p-5 space-y-4">
-                <Button className="w-full bg-primary" onClick={handleAdd}><BookmarkIcon className="w-4 h-4 mr-2"/> 현재 시간 책갈피</Button>
-                {isLoading ? <Loader className="mx-auto animate-spin" /> : (
-                    <ul className="space-y-2">
-                        {bookmarks?.map(b => <BookmarkItem key={b.id} bookmark={b} onSeek={(t) => { if(videoElement) videoElement.currentTime = t; }} onDelete={(id) => deleteBookmark(user.id, id)} />)}
-                        {bookmarks?.length === 0 && <p className="text-center text-xs text-muted-foreground">저장된 책갈피가 없습니다.</p>}
-                    </ul>
-                )}
-            </div>
-        </ScrollArea>
+        <div className="p-4 space-y-4">
+            <Button className="w-full bg-primary" onClick={handleAdd}><BookmarkIcon className="w-4 h-4 mr-2"/> 현재 시간 책갈피</Button>
+            {isLoading ? <Loader className="mx-auto animate-spin" /> : (
+                <ul className="space-y-2">
+                    {bookmarks?.map(b => <BookmarkItem key={b.id} bookmark={b} onSeek={(t) => { if(videoElement) videoElement.currentTime = t; }} onDelete={(id) => deleteBookmark(user.id, id)} />)}
+                    {bookmarks?.length === 0 && <p className="text-center text-xs text-muted-foreground pt-4">저장된 책갈피가 없습니다.</p>}
+                </ul>
+            )}
+        </div>
     );
 };
 
@@ -286,7 +281,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const videoContainerRef = React.useRef<HTMLDivElement>(null);
   const shakaPlayerRef = React.useRef<any | null>(null);
-  const uiRef = React.useRef<any | null>(null);
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
   const { data: course } = useDoc<Course>(courseRef);
@@ -301,32 +295,23 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
   React.useEffect(() => {
     let isMounted = true;
+    let player: any | null = null;
+    let ui: any | null = null;
     const shaka = (window as any).shaka;
 
-    if (!isOpen) return;
-    
-    if (!shaka) {
-        setPlayerError("플레이어 라이브러리를 로드하는 중입니다. 잠시 후 다시 시도해주세요.");
-        setIsLoading(false);
-        return;
-    }
-    
-    if (episode.packagingStatus !== 'completed' || !episode.manifestPath) {
-        setIsLoading(false);
-        return;
-    }
-    
     async function initPlayer() {
-        if (!videoRef.current || !videoContainerRef.current) return;
-        
-        try {
-            const manifestUrl = getPublicUrl(firebaseConfig.storageBucket, episode.manifestPath!);
+        if (!isMounted || !shaka || !videoRef.current || !videoContainerRef.current) return;
+        if (episode.packagingStatus !== 'completed' || !episode.manifestPath) {
+          setIsLoading(false);
+          return;
+        }
 
-            const player = new shaka.Player();
-            shakaPlayerRef.current = player;
+        try {
+            const manifestUrl = getPublicUrl(firebaseConfig.storageBucket, episode.manifestPath);
             
-            const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
-            uiRef.current = ui;
+            player = new shaka.Player();
+            shakaPlayerRef.current = player;
+            ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
             
             await player.attach(videoRef.current!);
             player.addEventListener('error', (e: any) => {
@@ -354,12 +339,15 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         }
     }
 
-    initPlayer();
+    if (isOpen) {
+        initPlayer();
+    }
 
     return () => { 
         isMounted = false; 
-        if (uiRef.current) uiRef.current.destroy();
-        if (shakaPlayerRef.current) shakaPlayerRef.current.destroy(); 
+        if (ui) ui.destroy();
+        if (player) player.destroy(); 
+        shakaPlayerRef.current = null;
     };
   }, [isOpen, episode]);
 
@@ -367,10 +355,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[96vw] md:h-[92vh] md:rounded-2xl overflow-hidden shadow-2xl">
         <div className="flex h-14 items-center justify-between border-b bg-white px-4 flex-shrink-0">
-            <DialogTitle className="text-lg font-bold truncate">
-                {course?.name} <ChevronRight className="inline w-4 h-4 mx-1 text-muted-foreground"/> {episode.title}
-            </DialogTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+                <DialogTitle className="text-base font-bold truncate">
+                    {course?.name} <ChevronRight className="inline w-4 h-4 mx-1 text-muted-foreground"/> {episode.title}
+                </DialogTitle>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
                 <Button variant="ghost" size="icon" className="h-8 w-8">
                     <Download className="h-4 h-4"/>
                 </Button>
@@ -383,25 +373,27 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         </div>
         
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 bg-muted/30 min-h-0">
-            <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center" ref={videoContainerRef}>
+            <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center min-h-0" ref={videoContainerRef}>
                 <PlayerStatusOverlay episode={episode} isLoading={isLoading} playerError={playerError} />
                 <video ref={videoRef} className="w-full h-full" autoPlay playsInline/>
             </div>
 
             <div className="col-span-10 md:col-span-3 bg-white border-l flex flex-col min-h-0">
-                <Tabs defaultValue="syllabus" className="flex-1 flex flex-col">
-                    <TabsList className="grid w-full grid-cols-4 rounded-none border-b h-12 bg-gray-50/50">
+                <Tabs defaultValue="syllabus" className="flex-1 flex flex-col min-h-0">
+                    <TabsList className="grid w-full grid-cols-4 rounded-none border-b h-12 bg-gray-50/50 flex-shrink-0">
                         <TabsTrigger value="syllabus" className="text-xs">강의목차</TabsTrigger>
                         <TabsTrigger value="search" className="text-xs">강의검색</TabsTrigger>
                         <TabsTrigger value="textbook" className="text-xs">교재정보</TabsTrigger>
                         <TabsTrigger value="bookmark" className="text-xs">책갈피</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="syllabus" className="flex-1 mt-0 min-h-0">
-                        <SyllabusView episode={episode} onSeek={handleSeek}/>
-                    </TabsContent>
-                    <TabsContent value="search" className="flex-1 mt-0 min-h-0">{user ? <ChatView episode={episode} user={user}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
-                    <TabsContent value="textbook" className="flex-1 mt-0 min-h-0"><TextbookView /></TabsContent>
-                    <TabsContent value="bookmark" className="flex-1 mt-0 min-h-0">{user ? <BookmarkView episode={episode} user={user} videoElement={videoRef.current}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
+                    <div className="flex-1 min-h-0">
+                        <TabsContent value="syllabus" className="mt-0 h-full">
+                            <ScrollArea className="h-full"><SyllabusView episode={episode} onSeek={handleSeek}/></ScrollArea>
+                        </TabsContent>
+                        <TabsContent value="search" className="mt-0 h-full">{user ? <ChatView episode={episode} user={user}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
+                        <TabsContent value="textbook" className="mt-0 h-full"><TextbookView /></TabsContent>
+                        <TabsContent value="bookmark" className="mt-0 h-full">{user ? <BookmarkView episode={episode} user={user} videoElement={videoRef.current}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
+                    </div>
                 </Tabs>
             </div>
         </div>
