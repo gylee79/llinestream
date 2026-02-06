@@ -364,11 +364,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 <Button variant="ghost" size="icon" className="h-8 w-8">
                     <Download className="h-4 h-4"/>
                 </Button>
-                 <DialogClose asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <X className="h-5 w-5" />
-                    </Button>
-                </DialogClose>
             </div>
         </div>
         
