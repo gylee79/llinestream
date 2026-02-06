@@ -374,7 +374,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 </DialogTitle>
             </div>
             <div className="flex items-center gap-2 pr-4">
-                <Button variant="ghost" size="icon" className="h-8 w-8"><Download className="h-4 w-4"/></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8"><Download className="h-4 h-4"/></Button>
                 <DialogClose><X className="h-5 w-5"/></DialogClose>
             </div>
         </DialogHeader>
