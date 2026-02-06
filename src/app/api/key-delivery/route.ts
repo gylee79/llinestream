@@ -63,10 +63,10 @@ export async function GET(req: NextRequest) {
         const file = storage.bucket().file(keyPath);
         const [keyBuffer] = await file.download();
 
-        // Explicitly create a Uint8Array from the Buffer to resolve type ambiguity
-        const keyData = new Uint8Array(keyBuffer);
+        // Create a Blob from the Buffer to ensure type compatibility with NextResponse
+        const keyBlob = new Blob([keyBuffer]);
 
-        return new NextResponse(keyData, {
+        return new NextResponse(keyBlob, {
             status: 200,
             headers: {
                 'Content-Type': 'application/octet-stream',
