@@ -359,21 +359,17 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[96vw] md:h-[92vh] md:rounded-2xl overflow-hidden shadow-2xl">
-        <DialogHeader className="py-1.5 px-4 border-b flex flex-row justify-between items-center bg-white">
-            <DialogTitle className="text-sm font-bold truncate">
+        <div className="p-2 border-b flex items-center justify-between bg-white flex-shrink-0">
+            <DialogTitle className="text-sm font-bold truncate pl-2">
                 {course?.name} <ChevronRight className="inline w-4 h-4 mx-1 text-muted-foreground"/> {episode.title}
             </DialogTitle>
             <div className="flex items-center">
               <Button variant="ghost" size="icon" className="h-8 w-8">
                   <Download className="h-4 h-4"/>
               </Button>
-              <DialogClose asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <X className="h-5 w-5" />
-                </Button>
-              </DialogClose>
+              {/* The extra X button is now gone. The one from DialogContent will be used. */}
             </div>
-        </DialogHeader>
+        </div>
         
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 bg-muted/30 min-h-0">
             <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center" ref={videoContainerRef}>
