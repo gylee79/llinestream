@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useTransition, useMemo, useEffect, useCallback } from 'react';
@@ -13,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, PlusCircle, ImageIcon, CheckCircle2, AlertTriangle, Loader, HelpCircle, GripVertical } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, ImageIcon, CheckCircle2, AlertTriangle, Loader, HelpCircle, GripVertical, KeyRound } from 'lucide-react';
 import type { Episode, Course, Classification, Field, Instructor } from '@/lib/types';
 import VideoUploadDialog from '@/components/admin/content/video-upload-dialog';
 import {
@@ -130,6 +129,51 @@ const AIStatusIndicator = ({ episode }: {
         </div>
     );
 };
+
+const KeyStatusIndicator = ({ episode }: { episode: Episode }) => {
+    if (episode.packagingStatus === 'failed') {
+        return (
+             <Tooltip>
+                <TooltipTrigger>
+                    <KeyRound className="h-4 w-4 text-destructive" />
+                </TooltipTrigger>
+                <TooltipContent><p>키 생성 실패. 재분석을 시도하세요.</p></TooltipContent>
+            </Tooltip>
+        )
+    }
+    
+    if (episode.keyPath) {
+        return (
+            <Tooltip>
+                <TooltipTrigger>
+                    <KeyRound className="h-4 w-4 text-green-500" />
+                </TooltipTrigger>
+                <TooltipContent><p>암호화 키 저장됨</p></TooltipContent>
+            </Tooltip>
+        );
+    }
+
+    if (episode.packagingStatus === 'processing' || episode.packagingStatus === 'pending' || episode.aiProcessingStatus === 'processing' || episode.aiProcessingStatus === 'pending') {
+        return (
+            <Tooltip>
+                <TooltipTrigger>
+                    <KeyRound className="h-4 w-4 text-muted-foreground animate-pulse" />
+                </TooltipTrigger>
+                <TooltipContent><p>영상 처리 중...</p></TooltipContent>
+            </Tooltip>
+        );
+    }
+
+    return (
+        <Tooltip>
+            <TooltipTrigger>
+                <KeyRound className="h-4 w-4 text-muted-foreground" />
+            </TooltipTrigger>
+            <TooltipContent><p>암호화 키 정보 없음.</p></TooltipContent>
+        </Tooltip>
+    );
+};
+
 
 const formatFileSize = (bytes: number | undefined): string => {
     if (bytes === undefined || bytes === 0) return 'N/A';
@@ -350,83 +394,99 @@ useEffect(() => {
                     <Skeleton className="h-12 w-full" />
                 </div>
             ) : Object.keys(orderedEpisodes).length > 0 ? (
-                <Accordion 
-                    type="multiple" 
-                    className="w-full space-y-2"
-                    value={openAccordionItems}
-                    onValueChange={setOpenAccordionItems}
-                >
-                    {Object.entries(orderedEpisodes).map(([courseId, episodeList]) => {
-                        const courseName = getFullCoursePath(courseId);
-                        const isChanged = changedCourses.has(courseId);
-                        return (
-                            <AccordionItem value={courseId} key={courseId} className="border-b-0">
-                                <Card className="overflow-hidden">
-                                <div className="flex items-center w-full bg-muted/50 pr-4">
-                                    <AccordionTrigger className="flex-grow px-4 py-2 text-left hover:no-underline">
-                                        <div className="flex items-baseline gap-2 font-headline truncate">
-                                            <span className="text-lg font-semibold truncate">{courseName}</span>
-                                            <span className="text-sm text-muted-foreground flex-shrink-0">({episodeList.length}개 에피소드)</span>
-                                        </div>
-                                    </AccordionTrigger>
-                                    <Button 
-                                        disabled={!isChanged || isSavingOrder}
-                                        onClick={(e) => { e.stopPropagation(); handleSaveOrder(courseId); }}
-                                        className="ml-4 flex-shrink-0 h-7 text-xs px-2"
-                                    >
-                                        {isSavingOrder && changedCourses.has(courseId) ? '저장 중...' : '순서 저장'}
-                                    </Button>
-                                </div>
-                                <AccordionContent className="p-2">
-                                    <Reorder.Group axis="y" values={episodeList} onReorder={(newOrder) => handleReorder(courseId, newOrder as Episode[])}>
-                                        <div className="space-y-2">
-                                        {episodeList.map((episode) => (
-                                            <Reorder.Item key={episode.id} value={episode} className="bg-background rounded-lg border">
-                                                <div className="p-2 flex items-center gap-3">
-                                                    <GripVertical className="cursor-grab text-muted-foreground" />
-                                                    <div className="relative aspect-video w-16 rounded-md overflow-hidden bg-muted border flex-shrink-0">
-                                                        {episode.thumbnailUrl ? (
-                                                            <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="64px" className="object-cover" />
-                                                        ) : (
-                                                            <ImageIcon className="h-5 w-5 text-muted-foreground m-auto" />
-                                                        )}
+                <>
+                    <div className="hidden md:grid grid-cols-12 gap-3 items-center px-4 py-2 text-xs font-medium text-muted-foreground border-b sticky top-0 bg-background/95 z-10">
+                        <div className="col-span-4 pl-8">에피소드 제목</div>
+                        <div className="col-span-1">재생시간</div>
+                        <div className="col-span-2">강사</div>
+                        <div className="col-span-1 text-center">AI 상태</div>
+                        <div className="col-span-1 text-center">키 상태</div>
+                        <div className="col-span-1">무료</div>
+                        <div className="col-span-2 text-right pr-12">관리</div>
+                    </div>
+                    <Accordion 
+                        type="multiple" 
+                        className="w-full space-y-2"
+                        value={openAccordionItems}
+                        onValueChange={setOpenAccordionItems}
+                    >
+                        {Object.entries(orderedEpisodes).map(([courseId, episodeList]) => {
+                            const courseName = getFullCoursePath(courseId);
+                            const isChanged = changedCourses.has(courseId);
+                            return (
+                                <AccordionItem value={courseId} key={courseId} className="border-b-0">
+                                    <Card className="overflow-hidden">
+                                    <div className="flex items-center w-full bg-muted/50 pr-4">
+                                        <AccordionTrigger className="flex-grow px-4 py-2 text-left hover:no-underline">
+                                            <div className="flex items-baseline gap-2 font-headline truncate">
+                                                <span className="text-lg font-semibold truncate">{courseName}</span>
+                                                <span className="text-sm text-muted-foreground flex-shrink-0">({episodeList.length}개 에피소드)</span>
+                                            </div>
+                                        </AccordionTrigger>
+                                        <Button 
+                                            disabled={!isChanged || isSavingOrder}
+                                            onClick={(e) => { e.stopPropagation(); handleSaveOrder(courseId); }}
+                                            className="ml-4 flex-shrink-0 h-7 text-xs px-2"
+                                        >
+                                            {isSavingOrder && changedCourses.has(courseId) ? '저장 중...' : '순서 저장'}
+                                        </Button>
+                                    </div>
+                                    <AccordionContent className="p-2">
+                                        <Reorder.Group axis="y" values={episodeList} onReorder={(newOrder) => handleReorder(courseId, newOrder as Episode[])}>
+                                            <div className="space-y-2">
+                                            {episodeList.map((episode) => (
+                                                <Reorder.Item key={episode.id} value={episode} className="bg-background rounded-lg border">
+                                                    <div className="p-2 grid grid-cols-12 gap-3 items-center">
+                                                        <div className="col-span-4 flex items-center gap-3">
+                                                            <GripVertical className="cursor-grab text-muted-foreground" />
+                                                            <div className="relative aspect-video w-16 rounded-md overflow-hidden bg-muted border flex-shrink-0">
+                                                                {episode.thumbnailUrl ? (
+                                                                    <Image src={episode.thumbnailUrl} alt={episode.title} fill sizes="64px" className="object-cover" />
+                                                                ) : (
+                                                                    <ImageIcon className="h-5 w-5 text-muted-foreground m-auto" />
+                                                                )}
+                                                            </div>
+                                                            <p className="font-medium truncate" title={episode.title}>{episode.title}</p>
+                                                        </div>
+                                                        <p className="truncate col-span-1">{formatDuration(episode.duration)}</p>
+                                                        <p className="truncate col-span-2">{getInstructorName(episode.instructorId)}</p>
+                                                        <div className="flex justify-center col-span-1">
+                                                            <AIStatusIndicator episode={episode} />
+                                                        </div>
+                                                         <div className="flex justify-center col-span-1">
+                                                            <KeyStatusIndicator episode={episode} />
+                                                        </div>
+                                                        <div className="flex items-center gap-2 col-span-1">
+                                                            <Switch checked={episode.isFree} onCheckedChange={() => toggleFreeStatus(episode)} />
+                                                            <span className="text-xs">{episode.isFree ? '무료' : '유료'}</span>
+                                                        </div>
+                                                        <div className="col-span-2 flex justify-end items-center">
+                                                            <Button variant="outline" size="sm" onClick={() => handlePlayVideo(episode)}>시청</Button>
+                                                            <DropdownMenu>
+                                                              <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                                                  <MoreHorizontal className="h-4 w-4" />
+                                                                </Button>
+                                                              </DropdownMenuTrigger>
+                                                              <DropdownMenuContent align="end">
+                                                                <DropdownMenuItem onClick={() => handleOpenUploadDialog(episode)}>정보 수정</DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => handleOpenThumbnailDialog(episode)}>썸네일 수정</DropdownMenuItem>
+                                                                <DropdownMenuItem className="text-destructive" onClick={() => requestDeleteEpisode(episode)}>삭제</DropdownMenuItem>
+                                                              </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex-grow grid grid-cols-6 gap-2 items-center text-sm min-w-0">
-                                                      <p className="font-medium truncate col-span-2" title={episode.title}>{episode.title}</p>
-                                                      <p className="truncate">{formatDuration(episode.duration)}</p>
-                                                      <p className="truncate">{getInstructorName(episode.instructorId)}</p>
-                                                      <div className="flex items-center gap-2">
-                                                        <AIStatusIndicator episode={episode} />
-                                                        <Switch checked={episode.isFree} onCheckedChange={() => toggleFreeStatus(episode)} />
-                                                        <span className="text-xs">{episode.isFree ? '무료' : '유료'}</span>
-                                                      </div>
-                                                      <div className="col-span-1 flex justify-end items-center">
-                                                          <Button variant="outline" size="sm" onClick={() => handlePlayVideo(episode)}>시청</Button>
-                                                          <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                              <Button variant="ghost" className="h-8 w-8 p-0">
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                              </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end">
-                                                              <DropdownMenuItem onClick={() => handleOpenUploadDialog(episode)}>정보 수정</DropdownMenuItem>
-                                                              <DropdownMenuItem onClick={() => handleOpenThumbnailDialog(episode)}>썸네일 수정</DropdownMenuItem>
-                                                              <DropdownMenuItem className="text-destructive" onClick={() => requestDeleteEpisode(episode)}>삭제</DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                          </DropdownMenu>
-                                                      </div>
-                                                    </div>
-                                                </div>
-                                            </Reorder.Item>
-                                        ))}
-                                        </div>
-                                    </Reorder.Group>
-                                </AccordionContent>
-                                </Card>
-                            </AccordionItem>
-                        )
-                    })}
-                </Accordion>
+                                                </Reorder.Item>
+                                            ))}
+                                            </div>
+                                        </Reorder.Group>
+                                    </AccordionContent>
+                                    </Card>
+                                </AccordionItem>
+                            )
+                        })}
+                    </Accordion>
+                </>
             ) : (
                 <div className="text-center text-muted-foreground py-10">에피소드가 없습니다.</div>
             )}
