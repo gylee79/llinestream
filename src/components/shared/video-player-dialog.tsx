@@ -319,15 +319,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             const player = new shaka.Player();
             shakaPlayerRef.current = player;
-            
-            player.configure({
-                drm: {
-                    clearKeys: {
-                        // 'org.w3.clearkey' is the key system for AES-128
-                        'org.w3.clearkey': getPublicUrl(firebaseConfig.storageBucket, `episodes/${episode.id}/keys/enc.key`)
-                    }
-                }
-            });
+
+            // No longer needed to configure DRM manually. Shaka will read it from the manifest.
             
             const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
             uiRef.current = ui;
