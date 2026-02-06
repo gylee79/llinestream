@@ -27,6 +27,7 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # local env files
+.env
 .env.local
 .env.development.local
 .env.test.local
@@ -39,10 +40,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# User-specific files
-.vscode/
-*.code-workspace
-
-# Sensitive files
-service-account.json
-*.env
+# sensitive files
+/src/lib/service-account.json
