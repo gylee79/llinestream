@@ -304,8 +304,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
     async function initPlayer() {
         if (!isMounted || !shaka || !videoRef.current || !videoContainerRef.current) return;
+        
         if (episode.packagingStatus !== 'completed' || !episode.manifestPath || !episode.keyPath) {
-            console.log("Player not ready: packaging not complete or manifest/key path missing.", episode);
+            console.log("Player not ready: packaging incomplete, or manifest/key path missing.", episode);
             setIsLoading(false);
             return;
         }
@@ -378,18 +379,22 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[96vw] md:h-[92vh] md:rounded-2xl overflow-hidden shadow-2xl">
-         <div className="flex h-12 items-center justify-between border-b bg-white pl-4 pr-12 flex-shrink-0">
+       <DialogContent className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[96vw] md:h-[92vh] md:rounded-2xl overflow-hidden shadow-2xl">
+         <div className="flex h-12 items-center justify-between border-b bg-white pl-4 pr-12 flex-shrink-0 relative">
             <div className="flex-1 min-w-0">
                 <DialogTitle className="text-base font-bold truncate">
                     {course?.name} <ChevronRight className="inline w-4 h-4 mx-1 text-muted-foreground"/> {episode.title}
                 </DialogTitle>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0 ml-4">
                 <Button variant="ghost" size="icon" className="h-8 w-8">
                     <Download className="h-4 h-4"/>
                 </Button>
             </div>
+             <DialogClose className="absolute right-4 top-1/2 -translate-y-1/2 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+            </DialogClose>
         </div>
         
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 bg-muted/30 min-h-0">
@@ -421,3 +426,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
+
+
+    

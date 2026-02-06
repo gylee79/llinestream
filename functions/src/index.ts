@@ -14,6 +14,8 @@ import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
 import * as crypto from "crypto";
+import { getPublicUrl } from './utils';
+import { firebaseConfig } from './config';
 
 // 0. Firebase Admin & Global Options 초기화
 if (!admin.apps.length) {
@@ -162,10 +164,12 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
 
             if (job.state === 'SUCCEEDED') {
                 console.log(`[${episodeId}] HLS Job: SUCCEEDED.`);
+                
                 // 6. On success, store the path to the manifest, NOT a full URL.
                 await docRef.update({
                     packagingStatus: 'completed',
-                    manifestUrl: `${outputFolder}manifest.m3u8`, // Store the path only
+                    manifestPath: `${outputFolder}manifest.m3u8`, // Store the path
+                    keyPath: keyStoragePath, // Store the key path
                     packagingError: null,
                 });
                 console.log(`[${episodeId}] HLS Job: Firestore document updated to 'completed'.`);
@@ -453,5 +457,6 @@ interface EpisodeData {
   vttPath?: string;
   [key: string]: any;
 }
+    
 
     
