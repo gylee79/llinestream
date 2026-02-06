@@ -1,4 +1,3 @@
-/// <reference types="shaka-player" />
 
 'use client';
 
@@ -280,8 +279,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const videoContainerRef = React.useRef<HTMLDivElement>(null);
-  const shakaPlayerRef = React.useRef<shaka.Player | null>(null);
-  const uiRef = React.useRef<shaka.ui.Overlay | null>(null);
+  const shakaPlayerRef = React.useRef<any | null>(null);
+  const uiRef = React.useRef<any | null>(null);
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
   const { data: course } = useDoc<Course>(courseRef);
@@ -320,6 +319,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             const player = new shaka.Player();
             shakaPlayerRef.current = player;
             
+            player.configure({
+                drm: {
+                    clearKey: {
+                        'org.w3.clearkey': manifestUrl.replace('manifest.m3u8', 'enc.key')
+                    }
+                }
+            });
+
             const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
             uiRef.current = ui;
             
