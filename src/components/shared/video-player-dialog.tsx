@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark } from '@/lib/types';
@@ -369,12 +368,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         </div>
         
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 bg-muted/30 min-h-0">
-            <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center min-h-0" ref={videoContainerRef}>
+            <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center md:min-h-0 aspect-video md:aspect-auto" ref={videoContainerRef}>
                 <PlayerStatusOverlay episode={episode} isLoading={isLoading} playerError={playerError} />
                 <video ref={videoRef} className="w-full h-full" autoPlay playsInline/>
             </div>
 
-            <div className="col-span-10 md:col-span-3 bg-white border-l flex flex-col min-h-0">
+            <div className="col-span-10 md:col-span-3 bg-white border-l flex flex-col min-h-0 flex-1 md:flex-auto">
                 <Tabs defaultValue="syllabus" className="flex-1 flex flex-col min-h-0">
                     <TabsList className="grid w-full grid-cols-4 rounded-none border-b h-12 bg-gray-50/50 flex-shrink-0">
                         <TabsTrigger value="syllabus" className="text-xs">강의목차</TabsTrigger>
