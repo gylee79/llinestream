@@ -14,7 +14,6 @@ import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
 import * as crypto from "crypto";
-import { firebaseConfig } from './config';
 
 // 0. Firebase Admin & Global Options 초기화
 if (!admin.apps.length) {
@@ -441,6 +440,4 @@ interface EpisodeData {
   vttPath?: string;
   [key: string]: any;
 }
-    
-
     
