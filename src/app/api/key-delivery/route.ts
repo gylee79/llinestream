@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
         const file = storage.bucket().file(keyPath);
         const [keyBuffer] = await file.download();
 
-        return new NextResponse(keyBuffer.buffer, {
+        return new NextResponse(keyBuffer, {
             status: 200,
             headers: {
                 'Content-Type': 'application/octet-stream',
