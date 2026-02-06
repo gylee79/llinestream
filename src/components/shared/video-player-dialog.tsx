@@ -328,7 +328,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             player.getNetworkingEngine().registerRequestFilter(
               async (type: number, request: { uris: string[] }) => {
-                if (type === shaka.net.NetworkingEngine.RequestType.LICENSE) {
+                if (type === shaka.net.NetworkingEngine.RequestType.KEY) {
                   const placeholderUri = `https://llinestream.internal/keys/${episodeId}`;
                   if (request.uris[0] === placeholderUri) {
                     console.log(`[Player] Intercepted key request for ${placeholderUri}. Fetching signed URL...`);
@@ -379,7 +379,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[96vw] md:h-[92vh] md:rounded-2xl overflow-hidden shadow-2xl">
-        <div className="flex h-12 items-center justify-between border-b bg-white pl-4 pr-12 flex-shrink-0">
+         <div className="flex h-12 items-center justify-between border-b bg-white pl-4 pr-12 flex-shrink-0">
             <div className="flex-1 min-w-0">
                 <DialogTitle className="text-base font-bold truncate">
                     {course?.name} <ChevronRight className="inline w-4 h-4 mx-1 text-muted-foreground"/> {episode.title}
@@ -393,7 +393,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         </div>
         
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 bg-muted/30 min-h-0">
-            <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center md:min-h-0 aspect-video md:aspect-auto" ref={videoContainerRef}>
+            <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center aspect-video md:aspect-auto md:min-h-0" ref={videoContainerRef}>
                 <PlayerStatusOverlay episode={episode} isLoading={isLoading} playerError={playerError} />
                 <video ref={videoRef} className="w-full h-full" autoPlay playsInline/>
             </div>
