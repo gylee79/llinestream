@@ -98,7 +98,8 @@ export interface Episode {
   aiProcessingError?: string | null;
   aiModel?: string; // The model used for the last AI analysis
 
-  manifestPath?: string; // Changed from manifestUrl
+  manifestPath?: string;
+  keyPath?: string; // Path to the private encryption key in Storage
   packagingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
   packagingError?: string | null;
   

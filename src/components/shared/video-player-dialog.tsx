@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark } from '@/lib/types';
@@ -23,6 +24,8 @@ import Link from 'next/link';
 import { Skeleton } from '../ui/skeleton';
 import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/bookmark-actions';
 import { Input } from '../ui/input';
+import { getSignedUrl } from '@/lib/actions/get-signed-url';
+
 
 // ========= TYPES AND INTERFACES =========
 
@@ -301,19 +304,21 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
     async function initPlayer() {
         if (!isMounted || !shaka || !videoRef.current || !videoContainerRef.current) return;
-        if (episode.packagingStatus !== 'completed' || !episode.manifestPath) {
-          setIsLoading(false);
-          return;
+        if (episode.packagingStatus !== 'completed' || !episode.manifestPath || !episode.keyPath) {
+            console.log("Player not ready: packaging not complete or manifest/key path missing.", episode);
+            setIsLoading(false);
+            return;
         }
 
         try {
             const manifestUrl = getPublicUrl(firebaseConfig.storageBucket, episode.manifestPath);
-            
+            const keyPath = episode.keyPath;
+            const episodeId = episode.id;
+
             player = new shaka.Player();
             shakaPlayerRef.current = player;
             ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
             
-            await player.attach(videoRef.current!);
             player.addEventListener('error', (e: any) => {
               if (isMounted) {
                 console.error("Shaka Player Error:", e.detail);
@@ -321,6 +326,26 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
               }
             });
 
+            player.getNetworkingEngine().registerRequestFilter(
+              async (type: number, request: { uris: string[] }) => {
+                if (type === shaka.net.NetworkingEngine.RequestType.LICENSE) {
+                  const placeholderUri = `https://llinestream.internal/keys/${episodeId}`;
+                  if (request.uris[0] === placeholderUri) {
+                    console.log(`[Player] Intercepted key request for ${placeholderUri}. Fetching signed URL...`);
+                    const result = await getSignedUrl(keyPath);
+                    if ('signedURL' in result) {
+                        request.uris[0] = result.signedURL;
+                        console.log('[Player] Key request URI updated with signed URL.');
+                    } else {
+                        console.error('[Player] Failed to get signed URL for key:', result.error);
+                        throw new Error(result.error);
+                    }
+                  }
+                }
+              }
+            );
+
+            await player.attach(videoRef.current!);
             await player.load(manifestUrl);
 
             if (episode.vttPath) {
