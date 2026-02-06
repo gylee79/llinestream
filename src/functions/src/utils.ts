@@ -1,3 +1,4 @@
+
 /**
  * Constructs the public URL for a file in a Firebase Storage bucket.
  * @param bucketName The full name of your Firebase Storage bucket.
