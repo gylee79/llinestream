@@ -119,7 +119,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
     const [userQuestion, setUserQuestion] = React.useState('');
     const [messages, setMessages] = React.useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
-    const isAIAvailable = episode.aiProcessingStatus === 'completed';
+    const isAIAvailable = episode.status.processing === 'completed';
 
     React.useEffect(() => {
         if (!user || !firestore) return;
@@ -254,16 +254,16 @@ const PlayerStatusOverlay = ({ episode, isLoading, playerError }: { episode: Epi
         );
     }
     
-    if (episode.packagingStatus !== 'completed') {
-        const statusText = episode.packagingStatus === 'failed' ? '영상 처리 실패' : '영상 처리 중...';
-        const Icon = episode.packagingStatus === 'failed' ? AlertTriangle : Loader;
-        const iconColor = episode.packagingStatus === 'failed' ? 'text-destructive' : '';
+    if (episode.status.processing !== 'completed') {
+        const statusText = episode.status.processing === 'failed' ? '영상 처리 실패' : '영상 처리 중...';
+        const Icon = episode.status.processing === 'failed' ? AlertTriangle : Loader;
+        const iconColor = episode.status.processing === 'failed' ? 'text-destructive' : '';
         
         return (
             <div className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center text-white p-6 text-center">
-                <Icon className={cn("w-12 h-12 mb-4", episode.packagingStatus !== 'failed' && 'animate-spin', iconColor)} />
+                <Icon className={cn("w-12 h-12 mb-4", episode.status.processing !== 'failed' && 'animate-spin', iconColor)} />
                 <p className="font-bold">{statusText}</p>
-                {episode.packagingError && <p className="text-xs text-muted-foreground mt-2 max-w-sm">{episode.packagingError}</p>}
+                {episode.status.error && <p className="text-xs text-muted-foreground mt-2 max-w-sm">{episode.status.error}</p>}
             </div>
         );
     }
@@ -274,16 +274,14 @@ const PlayerStatusOverlay = ({ episode, isLoading, playerError }: { episode: Epi
 // ========= MAIN COMPONENT =========
 
 export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
-  const { user } = useUser();
-  const auth = useAuth();
+  const { user, authUser } = useUser();
   const { toast } = useToast();
   const firestore = useFirestore();
   const [isLoading, setIsLoading] = React.useState(true);
   const [playerError, setPlayerError] = React.useState<string | null>(null);
 
   const videoRef = React.useRef<HTMLVideoElement>(null);
-  const videoContainerRef = React.useRef<HTMLDivElement>(null);
-
+  
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
   const { data: course } = useDoc<Course>(courseRef);
 
@@ -296,65 +294,99 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   };
 
   React.useEffect(() => {
-    let isMounted = true;
-    let player: any | null = null;
-    let ui: any | null = null;
-    const shaka = (window as any).shaka;
-
-    async function initPlayer() {
-        if (!isMounted || !shaka || !videoRef.current || !videoContainerRef.current) {
-            setIsLoading(false);
-            return;
-        }
-        
-        if (episode.packagingStatus !== 'completed' || !episode.manifestPath) {
-            console.log("Player not ready: packaging incomplete or manifest path missing.", episode);
-            setIsLoading(false);
-            return;
-        }
+    let mediaSource: MediaSource | null = null;
+    let sourceBuffer: SourceBuffer | null = null;
+    
+    const onSourceOpen = async () => {
+        if (!videoRef.current || !authUser || !mediaSource) return;
 
         try {
-            const manifestUrl = getPublicUrl(firebaseConfig.storageBucket, episode.manifestPath);
-
-            player = new shaka.Player();
-            ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
-            
-            player.addEventListener('error', (e: any) => {
-              if (isMounted) {
-                console.error("Shaka Player Error:", e.detail);
-                setPlayerError(`코드: ${e.detail.code}, ${e.detail.message}`);
-              }
+            // 1. Get Derived Key from our secure API
+            const token = await authUser.getIdToken();
+            const sessionRes = await fetch('/api/play-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ videoId: episode.id }),
             });
 
-            await player.attach(videoRef.current!);
-            await player.load(manifestUrl);
-
-            if (episode.vttPath) {
-                const url = getPublicUrl(firebaseConfig.storageBucket, episode.vttPath);
-                await player.addTextTrackAsync(url, 'ko', 'subtitle', 'text/vtt');
-                player.setTextTrackVisibility(true);
+            if (!sessionRes.ok) {
+                const errorData = await sessionRes.json();
+                throw new Error(errorData.error || 'Failed to start play session');
             }
+            const { derivedKey: derivedKeyB64 } = await sessionRes.json();
 
+            // 2. Fetch encrypted video file
+            const videoUrl = getPublicUrl(firebaseConfig.storageBucket, episode.storage.encryptedPath);
+            const encryptedRes = await fetch(videoUrl);
+            const encryptedBuffer = await encryptedRes.arrayBuffer();
+
+            // 3. Prepare for decryption
+            const ivLength = episode.encryption.ivLength;
+            const tagLength = episode.encryption.tagLength;
+            
+            const iv = encryptedBuffer.slice(0, ivLength);
+            const authTag = encryptedBuffer.slice(encryptedBuffer.byteLength - tagLength);
+            const encryptedData = encryptedBuffer.slice(ivLength, encryptedBuffer.byteLength - tagLength);
+            
+            const keyBuffer = Buffer.from(derivedKeyB64, 'base64');
+            const cryptoKey = await window.crypto.subtle.importKey(
+                'raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']
+            );
+
+            // 4. Decrypt in memory
+            const decryptedData = await window.crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv, additionalData: undefined, tagLength: tagLength * 8 },
+                cryptoKey,
+                encryptedData
+            );
+
+            // 5. Append to MediaSource
+            // This MIME type might need adjustment based on original video encoding
+            sourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.42E01E, mp4a.40.2"');
+            sourceBuffer.addEventListener('updateend', () => {
+                if (mediaSource?.readyState === 'open' && !sourceBuffer?.updating) {
+                    mediaSource.endOfStream();
+                }
+            });
+            sourceBuffer.appendBuffer(decryptedData);
+            
             if (isMounted) setIsLoading(false);
-        } catch (e: any) {
-            if (isMounted) {
-                console.error("Player Initialization Error:", e);
-                setPlayerError(e.message || "플레이어를 초기화할 수 없습니다.");
+
+        } catch (error: any) {
+             if (isMounted) {
+                console.error("Player Initialization Error:", error);
+                setPlayerError(error.message || "비디오를 재생할 수 없습니다.");
                 setIsLoading(false);
             }
         }
-    }
+    };
 
-    if (isOpen) {
-        initPlayer();
-    }
+    let isMounted = true;
+    if (isOpen && episode.status.processing === 'completed' && episode.status.playable) {
+        setIsLoading(true);
+        setPlayerError(null);
+        
+        mediaSource = new MediaSource();
+        if (videoRef.current) {
+            videoRef.current.src = URL.createObjectURL(mediaSource);
+        }
+        mediaSource.addEventListener('sourceopen', onSourceOpen);
 
+    } else if (isOpen) {
+        setIsLoading(false);
+    }
+    
     return () => { 
         isMounted = false; 
-        if (ui) ui.destroy();
-        if (player) player.destroy(); 
+        if (mediaSource) {
+            mediaSource.removeEventListener('sourceopen', onSourceOpen);
+            if(videoRef.current?.src) {
+                URL.revokeObjectURL(videoRef.current.src);
+            }
+        }
     };
-  }, [isOpen, episode, auth]);
+
+  }, [isOpen, episode, authUser]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -377,9 +409,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         </div>
         
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 bg-muted/30 min-h-0">
-            <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center aspect-video md:aspect-auto md:min-h-0" ref={videoContainerRef}>
+            <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center aspect-video md:aspect-auto md:min-h-0">
                 <PlayerStatusOverlay episode={episode} isLoading={isLoading} playerError={playerError} />
-                <video ref={videoRef} className="w-full h-full" autoPlay playsInline/>
+                <video ref={videoRef} className="w-full h-full" autoPlay playsInline controls/>
             </div>
 
             <div className="col-span-10 md:col-span-3 bg-white border-l flex flex-col min-h-0 flex-1 md:flex-auto">
@@ -405,4 +437,3 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
-

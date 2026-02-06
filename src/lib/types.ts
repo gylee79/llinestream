@@ -67,6 +67,13 @@ export interface Course {
   createdAt?: Timestamp;
 }
 
+export interface EncryptionInfo {
+  algorithm: 'AES-256-GCM';
+  keyId: string;
+  ivLength: 12;
+  tagLength: 16;
+}
+
 export interface Episode {
   id: string; // This will be the document ID from Firestore, added on the client
   courseId: string;
@@ -75,34 +82,37 @@ export interface Episode {
   description?: string;
   duration: number; // in seconds
   isFree: boolean;
-  videoUrl: string;
-  filePath?: string; // Path in Firebase Storage
-  fileSize?: number; // Size in bytes
   orderIndex?: number; // For manual ordering
-  // The single source of truth for the thumbnail to be displayed.
-  // This will be the customThumbnailUrl if it exists, otherwise the defaultThumbnailUrl.
   thumbnailUrl: string;
   
-  // Paths and URLs for the two types of thumbnails
-  defaultThumbnailUrl?: string;
-  defaultThumbnailPath?: string;
-  customThumbnailUrl?: string;
-  customThumbnailPath?: string;
+  // File & Storage Information
+  storage: {
+    encryptedPath: string;
+    fileSize: number;
+  };
+  subtitlePath?: string;
 
-  transcript?: string | null; // Pure audio transcript
-  aiGeneratedContent?: string | null; // Full analysis including visual descriptions and summary
-  vttUrl?: string; // URL for the VTT subtitle file
-  vttPath?: string; // Path in Firebase Storage for the VTT file
+  // Encryption Information
+  encryption: EncryptionInfo;
 
-  aiProcessingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
-  aiProcessingError?: string | null;
-  aiModel?: string; // The model used for the last AI analysis
-
-  manifestPath?: string;
-  keyPath?: string; // Path to the private encryption key in Storage
-  packagingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
-  packagingError?: string | null;
+  // Processing Status
+  status: {
+    processing: 'pending' | 'processing' | 'completed' | 'failed';
+    playable: boolean;
+    error?: string | null;
+  };
   
+  // AI Generated Content
+  aiGeneratedContent?: string | null;
+  
+  createdAt: Timestamp;
+}
+
+export interface VideoKey {
+  keyId: string;
+  videoId: string;
+  masterKey: string; // BASE64_32_BYTES_KEY
+  rotation: number;
   createdAt: Timestamp;
 }
 

@@ -1,3 +1,4 @@
+
 {
   "name": "functions",
   "main": "lib/index.js",
@@ -20,6 +21,7 @@
     "firebase-functions": "^5.3.0"
   },
   "devDependencies": {
+    "@types/node": "^20.14.2",
     "firebase-functions-test": "^3.1.0",
     "typescript": "^5.0.0"
   },
