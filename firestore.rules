@@ -1,11 +1,102 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // 개발 중에는 모든 읽기/쓰기를 허용합니다.
-      // 주의: 프로덕션 배포 전에는 반드시 보안 규칙을 강화해야 합니다.
-      allow read, write: if true;
+    
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/roles_admin/$(request.auth.uid)).data != null;
+    }
+
+    // Publicly readable content
+    match /fields/{fieldId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /classifications/{classificationId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /courses/{courseId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /episodes/{episodeId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /instructors/{instructorId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+     match /policies/{policyId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // User-specific data
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isSignedIn() && request.resource.data.id == request.auth.uid; // Can create their own user doc
+      allow update: if isOwner(userId); // Can update their own profile
+      allow delete: if isAdmin(); // Only admins can delete users
+
+      // Subcollections
+      match /subscriptions/{subscriptionId} {
+        allow read: if isOwner(userId) || isAdmin();
+        // Writes are handled by secure backend (webhooks/server actions)
+        allow write: if isAdmin();
+      }
+      match /viewHistory/{logId} {
+        allow read: if isOwner(userId) || isAdmin();
+        // Writes are handled by secure server action
+        allow write: if isAdmin();
+      }
+       match /chats/{chatId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+      match /bookmarks/{bookmarkId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+    
+    // AI Content (can be read by anyone, written by backend)
+    match /episode_ai_chunks/{chunkId} {
+        allow read: if isSignedIn();
+        allow write: if false; // Only backend can write
+    }
+
+    // Admin-only collections
+    match /roles_admin/{userId} {
+        allow read, write: if isAdmin();
+    }
+    match /episode_view_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+    match /chat_logs/{chatId} {
+        allow read, write: if isAdmin();
+    }
+    match /bookmarks/{bookmarkId} {
+        allow read, write: if isAdmin();
+    }
+    match /user_audit_logs/{logId} {
+        allow read: if isAdmin();
+        allow write: if false; // only backend
+    }
+    
+    // Settings collection
+    match /settings/{docId} {
+        allow read: if true;
+        allow write: if isAdmin();
     }
   }
 }

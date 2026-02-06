@@ -65,7 +65,7 @@ function initializeTools() {
   return { genAI, fileManager, transcoderClient };
 }
 
-// 3. HLS Packaging with Transcoder API (AES-128) - Private Key with Placeholder URI
+// 3. HLS Packaging with Transcoder API (AES-128) - Private Key with API-based delivery
 async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef: admin.firestore.DocumentReference): Promise<void> {
     try {
         await docRef.update({ packagingStatus: "processing", packagingError: null });
@@ -78,21 +78,20 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         const outputFolder = `episodes/${episodeId}/packaged/`;
         const outputUri = `gs://${bucket.name}/${outputFolder}`;
 
-        // 1. Generate a 16-byte AES-128 key.
+        // 1. Generate and save private AES key
         const aesKey = crypto.randomBytes(16);
         const keyFileName = 'enc.key';
         const keyStoragePath = `episodes/${episodeId}/keys/${keyFileName}`;
         const keyFile = bucket.file(keyStoragePath);
         
-        // 2. Save the key to a private location in Storage.
         console.log(`[${episodeId}] HLS Job: Uploading private AES-128 key to ${keyStoragePath}`);
         await keyFile.save(aesKey, { contentType: 'application/octet-stream', private: true });
         
-        // 3. Create a unique, non-public placeholder URI for the manifest.
-        const keyUriPlaceholder = `https://llinestream.internal/keys/${episodeId}`;
-        console.log(`[${episodeId}] HLS Job: Using placeholder URI for manifest: ${keyUriPlaceholder}`);
+        // 2. Define the key URI pointing to our secure API endpoint (relative path)
+        const keyDeliveryUri = `/api/key-delivery?episodeId=${episodeId}`;
+        console.log(`[${episodeId}] HLS Job: Using API endpoint for manifest key URI: ${keyDeliveryUri}`);
 
-        // 4. Configure the Transcoder job.
+        // 3. Configure the Transcoder job
         const request = {
             parent: `projects/${projectId}/locations/${location}`,
             job: {
@@ -108,7 +107,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                                 individualSegments: true,
                                 segmentDuration: { seconds: 4 },
                                 encryption: {
-                                    aes128: { uri: keyUriPlaceholder } // Use the placeholder URI
+                                    aes128: { uri: keyDeliveryUri } // Use the API endpoint URI
                                 }
                             },
                         },
@@ -120,7 +119,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                                 individualSegments: true,
                                 segmentDuration: { seconds: 4 },
                                 encryption: {
-                                    aes128: { uri: keyUriPlaceholder } // Use the placeholder URI
+                                    aes128: { uri: keyDeliveryUri } // Use the API endpoint URI
                                 }
                             },
                         }
@@ -150,7 +149,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         const jobName = createJobResponse.name;
         console.log(`[${episodeId}] HLS Job: Transcoder job created successfully. Job name: ${jobName}`);
 
-        // 5. Poll for job completion.
+        // 4. Poll for job completion
         const POLLING_INTERVAL = 15000;
         const MAX_POLLS = 35;
         let jobSucceeded = false;
@@ -165,11 +164,17 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
             if (job.state === 'SUCCEEDED') {
                 console.log(`[${episodeId}] HLS Job: SUCCEEDED.`);
                 
-                // 6. On success, store the path to the manifest, NOT a full URL.
+                // 5. Make manifest and segments public
+                console.log(`[${episodeId}] HLS Job: Making output files public...`);
+                const [outputFiles] = await bucket.getFiles({ prefix: outputFolder });
+                await Promise.all(outputFiles.map(file => file.makePublic()));
+                console.log(`[${episodeId}] HLS Job: ${outputFiles.length} output files made public.`);
+
+                // 6. On success, store paths
                 await docRef.update({
                     packagingStatus: 'completed',
-                    manifestPath: `${outputFolder}manifest.m3u8`, // Store the path
-                    keyPath: keyStoragePath, // Store the key path
+                    manifestPath: `${outputFolder}manifest.m3u8`,
+                    keyPath: keyStoragePath,
                     packagingError: null,
                 });
                 console.log(`[${episodeId}] HLS Job: Firestore document updated to 'completed'.`);
@@ -193,6 +198,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         });
     }
 }
+
 
 // ==========================================
 // [Trigger] 메인 분석 함수 (v2 onDocumentWritten)
@@ -457,6 +463,4 @@ interface EpisodeData {
   vttPath?: string;
   [key: string]: any;
 }
-    
-
     

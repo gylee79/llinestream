@@ -4,7 +4,7 @@
 import type { Episode, Instructor, Course, User, Bookmark } from '@/lib/types';
 import React from 'react';
 import { Button } from '../ui/button';
-import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection, useAuth } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
 import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark as BookmarkIcon, Trash2, Download, AlertTriangle } from 'lucide-react';
@@ -24,7 +24,6 @@ import Link from 'next/link';
 import { Skeleton } from '../ui/skeleton';
 import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/bookmark-actions';
 import { Input } from '../ui/input';
-import { getSignedUrl } from '@/lib/actions/get-signed-url';
 
 
 // ========= TYPES AND INTERFACES =========
@@ -276,6 +275,7 @@ const PlayerStatusOverlay = ({ episode, isLoading, playerError }: { episode: Epi
 
 export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
   const { user } = useUser();
+  const auth = useAuth();
   const { toast } = useToast();
   const firestore = useFirestore();
   const [isLoading, setIsLoading] = React.useState(true);
@@ -303,18 +303,16 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     const shaka = (window as any).shaka;
 
     async function initPlayer() {
-        if (!isMounted || !shaka || !videoRef.current || !videoContainerRef.current) return;
+        if (!isMounted || !shaka || !videoRef.current || !videoContainerRef.current || !auth) return;
         
-        if (episode.packagingStatus !== 'completed' || !episode.manifestPath || !episode.keyPath) {
-            console.log("Player not ready: packaging incomplete, or manifest/key path missing.", episode);
+        if (episode.packagingStatus !== 'completed' || !episode.manifestPath) {
+            console.log("Player not ready: packaging incomplete or manifest path missing.", episode);
             setIsLoading(false);
             return;
         }
 
         try {
             const manifestUrl = getPublicUrl(firebaseConfig.storageBucket, episode.manifestPath);
-            const keyPath = episode.keyPath;
-            const episodeId = episode.id;
 
             player = new shaka.Player();
             shakaPlayerRef.current = player;
@@ -327,24 +325,21 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
               }
             });
 
-            player.getNetworkingEngine().registerRequestFilter(
-              async (type: number, request: { uris: string[] }) => {
+            // NEW: Request filter to add Authorization header for key requests
+            player.getNetworkingEngine().registerRequestFilter(async (type: number, request: { uris: string[], headers: Record<string, string> }) => {
                 if (type === shaka.net.NetworkingEngine.RequestType.KEY) {
-                  const placeholderUri = `https://llinestream.internal/keys/${episodeId}`;
-                  if (request.uris[0] === placeholderUri) {
-                    console.log(`[Player] Intercepted key request for ${placeholderUri}. Fetching signed URL...`);
-                    const result = await getSignedUrl(keyPath);
-                    if ('signedURL' in result) {
-                        request.uris[0] = result.signedURL;
-                        console.log('[Player] Key request URI updated with signed URL.');
-                    } else {
-                        console.error('[Player] Failed to get signed URL for key:', result.error);
-                        throw new Error(result.error);
+                    if (auth.currentUser) {
+                        try {
+                            const token = await auth.currentUser.getIdToken();
+                            request.headers['Authorization'] = 'Bearer ' + token;
+                            console.log('[Player] Added Authorization header to key request.');
+                        } catch (error) {
+                            console.error('[Player] Failed to get ID token for key request:', error);
+                            // Allow the request to proceed without the header, the API will deny it
+                        }
                     }
-                  }
                 }
-              }
-            );
+            });
 
             await player.attach(videoRef.current!);
             await player.load(manifestUrl);
@@ -375,7 +370,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         if (player) player.destroy(); 
         shakaPlayerRef.current = null;
     };
-  }, [isOpen, episode]);
+  }, [isOpen, episode, auth]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -426,6 +421,3 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
-
-
-    
