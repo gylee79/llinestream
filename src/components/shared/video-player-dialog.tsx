@@ -319,8 +319,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             const player = new shaka.Player();
             shakaPlayerRef.current = player;
-
-            // No longer needed to configure DRM manually. Shaka will read it from the manifest.
             
             const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
             uiRef.current = ui;

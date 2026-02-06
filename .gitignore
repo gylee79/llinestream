@@ -2,12 +2,19 @@
 
 # dependencies
 /node_modules
-/functions/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
 
-# build output
-/functions/lib
+# testing
+/coverage
+
+# next.js
 /.next/
 /out/
+
+# production
+/build
 
 # misc
 .DS_Store
@@ -17,11 +24,25 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
 
 # local env files
-.env
-.env*.local
-.env.*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# vercel
+.vercel
 
 # typescript
 *.tsbuildinfo
+next-env.d.ts
+
+# User-specific files
+.vscode/
+*.code-workspace
+
+# Sensitive files
+service-account.json
+*.env
