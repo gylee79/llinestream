@@ -14,7 +14,6 @@ import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
 import * as crypto from "crypto";
-import { getPublicUrl } from './utils';
 import { firebaseConfig } from './config';
 
 // 0. Firebase Admin & Global Options 초기화
@@ -85,7 +84,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         const keyFile = bucket.file(keyStoragePath);
         
         console.log(`[${episodeId}] HLS Job: Uploading private AES-128 key to ${keyStoragePath}`);
-        await keyFile.save(aesKey, { contentType: 'application/octet-stream', private: true });
+        await keyFile.save(aesKey, { contentType: 'application/octet-stream' });
         
         // 2. Define the key URI pointing to our secure API endpoint (relative path)
         const keyDeliveryUri = `/api/key-delivery?episodeId=${episodeId}`;
@@ -463,4 +462,6 @@ interface EpisodeData {
   vttPath?: string;
   [key: string]: any;
 }
+    
+
     

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition, useMemo, useEffect, useCallback } from 'react';
@@ -142,7 +143,7 @@ const KeyStatusIndicator = ({ episode }: { episode: Episode }) => {
         )
     }
     
-    if (episode.keyPath) {
+    if (episode.packagingStatus === 'completed' && episode.keyPath) {
         return (
             <Tooltip>
                 <TooltipTrigger>
@@ -173,53 +174,6 @@ const KeyStatusIndicator = ({ episode }: { episode: Episode }) => {
         </Tooltip>
     );
 };
-
-const KeyPathDisplay = ({ episode }: { episode: Episode }) => {
-    if (episode.keyPath) {
-        return (
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <p className="truncate text-xs text-muted-foreground cursor-help">{episode.keyPath}</p>
-                </TooltipTrigger>
-                <TooltipContent align="start">
-                    <p>{episode.keyPath}</p>
-                </TooltipContent>
-            </Tooltip>
-        );
-    }
-
-    let reason = "알 수 없음";
-    if (episode.packagingStatus === 'failed') {
-        reason = "키 생성 실패 (재분석 필요)";
-    } else if (episode.packagingStatus === 'processing' || episode.aiProcessingStatus === 'processing' || episode.packagingStatus === 'pending' || episode.aiProcessingStatus === 'pending') {
-        reason = "영상 처리 중...";
-    } else if (episode.aiProcessingStatus !== 'completed') {
-        reason = "AI 분석 미완료";
-    } else if (episode.packagingStatus === 'completed' && !episode.keyPath) {
-        reason = "경로 정보 누락 (재분석 필요)";
-    }
-
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <p className="text-xs text-destructive cursor-help">주소를 찾을 수 없음</p>
-            </TooltipTrigger>
-            <TooltipContent align="start">
-                <p>이유: {reason}</p>
-            </TooltipContent>
-        </Tooltip>
-    );
-};
-
-
-const formatFileSize = (bytes: number | undefined): string => {
-    if (bytes === undefined || bytes === 0) return 'N/A';
-    if (bytes < 1024) return `${bytes} B`;
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
-}
-
 
 export default function VideoManager() {
   const firestore = useFirestore();
@@ -432,15 +386,14 @@ useEffect(() => {
                 </div>
             ) : Object.keys(orderedEpisodes).length > 0 ? (
                 <>
-                    <div className="hidden md:grid grid-cols-12 gap-3 items-center px-4 py-2 text-xs font-medium text-muted-foreground border-b sticky top-0 bg-background/95 z-10">
-                        <div className="col-span-3 pl-8">에피소드 제목</div>
+                    <div className="hidden md:grid grid-cols-10 gap-3 items-center px-4 py-2 text-xs font-medium text-muted-foreground border-b sticky top-0 bg-background/95 z-10">
+                        <div className="col-span-4 pl-8">에피소드 제목</div>
                         <div className="col-span-1">재생시간</div>
                         <div className="col-span-1">강사</div>
                         <div className="col-span-1 text-center">AI 상태</div>
                         <div className="col-span-1 text-center">키 상태</div>
-                        <div className="col-span-2">키 경로</div>
                         <div className="col-span-1">무료</div>
-                        <div className="col-span-2 text-right pr-12">관리</div>
+                        <div className="col-span-1 text-right pr-12">관리</div>
                     </div>
                     <Accordion 
                         type="multiple" 
@@ -474,8 +427,8 @@ useEffect(() => {
                                             <div className="space-y-2">
                                             {episodeList.map((episode) => (
                                                 <Reorder.Item key={episode.id} value={episode} className="bg-background rounded-lg border">
-                                                    <div className="p-2 grid grid-cols-12 gap-3 items-center">
-                                                        <div className="col-span-3 flex items-center gap-3">
+                                                    <div className="p-2 grid grid-cols-10 gap-3 items-center">
+                                                        <div className="col-span-4 flex items-center gap-3">
                                                             <GripVertical className="cursor-grab text-muted-foreground" />
                                                             <div className="relative aspect-video w-16 rounded-md overflow-hidden bg-muted border flex-shrink-0">
                                                                 {episode.thumbnailUrl ? (
@@ -494,14 +447,11 @@ useEffect(() => {
                                                          <div className="flex justify-center col-span-1">
                                                             <KeyStatusIndicator episode={episode} />
                                                         </div>
-                                                        <div className="col-span-2">
-                                                            <KeyPathDisplay episode={episode} />
-                                                        </div>
                                                         <div className="flex items-center gap-2 col-span-1">
                                                             <Switch checked={episode.isFree} onCheckedChange={() => toggleFreeStatus(episode)} />
                                                             <span className="text-xs">{episode.isFree ? '무료' : '유료'}</span>
                                                         </div>
-                                                        <div className="col-span-2 flex justify-end items-center">
+                                                        <div className="col-span-1 flex justify-end items-center">
                                                             <Button variant="outline" size="sm" onClick={() => handlePlayVideo(episode)}>시청</Button>
                                                             <DropdownMenu>
                                                               <DropdownMenuTrigger asChild>
@@ -586,3 +536,5 @@ useEffect(() => {
     </>
   );
 }
+
+    

@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark } from '@/lib/types';
@@ -282,7 +283,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const videoContainerRef = React.useRef<HTMLDivElement>(null);
-  const shakaPlayerRef = React.useRef<any | null>(null);
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
   const { data: course } = useDoc<Course>(courseRef);
@@ -302,7 +302,11 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     const shaka = (window as any).shaka;
 
     async function initPlayer() {
-        if (!isMounted || !shaka || !videoRef.current || !videoContainerRef.current) return;
+        if (!isMounted || !shaka || !videoRef.current || !videoContainerRef.current || !auth.currentUser) {
+            setIsLoading(false);
+            if (!auth.currentUser) setPlayerError("로그인이 필요합니다.");
+            return;
+        }
         
         if (episode.packagingStatus !== 'completed' || !episode.manifestPath) {
             console.log("Player not ready: packaging incomplete or manifest path missing.", episode);
@@ -314,8 +318,21 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             const manifestUrl = getPublicUrl(firebaseConfig.storageBucket, episode.manifestPath);
 
             player = new shaka.Player();
-            shakaPlayerRef.current = player;
             ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
+            
+            // Add request filter to add auth token to key requests
+            player.getNetworkingEngine().registerRequestFilter(async (type: any, request: any) => {
+                if (type === shaka.net.NetworkingEngine.RequestType.LICENSE) {
+                    if (auth.currentUser) {
+                        try {
+                            const token = await auth.currentUser.getIdToken();
+                            request.headers['Authorization'] = 'Bearer ' + token;
+                        } catch (error) {
+                            console.error("Error getting auth token for key request:", error);
+                        }
+                    }
+                }
+            });
             
             player.addEventListener('error', (e: any) => {
               if (isMounted) {
@@ -351,9 +368,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         isMounted = false; 
         if (ui) ui.destroy();
         if (player) player.destroy(); 
-        shakaPlayerRef.current = null;
     };
-  }, [isOpen, episode]);
+  }, [isOpen, episode, auth]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -404,3 +420,5 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
+
+    
