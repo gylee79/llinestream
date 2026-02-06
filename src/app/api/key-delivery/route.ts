@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import type { Episode, User } from '@/lib/types';
+import { toJSDate } from '@/lib/date-helpers';
 
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
@@ -51,7 +52,8 @@ export async function GET(req: NextRequest) {
 
         // 3. Check authorization
         const userSubscription = user.activeSubscriptions?.[episode.courseId];
-        const isSubscribed = userSubscription && new Date() < userSubscription.expiresAt.toDate();
+        const expiryDate = userSubscription ? toJSDate(userSubscription.expiresAt) : null;
+        const isSubscribed = !!expiryDate && new Date() < expiryDate;
         
         if (user.role !== 'admin' && !episode.isFree && !isSubscribed) {
             return new NextResponse('You are not authorized to view this content', { status: 403 });
@@ -61,7 +63,7 @@ export async function GET(req: NextRequest) {
         const file = storage.bucket().file(keyPath);
         const [keyBuffer] = await file.download();
 
-        return new NextResponse(keyBuffer, {
+        return new NextResponse(keyBuffer.buffer, {
             status: 200,
             headers: {
                 'Content-Type': 'application/octet-stream',
@@ -82,6 +84,3 @@ export async function GET(req: NextRequest) {
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 }
-
-
-    
