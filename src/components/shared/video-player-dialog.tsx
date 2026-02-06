@@ -318,14 +318,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             const player = new shaka.Player();
             shakaPlayerRef.current = player;
             
-            player.configure({
-                drm: {
-                    clearKey: {
-                        'org.w3.clearkey': manifestUrl.replace('manifest.m3u8', 'enc.key')
-                    }
-                }
-            });
-
             const ui = new shaka.ui.Overlay(player, videoContainerRef.current!, videoRef.current!);
             uiRef.current = ui;
             
