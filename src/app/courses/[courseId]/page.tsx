@@ -1,3 +1,4 @@
+
 'use client';
 import Image from 'next/image';
 import { notFound, useParams, useSearchParams } from 'next/navigation';
@@ -19,9 +20,7 @@ import { DotButton, useDotButton } from '@/components/ui/dot-button';
 import { Button } from '@/components/ui/button';
 import EpisodeCommentDialog from '@/components/shared/episode-comment-dialog';
 import CourseImagesDialog from '@/components/shared/course-images-dialog';
-import dynamic from 'next/dynamic';
-
-const VideoPlayerDialog = dynamic(() => import('@/components/shared/video-player-dialog'), { ssr: false });
+import VideoPlayerDialog from '@/components/shared/video-player-dialog';
 
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();

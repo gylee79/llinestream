@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useUser, useCollection, useFirestore, useMemoFirebase } from '@/firebase/hooks';
@@ -20,8 +19,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Play, Clock, CheckCircle } from 'lucide-react';
 import { formatDuration } from '@/lib/utils';
-
-const VideoPlayerDialog = dynamic(() => import('@/components/shared/video-player-dialog'), { ssr: false });
+import VideoPlayerDialog from '@/components/shared/video-player-dialog';
 
 const MyCoursesPage = () => {
   const { user, isUserLoading } = useUser();
