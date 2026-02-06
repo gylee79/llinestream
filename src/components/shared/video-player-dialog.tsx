@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark } from '@/lib/types';
@@ -303,7 +302,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     const shaka = (window as any).shaka;
 
     async function initPlayer() {
-        if (!isMounted || !shaka || !videoRef.current || !videoContainerRef.current || !auth) return;
+        if (!isMounted || !shaka || !videoRef.current || !videoContainerRef.current) return;
         
         if (episode.packagingStatus !== 'completed' || !episode.manifestPath) {
             console.log("Player not ready: packaging incomplete or manifest path missing.", episode);
@@ -323,22 +322,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 console.error("Shaka Player Error:", e.detail);
                 setPlayerError(`코드: ${e.detail.code}, ${e.detail.message}`);
               }
-            });
-
-            // NEW: Request filter to add Authorization header for key requests
-            player.getNetworkingEngine().registerRequestFilter(async (type: number, request: { uris: string[], headers: Record<string, string> }) => {
-                if (type === shaka.net.NetworkingEngine.RequestType.KEY) {
-                    if (auth.currentUser) {
-                        try {
-                            const token = await auth.currentUser.getIdToken();
-                            request.headers['Authorization'] = 'Bearer ' + token;
-                            console.log('[Player] Added Authorization header to key request.');
-                        } catch (error) {
-                            console.error('[Player] Failed to get ID token for key request:', error);
-                            // Allow the request to proceed without the header, the API will deny it
-                        }
-                    }
-                }
             });
 
             await player.attach(videoRef.current!);
@@ -370,7 +353,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         if (player) player.destroy(); 
         shakaPlayerRef.current = null;
     };
-  }, [isOpen, episode, auth]);
+  }, [isOpen, episode]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>

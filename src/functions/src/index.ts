@@ -65,7 +65,7 @@ function initializeTools() {
   return { genAI, fileManager, transcoderClient };
 }
 
-// 3. HLS Packaging with Transcoder API (AES-128) - Private Key with Placeholder URI
+// 3. HLS Packaging with Transcoder API (AES-128) - Public Key Method
 async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef: admin.firestore.DocumentReference): Promise<void> {
     try {
         await docRef.update({ packagingStatus: "processing", packagingError: null });
@@ -78,19 +78,20 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         const outputFolder = `episodes/${episodeId}/packaged/`;
         const outputUri = `gs://${bucket.name}/${outputFolder}`;
 
-        // 1. Generate a 16-byte AES-128 key.
+        // 1. Generate AES key
         const aesKey = crypto.randomBytes(16);
         const keyFileName = 'enc.key';
         const keyStoragePath = `episodes/${episodeId}/keys/${keyFileName}`;
         const keyFile = bucket.file(keyStoragePath);
         
-        // 2. Save the key to a private location in Storage.
-        console.log(`[${episodeId}] HLS Job: Uploading private AES-128 key to ${keyStoragePath}`);
-        await keyFile.save(aesKey, { contentType: 'application/octet-stream', private: true });
-        
-        // 3. Create a unique, non-public placeholder URI for the manifest.
-        const keyUriPlaceholder = `https://llinestream.internal/keys/${episodeId}`;
-        console.log(`[${episodeId}] HLS Job: Using placeholder URI for manifest: ${keyUriPlaceholder}`);
+        // 2. Save the key to a PUBLIC location in Storage.
+        console.log(`[${episodeId}] HLS Job: Uploading PUBLIC AES-128 key to ${keyStoragePath}`);
+        await keyFile.save(aesKey, { contentType: 'application/octet-stream', predefinedAcl: 'publicRead' });
+
+        // 3. Get the public URL of the key.
+        const keyDeliveryUri = keyFile.publicUrl();
+        console.log(`[${episodeId}] HLS Job: Using public key URI for manifest: ${keyDeliveryUri}`);
+
 
         // 4. Configure the Transcoder job.
         const request = {
@@ -108,7 +109,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                                 individualSegments: true,
                                 segmentDuration: { seconds: 4 },
                                 encryption: {
-                                    aes128: { uri: keyUriPlaceholder } // Use the placeholder URI
+                                    aes128: { uri: keyDeliveryUri } // Use the full public URL
                                 }
                             },
                         },
@@ -120,7 +121,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
                                 individualSegments: true,
                                 segmentDuration: { seconds: 4 },
                                 encryption: {
-                                    aes128: { uri: keyUriPlaceholder } // Use the placeholder URI
+                                    aes128: { uri: keyDeliveryUri } // Use the full public URL
                                 }
                             },
                         }
@@ -199,6 +200,7 @@ async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef
         });
     }
 }
+
 
 // ==========================================
 // [Trigger] 메인 분석 함수 (v2 onDocumentWritten)
