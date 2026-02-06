@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark } from '@/lib/types';
@@ -171,11 +172,13 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
 };
 
 const TextbookView = () => (
-    <div className="h-full flex flex-col items-center justify-center p-10 text-center">
-        <Image src="https://picsum.photos/seed/textbook/200/280" width={150} height={210} alt="교재" className="rounded-md shadow-md mb-4" />
-        <p className="text-sm text-muted-foreground">교재 정보는 현재 준비 중입니다.</p>
-        <Button className="mt-4 bg-orange-500 hover:bg-orange-600 text-white">교재 구매하기</Button>
-    </div>
+    <ScrollArea className="h-full">
+        <div className="h-full flex flex-col items-center justify-center p-10 text-center">
+            <Image src="https://picsum.photos/seed/textbook/200/280" width={150} height={210} alt="교재" className="rounded-md shadow-md mb-4" />
+            <p className="text-sm text-muted-foreground">교재 정보는 현재 준비 중입니다.</p>
+            <Button className="mt-4 bg-orange-500 hover:bg-orange-600 text-white">교재 구매하기</Button>
+        </div>
+    </ScrollArea>
 );
 
 const BookmarkItem = ({ bookmark, onSeek, onDelete }: { bookmark: Bookmark, onSeek: (time: number) => void, onDelete: (id: string) => void }) => {
@@ -220,15 +223,17 @@ const BookmarkView = ({ episode, user, videoElement }: { episode: Episode; user:
     };
 
     return (
-        <div className="p-5 space-y-4">
-            <Button className="w-full bg-primary" onClick={handleAdd}><BookmarkIcon className="w-4 h-4 mr-2"/> 현재 시간 책갈피</Button>
-            {isLoading ? <Loader className="mx-auto animate-spin" /> : (
-                <ul className="space-y-2">
-                    {bookmarks?.map(b => <BookmarkItem key={b.id} bookmark={b} onSeek={(t) => { if(videoElement) videoElement.currentTime = t; }} onDelete={(id) => deleteBookmark(user.id, id)} />)}
-                    {bookmarks?.length === 0 && <p className="text-center text-xs text-muted-foreground">저장된 책갈피가 없습니다.</p>}
-                </ul>
-            )}
-        </div>
+        <ScrollArea className="h-full">
+            <div className="p-5 space-y-4">
+                <Button className="w-full bg-primary" onClick={handleAdd}><BookmarkIcon className="w-4 h-4 mr-2"/> 현재 시간 책갈피</Button>
+                {isLoading ? <Loader className="mx-auto animate-spin" /> : (
+                    <ul className="space-y-2">
+                        {bookmarks?.map(b => <BookmarkItem key={b.id} bookmark={b} onSeek={(t) => { if(videoElement) videoElement.currentTime = t; }} onDelete={(id) => deleteBookmark(user.id, id)} />)}
+                        {bookmarks?.length === 0 && <p className="text-center text-xs text-muted-foreground">저장된 책갈피가 없습니다.</p>}
+                    </ul>
+                )}
+            </div>
+        </ScrollArea>
     );
 };
 
@@ -365,10 +370,15 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             <DialogTitle className="text-lg font-bold truncate">
                 {course?.name} <ChevronRight className="inline w-4 h-4 mx-1 text-muted-foreground"/> {episode.title}
             </DialogTitle>
-            <div className="flex items-center gap-2 pr-10"> {/* Space for the absolute X button */}
+            <div className="flex items-center gap-2">
                 <Button variant="ghost" size="icon" className="h-8 w-8">
                     <Download className="h-4 h-4"/>
                 </Button>
+                 <DialogClose asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <X className="h-5 w-5" />
+                    </Button>
+                </DialogClose>
             </div>
         </div>
         
@@ -386,12 +396,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <TabsTrigger value="textbook" className="text-xs">교재정보</TabsTrigger>
                         <TabsTrigger value="bookmark" className="text-xs">책갈피</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="syllabus" className="flex-1 mt-0">
+                    <TabsContent value="syllabus" className="flex-1 mt-0 min-h-0">
                         <SyllabusView episode={episode} onSeek={handleSeek}/>
                     </TabsContent>
-                    <TabsContent value="search" className="flex-1 overflow-y-auto mt-0">{user ? <ChatView episode={episode} user={user}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
-                    <TabsContent value="textbook" className="flex-1 overflow-y-auto mt-0"><TextbookView /></TabsContent>
-                    <TabsContent value="bookmark" className="flex-1 overflow-y-auto mt-0">{user ? <BookmarkView episode={episode} user={user} videoElement={videoRef.current}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
+                    <TabsContent value="search" className="flex-1 mt-0 min-h-0">{user ? <ChatView episode={episode} user={user}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
+                    <TabsContent value="textbook" className="flex-1 mt-0 min-h-0"><TextbookView /></TabsContent>
+                    <TabsContent value="bookmark" className="flex-1 mt-0 min-h-0">{user ? <BookmarkView episode={episode} user={user} videoElement={videoRef.current}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
                 </Tabs>
             </div>
         </div>
