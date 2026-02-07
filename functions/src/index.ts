@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Video Analysis & Encryption with Gemini using Firebase Cloud Functions v2.
  * This function now performs file-based AES-256-GCM encryption instead of HLS packaging.
@@ -244,6 +245,15 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
       ]);
 
       const output = JSON.parse(result.response.text());
+      
+      // NEW: Separate transcript from the main content
+      const transcriptContent = output.transcript || "";
+      delete output.transcript; // Remove large transcript from the object to be stored in Firestore
+
+      const transcriptPath = `episodes/${episodeId}/ai/transcript.txt`;
+      await bucket.file(transcriptPath).save(transcriptContent, { contentType: 'text/plain' });
+      console.log(`[${episodeId}] Transcript saved to Storage: ${transcriptPath}`);
+
 
       let subtitlePath = null;
       if (output.timeline && Array.isArray(output.timeline)) {
@@ -270,9 +280,9 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
       await docRef.update({
         aiProcessingStatus: "completed",
         aiModel: modelName,
-        transcript: output.transcript || "",
         aiGeneratedContent: analysisJsonString,
         subtitlePath: subtitlePath,
+        transcriptPath: transcriptPath, // Store path to transcript file
         aiProcessingError: null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });

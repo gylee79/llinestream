@@ -96,6 +96,7 @@ export interface Episode {
     fileSize: number;
   };
   subtitlePath?: string;
+  transcriptPath?: string; // Path to the transcript file in Storage
 
   // Encryption Information
   encryption: EncryptionInfo;
@@ -110,9 +111,8 @@ export interface Episode {
     error?: string | null;
   };
   
-  // AI Generated Content
+  // AI Generated Content (summary, timeline etc. without large transcript)
   aiGeneratedContent?: string | null;
-  transcript?: string | null; // For direct access
   
   createdAt: Timestamp;
 }
