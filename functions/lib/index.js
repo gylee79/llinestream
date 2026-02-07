@@ -211,7 +211,7 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)("episodes/{epis
     }
 });
 async function runAiAnalysis(episodeId, filePath, docRef) {
-    const modelName = "gemini-3-flash-preview";
+    const modelName = "gemini-1.5-pro-latest";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
@@ -248,18 +248,23 @@ async function runAiAnalysis(episodeId, filePath, docRef) {
         const rawText = result.response.text();
         let output;
         try {
-            output = JSON.parse(rawText);
+            const jsonMatch = rawText.match(/```(json)?\n([\s\S]*?)\n```/);
+            if (jsonMatch && jsonMatch[2]) {
+                output = JSON.parse(jsonMatch[2]);
+            }
+            else {
+                output = JSON.parse(rawText);
+            }
         }
         catch (jsonError) {
-            console.error(`[${episodeId}] AI analysis failed: JSON parsing error.`);
-            // Throw a more informative error
-            throw new Error(`JSON parsing failed: ${jsonError.message}. Raw AI output: ${rawText.substring(0, 500)}...`);
+            console.error(`[${episodeId}] AI analysis failed: JSON parsing error. Raw output was:`, rawText);
+            throw new Error(`JSON parsing failed: ${jsonError.message}.`);
         }
         // NEW: Separate transcript from the main content
         const transcriptContent = output.transcript || "";
         delete output.transcript; // Remove large transcript from the object to be stored in Firestore
         const transcriptPath = `episodes/${episodeId}/ai/transcript.txt`;
-        await bucket.file(transcriptPath).save(transcriptContent, { contentType: 'text/plain' });
+        await bucket.file(transcriptPath).save(transcriptContent, { contentType: 'text/plain', predefinedAcl: 'publicRead' });
         console.log(`[${episodeId}] Transcript saved to Storage: ${transcriptPath}`);
         let subtitlePath = null;
         if (output.timeline && Array.isArray(output.timeline)) {
@@ -294,7 +299,8 @@ async function runAiAnalysis(episodeId, filePath, docRef) {
         console.error(`❌ [${episodeId}] AI analysis failed. Detailed error:`, detailedError);
         await docRef.update({
             aiProcessingStatus: "failed",
-            aiProcessingError: error.message || String(error)
+            aiProcessingError: error.message || String(error),
+            aiGeneratedContent: null // Ensure content is cleared on failure
         });
     }
     finally {
