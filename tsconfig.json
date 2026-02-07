@@ -37,6 +37,7 @@
   ],
   "exclude": [
     "node_modules",
-    "src/functions"
+    "src/functions",
+    "src/app/api/key-delivery/route.ts"
   ]
 }
