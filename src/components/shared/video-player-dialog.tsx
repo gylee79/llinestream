@@ -324,23 +324,33 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         if (!videoRef.current || !authUser || !mediaSource) return;
 
         try {
-            // 1. Get Derived Key from our secure API
+            // 1. Get Derived Key from our secure API with timeout
             const token = await authUser.getIdToken();
-            const sessionRes = await fetch('/api/play-session', {
+            const sessionPromise = fetch('/api/play-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ videoId: episode.id, deviceId: 'web-online' }),
             });
+            
+            const sessionRes = await Promise.race([
+                sessionPromise,
+                new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('세션 정보를 가져오는 데 시간이 너무 오래 걸립니다.')), 15000))
+            ]);
 
             if (!sessionRes.ok) {
                 const errorData = await sessionRes.json();
-                throw new Error(errorData.error || 'Failed to start play session');
+                throw new Error(errorData.error || '플레이 세션을 시작하지 못했습니다.');
             }
             const { derivedKey: derivedKeyB64 } = await sessionRes.json();
 
-            // 2. Fetch encrypted video file
+            // 2. Fetch encrypted video file with timeout
             const videoUrl = getPublicUrl(firebaseConfig.storageBucket, episode.storage.encryptedPath);
-            const encryptedRes = await fetch(videoUrl);
+            const encryptedPromise = fetch(videoUrl);
+
+            const encryptedRes = await Promise.race([
+                encryptedPromise,
+                new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('비디오 파일을 가져오는 데 시간이 너무 오래 걸립니다.')), 30000)) // 30s timeout
+            ]);
             
             if (!encryptedRes.ok) {
               throw new Error(`암호화된 비디오 파일을 가져오는데 실패했습니다 (상태: ${encryptedRes.status}).`);
