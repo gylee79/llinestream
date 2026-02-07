@@ -1,13 +1,13 @@
 
 'use client';
 
-import type { Episode, Instructor, Course, User, Bookmark } from '@/lib/types';
+import type { Episode, Instructor, Course, User, Bookmark, OfflineVideoData } from '@/lib/types';
 import React from 'react';
 import { Button } from '../ui/button';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection, useAuth } from '@/firebase';
 import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
-import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark as BookmarkIcon, Trash2, Download, AlertTriangle } from 'lucide-react';
+import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark as BookmarkIcon, Trash2, Download, AlertTriangle, CheckCircle } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { cn, formatDuration } from '@/lib/utils';
@@ -23,6 +23,7 @@ import Link from 'next/link';
 import { Skeleton } from '../ui/skeleton';
 import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/bookmark-actions';
 import { Input } from '../ui/input';
+import { saveVideo } from '@/lib/offline-db';
 
 
 // ========= TYPES AND INTERFACES =========
@@ -49,10 +50,41 @@ interface VideoPlayerDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   episode: Episode;
-  instructor: Instructor | null;
+  instructor?: Instructor | null;
+  offlineVideoData?: OfflineVideoData | null;
 }
 
 // ========= SUB-COMPONENTS =========
+
+const Watermark = ({ seed }: { seed: string | null }) => {
+    const [positions, setPositions] = React.useState<{ top: string; left: string }[]>([]);
+  
+    React.useEffect(() => {
+      if (seed) {
+        const newPositions = Array.from({ length: 5 }).map(() => ({
+          top: `${Math.random() * 80 + 10}%`,
+          left: `${Math.random() * 80 + 10}%`,
+        }));
+        setPositions(newPositions);
+      }
+    }, [seed]);
+  
+    if (!seed) return null;
+  
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
+        {positions.map((pos, i) => (
+          <span
+            key={i}
+            className="absolute text-white/10 text-xs"
+            style={{ ...pos, transform: 'rotate(-15deg)' }}
+          >
+            {seed}
+          </span>
+        ))}
+      </div>
+    );
+  };
 
 const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSeconds: number) => void; }) => {
     // New, more detailed status handling
@@ -295,12 +327,14 @@ const PlayerStatusOverlay = ({ episode, isLoading, playerError }: { episode: Epi
 
 // ========= MAIN COMPONENT =========
 
-export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor }: VideoPlayerDialogProps) {
+export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instructor, offlineVideoData }: VideoPlayerDialogProps) {
   const { user, authUser } = useUser();
   const { toast } = useToast();
   const firestore = useFirestore();
   const [isLoading, setIsLoading] = React.useState(true);
   const [playerError, setPlayerError] = React.useState<string | null>(null);
+  const [watermarkSeed, setWatermarkSeed] = React.useState<string | null>(null);
+  const [downloadState, setDownloadState] = React.useState<'idle' | 'downloading' | 'saving' | 'completed' | 'error'>('idle');
 
   const videoRef = React.useRef<HTMLVideoElement>(null);
   
@@ -315,107 +349,170 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     }
   };
 
+  const handleDownload = async () => {
+    if (!authUser || !course || !episode) {
+        toast({ variant: 'destructive', title: '오류', description: '다운로드에 필요한 정보가 부족합니다.' });
+        return;
+    }
+    setDownloadState('downloading');
+    try {
+        const token = await authUser.getIdToken();
+        
+        const licenseRes = await fetch('/api/offline-license', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ videoId: episode.id, deviceId: 'web-offline' }),
+        });
+        if (!licenseRes.ok) throw new Error(`오프라인 라이선스 발급 실패: ${await licenseRes.text()}`);
+        const license = await licenseRes.json();
+        
+        const urlRes = await fetch('/api/video-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ videoId: episode.id }),
+        });
+        if (!urlRes.ok) throw new Error(`비디오 URL 요청 실패: ${await urlRes.text()}`);
+        const { signedUrl } = await urlRes.json();
+        
+        const encryptedRes = await fetch(signedUrl);
+        const encryptedVideo = await encryptedRes.arrayBuffer();
+
+        setDownloadState('saving');
+        
+        await saveVideo({
+            episode: episode,
+            courseName: course.name,
+            downloadedAt: new Date(),
+            expiresAt: new Date(license.expiresAt),
+            encryptedVideo,
+            license: {
+                offlineDerivedKey: license.offlineDerivedKey,
+                watermarkSeed: license.watermarkSeed,
+            },
+        });
+        
+        setDownloadState('completed');
+        toast({ title: '다운로드 완료', description: `'${episode.title}' 영상이 다운로드함에 저장되었습니다.` });
+
+    } catch (error: any) {
+        setDownloadState('error');
+        toast({ variant: 'destructive', title: '다운로드 실패', description: error.message });
+        console.error("Download Error:", error);
+    }
+  };
+
   React.useEffect(() => {
     let mediaSource: MediaSource | null = null;
     let sourceBuffer: SourceBuffer | null = null;
-    
-    const onSourceOpen = async () => {
-        if (!videoRef.current || !authUser || !mediaSource) return;
-
-        try {
-            const token = await authUser.getIdToken();
-            
-            // 1. Get Derived Key for decryption
-            const sessionPromise = fetch('/api/play-session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ videoId: episode.id, deviceId: 'web-online' }),
-            });
-             const sessionRes = await Promise.race([ sessionPromise, new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('세션 정보를 가져오는 데 시간이 너무 오래 걸립니다.')), 15000)) ]);
-            if (!sessionRes.ok) {
-                const errorData = await sessionRes.json();
-                throw new Error(errorData.error || '플레이 세션을 시작하지 못했습니다.');
-            }
-            const { derivedKey: derivedKeyB64 } = await sessionRes.json();
-            
-            // 2. Get Signed URL for the private video file
-            const urlRes = await fetch('/api/video-url', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ videoId: episode.id }),
-            });
-            if (!urlRes.ok) {
-                const errorData = await urlRes.json();
-                throw new Error(errorData.error || '비디오 주소를 가져오지 못했습니다.');
-            }
-            const { signedUrl } = await urlRes.json();
-
-            // 3. Fetch encrypted video file using the Signed URL
-            const encryptedPromise = fetch(signedUrl);
-            const encryptedRes = await Promise.race([ encryptedPromise, new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('비디오 파일을 가져오는 데 시간이 너무 오래 걸립니다.')), 30000))]);
-            if (!encryptedRes.ok) {
-              throw new Error(`암호화된 비디오 파일을 가져오는데 실패했습니다 (상태: ${encryptedRes.status}).`);
-            }
-            const encryptedBuffer = await encryptedRes.arrayBuffer();
-
-            // 4. Prepare for decryption
-            const ivLength = episode.encryption.ivLength;
-            const tagLength = episode.encryption.tagLength;
-            const iv = encryptedBuffer.slice(0, ivLength);
-            const authTag = encryptedBuffer.slice(ivLength, ivLength + tagLength);
-            const encryptedData = encryptedBuffer.slice(ivLength + tagLength);
-            const keyBuffer = Buffer.from(derivedKeyB64, 'base64');
-            const cryptoKey = await window.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
-
-            // 5. Decrypt in memory
-            const decryptedData = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv, tagLength: tagLength * 8 }, cryptoKey, encryptedData);
-
-            // 6. Append to MediaSource
-            sourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.42E01E, mp4a.40.2"');
-            sourceBuffer.addEventListener('updateend', () => {
-                if (mediaSource?.readyState === 'open' && !sourceBuffer?.updating) {
-                    try { mediaSource.endOfStream(); } catch(e) {}
-                }
-            });
-            sourceBuffer.appendBuffer(decryptedData);
-            
-            if (isMounted) setIsLoading(false);
-
-        } catch (error: any) {
-             if (isMounted) {
-                console.error("Player Initialization Error:", error);
-                setPlayerError(error.message || "비디오를 재생할 수 없습니다.");
-                setIsLoading(false);
-            }
-        }
-    };
-
     let isMounted = true;
-    if (isOpen && episode.status?.processing === 'completed' && episode.status?.playable) {
+
+    const setupPlayback = async () => {
+        if (!isMounted) return;
         setIsLoading(true);
         setPlayerError(null);
-        
+        setWatermarkSeed(null);
+
         mediaSource = new MediaSource();
         if (videoRef.current) {
             videoRef.current.src = URL.createObjectURL(mediaSource);
         }
-        mediaSource.addEventListener('sourceopen', onSourceOpen);
+        
+        mediaSource.addEventListener('sourceopen', async () => {
+            try {
+                let decryptedData: ArrayBuffer;
+                let seed: string | null = null;
 
-    } else if (isOpen) {
+                if (offlineVideoData) { // Offline Playback
+                    const keyBuffer = Buffer.from(offlineVideoData.license.offlineDerivedKey, 'base64');
+                    const cryptoKey = await window.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
+                    
+                    const { ivLength, tagLength } = offlineVideoData.episode.encryption;
+                    const iv = offlineVideoData.encryptedVideo.slice(0, ivLength);
+                    const authTag = offlineVideoData.encryptedVideo.slice(ivLength, ivLength + tagLength);
+                    const encryptedData = offlineVideoData.encryptedVideo.slice(ivLength + tagLength);
+
+                    decryptedData = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv, tagLength: tagLength * 8 }, cryptoKey, encryptedData);
+                    seed = offlineVideoData.license.watermarkSeed;
+
+                } else { // Online Streaming
+                    if (!authUser) throw new Error("로그인이 필요합니다.");
+                    const token = await authUser.getIdToken();
+
+                    const sessionRes = await fetch('/api/play-session', { /* ... */ });
+                    if (!sessionRes.ok) throw new Error(`플레이 세션 시작 실패: ${await sessionRes.text()}`);
+                    const { derivedKey: derivedKeyB64, watermarkSeed } = await sessionRes.json();
+                    
+                    const urlRes = await fetch('/api/video-url', { /* ... */ });
+                    if (!urlRes.ok) throw new Error(`비디오 URL 요청 실패: ${await urlRes.text()}`);
+                    const { signedUrl } = await urlRes.json();
+
+                    const encryptedRes = await fetch(signedUrl);
+                    if (!encryptedRes.ok) throw new Error(`비디오 파일 다운로드 실패 (상태: ${encryptedRes.status})`);
+                    const encryptedBuffer = await encryptedRes.arrayBuffer();
+                    
+                    const { ivLength, tagLength } = episode.encryption;
+                    const iv = encryptedBuffer.slice(0, ivLength);
+                    const authTag = encryptedBuffer.slice(ivLength, ivLength + tagLength);
+                    const encryptedData = encryptedBuffer.slice(ivLength + tagLength);
+                    const keyBuffer = Buffer.from(derivedKeyB64, 'base64');
+                    const cryptoKey = await window.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
+
+                    decryptedData = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv, tagLength: tagLength * 8 }, cryptoKey, encryptedData);
+                    seed = watermarkSeed;
+                }
+
+                if (!isMounted) return;
+
+                setWatermarkSeed(seed);
+                sourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.42E01E, mp4a.40.2"');
+                sourceBuffer.addEventListener('updateend', () => {
+                    if (mediaSource?.readyState === 'open' && !sourceBuffer?.updating) {
+                        try { mediaSource.endOfStream(); } catch(e) {}
+                    }
+                });
+                sourceBuffer.appendBuffer(decryptedData);
+                setIsLoading(false);
+
+            } catch (error: any) {
+                if (isMounted) {
+                    console.error("Player Initialization Error:", error);
+                    setPlayerError(error.message || "비디오를 재생할 수 없습니다.");
+                    setIsLoading(false);
+                }
+            }
+        });
+    };
+
+    if (isOpen) {
+      if (offlineVideoData || (episode.status?.processing === 'completed' && episode.status?.playable)) {
+        setupPlayback();
+      } else {
         setIsLoading(false);
+      }
     }
     
     return () => { 
         isMounted = false; 
-        if (mediaSource) {
-            mediaSource.removeEventListener('sourceopen', onSourceOpen);
-            if(videoRef.current?.src) {
-                URL.revokeObjectURL(videoRef.current.src);
-            }
+        if (mediaSource && videoRef.current?.src) {
+            URL.revokeObjectURL(videoRef.current.src);
         }
     };
+  }, [isOpen, episode, offlineVideoData, authUser]);
 
-  }, [isOpen, episode, authUser]);
+  const DownloadButton = () => {
+    switch (downloadState) {
+        case 'downloading':
+            return <Button variant="ghost" size="icon" disabled><Loader className="h-4 w-4 animate-spin"/></Button>;
+        case 'saving':
+            return <Button variant="ghost" size="icon" disabled><Loader className="h-4 w-4 animate-spin"/></Button>;
+        case 'completed':
+            return <Button variant="ghost" size="icon" disabled><CheckCircle className="h-4 w-4 text-green-500"/></Button>;
+        case 'error':
+             return <Button variant="ghost" size="icon" onClick={handleDownload}><AlertTriangle className="h-4 w-4 text-destructive"/></Button>;
+        default:
+            return <Button variant="ghost" size="icon" onClick={handleDownload}><Download className="h-4 w-4"/></Button>;
+    }
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -427,9 +524,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 </DialogTitle>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Download className="h-4 h-4"/>
-                </Button>
+                <DownloadButton />
             </div>
              <DialogClose className="absolute right-4 top-1/2 -translate-y-1/2 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
                 <X className="h-4 w-4" />
@@ -441,6 +536,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center aspect-video md:aspect-auto md:min-h-0">
                 <PlayerStatusOverlay episode={episode} isLoading={isLoading} playerError={playerError} />
                 <video ref={videoRef} className="w-full h-full" autoPlay playsInline controls/>
+                <Watermark seed={watermarkSeed} />
             </div>
 
             <div className="col-span-10 md:col-span-3 bg-white border-l flex flex-col min-h-0 flex-1 md:flex-auto">

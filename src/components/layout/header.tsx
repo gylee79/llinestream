@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -18,6 +19,7 @@ import {
   Settings,
   BookOpen,
   Bookmark as BookmarkIcon,
+  Download,
 } from 'lucide-react';
 
 import { LlineStreamLogo } from '@/components/icons';
@@ -220,6 +222,10 @@ export default function Header() {
                     <DropdownMenuItem onSelect={() => router.push('/my-bookmarks')}>
                         <BookmarkIcon className="mr-2 h-4 w-4" />
                         <span>나의 책갈피</span>
+                    </DropdownMenuItem>
+                     <DropdownMenuItem onSelect={() => router.push('/downloads')}>
+                        <Download className="mr-2 h-4 w-4" />
+                        <span>다운로드함</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={openCart}>
                       <ShoppingCart className="mr-2 h-4 w-4" />

@@ -1,4 +1,5 @@
 
+
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
 import type { UseEmblaCarouselType } from 'embla-carousel-react';
 
@@ -274,4 +275,25 @@ export interface Bookmark {
   userName?: string;
   userEmail?: string;
   episodeTitle?: string;
+}
+
+export interface OfflineVideoData {
+  episode: Episode;
+  courseName: string;
+  downloadedAt: Date;
+  expiresAt: Date;
+  encryptedVideo: ArrayBuffer;
+  license: {
+    offlineDerivedKey: string;
+    watermarkSeed: string;
+  };
+}
+
+export interface OfflineVideoInfo {
+  episodeId: string;
+  title: string;
+  courseName: string;
+  thumbnailUrl: string;
+  downloadedAt: Date;
+  expiresAt: Date;
 }
