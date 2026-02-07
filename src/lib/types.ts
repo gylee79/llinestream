@@ -75,17 +75,22 @@ export interface EncryptionInfo {
 }
 
 export interface Episode {
-  id: string; // This will be the document ID from Firestore, added on the client
+  id: string;
   courseId: string;
   instructorId: string;
   title: string;
   description?: string;
   duration: number; // in seconds
   isFree: boolean;
-  orderIndex?: number; // For manual ordering
+  orderIndex?: number;
   thumbnailUrl: string;
+  defaultThumbnailUrl?: string;
+  defaultThumbnailPath?: string;
+  customThumbnailUrl?: string;
+  customThumbnailPath?: string;
   
-  // File & Storage Information
+  // File & Storage Information (Legacy & New)
+  filePath?: string; // Path to the original uploaded file (will be deleted after processing)
   storage: {
     encryptedPath: string;
     fileSize: number;
@@ -96,6 +101,9 @@ export interface Episode {
   encryption: EncryptionInfo;
 
   // Processing Status
+  aiProcessingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  aiProcessingError?: string | null;
+  aiModel?: string;
   status: {
     processing: 'pending' | 'processing' | 'completed' | 'failed';
     playable: boolean;
@@ -104,9 +112,11 @@ export interface Episode {
   
   // AI Generated Content
   aiGeneratedContent?: string | null;
+  transcript?: string | null; // For direct access
   
   createdAt: Timestamp;
 }
+
 
 export interface VideoKey {
   keyId: string;
@@ -115,6 +125,7 @@ export interface VideoKey {
   rotation: number;
   createdAt: Timestamp;
 }
+
 
 export interface ViewHistoryItem {
   id: string; // Should be episodeId

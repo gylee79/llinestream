@@ -1,15 +1,12 @@
-
 /**
- * @fileoverview Video Analysis with Gemini & Transcoder API using Firebase Cloud Functions v2.
- * Gemini Model: gemini-2.5-flash
- * Transcoder API for HLS Packaging with AES-128 encryption.
+ * @fileoverview Video Analysis & Encryption with Gemini using Firebase Cloud Functions v2.
+ * This function now performs file-based AES-256-GCM encryption instead of HLS packaging.
  */
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
-import { TranscoderServiceClient } from '@google-cloud/video-transcoder';
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
@@ -23,7 +20,7 @@ if (!admin.apps.length) {
 setGlobalOptions({
   region: "us-central1",
   secrets: ["GOOGLE_GENAI_API_KEY"],
-  timeoutSeconds: 540, // Set to maximum allowed timeout (9 minutes)
+  timeoutSeconds: 540,
   memory: "2GiB",
   serviceAccount: "firebase-adminsdk-fbsvc@studio-6929130257-b96ff.iam.gserviceaccount.com",
 });
@@ -50,7 +47,6 @@ function getMimeType(filePath: string): string {
 // 2. 지연 초기화 (Lazy Initialization)
 let genAI: GoogleGenerativeAI | null = null;
 let fileManager: GoogleAIFileManager | null = null;
-let transcoderClient: TranscoderServiceClient | null = null;
 
 function initializeTools() {
   const apiKey = process.env.GOOGLE_GENAI_API_KEY;
@@ -58,150 +54,99 @@ function initializeTools() {
 
   if (!genAI) genAI = new GoogleGenerativeAI(apiKey);
   if (!fileManager) fileManager = new GoogleAIFileManager(apiKey);
-  if (!transcoderClient) transcoderClient = new TranscoderServiceClient();
   
-  return { genAI, fileManager, transcoderClient };
+  return { genAI, fileManager };
 }
 
-// 3. HLS Packaging with Transcoder API (AES-128) - Public Key Method
-async function createHlsPackagingJob(episodeId: string, inputUri: string, docRef: admin.firestore.DocumentReference): Promise<void> {
+// 3. NEW: File-based Encryption (AES-256-GCM)
+async function createEncryptedFile(episodeId: string, inputFilePath: string, docRef: admin.firestore.DocumentReference): Promise<void> {
+    const tempInputPath = path.join(os.tmpdir(), `original-${episodeId}`);
+    const tempOutputPath = path.join(os.tmpdir(), `encrypted-${episodeId}`);
+
     try {
-        await docRef.update({ packagingStatus: "processing", packagingError: null });
-        console.log(`[${episodeId}] HLS Job: Set status to 'processing'.`);
+        console.log(`[${episodeId}] Encryption: Starting download of ${inputFilePath}`);
+        await bucket.file(inputFilePath).download({ destination: tempInputPath });
+        console.log(`[${episodeId}] Encryption: Download complete.`);
 
-        const { transcoderClient: client } = initializeTools();
-        const projectId = await client.getProjectId();
-        const location = 'us-central1';
+        // 1. Generate master key and IV
+        const masterKey = crypto.randomBytes(32); // 256 bits for AES-256
+        const iv = crypto.randomBytes(12);       // 96 bits is recommended for GCM
 
-        const outputFolder = `episodes/${episodeId}/packaged/`;
-        const outputUri = `gs://${bucket.name}/${outputFolder}`;
-
-        // 1. Generate AES key
-        const aesKey = crypto.randomBytes(16);
-        const keyFileName = 'enc.key';
-        const keyStoragePath = `episodes/${episodeId}/keys/${keyFileName}`;
-        const keyFile = bucket.file(keyStoragePath);
+        // 2. Create cipher
+        const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
         
-        // 2. Save the key to a PUBLIC location in Storage.
-        console.log(`[${episodeId}] HLS Job: Uploading PUBLIC AES-128 key to ${keyStoragePath}`);
-        await keyFile.save(aesKey, { contentType: 'application/octet-stream', predefinedAcl: 'publicRead' });
+        // 3. Encrypt using streams to handle large files
+        console.log(`[${episodeId}] Encryption: Starting file encryption.`);
+        const readStream = fs.createReadStream(tempInputPath);
+        const writeStream = fs.createWriteStream(tempOutputPath);
+        
+        await new Promise((resolve, reject) => {
+            readStream.pipe(cipher).pipe(writeStream)
+                .on('finish', resolve)
+                .on('error', reject);
+        });
+        console.log(`[${episodeId}] Encryption: File encryption finished.`);
 
-        // 3. Get the public URL of the key.
-        const keyDeliveryUri = keyFile.publicUrl();
-        console.log(`[${episodeId}] HLS Job: Using public key URI for manifest: ${keyDeliveryUri}`);
+        // 4. Get the GCM authentication tag
+        const authTag = cipher.getAuthTag();
 
+        // 5. Construct the final encrypted file: [IV][AuthTag][EncryptedData]
+        const encryptedData = fs.readFileSync(tempOutputPath);
+        const finalBuffer = Buffer.concat([iv, authTag, encryptedData]);
 
-        // 4. Configure the Transcoder job.
-        const request = {
-            parent: `projects/${projectId}/locations/${location}`,
-            job: {
-                inputUri,
-                outputUri,
-                config: {
-                    muxStreams: [
-                        {
-                            key: 'video-sd-ts',
-                            container: 'ts',
-                            elementaryStreams: ['sd-video-stream'],
-                            segmentSettings: {
-                                individualSegments: true,
-                                segmentDuration: { seconds: 4 },
-                                encryption: {
-                                    aes128: { uri: keyDeliveryUri } // Use the full public URL
-                                }
-                            },
-                        },
-                        {
-                            key: 'audio-ts',
-                            container: 'ts',
-                            elementaryStreams: ['audio-stream'],
-                            segmentSettings: {
-                                individualSegments: true,
-                                segmentDuration: { seconds: 4 },
-                                encryption: {
-                                    aes128: { uri: keyDeliveryUri } // Use the full public URL
-                                }
-                            },
-                        }
-                    ],
-                    elementaryStreams: [
-                        { key: 'sd-video-stream', videoStream: { h264: { 
-                            heightPixels: 480, 
-                            widthPixels: 854, 
-                            bitrateBps: 1000000, 
-                            frameRate: 30,
-                            gopDuration: { seconds: 2 }
-                        }}},
-                        { key: 'audio-stream', audioStream: { codec: 'aac', bitrateBps: 128000 } },
-                    ],
-                    manifests: [{ fileName: 'manifest.m3u8', type: 'HLS' as const, muxStreams: ['video-sd-ts', 'audio-ts'] }],
-                },
+        // 6. Upload the final .lsv file
+        const encryptedStoragePath = `episodes/${episodeId}/encrypted.lsv`;
+        console.log(`[${episodeId}] Encryption: Uploading encrypted file to ${encryptedStoragePath}`);
+        await bucket.file(encryptedStoragePath).save(finalBuffer, {
+            contentType: 'application/octet-stream',
+        });
+        console.log(`[${episodeId}] Encryption: Upload complete.`);
+
+        // 7. Store the master key securely in `video_keys` collection
+        const keyId = `vidkey_${episodeId}`;
+        const keyDocRef = db.collection('video_keys').doc(keyId);
+        await keyDocRef.set({
+            keyId,
+            videoId: episodeId,
+            masterKey: masterKey.toString('base64'),
+            rotation: 1,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        console.log(`[${episodeId}] Encryption: Master key saved to video_keys/${keyId}`);
+
+        // 8. Update the episode document with encryption metadata
+        await docRef.update({
+            'storage.encryptedPath': encryptedStoragePath,
+            'storage.fileSize': finalBuffer.length,
+            'encryption': {
+                algorithm: 'AES-256-GCM',
+                keyId: keyId,
+                ivLength: iv.length,
+                tagLength: authTag.length
             },
-        };
-        
-        console.log(`[${episodeId}] HLS Job: Creating Transcoder job...`);
-        
-        const [createJobResponse] = await client.createJob(request);
-        
-        if (!createJobResponse.name) {
-            throw new Error('Transcoder job creation failed, no job name returned.');
-        }
-        const jobName = createJobResponse.name;
-        console.log(`[${episodeId}] HLS Job: Transcoder job created successfully. Job name: ${jobName}`);
-
-        // 5. Poll for job completion.
-        const POLLING_INTERVAL = 15000;
-        const MAX_POLLS = 35;
-        let jobSucceeded = false;
-
-        for (let i = 0; i < MAX_POLLS; i++) {
-            await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
-            
-            const [job] = await client.getJob({ name: jobName });
-            
-            console.log(`[${episodeId}] HLS Job: Polling job status... (Attempt ${i+1}/${MAX_POLLS}). Current state: ${job.state}`);
-
-            if (job.state === 'SUCCEEDED') {
-                console.log(`[${episodeId}] HLS Job: SUCCEEDED.`);
-                
-                // 6. Make manifest and segments public
-                console.log(`[${episodeId}] HLS Job: Making output files public...`);
-                const [outputFiles] = await bucket.getFiles({ prefix: outputFolder });
-                await Promise.all(outputFiles.map(file => file.makePublic()));
-                console.log(`[${episodeId}] HLS Job: ${outputFiles.length} output files made public.`);
-                
-                // 7. On success, store paths
-                await docRef.update({
-                    packagingStatus: 'completed',
-                    manifestPath: `${outputFolder}manifest.m3u8`, // Store the path
-                    keyPath: keyStoragePath, // Store the key path
-                    packagingError: null,
-                });
-                console.log(`[${episodeId}] HLS Job: Firestore document updated to 'completed'.`);
-                jobSucceeded = true;
-                break;
-            } else if (job.state === 'FAILED') {
-                const errorMessage = `Transcoder job failed: ${JSON.stringify(job.error, null, 2)}`;
-                throw new Error(errorMessage);
-            }
-        }
-
-        if (!jobSucceeded) {
-             throw new Error(`Transcoder job timed out after ${MAX_POLLS * POLLING_INTERVAL / 1000 / 60} minutes.`);
-        }
+            'status.processing': 'completed',
+            'status.playable': true,
+            'status.error': null,
+        });
+        console.log(`[${episodeId}] Encryption: Firestore document updated to 'completed' and 'playable'.`);
 
     } catch (error: any) {
-        console.error(`[${episodeId}] HLS packaging process failed critically. Error:`, error);
+        console.error(`[${episodeId}] File encryption process failed critically. Error:`, error);
         await docRef.update({ 
-            packagingStatus: "failed", 
-            packagingError: error.message || 'An unknown error occurred during HLS packaging.' 
+            'status.processing': "failed",
+            'status.playable': false, 
+            'status.error': error.message || 'An unknown error occurred during video encryption.' 
         });
+    } finally {
+        // Clean up temporary files
+        if (fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath);
+        if (fs.existsSync(tempOutputPath)) fs.unlinkSync(tempOutputPath);
     }
 }
 
 
 // ==========================================
-// [Trigger] 메인 분석 함수 (v2 onDocumentWritten)
+// [Trigger] 메인 분석 및 암호화 함수 (v2 onDocumentWritten)
 // ==========================================
 export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", async (event) => {
     const change = event.data;
@@ -222,28 +167,33 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
     const { episodeId } = event.params;
     const docRef = change.after.ref;
     
-    console.log(`✨ [${episodeId}] New analysis job detected. Starting...`);
+    console.log(`✨ [${episodeId}] New job detected. Starting AI analysis and Encryption...`);
 
-    await docRef.update({ aiProcessingStatus: "processing" });
+    await docRef.update({ aiProcessingStatus: "processing", 'status.processing': 'processing' });
     
     const filePath = afterData.filePath;
     if (!filePath) {
       await docRef.update({ 
-          aiProcessingStatus: "failed", 
-          packagingStatus: "failed", 
+          aiProcessingStatus: "failed",
+          'status.processing': "failed",
+          'status.playable': false,
+          'status.error': "No filePath found in document.",
           aiProcessingError: "No filePath found in document.",
-          packagingError: "No filePath found in document."
       });
       return;
     }
-    const inputUriForTranscoder = `gs://${bucket.name}/${filePath}`;
     
     const aiAnalysisPromise = runAiAnalysis(episodeId, filePath, docRef);
-    const hlsPackagingPromise = createHlsPackagingJob(episodeId, inputUriForTranscoder, docRef);
+    const encryptionPromise = createEncryptedFile(episodeId, filePath, docRef);
 
     try {
-        await Promise.allSettled([aiAnalysisPromise, hlsPackagingPromise]);
-        console.log(`✅ [${episodeId}] All jobs (AI & HLS) have finished their execution.`);
+        await Promise.allSettled([aiAnalysisPromise, encryptionPromise]);
+        
+        // After both finish, delete the original raw video file
+        console.log(`[${episodeId}] Deleting original source file: ${filePath}`);
+        await deleteStorageFileByPath(storage, filePath);
+        
+        console.log(`✅ [${episodeId}] All jobs (AI & Encryption) have finished execution.`);
     } catch(error: any) {
         console.error(`❌ [${episodeId}] A critical unexpected error occurred in Promise.all. This should not happen.`, error);
     }
@@ -295,7 +245,7 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
 
       const output = JSON.parse(result.response.text());
 
-      let vttPath = null;
+      let subtitlePath = null;
       if (output.timeline && Array.isArray(output.timeline)) {
         const vttContent = `WEBVTT\n\n${output.timeline
           .map((item: any) => `${item.startTime} --> ${item.endTime}\n${item.subtitle}`)
@@ -304,11 +254,11 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
         const vttTempPath = path.join(os.tmpdir(), `${episodeId}.vtt`);
         fs.writeFileSync(vttTempPath, vttContent);
         
-        vttPath = `episodes/${episodeId}/subtitles/${episodeId}.vtt`;
+        subtitlePath = `episodes/${episodeId}/subtitles/subtitle.vtt`;
         
         await bucket.upload(vttTempPath, {
-          destination: vttPath,
-          metadata: { contentType: 'text/vtt' },
+          destination: subtitlePath,
+          metadata: { contentType: 'text/vtt', predefinedAcl: 'publicRead' },
         });
 
         if (fs.existsSync(vttTempPath)) fs.unlinkSync(vttTempPath);
@@ -316,38 +266,16 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
       }
 
       const analysisJsonString = JSON.stringify(output);
-      const afterData = (await docRef.get()).data() as EpisodeData;
-      const courseDoc = await db.collection('courses').doc(afterData.courseId).get();
-      if (!courseDoc.exists) throw new Error(`Course not found for episode ${episodeId}`);
-      const classificationDoc = await db.collection('classifications').doc(courseDoc.data()!.classificationId).get();
-      if (!classificationDoc.exists) throw new Error(`Classification not found for course ${courseDoc.id}`);
-      const fieldId = classificationDoc.data()!.fieldId;
       
-      const aiChunkData = {
-          episodeId,
-          courseId: afterData.courseId,
-          classificationId: courseDoc.data()!.classificationId,
-          fieldId,
-          content: analysisJsonString,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      };
-
-      const batch = db.batch();
-      
-      batch.update(docRef, {
+      await docRef.update({
         aiProcessingStatus: "completed",
         aiModel: modelName,
         transcript: output.transcript || "",
         aiGeneratedContent: analysisJsonString,
-        vttPath: vttPath,
+        subtitlePath: subtitlePath,
         aiProcessingError: null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-
-      const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
-      batch.set(aiChunkRef, aiChunkData);
-
-      await batch.commit();
 
       console.log(`[${episodeId}] AI analysis succeeded!`);
 
@@ -359,7 +287,7 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
         aiProcessingError: error.message || String(error)
       });
     } finally {
-      if (fs.existsSync(tempFilePath)) { try { fs.unlinkSync(tempFilePath); } catch (e) {} }
+      if (fs.existsSync(tempFilePath) && !filePath.startsWith('/tmp/')) { try { fs.unlinkSync(tempFilePath); } catch (e) {} }
       if (uploadedFile) { try { await localFileManager.deleteFile(uploadedFile.name); } catch (e) {} }
     }
 }
@@ -376,29 +304,29 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
     // 1. Delete all files in the episode's main storage folder
     const prefix = `episodes/${episodeId}/`;
     try {
-        console.log(`[DELETE ACTION] Deleting all files with prefix: ${prefix}`);
+        console.log(`[DELETE ACTION] Deleting all storage files with prefix: ${prefix}`);
         await bucket.deleteFiles({ prefix });
         console.log(`[DELETE SUCCESS] All storage files with prefix "${prefix}" deleted.`);
     } catch (error) {
         console.error(`[DELETE FAILED] Could not delete storage files for episode ${episodeId}.`, error);
     }
     
-    // 2. Delete the corresponding document from the AI chunks collection
+    // 2. Delete the encryption key from `video_keys`
     try {
-        const aiChunkRef = db.collection('episode_ai_chunks').doc(episodeId);
-        await aiChunkRef.delete();
-        console.log(`[DELETE SUCCESS] AI chunk for episode ${episodeId} deleted.`);
+        const keyId = deletedData?.encryption?.keyId || `vidkey_${episodeId}`;
+        const keyRef = db.collection('video_keys').doc(keyId);
+        await keyRef.delete();
+        console.log(`[DELETE SUCCESS] Encryption key ${keyId} deleted.`);
     } catch (error) {
-        console.error(`[DELETE FAILED] Could not delete AI chunk for episode ${episodeId}.`, error);
+        console.error(`[DELETE FAILED] Could not delete encryption key for episode ${episodeId}.`, error);
     }
 
     // 3. (Optional but good practice) Explicitly delete specific files if paths were stored
     if (deletedData) {
         console.log(`[ADDITIONAL CLEANUP] Using data from deleted doc for explicit cleanup.`);
-        await deleteStorageFileByPath(storage, deletedData.filePath);
+        await deleteStorageFileByPath(storage, deletedData.filePath); // original file if not already deleted
         await deleteStorageFileByPath(storage, deletedData.defaultThumbnailPath);
         await deleteStorageFileByPath(storage, deletedData.customThumbnailPath);
-        await deleteStorageFileByPath(storage, deletedData.vttPath);
     }
     
     console.log(`[DELETE FINISHED] Cleanup process finished for episode ${episodeId}.`);
@@ -406,7 +334,7 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
 
 const deleteStorageFileByPath = async (storage: admin.storage.Storage, filePath: string | undefined) => {
     if (!filePath) {
-        console.warn(`[SKIP DELETE] No file path provided.`);
+        // console.warn(`[SKIP DELETE] No file path provided.`);
         return;
     }
     try {
@@ -417,12 +345,11 @@ const deleteStorageFileByPath = async (storage: admin.storage.Storage, filePath:
             await file.delete();
             console.log(`[DELETE SUCCESS] File deleted: ${filePath}`);
         } else {
-            console.log(`[SKIP DELETE] File does not exist, skipping deletion: ${filePath}`);
+            // console.log(`[SKIP DELETE] File does not exist, skipping deletion: ${filePath}`);
         }
     } catch (error: any) {
-        // Suppress "Not Found" errors during cleanup, as they are not critical.
         if (error.code === 404) {
-             console.log(`[SKIP DELETE] File not found during cleanup, which is acceptable: ${filePath}`);
+             // console.log(`[SKIP DELETE] File not found during cleanup, which is acceptable: ${filePath}`);
              return;
         }
         console.error(`[DELETE FAILED] Could not delete storage file at path ${filePath}. Error: ${error.message}`);
@@ -433,11 +360,8 @@ interface EpisodeData {
   filePath?: string;
   courseId: string;
   aiProcessingStatus?: string;
-  packagingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
-  packagingError?: string | null;
   defaultThumbnailPath?: string;
   customThumbnailPath?: string;
-  vttPath?: string;
+  encryption?: { keyId?: string };
   [key: string]: any;
 }
-    

@@ -7,7 +7,7 @@ config();
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
-import type { Episode, Timestamp } from '@/lib/types';
+import type { Episode, Timestamp, EncryptionInfo } from '@/lib/types';
 import { Storage } from 'firebase-admin/storage';
 import { extractPathFromUrl } from '@/lib/utils';
 
@@ -102,6 +102,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
         
         const episodeRef = db.collection('episodes').doc(episodeId);
         
+        // Define the initial structure based on the new architecture
         const newEpisode: Omit<Episode, 'id'> = {
             courseId: selectedCourseId,
             instructorId: instructorId || '',
@@ -109,9 +110,6 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             description: description || '',
             duration: duration,
             isFree: isFree || false,
-            videoUrl: videoUrl,
-            filePath: filePath,
-            fileSize: fileSize,
             orderIndex: newOrderIndex,
             thumbnailUrl: customThumbnailUrl || defaultThumbnailUrl, // Use custom if available
             defaultThumbnailUrl: defaultThumbnailUrl,
@@ -119,8 +117,20 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             customThumbnailUrl: customThumbnailUrl || '',
             customThumbnailPath: customThumbnailPath || '',
             createdAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
-            aiProcessingStatus: 'pending', // Set initial status to 'pending'
-            packagingStatus: 'pending', // Also set packaging status
+            
+            // New fields for encryption and status
+            filePath: filePath, // Store original path temporarily
+            storage: {
+                encryptedPath: '', // Will be filled by the cloud function
+                fileSize: 0,
+            },
+            encryption: {} as EncryptionInfo, // Will be filled by the cloud function
+            status: {
+                processing: 'pending',
+                playable: false,
+                error: null,
+            },
+            aiProcessingStatus: 'pending',
             aiProcessingError: null,
             aiGeneratedContent: null,
             transcript: null,
@@ -128,10 +138,10 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
 
         await episodeRef.set(newEpisode);
 
-        // Firestore Trigger in Cloud Functions will now handle the AI processing automatically.
+        // Firestore Trigger in Cloud Functions will now handle the encryption and AI processing.
         
         revalidatePath('/admin/content', 'layout');
-        return { success: true, message: `에피소드 '${title}'의 정보가 성공적으로 저장되었으며, AI 분석이 백그라운드에서 자동으로 시작됩니다.` };
+        return { success: true, message: `에피소드 '${title}'의 정보가 성공적으로 저장되었으며, 암호화 및 AI 분석이 백그라운드에서 자동으로 시작됩니다.` };
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : '알 수 없는 서버 오류가 발생했습니다.';
@@ -166,17 +176,20 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         }
         const currentData = currentDoc.data() as Episode;
         
-        let shouldResetAIState = false;
+        let shouldResetProcessingState = false;
 
         // --- File Deletion Logic ---
-        const oldFilePath = extractPathFromUrl(oldVideoUrl);
+        const oldFilePath = currentData.filePath; // The original uploaded file path
         if (newVideoData?.filePath && oldFilePath && newVideoData.filePath !== oldFilePath) {
           await deleteStorageFileByPath(storage, oldFilePath);
-          // Also delete old VTT file if a new video is uploaded
-          if (currentData.vttPath) {
-            await deleteStorageFileByPath(storage, currentData.vttPath);
+          // Also delete old encrypted file and vtt
+          if (currentData.storage?.encryptedPath) {
+            await deleteStorageFileByPath(storage, currentData.storage.encryptedPath);
           }
-          shouldResetAIState = true;
+           if (currentData.subtitlePath) {
+            await deleteStorageFileByPath(storage, currentData.subtitlePath);
+          }
+          shouldResetProcessingState = true;
         }
         
         const oldDefaultThumbnailPath = extractPathFromUrl(oldDefaultThumbnailUrl);
@@ -185,11 +198,9 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         }
 
         const oldCustomThumbnailPath = extractPathFromUrl(oldCustomThumbnailUrl);
-        // Handle deletion of custom thumbnail
         if (newCustomThumbnailData?.filePath === null && oldCustomThumbnailPath) {
             await deleteStorageFileByPath(storage, oldCustomThumbnailPath);
         } 
-        // Handle replacement of custom thumbnail
         else if (newCustomThumbnailData?.filePath && oldCustomThumbnailPath && newCustomThumbnailData.filePath !== oldCustomThumbnailPath) {
            await deleteStorageFileByPath(storage, oldCustomThumbnailPath);
         }
@@ -200,24 +211,25 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             description,
             isFree,
             courseId,
-            instructorId: instructorId,
-            duration: duration,
+            instructorId,
+            duration,
         };
 
         if (newVideoData) {
-            dataToUpdate.videoUrl = newVideoData.downloadUrl;
             dataToUpdate.filePath = newVideoData.filePath;
-            dataToUpdate.fileSize = newVideoData.fileSize;
+            // The downloadURL of the original video is not stored anymore.
         }
 
-        if (shouldResetAIState) {
-            // When a new video is uploaded, clear the old transcript and VTT info and set status to pending
+        if (shouldResetProcessingState) {
             dataToUpdate.transcript = null;
             dataToUpdate.aiGeneratedContent = null;
-            dataToUpdate.vttUrl = admin.firestore.FieldValue.delete();
-            dataToUpdate.vttPath = admin.firestore.FieldValue.delete();
+            dataToUpdate.subtitlePath = admin.firestore.FieldValue.delete();
             dataToUpdate.aiProcessingStatus = 'pending';
-            dataToUpdate.packagingStatus = 'pending'; // Also reset packaging status
+            dataToUpdate.status = { // Reset status object completely
+                processing: 'pending',
+                playable: false,
+                error: null
+            };
             dataToUpdate.aiProcessingError = null;
         }
 
@@ -231,7 +243,6 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             dataToUpdate.customThumbnailPath = newCustomThumbnailData.filePath ?? '';
         }
 
-        // Recalculate the final thumbnailUrl based on all updates
         const finalCustomUrl = newCustomThumbnailData ? newCustomThumbnailData.downloadUrl : currentData?.customThumbnailUrl;
         const finalDefaultUrl = newDefaultThumbnailData ? newDefaultThumbnailData.downloadUrl : currentData?.defaultThumbnailUrl;
         dataToUpdate.thumbnailUrl = finalCustomUrl || finalDefaultUrl || '';

@@ -7,6 +7,7 @@ import * as admin from 'firebase-admin';
 import { toJSDate } from '@/lib/date-helpers';
 import * as crypto from 'crypto';
 import type { VideoKey, User } from '@/lib/types';
+import { add } from 'date-fns';
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Bad Request: videoId and deviceId are required' }, { status: 400 });
     }
 
-    // 3. Verify User Subscription
+    // 3. Verify User Subscription and Download Rights
     const userDoc = await db.collection('users').doc(userId).get();
     if (!userDoc.exists) {
       return NextResponse.json({ error: 'Forbidden: User not found' }, { status: 403 });
@@ -48,16 +49,15 @@ export async function POST(req: NextRequest) {
     }
     const episodeData = episodeDoc.data();
     
-    // Check if the user has an active subscription for the course this episode belongs to
     const courseId = episodeData?.courseId;
     const subscription = userData.activeSubscriptions?.[courseId];
     const isSubscribed = subscription && new Date() < toJSDate(subscription.expiresAt)!;
 
     if (!isSubscribed && !episodeData?.isFree) {
-       return NextResponse.json({ error: 'Forbidden: Subscription required' }, { status: 403 });
+       return NextResponse.json({ error: 'Forbidden: Subscription required for download' }, { status: 403 });
     }
 
-    // 4. Retrieve Master Key from secure collection
+    // 4. Retrieve Master Key
     const keyId = episodeData?.encryption?.keyId;
     if (!keyId) {
         return NextResponse.json({ error: 'Not Found: Encryption info missing for this video' }, { status: 404 });
@@ -69,23 +69,26 @@ export async function POST(req: NextRequest) {
     const videoKeyData = keyDoc.data() as VideoKey;
     const masterKey = Buffer.from(videoKeyData.masterKey, 'base64');
 
-    // 5. Generate a Derived Key for online session
-    const derivationInput = `${userId}|${deviceId}`;
-    const derivedKey = crypto.createHmac('sha256', masterKey).update(derivationInput).digest();
+    // 5. Generate Offline Derived Key
+    const expiresAt = add(new Date(), { days: 7 });
+    const derivationInput = `${userId}|${deviceId}|${videoId}|${expiresAt.toISOString()}`;
+    const offlineDerivedKey = crypto.createHmac('sha256', masterKey).update(derivationInput).digest();
     
+    // 6. Generate Watermark Seed
     const watermarkSeed = crypto.createHash('sha256').update(userId).digest('hex');
 
-    // 6. Return Session Info
+    // 7. Return Offline License
     return NextResponse.json({
-      sessionId: `online_sess_${crypto.randomBytes(12).toString('hex')}`,
-      derivedKey: derivedKey.toString('base64'),
-      expiresIn: 60, // Key is valid for 60 seconds for this online session
+      offlineDerivedKey: offlineDerivedKey.toString('base64'),
+      expiresAt: expiresAt.toISOString(),
+      videoId: videoId,
+      deviceId: deviceId,
       watermarkSeed: watermarkSeed,
     });
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
-    console.error('[play-session API Error]', error);
+    console.error('[offline-license API Error]', error);
     return NextResponse.json({ error: `Internal Server Error: ${errorMessage}` }, { status: 500 });
   }
 }
