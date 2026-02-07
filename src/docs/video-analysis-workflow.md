@@ -3,7 +3,7 @@
 **목표:** 비디오가 등록되는 순간, Firebase Cloud Functions와 Genkit을 사용하여 백그라운드에서 자동으로 AI 분석을 수행하고, 사용자는 분석된 데이터를 기반으로 AI와 대화하는 서버리스 파이프라인.
 
 **기술 스택:**
-- **AI 모델:** Google Gemini 2.5 Pro
+- **AI 모델:** Google Gemini 3 Flash Preview
 - **AI 프레임워크:** Genkit
 - **실행 환경:** Firebase Cloud Functions (v1)
 - **트리거:** Firestore `onWrite`
@@ -28,7 +28,7 @@
 
 ### Step 3: Genkit을 이용한 AI 분석 (백엔드 - Cloud Function 내부)
 1.  **공개 URL 가져오기:** 함수는 에피소드 문서에 저장된 `videoUrl` (공개 URL)을 확보합니다. 만약 URL이 없다면, Storage 파일 경로(`filePath`)를 이용해 직접 공개 URL을 생성합니다.
-2.  **구조화된 데이터 요청:** Genkit의 `ai.generate()` 함수를 호출하여 **`gemini-2.5-pro`** 모델에 비디오 분석을 요청합니다. 이때, 미리 정의된 Zod 스키마(`AnalysisOutputSchema`)를 함께 전달하여 AI가 다음과 같은 **구조화된 JSON 데이터**를 반환하도록 합니다.
+2.  **구조화된 데이터 요청:** Genkit의 `ai.generate()` 함수를 호출하여 **`gemini-3-flash-preview`** 모델에 비디오 분석을 요청합니다. 이때, 미리 정의된 Zod 스키마(`AnalysisOutputSchema`)를 함께 전달하여 AI가 다음과 같은 **구조화된 JSON 데이터**를 반환하도록 합니다.
     *   `transcript`: 영상의 전체 음성 대본
     *   `summary`: 영상 콘텐츠에 대한 간결한 요약
     *   `timeline`: 시간대별 주요 이벤트 및 시각적 상세 설명
@@ -53,8 +53,10 @@
 ### Step 2: 컨텍스트 기반 답변 생성 (백엔드 - Genkit 플로우)
 1.  **분석 데이터 조회:** `askVideoTutor` 플로우는 전달받은 `episodeId`를 사용하여 Firestore에서 해당 에피소드의 **`aiGeneratedContent` 필드 값(Part 1에서 저장한 분석 데이터)**을 가져옵니다.
 2.  **답변 범위:** AI 튜터는 **오직 이 `aiGeneratedContent` 데이터 안에서만** 답변의 근거를 찾습니다. 외부 인터넷 검색이나 다른 지식을 사용하지 않으므로, 영상 내용과 직접적으로 관련된 정확한 정보만 제공할 수 있습니다.
-3.  **답변 생성:** 조회한 분석 데이터와 사용자 질문을 **`gemini-2.5-pro`** 모델에 함께 전달하여, 컨텍스트에 기반한 자연스러운 한국어 답변을 생성합니다.
+3.  **답변 생성:** 조회한 분석 데이터와 사용자 질문을 **`gemini-3-flash-preview`** 모델에 함께 전달하여, 컨텍스트에 기반한 자연스러운 한국어 답변을 생성합니다.
 
 ### Step 3: 응답 및 기록 저장 (백엔드 → 클라이언트)
 1.  **답변 표시:** 생성된 답변은 사용자 화면의 채팅창에 즉시 나타납니다.
 2.  **채팅 기록 저장:** 질문과 답변 내용은 사용자의 개인 채팅 기록 컬렉션(`users/{userId}/chats/{chatId}`)에 저장됩니다. 이를 통해 사용자는 나중에 '기록 보기' 기능으로 과거 대화 내역을 다시 확인할 수 있습니다.
+
+    

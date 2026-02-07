@@ -202,7 +202,7 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
 });
 
 async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.firestore.DocumentReference) {
-    const modelName = "gemini-2.5-flash";
+    const modelName = "gemini-3-flash-preview";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
@@ -244,8 +244,16 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
         { text: prompt }
       ]);
-
-      const output = JSON.parse(result.response.text());
+      
+      const rawText = result.response.text();
+      let output;
+      try {
+          output = JSON.parse(rawText);
+      } catch (jsonError: any) {
+          console.error(`[${episodeId}] AI analysis failed: JSON parsing error.`);
+          // Throw a more informative error
+          throw new Error(`JSON parsing failed: ${jsonError.message}. Raw AI output: ${rawText.substring(0, 500)}...`);
+      }
       
       // NEW: Separate transcript from the main content
       const transcriptContent = output.transcript || "";

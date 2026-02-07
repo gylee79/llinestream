@@ -120,6 +120,7 @@ async function createEncryptedFile(episodeId, inputFilePath, docRef) {
         console.log(`[${episodeId}] Encryption: Uploading encrypted file to ${encryptedStoragePath}`);
         await bucket.file(encryptedStoragePath).save(finalBuffer, {
             contentType: 'application/octet-stream',
+            predefinedAcl: 'publicRead', // Make the encrypted file publicly readable
         });
         console.log(`[${episodeId}] Encryption: Upload complete.`);
         // 7. Store the master key securely in `video_keys` collection
@@ -245,6 +246,12 @@ async function runAiAnalysis(episodeId, filePath, docRef) {
             { text: prompt }
         ]);
         const output = JSON.parse(result.response.text());
+        // NEW: Separate transcript from the main content
+        const transcriptContent = output.transcript || "";
+        delete output.transcript; // Remove large transcript from the object to be stored in Firestore
+        const transcriptPath = `episodes/${episodeId}/ai/transcript.txt`;
+        await bucket.file(transcriptPath).save(transcriptContent, { contentType: 'text/plain' });
+        console.log(`[${episodeId}] Transcript saved to Storage: ${transcriptPath}`);
         let subtitlePath = null;
         if (output.timeline && Array.isArray(output.timeline)) {
             const vttContent = `WEBVTT\n\n${output.timeline
@@ -265,9 +272,9 @@ async function runAiAnalysis(episodeId, filePath, docRef) {
         await docRef.update({
             aiProcessingStatus: "completed",
             aiModel: modelName,
-            transcript: output.transcript || "",
             aiGeneratedContent: analysisJsonString,
             subtitlePath: subtitlePath,
+            transcriptPath: transcriptPath, // Store path to transcript file
             aiProcessingError: null,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
