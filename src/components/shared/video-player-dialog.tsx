@@ -10,14 +10,13 @@ import { Textarea } from '../ui/textarea';
 import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark as BookmarkIcon, Trash2, Download, AlertTriangle } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
-import { cn, getPublicUrl, formatDuration } from '@/lib/utils';
+import { cn, formatDuration } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp, doc } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import Image from 'next/image';
-import { firebaseConfig } from '@/firebase/config';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '../ui/card';
 import Link from 'next/link';
@@ -324,61 +323,54 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         if (!videoRef.current || !authUser || !mediaSource) return;
 
         try {
-            // 1. Get Derived Key from our secure API with timeout
             const token = await authUser.getIdToken();
+            
+            // 1. Get Derived Key for decryption
             const sessionPromise = fetch('/api/play-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ videoId: episode.id, deviceId: 'web-online' }),
             });
-            
-            const sessionRes = await Promise.race([
-                sessionPromise,
-                new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('세션 정보를 가져오는 데 시간이 너무 오래 걸립니다.')), 15000))
-            ]);
-
+             const sessionRes = await Promise.race([ sessionPromise, new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('세션 정보를 가져오는 데 시간이 너무 오래 걸립니다.')), 15000)) ]);
             if (!sessionRes.ok) {
                 const errorData = await sessionRes.json();
                 throw new Error(errorData.error || '플레이 세션을 시작하지 못했습니다.');
             }
             const { derivedKey: derivedKeyB64 } = await sessionRes.json();
-
-            // 2. Fetch encrypted video file with timeout
-            const videoUrl = getPublicUrl(firebaseConfig.storageBucket, episode.storage.encryptedPath);
-            const encryptedPromise = fetch(videoUrl);
-
-            const encryptedRes = await Promise.race([
-                encryptedPromise,
-                new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('비디오 파일을 가져오는 데 시간이 너무 오래 걸립니다.')), 30000)) // 30s timeout
-            ]);
             
+            // 2. Get Signed URL for the private video file
+            const urlRes = await fetch('/api/video-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ videoId: episode.id }),
+            });
+            if (!urlRes.ok) {
+                const errorData = await urlRes.json();
+                throw new Error(errorData.error || '비디오 주소를 가져오지 못했습니다.');
+            }
+            const { signedUrl } = await urlRes.json();
+
+            // 3. Fetch encrypted video file using the Signed URL
+            const encryptedPromise = fetch(signedUrl);
+            const encryptedRes = await Promise.race([ encryptedPromise, new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('비디오 파일을 가져오는 데 시간이 너무 오래 걸립니다.')), 30000))]);
             if (!encryptedRes.ok) {
               throw new Error(`암호화된 비디오 파일을 가져오는데 실패했습니다 (상태: ${encryptedRes.status}).`);
             }
-
             const encryptedBuffer = await encryptedRes.arrayBuffer();
 
-            // 3. Prepare for decryption
+            // 4. Prepare for decryption
             const ivLength = episode.encryption.ivLength;
             const tagLength = episode.encryption.tagLength;
-            
             const iv = encryptedBuffer.slice(0, ivLength);
             const authTag = encryptedBuffer.slice(ivLength, ivLength + tagLength);
             const encryptedData = encryptedBuffer.slice(ivLength + tagLength);
-            
             const keyBuffer = Buffer.from(derivedKeyB64, 'base64');
-            const cryptoKey = await window.crypto.subtle.importKey(
-                'raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']
-            );
+            const cryptoKey = await window.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
 
-            // 4. Decrypt in memory
-            const decryptedData = await window.crypto.subtle.decrypt(
-                { name: 'AES-GCM', iv, tagLength: tagLength * 8 },
-                cryptoKey,
-                encryptedData
-            );
+            // 5. Decrypt in memory
+            const decryptedData = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv, tagLength: tagLength * 8 }, cryptoKey, encryptedData);
 
-            // 5. Append to MediaSource
+            // 6. Append to MediaSource
             sourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.42E01E, mp4a.40.2"');
             sourceBuffer.addEventListener('updateend', () => {
                 if (mediaSource?.readyState === 'open' && !sourceBuffer?.updating) {

@@ -23,6 +23,7 @@ setGlobalOptions({
   secrets: ["GOOGLE_GENAI_API_KEY"],
   timeoutSeconds: 540,
   memory: "2GiB",
+  minInstances: 1,
   serviceAccount: "firebase-adminsdk-fbsvc@studio-6929130257-b96ff.iam.gserviceaccount.com",
 });
 
@@ -95,12 +96,11 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
         const encryptedData = fs.readFileSync(tempOutputPath);
         const finalBuffer = Buffer.concat([iv, authTag, encryptedData]);
 
-        // 6. Upload the final .lsv file
+        // 6. Upload the final .lsv file (now private)
         const encryptedStoragePath = `episodes/${episodeId}/encrypted.lsv`;
         console.log(`[${episodeId}] Encryption: Uploading encrypted file to ${encryptedStoragePath}`);
         await bucket.file(encryptedStoragePath).save(finalBuffer, {
             contentType: 'application/octet-stream',
-            predefinedAcl: 'publicRead', // Make the encrypted file publicly readable
         });
         console.log(`[${episodeId}] Encryption: Upload complete.`);
 
@@ -248,10 +248,12 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
       const rawText = result.response.text();
       let output;
       try {
+          // Attempt to find and parse JSON within markdown-style code blocks.
           const jsonMatch = rawText.match(/```(json)?\n([\s\S]*?)\n```/);
           if (jsonMatch && jsonMatch[2]) {
               output = JSON.parse(jsonMatch[2]);
           } else {
+              // Fallback to parsing the whole string if no code block is found.
               output = JSON.parse(rawText);
           }
       } catch (jsonError: any) {
@@ -264,7 +266,7 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
       delete output.transcript; // Remove large transcript from the object to be stored in Firestore
 
       const transcriptPath = `episodes/${episodeId}/ai/transcript.txt`;
-      await bucket.file(transcriptPath).save(transcriptContent, { contentType: 'text/plain', predefinedAcl: 'publicRead' });
+      await bucket.file(transcriptPath).save(transcriptContent, { contentType: 'text/plain' });
       console.log(`[${episodeId}] Transcript saved to Storage: ${transcriptPath}`);
 
 
@@ -281,7 +283,7 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
         
         await bucket.upload(vttTempPath, {
           destination: subtitlePath,
-          metadata: { contentType: 'text/vtt', predefinedAcl: 'publicRead' },
+          metadata: { contentType: 'text/vtt' },
         });
 
         if (fs.existsSync(vttTempPath)) fs.unlinkSync(vttTempPath);
