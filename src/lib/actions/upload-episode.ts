@@ -131,7 +131,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             aiProcessingStatus: 'pending',
             aiProcessingError: null,
             aiGeneratedContent: null,
-            transcript: null,
+            transcriptPath: '',
         };
 
         await episodeRef.set(newEpisode);
@@ -218,7 +218,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         }
 
         if (shouldResetProcessingState) {
-            dataToUpdate.transcript = null;
+            dataToUpdate.transcriptPath = '';
             dataToUpdate.aiGeneratedContent = null;
             dataToUpdate.subtitlePath = admin.firestore.FieldValue.delete();
             dataToUpdate.aiProcessingStatus = 'pending';
@@ -255,5 +255,3 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         return { success: false, message: `에피소드 업데이트 실패: ${errorMessage}` };
     }
 }
-
-    
