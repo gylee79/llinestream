@@ -343,9 +343,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             const encryptedRes = await fetch(videoUrl);
             
             if (!encryptedRes.ok) {
-              if (encryptedRes.status === 403) {
-                  throw new Error('비디오 파일 접근 권한이 없습니다. 파일이 공개 상태인지 확인해주세요.');
-              }
               throw new Error(`암호화된 비디오 파일을 가져오는데 실패했습니다 (상태: ${encryptedRes.status}).`);
             }
 
