@@ -56,11 +56,32 @@ interface VideoPlayerDialogProps {
 // ========= SUB-COMPONENTS =========
 
 const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSeconds: number) => void; }) => {
-    if (!episode.aiGeneratedContent) {
+    // New, more detailed status handling
+    if (episode.aiProcessingStatus === 'failed') {
         return (
             <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
-                <FileText className="h-12 w-12 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mt-2 break-keep">AI 분석 중입니다...</p>
+                <AlertTriangle className="h-12 w-12 text-destructive" />
+                <p className="font-semibold mt-4">AI 분석 실패</p>
+                <p className="text-sm text-muted-foreground mt-2 break-keep">
+                    강의 요약 및 타임라인을 생성하지 못했습니다.
+                </p>
+                {episode.aiProcessingError && (
+                    <p className="text-xs text-muted-foreground mt-2 break-keep max-w-sm p-2 bg-destructive/10 rounded-md">
+                        오류 원인: {episode.aiProcessingError}
+                    </p>
+                )}
+                 <p className="text-xs text-muted-foreground mt-4 break-keep">
+                    관리자 페이지에서 재분석을 시도할 수 있습니다.
+                </p>
+            </div>
+        );
+    }
+    
+    if (episode.aiProcessingStatus !== 'completed' || !episode.aiGeneratedContent) {
+        return (
+            <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
+                <Loader className="h-12 w-12 text-muted-foreground animate-spin" />
+                <p className="text-sm text-muted-foreground mt-4 break-keep">AI가 강의 내용을 분석하고 있습니다.<br/>잠시 후 다시 시도해주세요.</p>
             </div>
         );
     }
@@ -109,7 +130,7 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
             </div>
         )
     } catch(e) {
-        return <div className="p-5 text-sm text-muted-foreground">콘텐츠 파싱 오류</div>;
+        return <div className="p-5 text-sm text-muted-foreground">콘텐츠 파싱 오류: AI가 생성한 데이터 형식이 올바르지 않습니다.</div>;
     }
 };
 
