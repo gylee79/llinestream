@@ -80,7 +80,7 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
         const readStream = fs.createReadStream(tempInputPath);
         const writeStream = fs.createWriteStream(tempOutputPath);
         
-        await new Promise((resolve, reject) => {
+        await new Promise<void>((resolve, reject) => {
             readStream.pipe(cipher).pipe(writeStream)
                 .on('finish', () => resolve())
                 .on('error', reject);
