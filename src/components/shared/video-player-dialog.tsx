@@ -308,7 +308,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             const sessionRes = await fetch('/api/play-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ videoId: episode.id }),
+                body: JSON.stringify({ videoId: episode.id, deviceId: 'web-online' }),
             });
 
             if (!sessionRes.ok) {
@@ -320,6 +320,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             // 2. Fetch encrypted video file
             const videoUrl = getPublicUrl(firebaseConfig.storageBucket, episode.storage.encryptedPath);
             const encryptedRes = await fetch(videoUrl);
+            
+            if (!encryptedRes.ok) {
+              if (encryptedRes.status === 403) {
+                  throw new Error('비디오 파일 접근 권한이 없습니다. 파일이 공개 상태인지 확인해주세요.');
+              }
+              throw new Error(`암호화된 비디오 파일을 가져오는데 실패했습니다 (상태: ${encryptedRes.status}).`);
+            }
+
             const encryptedBuffer = await encryptedRes.arrayBuffer();
 
             // 3. Prepare for decryption
@@ -327,8 +335,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             const tagLength = episode.encryption.tagLength;
             
             const iv = encryptedBuffer.slice(0, ivLength);
-            const authTag = encryptedBuffer.slice(encryptedBuffer.byteLength - tagLength);
-            const encryptedData = encryptedBuffer.slice(ivLength, encryptedBuffer.byteLength - tagLength);
+            const authTag = encryptedBuffer.slice(ivLength, ivLength + tagLength);
+            const encryptedData = encryptedBuffer.slice(ivLength + tagLength);
             
             const keyBuffer = Buffer.from(derivedKeyB64, 'base64');
             const cryptoKey = await window.crypto.subtle.importKey(
@@ -337,17 +345,16 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             // 4. Decrypt in memory
             const decryptedData = await window.crypto.subtle.decrypt(
-                { name: 'AES-GCM', iv, additionalData: undefined, tagLength: tagLength * 8 },
+                { name: 'AES-GCM', iv, tagLength: tagLength * 8 },
                 cryptoKey,
                 encryptedData
             );
 
             // 5. Append to MediaSource
-            // This MIME type might need adjustment based on original video encoding
             sourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.42E01E, mp4a.40.2"');
             sourceBuffer.addEventListener('updateend', () => {
                 if (mediaSource?.readyState === 'open' && !sourceBuffer?.updating) {
-                    mediaSource.endOfStream();
+                    try { mediaSource.endOfStream(); } catch(e) {}
                 }
             });
             sourceBuffer.appendBuffer(decryptedData);
@@ -439,5 +446,3 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
-
-    

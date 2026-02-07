@@ -100,6 +100,7 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
         console.log(`[${episodeId}] Encryption: Uploading encrypted file to ${encryptedStoragePath}`);
         await bucket.file(encryptedStoragePath).save(finalBuffer, {
             contentType: 'application/octet-stream',
+            predefinedAcl: 'publicRead', // Make the encrypted file publicly readable
         });
         console.log(`[${episodeId}] Encryption: Upload complete.`);
 
