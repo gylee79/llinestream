@@ -60,13 +60,6 @@
       ]
     },
     {
-      "collectionId": "subscriptions",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "purchasedAt", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionId": "bookmarks",
       "queryScope": "COLLECTION",
       "fields": [
