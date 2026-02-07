@@ -132,7 +132,7 @@ const AIStatusIndicator = ({ episode }: {
 };
 
 const KeyStatusIndicator = ({ episode }: { episode: Episode }) => {
-    if (episode.packagingStatus === 'failed') {
+    if (episode.status?.processing === 'failed') {
         return (
              <Tooltip>
                 <TooltipTrigger>
@@ -143,7 +143,7 @@ const KeyStatusIndicator = ({ episode }: { episode: Episode }) => {
         )
     }
     
-    if (episode.packagingStatus === 'completed' && episode.keyPath) {
+    if (episode.status?.processing === 'completed' && episode.encryption?.keyId) {
         return (
             <Tooltip>
                 <TooltipTrigger>
@@ -154,7 +154,7 @@ const KeyStatusIndicator = ({ episode }: { episode: Episode }) => {
         );
     }
 
-    if (episode.packagingStatus === 'processing' || episode.packagingStatus === 'pending' || episode.aiProcessingStatus === 'processing' || episode.aiProcessingStatus === 'pending') {
+    if (episode.status?.processing === 'processing' || episode.status?.processing === 'pending' || episode.aiProcessingStatus === 'processing' || episode.aiProcessingStatus === 'pending') {
         return (
             <Tooltip>
                 <TooltipTrigger>
@@ -536,5 +536,7 @@ useEffect(() => {
     </>
   );
 }
+
+    
 
     

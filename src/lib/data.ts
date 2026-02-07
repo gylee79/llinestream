@@ -56,45 +56,45 @@ export const courses: (Omit<Course, 'id' | 'classificationId'> & { prices: { day
 
 export const episodes: (Omit<Episode, 'id'| 'courseId' | 'createdAt'> & { createdAt: Date })[] = [
   // React 마스터 클래스 (course-001)
-  { title: '1. React 소개 및 환경 설정', instructorId: 'instructor-placeholder', duration: 980, isFree: true, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-001/600/400', createdAt: new Date() },
-  { title: '2. JSX와 컴포넌트의 이해', instructorId: 'instructor-placeholder', duration: 1230, isFree: false, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-002/600/400', createdAt: new Date() },
-  { title: '3. State와 Lifecycle', instructorId: 'instructor-placeholder', duration: 1500, isFree: false, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-003/600/400', createdAt: new Date() },
-  { title: '4. Hooks 완전 정복', instructorId: 'instructor-placeholder', duration: 1850, isFree: false, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-004/600/400', createdAt: new Date() },
+  { title: '1. React 소개 및 환경 설정', instructorId: 'instructor-placeholder', duration: 980, isFree: true, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-001/600/400', createdAt: new Date() },
+  { title: '2. JSX와 컴포넌트의 이해', instructorId: 'instructor-placeholder', duration: 1230, isFree: false, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-002/600/400', createdAt: new Date() },
+  { title: '3. State와 Lifecycle', instructorId: 'instructor-placeholder', duration: 1500, isFree: false, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-003/600/400', createdAt: new Date() },
+  { title: '4. Hooks 완전 정복', instructorId: 'instructor-placeholder', duration: 1850, isFree: false, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-004/600/400', createdAt: new Date() },
 
   // 스페이스 어드벤처 (course-002)
-  { title: '제1화: 새로운 시작', instructorId: 'instructor-placeholder', duration: 2700, isFree: true, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-005/600/400', createdAt: new Date() },
-  { title: '제2화: 미지의 신호', instructorId: 'instructor-placeholder', duration: 2850, isFree: false, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-006/600/400', createdAt: new Date() },
-  { title: '제3화: 첫 번째 접촉', instructorId: 'instructor-placeholder', duration: 2640, isFree: false, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-007/600/400', createdAt: new Date() },
+  { title: '제1화: 새로운 시작', instructorId: 'instructor-placeholder', duration: 2700, isFree: true, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-005/600/400', createdAt: new Date() },
+  { title: '제2화: 미지의 신호', instructorId: 'instructor-placeholder', duration: 2850, isFree: false, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-006/600/400', createdAt: new Date() },
+  { title: '제3화: 첫 번째 접촉', instructorId: 'instructor-placeholder', duration: 2640, isFree: false, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-007/600/400', createdAt: new Date() },
 
   // 매일 30분 요가 (course-003)
-  { title: 'Week 1: 기본 자세 익히기', instructorId: 'instructor-placeholder', duration: 1800, isFree: true, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-008/600/400', createdAt: new Date() },
-  { title: 'Week 2: 코어 강화', instructorId: 'instructor-placeholder', duration: 1860, isFree: false, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-009/600/400', createdAt: new Date() },
+  { title: 'Week 1: 기본 자세 익히기', instructorId: 'instructor-placeholder', duration: 1800, isFree: true, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-008/600/400', createdAt: new Date() },
+  { title: 'Week 2: 코어 강화', instructorId: 'instructor-placeholder', duration: 1860, isFree: false, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-009/600/400', createdAt: new Date() },
   
   // Python 기초 (course-004)
-  { title: '1. 변수와 자료형', instructorId: 'instructor-placeholder', duration: 1100, isFree: true, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-010/600/400', createdAt: new Date() },
-  { title: '2. 제어문 (if, for, while)', instructorId: 'instructor-placeholder', duration: 1400, isFree: false, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-011/600/400', createdAt: new Date() },
+  { title: '1. 변수와 자료형', instructorId: 'instructor-placeholder', duration: 1100, isFree: true, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-010/600/400', createdAt: new Date() },
+  { title: '2. 제어문 (if, for, while)', instructorId: 'instructor-placeholder', duration: 1400, isFree: false, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-011/600/400', createdAt: new Date() },
   
   // 블록버스터 액션 (course-005)
-  { title: '블록버스터 액션', instructorId: 'instructor-placeholder', duration: 7200, isFree: false, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-012/600/400', createdAt: new Date() },
+  { title: '블록버스터 액션', instructorId: 'instructor-placeholder', duration: 7200, isFree: false, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-012/600/400', createdAt: new Date() },
 
   // 위대한 자연 (course-006)
-  { title: '1. 숲의 지배자들', instructorId: 'instructor-placeholder', duration: 3200, isFree: true, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-013/600/400', createdAt: new Date() },
-  { title: '2. 바다의 거인들', instructorId: 'instructor-placeholder', duration: 3300, isFree: true, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-014/600/400', createdAt: new Date() },
+  { title: '1. 숲의 지배자들', instructorId: 'instructor-placeholder', duration: 3200, isFree: true, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-013/600/400', createdAt: new Date() },
+  { title: '2. 바다의 거인들', instructorId: 'instructor-placeholder', duration: 3300, isFree: true, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-014/600/400', createdAt: new Date() },
 
   // 비즈니스 영어 회화 (course-007)
-  { title: '1. 인사와 소개', instructorId: 'instructor-placeholder', duration: 1300, isFree: true, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-015/600/400', createdAt: new Date() },
-  { title: '2. 전화 및 이메일', instructorId: 'instructor-placeholder', duration: 1550, isFree: false, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-016/600/400', createdAt: new Date() },
+  { title: '1. 인사와 소개', instructorId: 'instructor-placeholder', duration: 1300, isFree: true, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-015/600/400', createdAt: new Date() },
+  { title: '2. 전화 및 이메일', instructorId: 'instructor-placeholder', duration: 1550, isFree: false, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-016/600/400', createdAt: new Date() },
 
   // 이탈리안 가정식 (course-008)
-  { title: '1. 완벽한 토마토 소스 만들기', instructorId: 'instructor-placeholder', duration: 1900, isFree: true, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-017/600/400', createdAt: new Date() },
-  { title: '2. 생면 파스타 도전', instructorId: 'instructor-placeholder', duration: 2200, isFree: false, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-018/600/400', createdAt: new Date() },
+  { title: '1. 완벽한 토마토 소스 만들기', instructorId: 'instructor-placeholder', duration: 1900, isFree: true, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-017/600/400', createdAt: new Date() },
+  { title: '2. 생면 파스타 도전', instructorId: 'instructor-placeholder', duration: 2200, isFree: false, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-018/600/400', createdAt: new Date() },
 
   // Node.js 백엔드 개발 (course-009)
-  { title: '1. Express.js 시작하기', instructorId: 'instructor-placeholder', duration: 1200, isFree: true, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-019/600/400', createdAt: new Date() },
-  { title: '2. REST API 설계', instructorId: 'instructor-placeholder', duration: 1600, isFree: false, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-020/600/400', createdAt: new Date() },
+  { title: '1. Express.js 시작하기', instructorId: 'instructor-placeholder', duration: 1200, isFree: true, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-019/600/400', createdAt: new Date() },
+  { title: '2. REST API 설계', instructorId: 'instructor-placeholder', duration: 1600, isFree: false, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-020/600/400', createdAt: new Date() },
 
   // 미스터리 스릴러 (course-010)
-  { title: '사라진 저택의 비밀', instructorId: 'instructor-placeholder', duration: 6800, isFree: false, videoUrl: '', filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-021/600/400', createdAt: new Date() },
+  { title: '사라진 저택의 비밀', instructorId: 'instructor-placeholder', duration: 6800, isFree: false, filePath: '', thumbnailUrl: 'https://picsum.photos/seed/ep-021/600/400', createdAt: new Date() },
 ];
 
 export const subscriptions: (Omit<Subscription, 'id' | 'purchasedAt' | 'expiresAt'> & { purchasedAt: Date, expiresAt: Date })[] = [
@@ -159,3 +159,5 @@ LlineStream은 다음의 목적을 위하여 개인정보를 처리합니다. �
         `,
     }
 ];
+
+    

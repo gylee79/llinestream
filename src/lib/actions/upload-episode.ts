@@ -25,7 +25,6 @@ type SaveMetadataPayload = {
     selectedCourseId: string;
     instructorId: string;
     duration: number;
-    videoUrl: string;
     filePath: string;
     fileSize: number;
     // Default thumbnail is required for new episodes
@@ -51,7 +50,6 @@ type UpdateEpisodePayload = {
     newCustomThumbnailData?: { downloadUrl: string | null; filePath: string | null; }; // null indicates deletion
 
     // Old file URLs for path extraction
-    oldVideoUrl?: string;
     oldDefaultThumbnailUrl?: string;
     oldCustomThumbnailUrl?: string;
 }
@@ -83,12 +81,12 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
 export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise<UploadResult> {
     const { 
         episodeId, title, description, isFree, selectedCourseId, instructorId, duration,
-        videoUrl, filePath, fileSize, defaultThumbnailUrl, defaultThumbnailPath,
+        filePath, fileSize, defaultThumbnailUrl, defaultThumbnailPath,
         customThumbnailUrl, customThumbnailPath
     } = payload;
 
-     if (!title || !selectedCourseId || !videoUrl || !episodeId || !filePath || !defaultThumbnailUrl || !defaultThumbnailPath || !instructorId) {
-        return { success: false, message: '필수 정보(에피소드ID, 제목, 강좌, 강사, 비디오 URL/경로, 대표 썸네일 URL/경로)가 누락되었습니다.' };
+     if (!title || !selectedCourseId || !episodeId || !filePath || !defaultThumbnailUrl || !defaultThumbnailPath || !instructorId) {
+        return { success: false, message: '필수 정보(에피소드ID, 제목, 강좌, 강사, 비디오 경로, 대표 썸네일 URL/경로)가 누락되었습니다.' };
     }
 
     try {
@@ -157,7 +155,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
     const { 
         episodeId, courseId, instructorId, title, description, isFree, duration,
         newVideoData, newDefaultThumbnailData, newCustomThumbnailData,
-        oldVideoUrl, oldDefaultThumbnailUrl, oldCustomThumbnailUrl
+        oldDefaultThumbnailUrl, oldCustomThumbnailUrl
     } = payload;
     
     if (!episodeId || !courseId || !title || !instructorId) {
@@ -217,7 +215,6 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
 
         if (newVideoData) {
             dataToUpdate.filePath = newVideoData.filePath;
-            // The downloadURL of the original video is not stored anymore.
         }
 
         if (shouldResetProcessingState) {
@@ -258,3 +255,5 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         return { success: false, message: `에피소드 업데이트 실패: ${errorMessage}` };
     }
 }
+
+    

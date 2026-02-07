@@ -208,19 +208,11 @@ export default function VideoUploadDialog({ open, onOpenChange, episode, onSucce
             setSelectedCourseId(episode.courseId);
             setSelectedInstructorId(episode.instructorId || '');
             
-            setVideoPreviewUrl(episode.videoUrl);
+            // Do not set video preview from a remote URL
+            setVideoPreviewUrl(null); 
+            
+            setDefaultThumbnailPreview(episode.defaultThumbnailUrl || null);
             setCustomThumbnailPreview(episode.customThumbnailUrl || null);
-
-            // Re-generate default thumbnail from existing video URL
-            if (episode.videoUrl) {
-                try {
-                    await generateDefaultThumbnail(episode.videoUrl, episode.id);
-                } catch (error) {
-                    console.error("Failed to re-generate default thumbnail on edit:", error);
-                    // If regeneration fails, fall back to the stored URL for preview
-                    setDefaultThumbnailPreview(episode.defaultThumbnailUrl || null);
-                }
-            }
 
             try {
               const courseDocRef = doc(firestore, 'courses', episode.courseId);
@@ -249,7 +241,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode, onSucce
     } else {
         resetForm();
     }
-  }, [open, episode, isEditMode, firestore, toast, resetForm, generateDefaultThumbnail]);
+  }, [open, episode, isEditMode, firestore, toast, resetForm]);
 
   const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -355,7 +347,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode, onSucce
                 newVideoData: videoFile ? { ...newVideoUploadResult!, fileSize: videoFile.size } : undefined,
                 newDefaultThumbnailData: newDefaultThumbUploadResult,
                 newCustomThumbnailData: newCustomThumbUploadResult,
-                oldVideoUrl: initialEpisode?.videoUrl,
                 oldDefaultThumbnailUrl: initialEpisode?.defaultThumbnailUrl,
                 oldCustomThumbnailUrl: initialEpisode?.customThumbnailUrl,
             };
@@ -371,7 +362,6 @@ export default function VideoUploadDialog({ open, onOpenChange, episode, onSucce
             const payload = {
                 episodeId, title, description, isFree, selectedCourseId, instructorId: selectedInstructorId,
                 duration: duration,
-                videoUrl: newVideoUploadResult.downloadUrl,
                 filePath: newVideoUploadResult.filePath,
                 fileSize: videoFile.size,
                 defaultThumbnailUrl: newDefaultThumbUploadResult.downloadUrl,
@@ -379,6 +369,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode, onSucce
                 customThumbnailUrl: newCustomThumbUploadResult?.downloadUrl,
                 customThumbnailPath: newCustomThumbUploadResult?.filePath,
             };
+            // @ts-ignore
             const result = await saveEpisodeMetadata(sanitize(payload));
             if (!result.success) throw new Error(result.message);
             toast({ title: '업로드 성공', description: result.message });
@@ -563,13 +554,11 @@ export default function VideoUploadDialog({ open, onOpenChange, episode, onSucce
                       accept="video/*"
                       disabled={isProcessing}
                   />
-                  {isEditMode && initialEpisode?.videoUrl && (
+                  {isEditMode && initialEpisode?.filePath && (
                     <div className="text-xs text-muted-foreground flex items-center gap-2">
                         <Video className="h-4 w-4"/>
                         <span>현재 파일: </span>
-                        <Link href={initialEpisode.videoUrl} target="_blank" className="truncate hover:underline" rel="noopener noreferrer">
-                           {initialEpisode.filePath || '저장된 비디오 보기'}
-                        </Link>
+                        <span className="truncate">{initialEpisode.filePath}</span>
                     </div>
                   )}
                   {videoFile && <p className="text-sm text-green-600">새 비디오 파일 선택됨: {videoFile.name}</p>}
@@ -611,3 +600,5 @@ export default function VideoUploadDialog({ open, onOpenChange, episode, onSucce
     </>
   );
 }
+
+    

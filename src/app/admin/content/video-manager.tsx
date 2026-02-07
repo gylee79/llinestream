@@ -80,10 +80,15 @@ const AIStatusIndicator = ({ episode }: {
         case 'completed':
             return (
                 <Tooltip>
-                    <TooltipTrigger>
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-auto w-auto p-0" onClick={handleStartAnalysis}>
+                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        </Button>
                     </TooltipTrigger>
-                    <TooltipContent><p>AI 분석 완료</p></TooltipContent>
+                    <TooltipContent>
+                        <p>AI 분석 완료</p>
+                        <p className="font-semibold">클릭하여 재분석</p>
+                    </TooltipContent>
                 </Tooltip>
             );
         case 'failed':
@@ -155,7 +160,7 @@ export default function VideoManager() {
 
   const totalFileSize = useMemo(() => {
     if (!episodes) return 0;
-    return episodes.reduce((acc, episode) => acc + (episode.fileSize || 0), 0);
+    return episodes.reduce((acc, episode) => acc + (episode.storage?.fileSize || 0), 0);
   }, [episodes]);
 
   const handleOpenUploadDialog = (episode: Episode | null = null) => {
@@ -301,7 +306,7 @@ export default function VideoManager() {
                       <TableCell className="font-medium">{episode.title}</TableCell>
                       <TableCell>{getFullCoursePath(episode.courseId)}</TableCell>
                       <TableCell>{episode.duration}초</TableCell>
-                      <TableCell>{formatFileSize(episode.fileSize)}</TableCell>
+                      <TableCell>{formatFileSize(episode.storage?.fileSize)}</TableCell>
                       <TableCell>{getInstructorName(episode.instructorId)}</TableCell>
                       <TableCell>
                         <AIStatusIndicator episode={episode} />
@@ -408,3 +413,5 @@ export default function VideoManager() {
     </>
   );
 }
+
+    
