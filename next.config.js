@@ -10,6 +10,8 @@ const nextConfig = {
       "@genkit-ai/firebase",
       "@genkit-ai/google-genai",
       "firebase-admin",
+      "@google-cloud/firestore",
+      "@google-cloud/storage",
       "@opentelemetry/instrumentation",
       "@opentelemetry/sdk-node",
       "require-in-the-middle",
