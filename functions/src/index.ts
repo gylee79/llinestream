@@ -82,7 +82,7 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
         
         await new Promise((resolve, reject) => {
             readStream.pipe(cipher).pipe(writeStream)
-                .on('finish', resolve)
+                .on('finish', () => resolve())
                 .on('error', reject);
         });
         console.log(`[${episodeId}] Encryption: File encryption finished.`);
