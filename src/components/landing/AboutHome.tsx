@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, BookOpenCheck, Users, Building } from 'lucide-react';
 import Image from 'next/image';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase/hooks';
 import { doc } from 'firebase/firestore';
@@ -12,35 +12,41 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
+import { BrainCircuit } from 'lucide-react';
 
 const curriculum = [
   {
     title: '국가자격증 반',
     description: '피부/바디 기초 완성 과정',
-    imageUrl: 'https://images.unsplash.com/photo-1556760544-442285d3b2a5?w=800&h=600&fit=crop&q=80',
     href: '/about/national-certificate',
-    aiHint: 'certificate award'
+    Icon: BookOpenCheck,
+    bgColor: 'bg-sky-100',
+    textColor: 'text-sky-800'
   },
   {
     title: '림프 마스터 반 (Signature)',
     description: '독보적인 재활/순환 테크닉',
-    imageUrl: 'https://images.unsplash.com/photo-1519824145371-296894a0d72b?w=800&h=600&fit=crop&q=80',
     href: '/about/lymph-master',
-    aiHint: 'lymph massage'
+    Icon: BrainCircuit,
+    bgColor: 'bg-rose-100',
+    textColor: 'text-rose-800'
   },
   {
     title: 'AI & 감정 아로마 반',
     description: 'AI 진단과 멘탈 케어 솔루션',
-    imageUrl: 'https://images.unsplash.com/photo-1540555233-1282491befe4?w=800&h=600&fit=crop&q=80',
     href: '/about/ai-aroma',
-    aiHint: 'AI aromatherapy'
+    Icon: BrainCircuit,
+    bgColor: 'bg-purple-100',
+    textColor: 'text-purple-800'
   },
   {
     title: '직원 위탁 교육 시스템',
     description: '3일 완성 실무형 인재 육성',
-    imageUrl: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=600&fit=crop&q=80',
     href: '/about/employee-training',
-    aiHint: 'team training'
+    Icon: Users,
+    bgColor: 'bg-green-100',
+    textColor: 'text-green-800'
   },
 ];
 
@@ -123,22 +129,14 @@ export default function AboutHome() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {curriculum.map((item) => (
               <Link href={item.href} key={item.title} className="group block">
-                <Card className="h-full overflow-hidden transition-all duration-300 ease-in-out hover:shadow-2xl hover:-translate-y-2">
-                  <div className="relative aspect-[3/4] w-full">
-                    <Image
-                      src={item.imageUrl}
-                      alt={item.title}
-                      fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover transition-transform duration-500 group-hover:scale-105"
-                      data-ai-hint={item.aiHint}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                <Card className="h-full overflow-hidden transition-all duration-300 ease-in-out hover:shadow-2xl hover:-translate-y-2 bg-card">
+                  <div className={cn("relative aspect-[3/4] w-full flex flex-col items-center justify-center p-8", item.bgColor)}>
+                    <item.Icon className={cn("w-20 h-20", item.textColor)} strokeWidth={1.5}/>
                   </div>
-                  <CardContent className="absolute bottom-0 left-0 right-0 p-4 bg-transparent text-white">
+                  <CardContent className="p-4">
                     <h3 className="font-headline text-xl font-bold">{item.title}</h3>
-                    <p className="text-sm text-white/80 mt-1">{item.description}</p>
-                    <div className="flex items-center text-xs text-accent mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
+                    <div className="flex items-center text-xs text-primary mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <span>자세히 보기</span>
                         <ArrowRight className="ml-1 h-3 w-3"/>
                     </div>
@@ -158,13 +156,13 @@ export default function AboutHome() {
                 </p>
             </div>
             <motion.div 
-                className="relative aspect-video rounded-lg overflow-hidden"
+                className="relative aspect-video rounded-lg overflow-hidden bg-muted-foreground/10 flex items-center justify-center"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.5 }}
                 transition={{ duration: 0.8 }}
             >
-                <Image src="https://picsum.photos/seed/ai-beauty/800/600" alt="AI 기반 교육" fill sizes="(max-width: 768px) 100vw, 50vw" style={{objectFit: "cover"}} data-ai-hint="futuristic beauty technology"/>
+                <Building className="w-24 h-24 text-muted-foreground/30" />
             </motion.div>
         </section>
 
