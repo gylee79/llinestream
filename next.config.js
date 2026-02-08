@@ -1,25 +1,10 @@
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: false,
   experimental: {
     serverActions: {
       bodySizeLimit: '500mb',
     },
-    serverComponentsExternalPackages: [
-      "genkit",
-      "@genkit-ai/firebase",
-      "@genkit-ai/google-genai",
-      "firebase-admin",
-      "@google-cloud/firestore",
-      "@google-cloud/storage",
-      "@google-cloud/aiplatform",
-      "@grpc/grpc-js",
-      "long",
-      "@opentelemetry/instrumentation",
-      "@opentelemetry/sdk-node",
-      "require-in-the-middle",
-      "express",
-    ],
   },
   images: {
     remotePatterns: [
@@ -45,7 +30,7 @@ const nextConfig = {
         hostname: "firebasestorage.googleapis.com",
       },
       {
-        protocol: "https" ,
+        protocol: "https",
         hostname: "storage.googleapis.com",
       },
     ],

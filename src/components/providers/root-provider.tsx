@@ -10,27 +10,29 @@ import { CartProvider } from '@/context/cart-context';
 import CartSidebar from '@/components/cart/cart-sidebar';
 import { LandingPageProvider, useLandingPage } from '@/context/landing-page-context';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '../ui/skeleton';
 
-// This component contains the client-side logic previously in RootLayout
 function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { preference, isLandingPageLoading } = useLandingPage();
   const { user } = useUser();
 
-  const isAdminPage = pathname.startsWith('/admin');
+  const isAdminPage = pathname?.startsWith('/admin');
 
-  // To prevent flash of incorrect component while loading preference
   if (isLandingPageLoading) {
     return (
       <div className="relative flex min-h-dvh flex-col bg-background">
         <Header />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1">
+            <div className="container py-8 space-y-8">
+                <Skeleton className="h-[70vh] w-full rounded-lg" />
+            </div>
+        </main>
         <CartSidebar />
       </div>
     );
   }
 
-  // '앱 버전'일 때의 레이아웃
   if (preference === 'original') {
     const showBottomNav = !isAdminPage && !!user;
     return (
@@ -43,7 +45,6 @@ function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // '홈페이지 모드'일 때의 레이아웃
   const showFooter = !isAdminPage;
   return (
     <div className="relative flex min-h-dvh flex-col bg-background">
@@ -55,7 +56,6 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-// This is the main provider that wraps the entire app
 export default function RootProvider({ children }: { children: React.ReactNode }) {
   return (
     <FirebaseClientProvider>
