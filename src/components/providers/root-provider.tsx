@@ -1,6 +1,6 @@
 
 'use client';
-
+import React from 'react';
 import { usePathname } from 'next/navigation';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/layout/header';
