@@ -246,3 +246,94 @@ AI는 다음 행동을 절대 하지 않는다:
 
 “이 문서를 구현하되, 해석하지 말고 그대로 실행하라.
 누락·완화·재해석은 모두 오류다.”
+---
+
+## 부록 B: v5.3 FINAL — Absolute Execution Rules (AI 전용)
+
+본 부록은 AI 코드 생성 시 발생 가능한 모든 해석 오류를 차단하기 위한 절대 규칙 집합이다.
+이 규칙은 Appendix A보다도 우선한다.
+
+### B-1. “동일한 복호화 로직”의 정확한 의미
+
+“온라인과 오프라인이 동일한 로직을 사용한다”는 말은 아래 항목만 공유됨을 의미한다.
+
+**공유 허용**
+
+- AES-GCM decrypt 함수
+- Chunk → MP4 fragment 변환 로직
+- appendBuffer 순서 제어
+
+**공유 금지**
+
+- fetch / HTTP / URL 처리
+- retry / recovering / backoff
+- 네트워크 오류 분기
+
+**오프라인 Worker는 순수 계산 모듈이어야 한다.**
+
+### B-2. 오프라인 워터마크 강제 규칙
+
+오프라인 재생 시 `watermarkMode`는 항상 `aggressive`
+- 서버 전달 값 무시
+- 클라이언트에서 강제 override
+  ```typescript
+  if (playbackMode === 'offline') {
+    watermarkMode = 'aggressive'
+  }
+  ```
+
+**이는 UX 옵션이 아니라 보안 정책이다.**
+
+### B-3. Offline State Transition Lock
+
+오프라인 재생은 반드시 아래 순서만 허용한다:
+
+1.  `idle`
+2.  → `offline-ready`
+    -   → (license 검증 완료)
+    -   → (watermark 초기화 완료)
+3.  → `offline-playing`
+
+**다음 상태 전이는 절대 금지:**
+
+-   idle → offline-playing
+-   offline-ready → playing
+-   watermark 미초기화 상태에서 재생 시작
+
+### B-4. IndexedDB 저장 원자성 규칙
+
+-   `.lsv` + `license` + `keyRef`는 단일 record
+-   단일 transaction으로 저장
+-   하나라도 실패 시 전체 롤백
+
+❌ `lsv_store` + `license_store` 분리 금지
+❌ 부분 성공 허용 금지
+
+### B-5. `error-fatal` 이후 UX 고정
+
+`error-fatal` 상태 진입 시:
+
+**허용:**
+
+-   오류 메시지 표시
+-   앱 종료 / 뒤로 가기
+-   재다운로드 안내 (offline only)
+
+**금지:**
+
+-   재시도 버튼
+-   자동 재시작
+-   상태 복구 시도
+
+### B-6. FINAL 선언의 기술적 의미
+
+“v5.3 FINAL”은 다음을 의미한다:
+
+-   새로운 기능 추가 ❌
+-   UX 개선을 위한 보안 완화 ❌
+-   성능 최적화를 위한 로직 변경 ❌
+
+**허용되는 변경:**
+
+-   상용 DRM 도입 시
+-   보안 취약점 패치 (기능 변경 없음)
