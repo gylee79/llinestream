@@ -7,6 +7,9 @@ import * as admin from 'firebase-admin';
 import { toJSDate } from '@/lib/date-helpers';
 import * as crypto from 'crypto';
 import type { VideoKey, User } from '@/lib/types';
+import { promisify } from 'util';
+
+const hkdf = promisify(crypto.hkdf);
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,7 +60,7 @@ export async function POST(req: NextRequest) {
        return NextResponse.json({ error: 'Forbidden: Subscription required' }, { status: 403 });
     }
 
-    // 4. Retrieve Master Key from secure collection
+    // 4. Retrieve Master Key and Salt from secure collection
     const keyId = episodeData?.encryption?.keyId;
     if (!keyId) {
         return NextResponse.json({ error: 'Not Found: Encryption info missing for this video' }, { status: 404 });
@@ -68,18 +71,20 @@ export async function POST(req: NextRequest) {
     }
     const videoKeyData = keyDoc.data() as VideoKey;
     const masterKey = Buffer.from(videoKeyData.masterKey, 'base64');
+    const salt = Buffer.from(videoKeyData.salt, 'base64');
 
-    // 5. Generate a Derived Key for online session
-    const derivationInput = `${userId}|${deviceId}`;
-    const derivedKey = crypto.createHmac('sha256', masterKey).update(derivationInput).digest();
+    // 5. Generate a Derived Key for online session using HKDF
+    const info = Buffer.from(`${userId}|${deviceId}`);
+    const derivedKey = await hkdf('sha256', masterKey, salt, info, 32);
     
+    // 6. Generate Watermark Seed
     const watermarkSeed = crypto.createHash('sha256').update(userId).digest('hex');
 
-    // 6. Return Session Info
+    // 7. Return Session Info
     return NextResponse.json({
       sessionId: `online_sess_${crypto.randomBytes(12).toString('hex')}`,
       derivedKey: derivedKey.toString('base64'),
-      expiresIn: 60, // Key is valid for 60 seconds for this online session
+      expiresIn: 3600, // Key is valid for 1 hour for this online session
       watermarkSeed: watermarkSeed,
     });
 

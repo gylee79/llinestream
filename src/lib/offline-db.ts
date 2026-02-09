@@ -30,6 +30,20 @@ const initDB = (): Promise<IDBDatabase> => {
 };
 
 export const saveVideo = async (data: OfflineVideoData): Promise<void> => {
+  if (navigator.storage && navigator.storage.estimate) {
+    const { quota, usage } = await navigator.storage.estimate();
+    const availableSpace = (quota || 0) - (usage || 0);
+    const requiredSpace = data.encryptedVideo.byteLength;
+
+    if (availableSpace < requiredSpace) {
+      throw new Error(
+        `저장 공간이 부족합니다. (필요: ${(requiredSpace / 1024 / 1024).toFixed(1)}MB, 사용 가능: ${(
+          availableSpace / 1024 / 1024
+        ).toFixed(1)}MB)`
+      );
+    }
+  }
+
   const dbInstance = await initDB();
   return new Promise((resolve, reject) => {
     const transaction = dbInstance.transaction(STORE_NAME, 'readwrite');

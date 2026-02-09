@@ -6,10 +6,11 @@
 **기술 스택:**
 - **AI 모델:** gemini-3-flash-preview
 - **파일 암호화 (1차):** AES-256-GCM (파일 전체 암호화)
-- **세션 키 암호화 (2차):** HMAC-SHA256 (사용자별 임시 키 생성)
-- **실행 환경:** Firebase Cloud Functions (v2)
+- **세션 키 암호화 (2차):** **HKDF-SHA256 (RFC 5869)** (사용자별 임시 키 생성)
+- **실행 환경:** Firebase Cloud Functions (v2) / Cloud Run Jobs (전환 가능 구조)
 - **데이터베이스:** Firestore
 - **파일 저장소:** Firebase Storage
+- **클라이언트:** React (Next.js), **Web Worker**, **Web Crypto API**
 - **클라이언트 DB:** IndexedDB (오프라인 저장용)
 
 ---
@@ -37,9 +38,10 @@
     *   **작업 B: 파일 암호화 (`createEncryptedFile`) - 1차 암호화:**
         *   **기술:** Node.js `crypto` 모듈, AES-256-GCM
         *   **과정:**
-            1. 비디오 파일 하나당 유일무이한 **`마스터 암호화 키`(AES-256)**를 생성합니다.
-            2. 마스터 키를 사용하여 원본 비디오 파일을 스트림 방식으로 완전히 암호화하고, 암호화된 데이터는 `.lsv` 확장자로 Firebase Storage의 **비공개(private) 경로**에 저장합니다.
-            3. 생성된 **마스터 키는 절대로 `episodes` 문서에 저장하지 않고**, 서버에서만 접근 가능한 별도의 컬렉션인 **`video_keys`에 안전하게 보관**합니다.
+            1. 비디오 파일 하나당 유일무이한 **`마스터 암호화 키`(AES-256)**와 암호화에 사용할 **`솔트(Salt)`**를 생성합니다.
+            2. 암호화 시, 매번 새로운 **12바이트 `IV`(초기화 벡터)**를 무작위로 생성합니다.
+            3. 마스터 키, IV, 솔트를 사용하여 원본 비디오 파일을 스트림 방식으로 완전히 암호화하고, 암호화된 데이터는 `.lsv` 확장자로 Firebase Storage의 **비공개(private) 경로**에 저장합니다. **암호화된 파일의 맨 앞에는 생성된 `IV`가 헤더로 추가**됩니다.
+            4. 생성된 **마스터 키와 솔트는 절대로 `episodes` 문서에 저장하지 않고**, 서버에서만 접근 가능한 별도의 컬렉션인 **`video_keys`에 안전하게 보관**합니다.
 
 5.  **최종 결과 저장 및 정리**
     두 작업이 모두 완료되면, AI 분석 결과 파일 경로(`transcriptPath`, `subtitlePath`), 암호화된 비디오 파일 경로(`storage.encryptedPath`) 및 메타데이터(`encryption` 객체)를 모두 Firestore의 해당 에피소드 문서에 업데이트하고 상태를 `'completed'`로 변경합니다. 마지막으로, 더 이상 필요 없는 원본 비디오 파일을 Storage에서 삭제하여 저장 공간을 절약하고 보안을 강화합니다.
@@ -57,24 +59,26 @@
     URL을 받은 클라이언트는 즉시 서버의 `/api/play-session` 엔드포인트로 `videoId`와 `deviceId`를 전송하여 재생 세션을 시작하겠다고 요청합니다.
 
 3.  **세션 키(Derived Key) 생성 (서버) - 2차 암호화**
-    서버는 요청을 받고 `video_keys` 비밀 금고에서 해당 비디오의 **'마스터 키'**를 꺼냅니다. 그리고 `사용자 ID`와 `기기 ID` 등 고유 정보를 조합하여 **HMAC-SHA256 해시**를 적용, **오직 이 사용자, 이 기기, 이 세션에서만 사용 가능한 일회성 `세션 키(Derived Key)`**를 생성하여 클라이언트에 전달합니다.
+    *   **기술:** Node.js `crypto.hkdf` (HKDF-SHA256 표준)
+    *   **과정:** 서버는 요청을 받고 `video_keys` 비밀 금고에서 해당 비디오의 **'마스터 키'**와 **'솔트'**를 꺼냅니다. 그리고 **HKDF-SHA256 알고리즘**을 사용하여 **오직 이 사용자, 이 기기, 이 세션에서만 유효한 일회성 `세션 키(Derived Key)`**를 생성하여 클라이언트에 전달합니다.
 
-4.  **실시간 복호화 및 재생 (클라이언트, `video-player-dialog.tsx`)**
-    *   **기술:** Media Source Extensions (MSE), Web Crypto API (`crypto.subtle.decrypt`)
+4.  **실시간 복호화 및 재생 (클라이언트)**
+    *   **기술:** **Web Worker**, **Web Crypto API (`crypto.subtle.decrypt`)**, Media Source Extensions (MSE)
     *   **과정:**
-        1. 클라이언트는 발급받은 서명된 URL을 통해 암호화된 `.lsv` 비디오 파일을 다운로드하기 시작합니다.
-        2. 비디오 데이터가 들어오는 대로, 클라이언트는 방금 받은 **세션 키**를 사용하여 JavaScript Crypto API로 암호화된 데이터를 **실시간으로 풀면서(복호화)** `MediaSource` 버퍼에 주입합니다.
-        3. HTML5 `<video>` 요소는 버퍼에 주입된 데이터를 일반 비디오처럼 재생합니다. 이 모든 복잡한 과정은 백그라운드에서 순식간에 일어나므로 사용자는 인지하지 못합니다.
+        1. 메인 스레드는 발급받은 서명된 URL을 통해 암호화된 `.lsv` 파일을 다운로드하고, 서버로부터 받은 `세션 키`와 함께 **Web Worker(백그라운드 스레드)로 전달**합니다.
+        2. **Web Worker**는 전달받은 암호화된 비디오 파일의 헤더에서 **`IV`를 먼저 추출**합니다.
+        3. 세션 키와 추출된 IV를 사용하여 JavaScript Crypto API로 암호화된 데이터를 **실시간으로 풀면서(복호화)**, 복호화된 데이터 조각(chunk)을 다시 메인 스레드로 전송합니다. 이 과정은 UI를 전혀 방해하지 않습니다.
+        4. 메인 스레드는 복호화된 데이터 조각을 `MediaSource` 버퍼에 주입하고, HTML5 `<video>` 요소는 버퍼에 주입된 데이터를 일반 비디오처럼 재생합니다.
 
 ---
 
 ## Part 3. 보안 오프라인 다운로드 및 재생 (사용자)
 
-1.  **오프라인 라이선스 요청 (`video-player-dialog.tsx` → `api/offline-license`)**
-    사용자가 다운로드 버튼을 클릭하면, 클라이언트는 서버의 `/api/offline-license` 엔드포인트로 `videoId`와 `deviceId`를 전송합니다.
+1.  **용량 확인 및 라이선스 요청 (`video-player-dialog.tsx` → `api/offline-license`)**
+    사용자가 다운로드 버튼을 클릭하면, 클라이언트는 먼저 `navigator.storage.estimate()`를 사용해 기기의 잔여 저장 공간을 확인합니다. 공간이 충분하면, 서버의 `/api/offline-license` 엔드포인트로 `videoId`와 `deviceId`를 전송합니다.
 
 2.  **오프라인 키 생성 (서버)**
-    서버는 구독 권한을 확인하고 마스터 키를 가져옵니다. 이번에는 **만료 시간(예: 7일 후)을 포함**하여 `HMAC(마스터키, 사용자ID|기기ID|비디오ID|**만료타임스탬프**)` 방식으로 **오프라인용 세션 키**를 생성합니다.
+    서버는 구독 권한을 확인하고 마스터 키와 솔트를 가져옵니다. 이번에는 **만료 시간(예: 7일 후)을 포함**하여 **HKDF-SHA256 알고리즘**으로 **오프라인용 세션 키**를 생성합니다.
 
 3.  **라이선스 발급**
     서버는 생성된 `오프라인용 세션 키`, `만료 시간`, `워터마크 시드`를 포함한 **오프라인 라이선스**를 클라이언트에 전달합니다.
@@ -83,7 +87,7 @@
     클라이언트는 `/api/video-url`을 통해 서명된 URL을 받아, 암호화된 `.lsv` 파일 전체를 다운로드합니다. 다운로드한 **암호화된 비디오 데이터**와 **오프라인 라이선스**를 함께 브라우저의 `IndexedDB`에 안전하게 저장합니다.
 
 5.  **오프라인 재생 (클라이언트, `downloads/page.tsx`)**
-    사용자가 오프라인 상태에서 다운로드한 영상을 재생하면, 앱은 `IndexedDB`에서 암호화된 비디오와 오프라인 라이선스를 불러옵니다. 재생 전, 현재 시간이 라이선스에 저장된 `만료 시간`을 지났는지 확인합니다. 만료되지 않았다면, 저장된 `오프라인용 세션 키`를 사용하여 비디오 데이터를 실시간으로 복호화하며 재생합니다.
+    사용자가 오프라인 상태에서 다운로드한 영상을 재생하면, 앱은 `IndexedDB`에서 암호화된 비디오와 오프라인 라이선스를 불러옵니다. 재생 전, 현재 시간이 라이선스에 저장된 `만료 시간`을 지났는지 확인합니다. 만료되지 않았다면, **Web Worker**가 저장된 `오프라인용 세션 키`를 사용하여 비디오 데이터를 실시간으로 복호화하며 재생합니다.
 
 ---
 
@@ -101,7 +105,7 @@
 ```json
 {
   "workflow": "LlineStream Video Processing & Playback",
-  "version": "2.0-AES-GCM",
+  "version": "3.0-HKDF-Worker",
   "parts": [
     {
       "name": "Part 1: Video Upload & Backend Processing",
@@ -110,28 +114,17 @@
         {
           "step": 1,
           "description": "Admin inputs metadata and selects files in the UI.",
-          "file": "src/components/admin/content/video-upload-dialog.tsx",
-          "technicalDetails": {
-            "action": "Calls 'saveEpisodeMetadata' Server Action."
-          }
+          "file": "src/components/admin/content/video-upload-dialog.tsx"
         },
         {
           "step": 2,
-          "description": "Files are uploaded to Storage and metadata saved to Firestore.",
-          "file": "src/lib/actions/upload-episode.ts",
-          "technicalDetails": {
-            "storageUpload": "Client-side upload using 'uploadFile' from 'src/firebase/storage/upload.ts'.",
-            "firestoreWrite": "Creates 'episodes' document with 'status.processing' set to 'pending'."
-          }
+          "description": "Files are uploaded to Storage and metadata saved to Firestore with 'pending' status.",
+          "file": "src/lib/actions/upload-episode.ts"
         },
         {
           "step": 3,
-          "description": "Cloud Function is triggered by the new Firestore document.",
-          "file": "functions/src/index.ts",
-          "technicalDetails": {
-            "trigger": "Firestore onDocumentWritten for 'episodes/{episodeId}'.",
-            "initialUpdate": "Sets 'status.processing' to 'processing'."
-          }
+          "description": "Cloud Function is triggered by the new Firestore document and sets status to 'processing'.",
+          "file": "functions/src/index.ts"
         },
         {
           "step": 4,
@@ -139,27 +132,19 @@
           "file": "functions/src/index.ts",
           "technicalDetails": {
             "aiAnalysis": {
-              "library": "@google/generative-ai",
-              "model": "gemini-3-flash-preview",
-              "function": "runAiAnalysis",
-              "output": "JSON summary, VTT subtitles, and a separate TXT transcript file."
+              "model": "gemini-3-flash-preview"
             },
             "fileEncryption": {
               "library": "Node.js Crypto",
               "algorithm": "AES-256-GCM",
-              "function": "createEncryptedFile",
-              "output": "A single encrypted '.lsv' file.",
-              "keyManagement": "Master key is stored in a separate, secure 'video_keys' Firestore collection."
+              "keyManagement": "Master key and a new random salt are stored in 'video_keys'. A random IV is prepended to the encrypted file header."
             }
           }
         },
         {
           "step": 5,
-          "description": "Results from both processes are saved to the episode document.",
-          "file": "functions/src/index.ts",
-          "technicalDetails": {
-            "updatedFields": ["storage.encryptedPath", "encryption", "status.playable", "aiGeneratedContent", "subtitlePath", "transcriptPath"]
-          }
+          "description": "Results (paths, metadata) are saved to the episode document, status is set to 'completed', and original file is deleted.",
+          "file": "functions/src/index.ts"
         }
       ]
     },
@@ -169,39 +154,62 @@
       "steps": [
         {
           "step": 6,
-          "description": "Client requests a short-lived signed URL for the encrypted file.",
+          "description": "Client requests a short-lived signed URL for the encrypted file and a temporary session key.",
           "file": "src/components/shared/video-player-dialog.tsx",
           "technicalDetails": {
-            "api": "/api/video-url",
-            "authentication": "Sends Firebase Auth ID Token to prove identity."
+            "api": [
+              "/api/video-url",
+              "/api/play-session"
+            ]
           }
         },
         {
           "step": 7,
-          "description": "Client requests a temporary session key for decryption.",
-          "file": "src/components/shared/video-player-dialog.tsx",
+          "description": "Server generates and returns a session-specific derived key using HKDF-SHA256.",
+          "file": "src/app/api/play-session/route.ts",
           "technicalDetails": {
-            "api": "/api/play-session",
-            "payload": "{ videoId, deviceId }"
+            "keyDerivation": "HKDF-SHA256(masterKey, salt, userInfo)"
           }
         },
         {
           "step": 8,
-          "description": "Server generates and returns a session-specific derived key and watermark seed.",
-          "file": "src/app/api/play-session/route.ts",
-          "technicalDetails": {
-            "keyDerivation": "HMAC-SHA256(masterKey, userId|deviceId)",
-            "authorization": "Checks user's subscription status in Firestore."
-          }
+          "description": "A Web Worker receives the encrypted data and the derived key.",
+          "file": "src/components/shared/video-player-dialog.tsx"
         },
         {
           "step": 9,
-          "description": "Player decrypts and plays the video in real-time.",
-          "file": "src/components/shared/video-player-dialog.tsx",
+          "description": "The Web Worker decrypts the video chunks in the background and sends them back to the main thread for playback via Media Source Extensions.",
+          "file": "src/workers/crypto.worker.ts",
           "technicalDetails": {
-            "decryption": "Uses Web Crypto API (AES-GCM) with the derived key.",
-            "playback": "Feeds decrypted data chunks into a MediaSource buffer attached to an HTML5 <video> element."
+            "decryption": "Uses Web Crypto API (AES-GCM) with the derived key and the IV extracted from the file header. `extractable` set to `false`."
           }
+        }
+      ]
+    },
+    {
+      "name": "Part 3: Secure Offline Playback",
+      "actor": "User",
+      "steps": [
+        {
+          "step": 10,
+          "description": "Client checks available storage and requests an offline license.",
+          "file": "src/lib/offline-db.ts",
+          "api": "/api/offline-license"
+        },
+        {
+          "step": 11,
+          "description": "Server generates a time-limited offline key using HKDF and returns it.",
+          "file": "src/app/api/offline-license/route.ts"
+        },
+        {
+          "step": 12,
+          "description": "Client downloads the encrypted video file and saves it along with the license to IndexedDB.",
+          "file": "src/lib/offline-db.ts"
+        },
+        {
+          "step": 13,
+          "description": "For offline playback, the app checks license validity and uses the Web Worker to decrypt and play the local file.",
+          "file": "src/components/shared/video-player-dialog.tsx"
         }
       ]
     }

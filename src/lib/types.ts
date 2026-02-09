@@ -123,6 +123,7 @@ export interface VideoKey {
   keyId: string;
   videoId: string;
   masterKey: string; // BASE64_32_BYTES_KEY
+  salt: string; // BASE64_16_BYTES_SALT for HKDF
   rotation: number;
   createdAt: Timestamp;
 }
@@ -296,4 +297,19 @@ export interface OfflineVideoInfo {
   thumbnailUrl: string;
   downloadedAt: Date;
   expiresAt: Date;
+}
+
+// ========= Web Worker Types =========
+export interface CryptoWorkerRequest {
+  type: 'DECRYPT';
+  payload: {
+    encryptedBuffer: ArrayBuffer;
+    derivedKeyB64: string;
+    encryption: Episode['encryption'];
+  };
+}
+
+export interface CryptoWorkerResponse {
+  type: 'DECRYPT_SUCCESS' | 'DECRYPT_ERROR';
+  payload: ArrayBuffer | { message: string };
 }

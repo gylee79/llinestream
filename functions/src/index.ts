@@ -70,9 +70,10 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
         await bucket.file(inputFilePath).download({ destination: tempInputPath });
         console.log(`[${episodeId}] Encryption: Download complete.`);
 
-        // 1. Generate master key and IV
+        // 1. Generate master key, salt, and IV
         const masterKey = crypto.randomBytes(32); // 256 bits for AES-256
-        const iv = crypto.randomBytes(12);       // 96 bits is recommended for GCM
+        const salt = crypto.randomBytes(16);      // 16 bytes salt for HKDF
+        const iv = crypto.randomBytes(12);        // 96 bits (12 bytes) is recommended for GCM
 
         // 2. Create cipher
         const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
@@ -104,17 +105,18 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
         });
         console.log(`[${episodeId}] Encryption: Upload complete.`);
 
-        // 7. Store the master key securely in `video_keys` collection
+        // 7. Store the master key and salt securely in `video_keys` collection
         const keyId = `vidkey_${episodeId}`;
         const keyDocRef = db.collection('video_keys').doc(keyId);
         await keyDocRef.set({
             keyId,
             videoId: episodeId,
             masterKey: masterKey.toString('base64'),
+            salt: salt.toString('base64'), // Save the salt
             rotation: 1,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        console.log(`[${episodeId}] Encryption: Master key saved to video_keys/${keyId}`);
+        console.log(`[${episodeId}] Encryption: Master key and salt saved to video_keys/${keyId}`);
 
         // 8. Update the episode document with encryption metadata
         await docRef.update({
@@ -266,7 +268,7 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
       delete output.transcript; // Remove large transcript from the object to be stored in Firestore
 
       const transcriptPath = `episodes/${episodeId}/ai/transcript.txt`;
-      await bucket.file(transcriptPath).save(transcriptContent, { contentType: 'text/plain' });
+      await bucket.file(transcriptPath).save(transcriptContent, { contentType: 'text/plain', predefinedAcl: 'publicRead' });
       console.log(`[${episodeId}] Transcript saved to Storage: ${transcriptPath}`);
 
 
@@ -283,7 +285,7 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
         
         await bucket.upload(vttTempPath, {
           destination: subtitlePath,
-          metadata: { contentType: 'text/vtt' },
+          metadata: { contentType: 'text/vtt', predefinedAcl: 'publicRead' },
         });
 
         if (fs.existsSync(vttTempPath)) fs.unlinkSync(vttTempPath);
