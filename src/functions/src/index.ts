@@ -22,10 +22,11 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-// KEK_SECRET 의존성을 제거하여 배포가 항상 성공하도록 함
+// KEK_SECRET은 Secret Manager 대신 .env 파일을 통해 런타임에 주입될 수 있으므로,
+// 배포 시점의 의존성에서는 제거합니다.
 setGlobalOptions({
   region: "us-central1",
-  secrets: ["GOOGLE_GENAI_API_KEY", "KEK_SECRET"], 
+  secrets: ["GOOGLE_GENAI_API_KEY"], 
   timeoutSeconds: 540,
   memory: "2GiB",
   minInstances: 0,
@@ -273,7 +274,7 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
 });
 
 async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.firestore.DocumentReference) {
-    const modelName = "gemini-1.5-flash-preview";
+    const modelName = "gemini-3-flash-preview";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
@@ -463,5 +464,3 @@ interface EpisodeData {
   encryption?: { keyId?: string };
   [key: string]: any;
 }
-
-    
