@@ -1,7 +1,6 @@
-
 'use client';
 
-import type { OfflineVideoData, OfflineVideoInfo } from './types';
+import type { OfflineVideoData, OfflineVideoInfo, OfflineLicense } from './types';
 
 const DB_NAME = 'LlineStreamOffline';
 const DB_VERSION = 1;
@@ -82,7 +81,7 @@ export const listDownloadedVideos = async (): Promise<OfflineVideoInfo[]> => {
         courseName: d.courseName,
         thumbnailUrl: d.episode.thumbnailUrl,
         downloadedAt: d.downloadedAt,
-        expiresAt: d.expiresAt,
+        expiresAt: new Date(d.license.expiresAt),
       }));
       resolve(infoList.sort((a, b) => b.downloadedAt.getTime() - a.downloadedAt.getTime()));
     };
@@ -102,4 +101,25 @@ export const deleteVideo = async (episodeId: string): Promise<void> => {
     });
   };
 
-    
+export const updateLicenseCheckTime = async (episodeId: string): Promise<void> => {
+  const dbInstance = await initDB();
+  const transaction = dbInstance.transaction(STORE_NAME, 'readwrite');
+  const store = transaction.objectStore(STORE_NAME);
+  
+  const getRequest = store.get(episodeId);
+
+  return new Promise((resolve, reject) => {
+    getRequest.onerror = () => reject(new Error("라이선스 업데이트 실패: 비디오를 찾을 수 없습니다."));
+    getRequest.onsuccess = () => {
+      const data = getRequest.result as OfflineVideoData | undefined;
+      if (data) {
+        data.license.lastCheckedAt = Date.now();
+        const putRequest = store.put(data);
+        putRequest.onsuccess = () => resolve();
+        putRequest.onerror = () => reject(new Error("라이선스 마지막 확인 시간 업데이트에 실패했습니다."));
+      } else {
+        reject(new Error("라이선스 업데이트 실패: 데이터가 없습니다."));
+      }
+    };
+  });
+};

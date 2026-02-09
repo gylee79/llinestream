@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     const derivedKeyB64 = (await hkdf('sha256', masterKey, salt, info, 32)).toString('base64');
     
     // 6. Generate Watermark Seed
-    const watermarkSeed = crypto.createHash('sha256').update(userId).digest('hex');
+    const watermarkSeed = crypto.createHash('sha256').update(userId + videoId + deviceId).digest('hex');
 
     // 7. Return Session Info with explicit scope
     return NextResponse.json({
@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
       expiresAt: Date.now() + 3600 * 1000, // Key is valid for 1 hour for this online session
       scope: 'ONLINE_STREAM_ONLY',
       watermarkSeed: watermarkSeed,
+      watermarkMode: "normal", // Default watermark mode
     });
 
   } catch (error) {
@@ -104,5 +105,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Internal Server Error: ${errorMessage}` }, { status: 500 });
   }
 }
-
-    

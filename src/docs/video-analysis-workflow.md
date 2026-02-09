@@ -1,113 +1,109 @@
-# [공식] 비디오 처리, 보안 재생 및 오프라인 워크플로우 (v5.2)
+# [공식] 비디오 처리, 보안 재생 및 오프라인 워크플로우 (v5.3)
 
-**목표:** v5.1에서 확보한 안정성을 기반으로, **즉시 재생(True Streaming Seek)**과 **부분 복구(Partial Recovery)** 기능을 도입하여 사용자 경험을 극대화하고, 오프라인 라이선스를 암호학적으로 분리하여 보안을 완성합니다.
+**목표:** v5.2에서 확보한 안정성·예측 가능성·운영 복구성을 기반으로, **즉시 재생(True Streaming Seek)**, **부분 복구**, 그리고 **오프라인 다운로드 및 라이선스** 기능을 완성하여 상용 DRM 도입 이전의 최종 아키텍처를 구축합니다.
 
 ---
 
 ## 1. 버전 히스토리
 
-- **v5.2 (Current): True Streaming & Partial Recovery**
-  - `v5.2.7` (구현) 상태 머신 타임아웃 및 경쟁 상태 방지 규칙 강제. 관측 가능성(Observability)을 위한 디버그 로깅 시스템 도입.
-  - `v5.2.4` (구현) 오프라인 라이선스 키 스코프 정식 분리 및 검증
+- **v5.3 (Current): Offline Playback & Dynamic Watermark**
+  - `v5.3.0` (구현) 오프라인 다운로드 및 7일 라이선스 재생 기능 완성 (IndexedDB)
+  - `v5.3.1` (구현) 온라인/오프라인 통합 동적 워터마킹 시스템 도입
+  - `v5.3.2` (구현) 리스크 기반 워터마크 강도 조절 정책 추가 (`normal`/`aggressive`)
+  - `v5.3.3` (구현) 오프라인 재생 시 시스템 시간 롤백 감지 로직 추가
+- **v5.2.x:** True Streaming & UX 고도화
+  - `v5.2.7` (구현) 상태 머신 타임아웃 및 경쟁 상태 방지 규칙 강제. 디버그 로깅 시스템 도입.
+  - `v5.2.4` (구현) 온라인/오프라인 라이선스 키 스코프 정식 분리 및 검증
   - `v5.2.3` (구현) 단일 청크 손상 시 부분 복구(재시도) 로직 도입
-  - `v5.2.2` (구현) `buffering-seek` 상태 추가 및 플레이어 UX 확장
   - `v5.2.1` (구현) HTTP Range 요청 기반 Chunk-on-Demand 스트리밍 도입
-- **v5.1.x:** 안정성 강화 패치
-  - `v5.1.9` Worker 생명주기 및 복구 규칙 정의
-  - `v5.1.8` 청크 복호화 실패 시 Fail-Fast 정책 강제
-  - `v5.1.7` Signed URL 및 세션 키 Race Condition 방지 규칙 적용
-  - `v5.1.6` Seek 안정성 범위 명문화 및 강제 (Prefetch-after-download)
+- **v5.1.x:** 안정성 강화 (Prefetch-after-download)
+  - `v5.1.9` (구현) Worker 생명주기 및 복구 규칙 정의
+  - `v5.1.8` (구현) 청크 복호화 실패 시 Fail-Fast 정책 강제
+  - `v5.1.7` (구현) Signed URL 및 세션 키 Race Condition 방지 규칙 적용
 - **v5.0:** 스트리밍 아키텍처 교체 (Robust Chunked AES-GCM)
-- **v4.0:** 보안 강화 (KEK 기반 마스터 키 암호화, HKDF 표준화)
 
 ---
 
-## 2. v5.2 아키텍처 핵심 변경점: 즉시 재생 (True Streaming)
+## 2. 전체 워크플로우 (v5.3)
 
-v5.1이 **안정성**을 위해 `Prefetch-after-download` (전체 다운로드 후 재생) 방식을 택했다면, v5.2는 v5.1에서 완성된 `Length-Prefixed Chunk` 구조를 100% 활용하여 **사용자 경험(UX)을 극대화**하는 방향으로 진화합니다.
+### 2.1. 파일 업로드 및 처리 (서버)
+1.  **[Admin] 파일 업로드:** 관리자가 원본 비디오 파일(mp4)을 업로드합니다.
+2.  **[Cloud Function] 처리 시작:** `onDocumentWritten` 트리거가 실행됩니다.
+3.  **[Cloud Function] 병렬 처리:** `Promise.allSettled`를 사용하여 **AI 분석**과 **암호화**를 동시에 진행합니다.
+    *   **AI 분석 (Gemini):** 비디오를 분석하여 요약, 타임라인, 자막(VTT), 전체 텍스트 스크립트를 생성합니다. (대용량 스크립트는 별도 .txt 파일로 저장)
+    *   **암호화 (AES-256-GCM-CHUNKED-V3):**
+        1.  원본 비디오를 1MB 단위 청크로 분할합니다.
+        2.  각 청크를 암호화하고, **청크의 길이를 담은 4바이트 헤더**를 앞에 붙여 `[길이][암호화된 데이터]` 구조를 만듭니다. 이는 스트리밍 안정성의 핵심입니다.
+        3.  모든 청크를 하나의 `.lsv` 파일로 합쳐 비공개 스토리지에 저장합니다.
+        4.  파일 암호화에 사용된 **마스터 키**는 서버의 KEK(Key-Encryption-Key)로 다시 암호화하여 `video_keys` 컬렉션에 안전하게 보관합니다.
+4.  **[Cloud Function] 원본 삭제:** 모든 처리가 끝나면 원본 비디오 파일을 스토리지에서 삭제합니다.
 
-- **v5.1:** [전체 파일 다운로드] → [전체 파일 복호화] → [재생 시작] (초기 대기 시간 김)
-- **v5.2:** [필요한 청크만 Range 요청] → [해당 청크만 복호화] → [즉시 재생 및 버퍼링] (초기 대기 시간 대폭 단축)
+### 2.2. 온라인 스트리밍 재생 (클라이언트)
+1.  **[Client] 재생 요청:** 사용자가 재생 버튼을 클릭합니다.
+2.  **[Client] 키 요청:** `/api/play-session`을 호출하여 온라인 재생 전용 **임시 세션 키**와 **워터마크 시드**를 발급받습니다.
+3.  **[Client] URL 요청:** `/api/video-url`을 호출하여 암호화된 `.lsv` 파일에 접근할 수 있는 단기 유효 `Signed URL`을 받습니다.
+4.  **[Worker] 초기화:** 세션 키와 Signed URL을 Web Worker로 전달하여 초기화합니다.
+5.  **[Worker] Offset Map 생성:** Worker는 Signed URL을 통해 `.lsv` 파일의 앞부분 수 KB만 **HTTP Range 요청**으로 가져옵니다. 이 데이터로 각 청크의 `[길이]` 헤더를 읽어, 전체 청크의 시작/끝 바이트 위치를 담은 `Offset Map`을 메모리에 구축합니다.
+6.  **[Worker] 실시간 복호화 및 전송:**
+    *   재생에 필요한 청크 인덱스부터 `Offset Map`을 참조하여 `Range` 요청으로 청크 데이터를 가져옵니다.
+    *   가져온 청크를 복호화하여 `decryptedChunk`를 메인 스레드로 전송합니다.
+7.  **[Main Thread] 재생:** 메인 스레드는 복호화된 청크를 `MediaSource` API를 통해 `<video>` 태그에 주입하여 재생합니다.
+8.  **[Main Thread] 워터마크 렌더링:** 서버에서 받은 워터마크 시드를 기반으로 사용자 식별자가 포함된 워터마크를 비디오 위에 오버레이로 렌더링합니다.
 
-```
-[Client App] --(Seek to 5:00)--> [Video Player Dialog]
-     |                                    |
-     | (1. Calculate Chunk Index)         v
-     |                             [Player State = 'buffering-seek']
-     |                                    |
-     | (2. Abort existing worker tasks)   v
-     +<-----(3. Request new chunk)---- [Web Worker] --(4. HTTP Range Request)--> [Storage (.lsv)]
-                                          | (Range: bytes=chunk_start-chunk_end)
-                                          |
-     (6. Append to MediaSource) <---(5. Decrypt Chunk)
-             |
-             v
-     [Video Element plays from 5:00]
-```
-
-### 2.1. Chunk Offset Map: 즉시 재생의 핵심 열쇠
-
-True Streaming을 구현하기 위해, 플레이어는 이제 전체 파일을 다운로드하는 대신 **청크 오프셋 맵(Chunk Offset Map)**을 먼저 구축합니다.
-
-1.  **초기 요청:** 플레이어는 `.lsv` 파일의 **앞부분 수 KB만** 먼저 요청합니다.
-2.  **맵 생성:** Worker는 수신한 데이터에서 각 청크의 **`[길이 헤더(4B)]`**를 순차적으로 읽어, 각 청크의 `시작 바이트(byteStart)`와 `끝 바이트(byteEnd)`를 계산하여 메모리에 `Offset Map`을 생성합니다.
-3.  **재생 시작:** 맵이 완성되면, Worker는 메인 스레드에 `INIT_SUCCESS`를 알리고, 메인 스레드는 `청크 0`부터 데이터 요청을 시작합니다.
-
-이 `Offset Map` 덕분에 플레이어는 전체 파일을 받지 않고도, 원하는 시간대에 해당하는 청크의 정확한 위치를 알고 HTTP Range 요청을 보낼 수 있습니다.
-
-### 2.2. 탐색(Seek) 및 부분 복구(Partial Recovery) 시나리오
-
--   **탐색 시:** 사용자가 타임라인을 5분으로 이동시키면, 플레이어는 `5분`에 해당하는 `chunkIndex`를 계산하여 Worker에 해당 청크부터 다시 요청합니다. Worker는 진행 중이던 다운로드를 취소하고 새 요청을 즉시 처리합니다.
--   **부분 복구:** 스트리밍 중 특정 청크 하나가 손상되어 복호화(Auth Tag 검증)에 실패하더라도, v5.1처럼 즉시 `error-fatal`로 종료하지 않습니다. 대신, Worker는 `RECOVERABLE_CHUNK_ERROR`를 보고하고, 메인 스레드는 **해당 청크만 최대 2회까지 자동으로 재요청**합니다. 2회 재시도 후에도 실패하면, 그 때 `error-fatal`로 전환하여 데이터 무결성을 보장합니다.
+### 2.3. 오프라인 다운로드 및 재생
+1.  **[Client] 다운로드 요청:** 사용자가 다운로드 버튼을 클릭합니다.
+2.  **[Client] 저장 공간 확인:** `navigator.storage.estimate()`를 통해 저장 공간이 충분한지 확인합니다. 부족하면 즉시 오류를 표시합니다.
+3.  **[Client] 오프라인 라이선스 요청:** `/api/offline-license`를 호출합니다.
+4.  **[Server] 라이선스 발급:**
+    *   서버는 **7일 유효기간**을 설정하고, 사용자와 기기 정보가 포함된 `info` 값으로 **오프라인 전용 키**를 파생(HKDF)합니다.
+    *   `videoId`, `userId`, `deviceId`, `expiresAt`, `scope: "OFFLINE_PLAYBACK"`, `watermarkSeed` 등이 포함된 라이선스를 생성하여 반환합니다.
+5.  **[Client] 파일 다운로드 및 저장:**
+    *   `Signed URL`을 통해 전체 `.lsv` 파일을 다운로드합니다.
+    *   다운로드한 암호화된 비디오 데이터와 발급받은 라이선스를 **하나의 객체로 묶어 IndexedDB에 저장**합니다.
+6.  **[Client] 오프라인 재생:**
+    *   IndexedDB에서 비디오 데이터와 라이선스를 로드합니다.
+    *   **라이선스 유효성 검증:** `expiresAt`과 `deviceId`를 확인합니다. 만료되었거나 다른 기기일 경우 재생을 차단하고 `license-expired` 상태로 전환합니다.
+    *   검증 통과 시, 암호화된 비디오 데이터와 오프라인 키를 Worker로 전달하여 온라인 재생과 동일한 방식으로 복호화 및 재생을 수행합니다. 워터마크도 동일하게 렌더링됩니다.
 
 ---
 
-## 3. Player State Machine (v5.2)
+## 3. Player State Machine (v5.3)
 
-`buffering-seek`와 `license-expired` 상태가 추가되어, 모든 재생 시나리오에 대응합니다. 각 비동기 상태는 무한 로딩을 방지하기 위한 타임아웃 규칙이 적용됩니다.
+플레이어의 모든 동작은 아래의 15개 상태로 명확하게 정의되며, 무한 로딩을 방지하기 위한 타임아웃 규칙이 강제됩니다.
 
 ```typescript
 type PlayerState =
   | 'idle'
-  | 'requesting-key' // Timeout: 3s
-  | 'downloading'      // (Offset Map 구성 또는 청크 다운로드)
-  | 'decrypting'       // (Web Worker 내부 작업)
-  | 'buffering-seek'   // Timeout: 5s
-  | 'ready'            // 재생 가능 (버퍼에 데이터 충분)
+  | 'requesting-key'      // Timeout: 3s
+  | 'downloading'         // (Offset Map 구성 또는 청크 다운로드)
+  | 'decrypting'          // (Web Worker 내부 작업)
+  | 'buffering-seek'      // Timeout: 5s
+  | 'ready'               // 재생 가능 (버퍼에 데이터 충분)
   | 'playing'
   | 'paused'
-  | 'recovering'       // Timeout: 15s (네트워크 오류 복구)
-  | 'error-fatal'      // 복구 불가 (파일 손상, 키 스코프 오류 등)
+  | 'recovering'          // Timeout: 15s (네트워크 오류, 청크 재시도)
+  | 'error-fatal'         // 복구 불가 (파일 손상, 키 스코프 오류 등)
   | 'error-retryable'
-  | 'license-expired'; // 오프라인 라이선스 만료
+  | 'license-expired'     // 오프라인 라이선스 만료
+  | 'offline-downloading' // 오프라인 저장 중
+  | 'offline-ready'
+  | 'offline-playing';
 ```
 
-### 3.1. 경쟁 상태 방지 (Race Condition)
-모든 Worker와 Main Thread 간의 비동기 통신은 `requestId`에 바인딩됩니다. Main Thread가 새로운 요청(예: 다른 비디오 재생, 탐색)을 시작하면 새로운 `requestId`를 생성합니다. Worker는 이전에 받은 `requestId`와 일치하지 않는 모든 요청 결과를 폐기하여, 상태 오염을 원천적으로 방지합니다.
+### 3.1. 경쟁 상태 방지 (Race Condition) - 절대 규칙
+모든 Worker와 Main Thread 간의 비동기 통신은 `requestId`에 바인딩됩니다. Main Thread가 새로운 요청(예: 다른 비디오 재생, 탐색)을 시작하면 새로운 `requestId`를 생성합니다. **Worker는 이전에 받은 `requestId`와 일치하지 않는 모든 요청 결과를 폐기하여, 상태 오염을 원천적으로 방지합니다.**
 
 ---
 
-## 4. 오프라인 라이선스 및 키 스코프 정식 분리 (v5.2.4)
-
-v5.1의 암묵적 처리를 개선하여, 온라인/오프라인 키의 역할을 암호학적으로 명확히 분리합니다.
-
--   **키 파생(HKDF) 시 `info` 값 분리:**
-    -   **온라인 키:** `info = "LSV_ONLINE_V1" + userId + deviceId + sessionId`
-    -   **오프라인 키:** `info = "LSV_OFFLINE_V1" + userId + deviceId + expiresAt`
--   **API 응답:** `/api/play-session`은 `scope: "ONLINE_STREAM_ONLY"`를, `/api/offline-license`는 `scope: "OFFLINE_PLAYBACK"`을 응답에 명시적으로 포함합니다.
--   **Worker 검증:** Worker는 재생 시작 전, 현재 컨텍스트(온라인/오프라인)와 전달받은 키의 `scope`가 일치하는지 검증합니다. 불일치 시, 복호화를 시도하지 않고 즉시 `error-fatal` 상태로 전환하여 키 오용을 원천 차단합니다.
-
----
-
-## 5. 장애 시나리오 및 UX 전략 (v5.2 기준)
+## 4. 장애 시나리오 및 UX 전략 (v5.3 기준)
 
 **원칙:** ① 무한 로딩 절대 금지 ② 항상 명확한 상태 피드백 ③ 자동 복구 우선, 실패 시 명확한 행동 유도
 
-| 장애 유형 | 시나리오 | 감지 위치 | 사용자 UX | PlayerState | 자동 대응 (v5.2) |
+| 장애 유형 | 시나리오 | 감지 위치 | 사용자 UX | PlayerState | 자동 대응 (v5.3) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **스트리밍** | **탐색(Seek)** | **Video Element** | ⏳ “이동 중…” | **`buffering-seek`** | **필요한 청크만 Range 요청** |
 | | **단일 청크 손상** | **Worker (decrypt)** | 🔄 “데이터 복구 중…” | **`recovering`** | **해당 청크 최대 2회 재요청** |
-| | 청크 복구 최종 실패 | Main Thread | ❌ “파일 일부가 손상됨” | `error-fatal` | 재생 중단 |
+| | 청크 복구 최종 실패 | Main Thread | ❌ “파일 일부가 손상됨” | `error-fatal` | 재생 중단, 재시도 안내 |
 | **네트워크** | Signed URL 만료 | Worker (fetch) | 🔄 “연결 갱신 중…” | `recovering` | 새 URL 자동 요청 |
 | | 네트워크 끊김 | Worker (fetch) | 📡 “네트워크 연결 불안정” | `recovering` | 3회 지수 백오프 재시도 |
 | **암호화/키** | Auth Tag 불일치 | Worker (decrypt) | 🔄 “데이터 복구 중…” | `recovering` | 손상된 청크로 간주, 재시도 |
@@ -115,13 +111,12 @@ v5.1의 암묵적 처리를 개선하여, 온라인/오프라인 키의 역할�
 | | 세션 키 만료 | Worker (시작 시) | 🔐 “보안 세션 갱신 중” | `recovering` | 새 키 자동 요청 |
 | **오프라인** | **라이선스 만료** | **Player (시작 시)** | ⏰ “다운로드 기간 만료” | **`license-expired`** | **재생 차단, 재다운로드 안내** |
 | | 저장 공간 부족 | `saveVideo` | 💾 “저장 공간 부족” | `error-retryable` | 다운로드 중단 |
+| | IndexedDB 손상 | `getDownloadedVideo` | ❌ "저장된 파일 오류" | `error-fatal` | 재다운로드 안내 |
 
 ---
 
-## 6. 보안 및 기타
+## 5. 보안 및 기타
 
--   **워터마크 처리 방식 (v5.2.5 제안):** `aggressive` 모드를 추가하여, 고위험 계정으로 판단될 경우 더 빈번하고 잘 보이는 워터마크를 동적으로 렌더링할 수 있습니다.
--   **보안 수준 고지:** 본 시스템은 상용 DRM 솔루션이 아니며, Web Crypto API를 기반으로 합니다. 메모리 덤프 등의 전문적인 공격으로부터 완벽하게 안전하지는 않으며, 일반적인 사용자에 의한 콘텐츠 불법 복제를 효과적으로 **억제(Deterrent)**하는 것을 목표로 합니다.
--   **관측 가능성 (v5.2.7):** 모든 플레이어 상태 전이, 오류, 재시도 횟수, 주요 동작(seek, init)의 소요 시간은 디버그 로깅 시스템에 기록되어, 문제 발생 시 신속한 원인 분석을 지원합니다.
-
-    
+-   **워터마크 처리:** 워터마크는 서버에서 생성된 `watermarkSeed`를 기반으로 클라이언트에서 렌더링됩니다. 이는 비디오 데이터 자체에 포함되지 않는 오버레이 방식이며, 유출 시 사용자를 특정하기 위한 **억제 및 추적** 수단입니다. `aggressive` 모드를 통해 고위험 계정으로 판단될 경우 더 빈번하고 잘 보이는 워터마크를 동적으로 렌더링할 수 있습니다.
+-   **보안 수준 고지:** 본 시스템은 Widevine, FairPlay와 같은 상용 DRM 솔루션이 아니며, Web Crypto API를 기반으로 합니다. 메모리 덤프, 고급 스크린 캡처 등의 전문적인 공격으로부터 완벽하게 안전하지는 않으며, 일반적인 사용자에 의한 콘텐츠 불법 복제를 효과적으로 **억제(Deterrent)**하고, 유출 시 **책임 소재를 추적**하는 것을 목표로 합니다.
+-   **관측 가능성 (Observability):** 모든 플레이어 상태 전이, 오류, 재시도 횟수, 주요 동작(seek, init)의 소요 시간은 `isOffline`, `playbackContext` 등의 메타데이터와 함께 디버그 로깅 시스템에 기록되어, 문제 발생 시 신속한 원인 분석을 지원합니다.

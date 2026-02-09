@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     const offlineDerivedKey = await hkdf('sha256', masterKey, salt, info, 32);
     
     // 6. Generate Watermark Seed
-    const watermarkSeed = crypto.createHash('sha256').update(userId).digest('hex');
+    const watermarkSeed = crypto.createHash('sha256').update(userId + videoId + deviceId).digest('hex');
 
     // 7. Return Offline License
     return NextResponse.json({
@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
       watermarkSeed: watermarkSeed,
       videoId: videoId,
       deviceId: deviceId,
+      watermarkMode: "normal", // Default watermark mode
     });
 
   } catch (error) {
@@ -105,5 +106,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Internal Server Error: ${errorMessage}` }, { status: 500 });
   }
 }
-
-    

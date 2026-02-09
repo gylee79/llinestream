@@ -1,4 +1,3 @@
-
 'use server';
 
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
@@ -10,16 +9,19 @@ export type Timestamp = FirebaseTimestamp | FieldValue;
 export type PlayerState =
   | 'idle'
   | 'requesting-key'
-  | 'downloading' // Initial file download for offset map or full file
+  | 'downloading'
   | 'decrypting'
-  | 'buffering-seek' // New state for seeking
+  | 'buffering-seek'
   | 'ready'
   | 'playing'
   | 'paused'
   | 'recovering'
   | 'error-fatal'
   | 'error-retryable'
-  | 'license-expired'; // New state for expired offline licenses
+  | 'license-expired'
+  | 'offline-downloading'
+  | 'offline-ready'
+  | 'offline-playing';
 
 export interface User {
   id: string; // This will be the document ID from Firestore, added on the client
@@ -295,16 +297,24 @@ export interface Bookmark {
   episodeTitle?: string;
 }
 
+export interface OfflineLicense {
+  videoId: string;
+  userId: string;
+  deviceId: string;
+  issuedAt: number;
+  expiresAt: number;
+  lastCheckedAt?: number;
+  scope: "OFFLINE_PLAYBACK";
+  watermarkSeed: string;
+  offlineDerivedKey: string;
+}
+
 export interface OfflineVideoData {
   episode: Episode;
   courseName: string;
   downloadedAt: Date;
-  expiresAt: Date;
+  license: OfflineLicense;
   encryptedVideo: ArrayBuffer;
-  license: {
-    offlineDerivedKey: string;
-    watermarkSeed: string;
-  };
 }
 
 export interface OfflineVideoInfo {
@@ -316,20 +326,28 @@ export interface OfflineVideoInfo {
   expiresAt: Date;
 }
 
-// ========= Web Worker Types (v5.2) =========
+// ========= Web Worker Types (v5.3) =========
 
-// Main thread to Worker
 export type CryptoWorkerRequest =
   | {
-      type: 'INIT_STREAM';
+      type: 'INIT_ONLINE_STREAM';
       payload: {
         requestId: string;
-        signedUrl: string;
         sessionKey: {
           derivedKeyB64: string;
           scope: 'ONLINE_STREAM_ONLY';
-          expiresAt: number;
         };
+        encryption: Episode['encryption'];
+        episodeId: string;
+        signedUrl: string;
+      };
+    }
+  | {
+      type: 'INIT_OFFLINE_PLAYBACK';
+      payload: {
+        requestId: string;
+        license: OfflineLicense;
+        encryptedBuffer: ArrayBuffer;
         encryption: Episode['encryption'];
         episodeId: string;
       };
@@ -350,7 +368,6 @@ export type CryptoWorkerRequest =
       }
     };
 
-// Worker to Main thread
 export type CryptoWorkerResponse =
   | {
       type: 'INIT_SUCCESS';
@@ -384,5 +401,3 @@ export type CryptoWorkerResponse =
         code: 'INVALID_SCOPE' | 'INTEGRITY_ERROR' | 'OFFSET_MAP_FAILED' | 'UNKNOWN_WORKER_ERROR';
       };
     };
-
-    
