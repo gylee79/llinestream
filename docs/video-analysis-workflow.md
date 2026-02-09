@@ -1,3 +1,4 @@
+
 # [최종] 비디오 처리, 보안 재생 및 오프라인 워크플로우 (v5.0)
 
 **목표:** 관리자가 비디오를 업로드하는 순간부터 최종 사용자가 온라인/오프라인에서 끊김 없이 안전하게 시청하기까지의 전 과정을 자동화합니다. **안정성이 대폭 향상된 Chunked 스트리밍**과 동적 워터마크 기술로 콘텐츠를 보호하는 서버리스 파이프라인입니다.
@@ -58,7 +59,7 @@
     클라이언트는 서버에 `videoId`와 인증 토큰을 보내 비공개 암호화 파일(`.lsv`)에 5분간 접근할 수 있는 **서명된 URL(Signed URL)**을 발급받습니다.
 
 2.  **재생 세션 및 임시 키 요청 (`video-player-dialog.tsx` → `/api/play-session`)**
-    클라이언트는 서버에 `videoId`와 `deviceId`를 보내 재생 세션을 요청합니다.
+    클라이언트는 서버에 `videoId`와 `deviceId`를 보내 재생 세션을 요청합니다. 응답에는 **세션 키의 만료 시간**이 포함됩니다.
 
 3.  **세션 키(Derived Key) 생성 (서버, `/api/play-session/route.ts`)**
     *   **기술:** Node.js `crypto.hkdf` (**HKDF-SHA256**)
@@ -67,13 +68,16 @@
         2. KEK를 이용해 `encryptedMasterKey`를 복호화하여 원본 마스터 키를 메모리에만 로드합니다.
         3. 가져온 마스터 키, 솔트, 그리고 표준화된 `info` 값을 **HKDF-SHA256 알고리즘**에 입력하여 **오직 이 세션에서만 유효한 일회성 `세션 키(Derived Key)`**를 생성합니다.
             *   **표준 `info` 구조:** `Buffer.concat([Buffer.from("LSV_ONLINE_V1"), ...])`
-        4. 생성된 세션 키를 클라이언트에 전달합니다.
+        4. 생성된 세션 키와 만료 정보를 클라이언트에 전달합니다.
 
 4.  **청크 단위 복호화 및 재생 (클라이언트, `crypto.worker.ts`)**
     *   **기술:** **Web Worker**, **Web Crypto API (`crypto.subtle.decrypt`)**, Media Source Extensions (MSE)
-    *   **과정:**
+    *   **재생 방식 (Prefetch-after-download):**
+        1. **안정성 최우선:** 현재 구현은 Web Worker가 암호화된 `.lsv` 파일 전체를 먼저 다운로드합니다. 이 방식은 구현이 단순하고 디버깅이 용이하며, 네트워크 환경이 불안정할 때 가장 안정적인 재생을 보장합니다.
+        2. **미래 확장성:** 향후 첫 N MB만 먼저 다운로드 및 복호화하여 재생을 시작하고, 나머지는 백그라운드에서 순차적으로 처리하는 **'프리패치 스트리밍'** 방식으로 개선하여 초기 로딩 속도를 더욱 단축할 수 있습니다.
+    *   **복호화 과정:**
         1. 메인 스레드는 발급받은 서명된 URL과 세션 키를 **Web Worker(백그라운드 스레드)로 전달**합니다.
-        2. Web Worker는 `.lsv` 파일 전체를 다운로드 받은 후, 버퍼를 순차적으로 처리합니다.
+        2. Web Worker는 `.lsv` 파일 버퍼를 순차적으로 처리합니다.
         3. **[v5.0 핵심]** 각 청크마다 **4바이트 `길이 헤더`를 먼저 읽어** 해당 청크의 정확한 크기를 파악합니다.
         4. 해당 길이만큼의 데이터에서 **`IV`를 추출**하고, 청크 인덱스를 AAD로 설정한 뒤 나머지 부분(**암호화된 데이터 + 인증 태그**)을 복호화합니다.
         5. 모든 청크의 복호화가 성공하면, **하나로 합쳐진 완전한 비디오 파일(MP4)**을 메인 스레드로 전송합니다.
@@ -100,16 +104,51 @@
 ## Part 4. 워터마크 및 보안 고지
 
 *   **워터마크 처리 방식:**
+    *   **목적:** 이 워터마크는 유출을 방지하는 기술이 아니라, **유출 발생 시 최초 유포자를 추적**하기 위한 **억제(Deterrent)** 수단입니다.
     *   **시드 생성:** 온라인/오프라인 키를 발급할 때, 서버는 `사용자 ID`를 해싱하여 고유한 **`워터마크 시드`** 문자열을 생성하여 키와 함께 전달합니다.
     *   **동적 렌더링 (`video-player-dialog.tsx`):** 비디오 플레이어는 전달받은 `워터마크 시드`를 비디오 위에 여러 개 복제하여 희미하게, 그리고 불규칙하게 움직이는 오버레이로 표시합니다.
-    *   **목적 및 한계:** 이 워터마크는 유출을 방지하는 기술이 아니라, **유출 발생 시 최초 유포자를 추적**하기 위한 **억제(Deterrent)** 수단입니다. 화면 녹화 후 크롭 등으로 제거될 수 있습니다.
+    *   **한계:** 화면 녹화 후 크롭, 필터링 등으로 제거될 수 있습니다.
 
 *   **보안 수준 고지:**
     *   본 시스템은 상용 DRM(Widevine, FairPlay) 솔루션이 아니며, Web Crypto API를 기반으로 합니다. 따라서 메모리 덤프, 코드 변조 등의 전문적인 공격으로부터 완벽하게 안전하지는 않습니다. 본 아키텍처는 추가 비용 없이 구현할 수 있는 **최대한의 보안 수준을 적용하여, 일반적인 사용자 및 비전문가에 의한 콘텐츠 불법 복제를 효과적으로 억제**하는 것을 목표로 합니다.
 
 ---
 
-## 워크플로우 요약 (JSON)
+## Part 5. 장애 시나리오 및 UX 전략
+
+**원칙:** ① 무한 로딩 금지 ② 항상 사용자에게 상황 고지 ③ 복구 가능한 오류는 자동, 불가능한 오류는 명확한 선택지 제공.
+
+| 장애 유형 | 시나리오 | 감지 위치 | 사용자 UX | 자동 대응 |
+| :--- | :--- | :--- | :--- | :--- |
+| **네트워크** | Signed URL 만료 | Worker fetch (403) | "연결 갱신 중…" | 새 URL 자동 요청 |
+| | 네트워크 끊김 | Worker fetch (Error) | "네트워크가 불안정합니다" | 3회 지수 백오프 재시도 |
+| **암호화 처리** | **Length Header 손상** | Worker | 파일 손상 | "파일이 손상되었습니다" | 즉시 중단 (Fail-fast) |
+| | **Auth Tag 불일치** | Worker decrypt | 무결성 실패 | "재생 불가(보안 오류)" | 재인증 및 재요청 |
+| **키/세션** | 세션 키 만료 | Worker | TTL 초과 | "보안 세션 갱신 중" | 새 키 자동 요청 |
+| | KEK 로드 실패 | Cloud Function | (사용자에게 도달 안 함) | 함수 실행 중단 | SRE/관리자 알림 |
+| **플레이어** | MSE/코덱 미지원 | Main Thread | "브라우저 미지원" | Fallback 안내 | - |
+| | Worker 비정상 종료 | Main Thread | Crash | "재생 복구 중" | Worker 재생성 |
+| **오프라인** | 저장 공간 부족 | `saveVideo` | "공간 부족" | 다운로드 중단 | - |
+| | 라이선스 만료 | `getDownloadedVideo` | "다운로드 만료" | 재인증/재다운로드 안내 | - |
+
+**플레이어 상태 머신 (UX 구현 권장):**
+```typescript
+type PlayerState =
+  | 'idle'
+  | 'requesting-key'
+  | 'downloading'
+  | 'decrypting'
+  | 'ready'
+  | 'playing'
+  | 'paused'
+  | 'recovering' // 자동 복구 시도 중
+  | 'error-fatal' // 복구 불가능
+  | 'error-retryable'; // 사용자 재시도 가능
+```
+
+---
+
+## Part 6. 워크플로우 요약 (JSON)
 
 ```json
 {
@@ -122,23 +161,25 @@
       "steps": [
         {
           "step": 4,
-          "description": "AI analysis and file encryption run in parallel.",
+          "description": "AI analysis and file encryption run in parallel. AI failure does not block encryption.",
           "file": "functions/src/index.ts",
           "technicalDetails": {
             "aiAnalysis": {
               "model": "gemini-1.5-flash-preview",
-              "statusField": "aiProcessingStatus"
+              "statusField": "aiProcessingStatus",
+              "retryable": "Yes, via admin panel."
             },
             "fileEncryption": {
               "library": "Node.js Crypto",
               "algorithm": "AES-256-GCM-CHUNKED-V3",
               "chunkSize": "1MB",
               "lsvChunkFormat": {
-                "description": "The .lsv file is a concatenation of self-describing encrypted chunks.",
-                "layout": "[ChunkLength(4B)][IV(12B)][Ciphertext(1MB)][AuthTag(16B)]...repeat"
+                "description": "The .lsv file is a concatenation of self-describing encrypted chunks for robust streaming.",
+                "layout": "[ChunkLength(4B)][IV(12B)][Ciphertext(1MB)][AuthTag(16B)]...repeat",
+                "integrity": "Each chunk's index is used as Additional Authenticated Data (AAD) to prevent reordering attacks."
               },
               "keyManagement": {
-                "description": "A unique Master Key is generated per video, encrypted with a KEK loaded from the environment (Secret Manager or .env), and stored in the 'video_keys' collection."
+                "description": "A unique Master Key is generated per video, encrypted with a KEK (loaded from env/Secret Manager), and stored in the 'video_keys' collection."
               }
             }
           }
@@ -146,23 +187,24 @@
       ]
     },
     {
-      "name": "Part 2: Encrypted Video Playback",
+      "name": "Part 2: Encrypted Video Playback (Online/Offline)",
       "actor": "User",
       "steps": [
         {
           "step": 7,
-          "description": "Server generates and returns a session-specific derived key using standardized HKDF.",
+          "description": "Server generates a session-specific derived key using standardized HKDF, including a purpose prefix.",
           "file": "src/app/api/play-session/route.ts",
           "technicalDetails": {
-            "keyDerivation": "HKDF-SHA256(masterKey, salt, Buffer.concat([Buffer.from(\"LSV_ONLINE_V1\"), ...]))"
+            "keyDerivation": "HKDF-SHA256(masterKey, salt, Buffer.concat([Buffer.from('LSV_ONLINE_V1' | 'LSV_OFFLINE_V1'), ...]))",
+            "response": "Includes derived key and its expiration time."
           }
         },
         {
           "step": 9,
-          "description": "A Web Worker downloads the entire encrypted file and decrypts it chunk by chunk, verifying integrity at each step.",
+          "description": "A Web Worker downloads the encrypted file and decrypts it chunk by chunk, verifying integrity at each step.",
           "file": "src/workers/crypto.worker.ts",
           "technicalDetails": {
-            "decryption": "Uses Web Crypto API (AES-GCM). It processes the stream by first reading a 4-byte length header, then decrypting the specified chunk. This prevents full-stream failure from partial data corruption."
+            "decryption": "Uses Web Crypto API (AES-GCM). It processes the stream by first reading a 4-byte length header, then decrypting the specified chunk. This prevents full-stream failure from partial data corruption and enables stable seeking."
           }
         }
       ]
