@@ -1,118 +1,221 @@
 
 /// <reference lib="webworker" />
 
-import type { CryptoWorkerRequest, CryptoWorkerResponse } from '@/lib/types';
+import type { CryptoWorkerRequest, CryptoWorkerResponse, Episode } from '@/lib/types';
 
-// PATCH v5.1.7, v5.1.8: Add detailed error handling and key validation.
-self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
-  if (event.data.type === 'DECRYPT') {
-    const { encryptedBuffer, sessionKey, encryption } = event.data.payload;
-    const { ivLength, tagLength } = encryption;
-
-    try {
-      // PATCH v5.1.7: Validate session key before any processing.
-      if (sessionKey.scope !== 'ONLINE_STREAM_ONLY' && sessionKey.scope !== 'OFFLINE_PLAYBACK') {
-        const response: CryptoWorkerResponse = {
-            type: 'RECOVERABLE_ERROR',
-            payload: { message: '유효하지 않은 키 사용 목적입니다.', code: 'INVALID_SCOPE' }
-        };
-        self.postMessage(response);
-        return;
-      }
-      if (sessionKey.expiresAt < Date.now()) {
-        const response: CryptoWorkerResponse = {
-            type: 'RECOVERABLE_ERROR',
-            payload: { message: '보안 세션이 만료되었습니다. 재생을 다시 시도합니다.', code: 'KEY_EXPIRED' }
-        };
-        self.postMessage(response);
-        return;
-      }
-      
-      // PATCH v5.1.6: Enforce full buffer assumption (basic check).
-      if (!encryptedBuffer || encryptedBuffer.byteLength < (4 + ivLength + tagLength)) {
-        throw new Error('Incomplete or empty video buffer received.');
-      }
-
-      // 1. Import the derived key for use with AES-GCM
-      const keyBuffer = Buffer.from(sessionKey.derivedKeyB64, 'base64');
-      const cryptoKey = await self.crypto.subtle.importKey(
-        'raw', 
-        keyBuffer, 
-        { name: 'AES-GCM' }, 
-        false, // Not extractable for security
-        ['decrypt']
-      );
-      
-      const decryptedChunks: ArrayBuffer[] = [];
-      let offset = 0;
-      let chunkIndex = 0;
-
-      // 2. Loop through the entire buffer, processing one chunk at a time
-      while (offset < encryptedBuffer.byteLength) {
-          // 2a. Read the chunk length header (4 bytes, Big Endian)
-          if (offset + 4 > encryptedBuffer.byteLength) {
-              // PATCH v5.1.8: Fail-fast on malformed stream
-              throw new Error(`Integrity error: Incomplete data, not enough bytes for a length header at offset ${offset}.`);
-          }
-          const lengthBuffer = encryptedBuffer.slice(offset, offset + 4);
-          const chunkBodyLength = new DataView(lengthBuffer).getUint32(0, false);
-          offset += 4;
-
-          // 2b. Check if the full chunk body is available
-          if (offset + chunkBodyLength > encryptedBuffer.byteLength) {
-              // PATCH v5.1.8: Fail-fast on malformed stream
-              throw new Error(`Integrity error: Corrupted stream. Expected chunk of size ${chunkBodyLength} but only ${encryptedBuffer.byteLength - offset} bytes are available.`);
-          }
-          
-          // 2c. Extract IV, ciphertext, and AuthTag from the chunk body
-          const chunkBody = encryptedBuffer.slice(offset, offset + chunkBodyLength);
-          offset += chunkBodyLength;
-          
-          const iv = chunkBody.slice(0, ivLength);
-          const ciphertextWithTag = chunkBody.slice(ivLength);
-          
-          // 2d. Use the chunk index as Additional Authenticated Data (AAD) for replay/reorder protection
-          const aad = Buffer.from(`chunk-index:${chunkIndex++}`);
-
-          // 2e. Decrypt the current chunk
-          const decryptedChunk = await self.crypto.subtle.decrypt(
-            { 
-              name: 'AES-GCM', 
-              iv: iv,
-              tagLength: tagLength * 8, // tagLength must be in bits
-              additionalData: aad
-            },
-            cryptoKey,
-            ciphertextWithTag
-          );
-
-          decryptedChunks.push(decryptedChunk);
-      }
-      
-      // 3. Concatenate all decrypted chunks and send back as a single buffer
-      const finalPlaintextBuffer = Buffer.concat(decryptedChunks);
-      const response: CryptoWorkerResponse = {
-          type: 'DECRYPT_SUCCESS',
-          payload: finalPlaintextBuffer,
-      };
-      self.postMessage(response, [finalPlaintextBuffer.buffer]);
-
-    } catch (error: any) {
-      // PATCH v5.1.8: Centralized fatal error handling.
-      // DOMException with name 'OperationError' is the typical error for an AuthTag mismatch in Web Crypto.
-      const isIntegrityError = error.name === 'OperationError';
-      const message = isIntegrityError
-          ? '암호화된 비디오 데이터의 무결성 검증에 실패했습니다. 파일이 손상되었거나 변조되었을 수 있습니다.'
-          : `복호화 중 치명적인 오류 발생: ${error.message}`;
-
-      const response: CryptoWorkerResponse = {
-        type: 'FATAL_ERROR',
-        payload: { message, code: isIntegrityError ? 'INTEGRITY_ERROR' : 'DECRYPT_FAILED' },
-      };
-      self.postMessage(response);
-    }
-  }
+// Helper function to build AAD for a chunk
+const buildAAD = (episodeId: string, chunkIndex: number, encryptionVersion: number): Buffer => {
+    const episodeIdBuffer = Buffer.from(episodeId, 'utf-8');
+    const chunkIndexBuffer = Buffer.alloc(4);
+    chunkIndexBuffer.writeUInt32BE(chunkIndex, 0);
+    const versionBuffer = Buffer.alloc(4);
+    versionBuffer.writeUInt32BE(encryptionVersion, 0);
+    return Buffer.concat([episodeIdBuffer, chunkIndexBuffer, versionBuffer]);
 };
 
-// This export is needed to satisfy the module system, even though it's a worker.
+// Global state for the worker instance
+let cryptoKey: CryptoKey | null = null;
+let encryptionInfo: Episode['encryption'] | null = null;
+let episodeId: string | null = null;
+let signedUrl: string | null = null;
+let abortController: AbortController | null = null;
+
+const handleInit = async (payload: CryptoWorkerRequest['payload'] & { type?: 'INIT_STREAM' }) => {
+    if (payload.type !== 'INIT_STREAM') return;
+
+    // 1. Reset state
+    cryptoKey = null;
+    encryptionInfo = null;
+    episodeId = null;
+    signedUrl = null;
+    if (abortController) abortController.abort();
+    abortController = new AbortController();
+
+    // 2. Validate Session Key (v5.1.7)
+    const { sessionKey } = payload;
+    if (sessionKey.scope !== 'ONLINE_STREAM_ONLY') {
+        const response: CryptoWorkerResponse = {
+            type: 'FATAL_ERROR',
+            payload: { message: '유효하지 않은 키 사용 목적입니다. 온라인 재생에는 온라인 전용 키가 필요합니다.', code: 'INVALID_SCOPE' }
+        };
+        self.postMessage(response);
+        return;
+    }
+    if (sessionKey.expiresAt < Date.now()) {
+        const response: CryptoWorkerResponse = {
+            type: 'RECOVERABLE_ERROR',
+            payload: { message: '보안 세션이 만료되었습니다.', code: 'KEY_EXPIRED' }
+        };
+        self.postMessage(response);
+        return;
+    }
+    
+    // 3. Import CryptoKey
+    const keyBuffer = Buffer.from(sessionKey.derivedKeyB64, 'base64');
+    cryptoKey = await self.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
+
+    // 4. Store necessary info
+    encryptionInfo = payload.encryption;
+    episodeId = payload.episodeId;
+    signedUrl = payload.signedUrl;
+
+    // 5. Build Chunk Offset Map (v5.2)
+    try {
+        const response = await fetch(signedUrl, { signal: abortController.signal });
+        if (!response.ok || !response.body) {
+            throw new Error(`비디오 정보 다운로드 실패 (HTTP ${response.status})`);
+        }
+        const reader = response.body.getReader();
+        const offsetMap: { byteStart: number; byteEnd: number }[] = [];
+        let currentOffset = 0;
+        let buffer = new Uint8Array();
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer = Buffer.concat([buffer, value]);
+            
+            while (buffer.length >= currentOffset + 4) {
+                const chunkBodyLength = new DataView(buffer.buffer, buffer.byteOffset + currentOffset).getUint32(0, false);
+                const chunkTotalLength = 4 + chunkBodyLength;
+                
+                if (buffer.length >= currentOffset + chunkTotalLength) {
+                    offsetMap.push({
+                        byteStart: currentOffset,
+                        byteEnd: currentOffset + chunkTotalLength - 1
+                    });
+                    currentOffset += chunkTotalLength;
+                } else {
+                    break; // Not enough data for the full chunk, wait for more
+                }
+            }
+        }
+        
+        const initSuccessResponse: CryptoWorkerResponse = {
+            type: 'INIT_SUCCESS',
+            payload: { offsetMap }
+        };
+        self.postMessage(initSuccessResponse);
+
+    } catch (error: any) {
+        const response: CryptoWorkerResponse = {
+            type: 'RECOVERABLE_ERROR',
+            payload: { message: `초기화 실패: ${error.message}`, code: 'NETWORK_ERROR' }
+        };
+        self.postMessage(response);
+    }
+};
+
+const handleDecryptChunk = async (payload: CryptoWorkerRequest['payload'] & { type?: 'DECRYPT_CHUNK' }) => {
+    if (payload.type !== 'DECRYPT_CHUNK' || !cryptoKey || !encryptionInfo || !episodeId || !signedUrl) {
+        // This shouldn't happen if the main thread logic is correct
+        const response: CryptoWorkerResponse = {
+            type: 'FATAL_ERROR',
+            payload: { message: 'Worker가 초기화되지 않았거나 정보가 손상되었습니다.', code: 'UNKNOWN_WORKER_ERROR' }
+        };
+        self.postMessage(response);
+        return;
+    }
+    
+    const { chunkIndex } = payload;
+    const { offsetMap } = (self as any)._offsetMap; // Assume offsetMap is stored in worker's global scope after init
+
+    if (!offsetMap || chunkIndex >= offsetMap.length) {
+         const response: CryptoWorkerResponse = {
+            type: 'FATAL_ERROR',
+            payload: { message: `잘못된 청크 인덱스(${chunkIndex})가 요청되었습니다.`, code: 'UNKNOWN_WORKER_ERROR' }
+        };
+        self.postMessage(response);
+        return;
+    }
+
+    const { byteStart, byteEnd } = offsetMap[chunkIndex];
+
+    try {
+        const rangeResponse = await fetch(signedUrl, {
+            headers: { 'Range': `bytes=${byteStart}-${byteEnd}` },
+            signal: abortController?.signal
+        });
+
+        if (!rangeResponse.ok) {
+            throw new Error(`HTTP ${rangeResponse.status}`);
+        }
+        
+        const encryptedChunkWithHeader = await rangeResponse.arrayBuffer();
+        
+        const chunkBody = encryptedChunkWithHeader.slice(4);
+        const iv = chunkBody.slice(0, encryptionInfo.ivLength);
+        const ciphertextWithTag = chunkBody.slice(encryptionInfo.ivLength);
+        const aad = buildAAD(episodeId, chunkIndex, encryptionInfo.version);
+        
+        const decryptedChunk = await self.crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv, tagLength: encryptionInfo.tagLength * 8, additionalData: aad },
+            cryptoKey,
+            ciphertextWithTag
+        );
+        
+        const decryptSuccessResponse: CryptoWorkerResponse = {
+            type: 'DECRYPT_SUCCESS',
+            payload: { chunkIndex, decryptedChunk },
+        };
+        self.postMessage(decryptSuccessResponse, [decryptedChunk]);
+
+    } catch (error: any) {
+        if (error.name === 'AbortError') {
+            console.log(`Chunk ${chunkIndex} fetch aborted.`);
+            return;
+        }
+
+        const isIntegrityError = error.name === 'OperationError';
+        
+        if (isIntegrityError) {
+            // v5.1.8: Fail-fast is now a RECOVERABLE error for the chunk, letting main thread decide to retry
+             const response: CryptoWorkerResponse = {
+                type: 'RECOVERABLE_ERROR',
+                payload: {
+                    message: `청크 ${chunkIndex}의 무결성 검증에 실패했습니다.`,
+                    code: 'CHUNK_DECRYPT_FAILED',
+                    chunkIndex
+                },
+            };
+            self.postMessage(response);
+        } else {
+            // Network errors are recoverable
+            const response: CryptoWorkerResponse = {
+                type: 'RECOVERABLE_ERROR',
+                payload: {
+                    message: `청크 ${chunkIndex} 다운로드 실패: ${error.message}`,
+                    code: 'NETWORK_ERROR',
+                    chunkIndex
+                },
+            };
+            self.postMessage(response);
+        }
+    }
+};
+
+self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
+    switch (event.data.type) {
+        case 'INIT_STREAM':
+            // Store offsetMap in a non-standard way for access in other handlers.
+            const initResponse = await handleInit(event.data.payload as any);
+            if(initResponse && (initResponse as any).type === 'INIT_SUCCESS') {
+                 (self as any)._offsetMap = (initResponse as any).payload;
+            }
+            break;
+        case 'DECRYPT_CHUNK':
+            await handleDecryptChunk(event.data.payload as any);
+            break;
+        case 'ABORT':
+            if (abortController) {
+                abortController.abort();
+                abortController = new AbortController(); // Prepare for next operation
+            }
+            break;
+    }
+};
+
 export {};
+
+    

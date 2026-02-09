@@ -76,13 +76,13 @@ export async function POST(req: NextRequest) {
     const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
     const salt = Buffer.from(videoKeyData.salt, 'base64');
 
-    // 5. Generate Offline Derived Key using HKDF with a structured info
+    // 5. Generate Offline Derived Key using HKDF with a structured info (v5.2)
     const expiresAt = add(new Date(), { days: 7 });
     const info = Buffer.concat([
-        Buffer.from("LSV_OFFLINE_V1"),
+        Buffer.from("LSV_OFFLINE_V1"), // Standardized info prefix
         Buffer.from(userId),
         Buffer.from(deviceId),
-        Buffer.from(expiresAt.toISOString())
+        Buffer.from(expiresAt.toISOString()) // Bind key to expiration
     ]);
     const offlineDerivedKey = await hkdf('sha256', masterKey, salt, info, 32);
     
@@ -91,11 +91,12 @@ export async function POST(req: NextRequest) {
 
     // 7. Return Offline License
     return NextResponse.json({
-      offlineDerivedKey: offlineDerivedKey.toString('base64'),
+      derivedKeyB64: offlineDerivedKey.toString('base64'),
       expiresAt: expiresAt.toISOString(),
-      videoId: videoId,
-      deviceId: deviceId,
+      scope: 'OFFLINE_PLAYBACK', // v5.2 Explicit Scope
       watermarkSeed: watermarkSeed,
+      videoId: videoId, // Included for client-side verification
+      deviceId: deviceId,
     });
 
   } catch (error) {
@@ -104,3 +105,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Internal Server Error: ${errorMessage}` }, { status: 500 });
   }
 }
+
+    

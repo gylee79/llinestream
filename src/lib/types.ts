@@ -1,10 +1,25 @@
 
+'use server';
 
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
 import type { UseEmblaCarouselType } from 'embla-carousel-react';
 
 // This union type can represent a client-side Timestamp or a server-side FieldValue for server timestamps.
 export type Timestamp = FirebaseTimestamp | FieldValue;
+
+export type PlayerState =
+  | 'idle'
+  | 'requesting-key'
+  | 'downloading' // Initial file download for offset map or full file
+  | 'decrypting'
+  | 'buffering-seek' // New state for seeking
+  | 'ready'
+  | 'playing'
+  | 'paused'
+  | 'recovering'
+  | 'error-fatal'
+  | 'error-retryable'
+  | 'license-expired'; // New state for expired offline licenses
 
 export interface User {
   id: string; // This will be the document ID from Firestore, added on the client
@@ -301,28 +316,62 @@ export interface OfflineVideoInfo {
   expiresAt: Date;
 }
 
-// ========= Web Worker Types =========
-// PATCH v5.1.7: Refine worker request to include sessionKey object for validation.
-export interface CryptoWorkerRequest {
-  type: 'DECRYPT';
-  payload: {
-    encryptedBuffer: ArrayBuffer;
-    sessionKey: {
-      derivedKeyB64: string;
-      scope: 'ONLINE_STREAM_ONLY' | 'OFFLINE_PLAYBACK';
-      expiresAt: number; // JS timestamp (Date.now())
-    };
-    encryption: Episode['encryption'];
-  };
-}
+// ========= Web Worker Types (v5.2) =========
 
-// PATCH v5.1.7, v5.1.8: Refine worker response types for better error handling and security.
-export interface CryptoWorkerResponse {
-  type: 'DECRYPT_SUCCESS' | 'FATAL_ERROR' | 'RECOVERABLE_ERROR';
-  payload: 
-    | ArrayBuffer 
-    | { 
-        message: string; 
-        code?: 'KEY_EXPIRED' | 'INVALID_SCOPE' | 'DECRYPT_FAILED' | 'INTEGRITY_ERROR' | 'UNKNOWN_WORKER_ERROR';
+// Main thread to Worker
+export type CryptoWorkerRequest =
+  | {
+      type: 'INIT_STREAM';
+      payload: {
+        signedUrl: string;
+        sessionKey: {
+          derivedKeyB64: string;
+          scope: 'ONLINE_STREAM_ONLY';
+          expiresAt: number;
+        };
+        encryption: Episode['encryption'];
+        episodeId: string;
       };
-}
+    }
+  | {
+      type: 'DECRYPT_CHUNK';
+      payload: {
+        chunkIndex: number;
+      };
+    }
+  | {
+      type: 'ABORT';
+    };
+
+// Worker to Main thread
+export type CryptoWorkerResponse =
+  | {
+      type: 'INIT_SUCCESS';
+      payload: {
+        offsetMap: { byteStart: number; byteEnd: number }[];
+      };
+    }
+  | {
+      type: 'DECRYPT_SUCCESS';
+      payload: {
+        chunkIndex: number;
+        decryptedChunk: ArrayBuffer;
+      };
+    }
+  | {
+      type: 'RECOVERABLE_ERROR';
+      payload: {
+        message: string;
+        code: 'KEY_EXPIRED' | 'INVALID_SCOPE' | 'NETWORK_ERROR' | 'CHUNK_DECRYPT_FAILED';
+        chunkIndex?: number;
+      };
+    }
+  | {
+      type: 'FATAL_ERROR';
+      payload: {
+        message: string;
+        code: 'INTEGRITY_ERROR' | 'UNKNOWN_WORKER_ERROR';
+      };
+    };
+
+    
