@@ -26,6 +26,47 @@ import { Input } from '../ui/input';
 import { saveVideo } from '@/lib/offline-db';
 import { useDebugLogDispatch } from '@/context/debug-log-context';
 
+const DownloadButton = ({
+    downloadState,
+    handleDownload,
+}: {
+    downloadState: 'idle' | 'downloading' | 'saving' | 'completed' | 'error';
+    handleDownload: () => void;
+}) => {
+    switch (downloadState) {
+        case 'downloading':
+        case 'saving':
+            return (
+                <Button variant="outline" disabled>
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                    {downloadState === 'downloading' ? '다운로드 중...' : '저장 중...'}
+                </Button>
+            );
+        case 'completed':
+            return (
+                <Button variant="outline" disabled>
+                    <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+                    저장 완료
+                </Button>
+            );
+        case 'error':
+            return (
+                <Button variant="destructive" onClick={handleDownload}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    다운로드 재시도
+                </Button>
+            );
+        case 'idle':
+        default:
+            return (
+                <Button variant="outline" onClick={handleDownload}>
+                    <Download className="mr-2 h-4 w-4" />
+                    오프라인 저장
+                </Button>
+            );
+    }
+};
+
 // ... (Existing sub-components like SyllabusView, ChatView, etc. remain the same)
 const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSeconds: number) => void; }) => {
     // New, more detailed status handling
@@ -315,6 +356,14 @@ const Watermark = ({ seed }: { seed: string | null }) => {
     );
   };
 
+interface VideoPlayerDialogProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  episode: Episode;
+  instructor?: Instructor | null;
+  offlineVideoData?: OfflineVideoData;
+}
+
 
 // ========= MAIN COMPONENT =========
 
@@ -386,10 +435,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 downloadedAt: new Date(),
                 expiresAt: new Date(license.expiresAt),
                 encryptedVideo,
-                license: {
-                    offlineDerivedKey: license.derivedKeyB64,
-                    watermarkSeed: license.watermarkSeed,
-                },
+                license: license,
             });
             
             setDownloadState('completed');
@@ -443,7 +489,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             if (payload.requestId !== activeRequestIdRef.current) return; // Discard stale responses
 
             if (type === 'DECRYPT_SUCCESS') {
-                const decryptedData = payload.payload as ArrayBuffer;
+                const decryptedData = payload.decryptedChunk as ArrayBuffer;
                 addLog('SUCCESS', '5. 복호화 성공! 미디어 버퍼에 데이터 추가 시작...');
                 if (mediaSourceRef.current?.readyState === 'open') {
                      try {
@@ -462,7 +508,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         setPlayerMessage(`미디어 버퍼 오류: ${e.message}`);
                     }
                 }
-            } else if (type === 'DECRYPT_ERROR') {
+            } else if (type === 'FATAL_ERROR') {
                 addLog('ERROR', `워커 복호화 실패: ${payload.message}`);
                 setPlayerState('error-fatal');
                 setPlayerMessage(payload.message);
@@ -481,7 +527,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 if (offlineVideoData) {
                     // Offline Playback Logic
                     addLog('INFO', '📀 오프라인 데이터로 재생합니다.');
-                    if (new Date() > offlineVideoData.expiresAt) {
+                    if (new Date() > new Date(offlineVideoData.license.expiresAt)) {
                         setPlayerState('license-expired');
                         setPlayerMessage('이 콘텐츠의 오프라인 라이선스가 만료되었습니다. 다시 다운로드해주세요.');
                         return;
@@ -526,8 +572,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
                 setPlayerState('decrypting');
                 const workerRequest: CryptoWorkerRequest = {
-                    type: 'DECRYPT',
-                    payload: { encryptedBuffer, derivedKeyB64, encryption: episode.encryption }
+                    type: 'DECRYPT_CHUNK',
+                    payload: { requestId: requestId, encryptedBuffer, derivedKeyB64, encryption: episode.encryption, chunkIndex: 0 }
                 };
                 addLog('INFO', '5. 웹 워커로 복호화 요청 전송...');
                 workerRef.current?.postMessage(workerRequest, [encryptedBuffer]);
@@ -579,7 +625,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 </DialogTitle>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                {!offlineVideoData && <DownloadButton />}
+                {!offlineVideoData && <DownloadButton downloadState={downloadState} handleDownload={handleDownload} />}
             </div>
              <DialogClose className="absolute right-4 top-1/2 -translate-y-1/2 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
                 <X className="h-4 w-4" />
