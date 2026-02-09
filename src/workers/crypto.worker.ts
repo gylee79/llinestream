@@ -2,14 +2,38 @@
 
 import type { CryptoWorkerRequest, CryptoWorkerResponse } from '@/lib/types';
 
+// PATCH v5.1.7, v5.1.8: Add detailed error handling and key validation.
 self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
   if (event.data.type === 'DECRYPT') {
-    const { encryptedBuffer, derivedKeyB64, encryption } = event.data.payload;
+    const { encryptedBuffer, sessionKey, encryption } = event.data.payload;
     const { ivLength, tagLength } = encryption;
 
     try {
+      // PATCH v5.1.7: Validate session key before any processing.
+      if (sessionKey.scope !== 'ONLINE_STREAM_ONLY' && sessionKey.scope !== 'OFFLINE_PLAYBACK') {
+        const response: CryptoWorkerResponse = {
+            type: 'RECOVERABLE_ERROR',
+            payload: { message: '유효하지 않은 키 사용 목적입니다.', code: 'INVALID_SCOPE' }
+        };
+        self.postMessage(response);
+        return;
+      }
+      if (sessionKey.expiresAt < Date.now()) {
+        const response: CryptoWorkerResponse = {
+            type: 'RECOVERABLE_ERROR',
+            payload: { message: '보안 세션이 만료되었습니다. 재생을 다시 시도합니다.', code: 'KEY_EXPIRED' }
+        };
+        self.postMessage(response);
+        return;
+      }
+      
+      // PATCH v5.1.6: Enforce full buffer assumption (basic check).
+      if (!encryptedBuffer || encryptedBuffer.byteLength < (4 + ivLength + tagLength)) {
+        throw new Error('Incomplete or empty video buffer received.');
+      }
+
       // 1. Import the derived key for use with AES-GCM
-      const keyBuffer = Buffer.from(derivedKeyB64, 'base64');
+      const keyBuffer = Buffer.from(sessionKey.derivedKeyB64, 'base64');
       const cryptoKey = await self.crypto.subtle.importKey(
         'raw', 
         keyBuffer, 
@@ -26,8 +50,8 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
       while (offset < encryptedBuffer.byteLength) {
           // 2a. Read the chunk length header (4 bytes, Big Endian)
           if (offset + 4 > encryptedBuffer.byteLength) {
-              console.warn("CryptoWorker: Incomplete data, not enough bytes for a length header.");
-              break;
+              // PATCH v5.1.8: Fail-fast on malformed stream
+              throw new Error(`Integrity error: Incomplete data, not enough bytes for a length header at offset ${offset}.`);
           }
           const lengthBuffer = encryptedBuffer.slice(offset, offset + 4);
           const chunkBodyLength = new DataView(lengthBuffer).getUint32(0, false);
@@ -35,7 +59,8 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
 
           // 2b. Check if the full chunk body is available
           if (offset + chunkBodyLength > encryptedBuffer.byteLength) {
-              throw new Error(`Corrupted stream: expected chunk of size ${chunkBodyLength} but only ${encryptedBuffer.byteLength - offset} bytes are available.`);
+              // PATCH v5.1.8: Fail-fast on malformed stream
+              throw new Error(`Integrity error: Corrupted stream. Expected chunk of size ${chunkBodyLength} but only ${encryptedBuffer.byteLength - offset} bytes are available.`);
           }
           
           // 2c. Extract IV, ciphertext, and AuthTag from the chunk body
@@ -66,16 +91,22 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
       // 3. Concatenate all decrypted chunks and send back as a single buffer
       const finalPlaintextBuffer = Buffer.concat(decryptedChunks);
       const response: CryptoWorkerResponse = {
-          type: 'DECRYPT_COMPLETE',
+          type: 'DECRYPT_SUCCESS',
           payload: finalPlaintextBuffer,
       };
       self.postMessage(response, [finalPlaintextBuffer.buffer]);
 
     } catch (error: any) {
-      console.error('CryptoWorker Error:', error);
+      // PATCH v5.1.8: Centralized fatal error handling.
+      // DOMException with name 'OperationError' is the typical error for an AuthTag mismatch in Web Crypto.
+      const isIntegrityError = error.name === 'OperationError';
+      const message = isIntegrityError
+          ? '암호화된 비디오 데이터의 무결성 검증에 실패했습니다. 파일이 손상되었거나 변조되었을 수 있습니다.'
+          : `복호화 중 치명적인 오류 발생: ${error.message}`;
+
       const response: CryptoWorkerResponse = {
-        type: 'DECRYPT_ERROR',
-        payload: { message: `복호화 실패: ${error.message}` },
+        type: 'FATAL_ERROR',
+        payload: { message, code: isIntegrityError ? 'INTEGRITY_ERROR' : 'DECRYPT_FAILED' },
       };
       self.postMessage(response);
     }

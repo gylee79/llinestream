@@ -302,16 +302,27 @@ export interface OfflineVideoInfo {
 }
 
 // ========= Web Worker Types =========
+// PATCH v5.1.7: Refine worker request to include sessionKey object for validation.
 export interface CryptoWorkerRequest {
   type: 'DECRYPT';
   payload: {
     encryptedBuffer: ArrayBuffer;
-    derivedKeyB64: string;
+    sessionKey: {
+      derivedKeyB64: string;
+      scope: 'ONLINE_STREAM_ONLY' | 'OFFLINE_PLAYBACK';
+      expiresAt: number; // JS timestamp (Date.now())
+    };
     encryption: Episode['encryption'];
   };
 }
 
+// PATCH v5.1.7, v5.1.8: Refine worker response types for better error handling and security.
 export interface CryptoWorkerResponse {
-  type: 'DECRYPT_COMPLETE' | 'DECRYPT_ERROR';
-  payload: ArrayBuffer | { message: string };
+  type: 'DECRYPT_SUCCESS' | 'FATAL_ERROR' | 'RECOVERABLE_ERROR';
+  payload: 
+    | ArrayBuffer 
+    | { 
+        message: string; 
+        code?: 'KEY_EXPIRED' | 'INVALID_SCOPE' | 'DECRYPT_FAILED' | 'INTEGRITY_ERROR' | 'UNKNOWN_WORKER_ERROR';
+      };
 }
