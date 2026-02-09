@@ -8,11 +8,13 @@ import { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
  * @param timestamp The Timestamp or Date to convert.
  * @returns A JavaScript Date object, or null if the input is invalid or a FieldValue.
  */
-export function toJSDate(timestamp: Timestamp | Date | null | undefined): Date | null {
+export function toJSDate(timestamp: any): Date | null {
   if (!timestamp) {
     return null;
   }
-  if (timestamp instanceof FirebaseTimestamp) {
+  // This handles both firebase/firestore and firebase-admin Timestamps,
+  // as well as JS Date objects, by checking for the toDate method.
+  if (typeof timestamp.toDate === 'function') {
     return timestamp.toDate();
   }
   if (timestamp instanceof Date) {
@@ -87,3 +89,4 @@ export function toDisplayTime(timestamp: Timestamp | Date | null | undefined): s
         hour12: false,
     }).format(date);
 }
+

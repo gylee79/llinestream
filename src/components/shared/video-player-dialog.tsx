@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark, OfflineVideoData, CryptoWorkerRequest, CryptoWorkerResponse, PlayerState, ChatLog, ChatMessage } from '@/lib/types';
@@ -30,9 +31,11 @@ type DownloadState = 'idle' | 'checking' | 'downloading' | 'saving' | 'completed
 const DownloadButton = ({
     downloadState,
     onDownload,
+    reasonDisabled
 }: {
     downloadState: DownloadState;
     onDownload: () => void;
+    reasonDisabled?: string;
 }) => {
     switch (downloadState) {
         case 'checking':
@@ -55,9 +58,9 @@ const DownloadButton = ({
             );
         case 'forbidden':
             return (
-                 <Button variant="outline" disabled>
+                 <Button variant="outline" disabled title={reasonDisabled}>
                     <AlertTriangle className="mr-2 h-4 w-4 text-yellow-500" />
-                    구독 필요
+                    저장 불가
                 </Button>
             );
         case 'error':
@@ -418,6 +421,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     
     const [watermarkSeed, setWatermarkSeed] = React.useState<string | null>(null);
     const [downloadState, setDownloadState] = React.useState<DownloadState>('idle');
+    const [downloadDisabledReason, setDownloadDisabledReason] = React.useState<string | undefined>();
 
     const videoRef = React.useRef<HTMLVideoElement>(null);
     const workerRef = React.useRef<Worker | null>(null);
@@ -457,7 +461,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             });
             
             if (licenseRes.status === 403) {
+                const errorData = await licenseRes.json();
                 setDownloadState('forbidden');
+                setDownloadDisabledReason(errorData.error || '이 콘텐츠는 오프라인 저장이 허용되지 않습니다.');
                 toast({ variant: 'default', title: '오프라인 저장 불가', description: '구독이 필요한 콘텐츠입니다.' });
                 return;
             }
@@ -492,6 +498,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
         } catch (error: any) {
             setDownloadState('error');
+            setDownloadDisabledReason(error.message);
             toast({ variant: 'destructive', title: '다운로드 실패', description: error.message });
             console.error("Download Error:", error);
         }
@@ -679,6 +686,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     <DownloadButton 
                         downloadState={downloadState} 
                         onDownload={handleDownload}
+                        reasonDisabled={downloadDisabledReason}
                     />
                 )}
             </div>
