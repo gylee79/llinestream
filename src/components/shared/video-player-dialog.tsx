@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark, OfflineVideoData, CryptoWorkerRequest, CryptoWorkerResponse, PlayerState, ChatLog, ChatMessage } from '@/lib/types';
@@ -26,20 +25,25 @@ import { Input } from '../ui/input';
 import { saveVideo } from '@/lib/offline-db';
 import { useDebugLogDispatch } from '@/context/debug-log-context';
 
+type DownloadState = 'idle' | 'checking' | 'downloading' | 'saving' | 'completed' | 'forbidden' | 'error';
+
 const DownloadButton = ({
     downloadState,
-    handleDownload,
+    onDownload,
 }: {
-    downloadState: 'idle' | 'downloading' | 'saving' | 'completed' | 'error';
-    handleDownload: () => void;
+    downloadState: DownloadState;
+    onDownload: () => void;
 }) => {
     switch (downloadState) {
+        case 'checking':
         case 'downloading':
         case 'saving':
             return (
                 <Button variant="outline" disabled>
                     <Loader className="mr-2 h-4 w-4 animate-spin" />
-                    {downloadState === 'downloading' ? '다운로드 중...' : '저장 중...'}
+                    {downloadState === 'checking' && '권한 확인 중...'}
+                    {downloadState === 'downloading' && '다운로드 중...'}
+                    {downloadState === 'saving' && '저장 중...'}
                 </Button>
             );
         case 'completed':
@@ -49,9 +53,16 @@ const DownloadButton = ({
                     저장 완료
                 </Button>
             );
+        case 'forbidden':
+            return (
+                 <Button variant="outline" disabled>
+                    <AlertTriangle className="mr-2 h-4 w-4 text-yellow-500" />
+                    구독 필요
+                </Button>
+            );
         case 'error':
             return (
-                <Button variant="destructive" onClick={handleDownload}>
+                <Button variant="destructive" onClick={onDownload}>
                     <RotateCcw className="mr-2 h-4 w-4" />
                     다운로드 재시도
                 </Button>
@@ -59,7 +70,7 @@ const DownloadButton = ({
         case 'idle':
         default:
             return (
-                <Button variant="outline" onClick={handleDownload}>
+                <Button variant="outline" onClick={onDownload}>
                     <Download className="mr-2 h-4 w-4" />
                     오프라인 저장
                 </Button>
@@ -161,7 +172,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
         if (!user || !firestore) return;
         setIsLoading(true);
         setChatError(null);
-        // This query requires a composite index on ('episodeId', 'createdAt') for the 'chats' collection group.
+        
         const q = query(
             collection(firestore, 'users', user.id, 'chats'), 
             where('episodeId', '==', episode.id), 
@@ -406,7 +417,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     const [playerMessage, setPlayerMessage] = React.useState<string | null>(null);
     
     const [watermarkSeed, setWatermarkSeed] = React.useState<string | null>(null);
-    const [downloadState, setDownloadState] = React.useState<'idle' | 'downloading' | 'saving' | 'completed' | 'error'>('idle');
+    const [downloadState, setDownloadState] = React.useState<DownloadState>('idle');
 
     const videoRef = React.useRef<HTMLVideoElement>(null);
     const workerRef = React.useRef<Worker | null>(null);
@@ -421,7 +432,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
     const handleSeek = (timeInSeconds: number) => {
         const video = videoRef.current;
-        if (video && playerState === 'ready' || playerState === 'playing' || playerState === 'paused') {
+        if (video && (playerState === 'ready' || playerState === 'playing' || playerState === 'paused')) {
             video.currentTime = timeInSeconds;
             video.play().catch(() => {});
             toast({ title: "이동 완료", description: `${formatDuration(timeInSeconds)} 지점입니다.` });
@@ -430,12 +441,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         }
     };
 
-    const handleDownload = async () => {
+    const handleDownload = React.useCallback(async () => {
         if (!authUser || !course || !episode) {
             toast({ variant: 'destructive', title: '오류', description: '다운로드에 필요한 정보가 부족합니다.' });
             return;
         }
-        setDownloadState('downloading');
+        setDownloadState('checking');
         try {
             const token = await authUser.getIdToken();
             
@@ -444,15 +455,22 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ videoId: episode.id, deviceId: 'web-offline' }),
             });
-            if (!licenseRes.ok) throw new Error(`오프라인 라이선스 발급 실패: ${await licenseRes.text()}`);
+            
+            if (licenseRes.status === 403) {
+                setDownloadState('forbidden');
+                toast({ variant: 'default', title: '오프라인 저장 불가', description: '구독이 필요한 콘텐츠입니다.' });
+                return;
+            }
+            if (!licenseRes.ok) throw new Error(`오프라인 라이선스 발급 실패: (${licenseRes.status})`);
             const license = await licenseRes.json();
             
+            setDownloadState('downloading');
             const urlRes = await fetch('/api/video-url', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ videoId: episode.id }),
             });
-            if (!urlRes.ok) throw new Error(`비디오 URL 요청 실패: ${await urlRes.text()}`);
+            if (!urlRes.ok) throw new Error(`비디오 URL 요청 실패: (${urlRes.status})`);
             const { signedUrl } = await urlRes.json();
             
             const encryptedRes = await fetch(signedUrl);
@@ -477,7 +495,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             toast({ variant: 'destructive', title: '다운로드 실패', description: error.message });
             console.error("Download Error:", error);
         }
-    };
+    }, [authUser, course, episode, toast]);
 
     const cleanup = React.useCallback(() => {
         addLog('INFO', 'Performing cleanup...');
@@ -649,7 +667,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
        <DialogContent className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[96vw] md:h-[92vh] md:rounded-2xl overflow-hidden shadow-2xl">
-         <DialogHeader className="flex h-12 items-center justify-between border-b bg-white pl-4 pr-12 flex-shrink-0 relative">
+         <DialogHeader className="flex flex-row h-12 items-center justify-between border-b bg-white pl-4 pr-12 flex-shrink-0 relative">
             <div className="flex-1 min-w-0">
                 <DialogTitle className="text-base font-bold truncate">
                     {course?.name} <ChevronRight className="inline w-4 h-4 mx-1 text-muted-foreground"/> {episode.title}
@@ -657,7 +675,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 <DialogDescription className="sr-only">비디오 재생 및 관련 정보 다이얼로그</DialogDescription>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                {!offlineVideoData && <DownloadButton downloadState={downloadState} handleDownload={handleDownload} />}
+                 {!offlineVideoData && (
+                    <DownloadButton 
+                        downloadState={downloadState} 
+                        onDownload={handleDownload}
+                    />
+                )}
             </div>
              <DialogClose className="absolute right-4 top-1/2 -translate-y-1/2 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
                 <X className="h-4 w-4" />
