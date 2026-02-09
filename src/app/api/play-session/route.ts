@@ -11,6 +11,23 @@ import { promisify } from 'util';
 
 const hkdf = promisify(crypto.hkdf);
 
+async function decryptMasterKey(encryptedMasterKeyB64: string): Promise<Buffer> {
+    const kekSecret = process.env.KEK_SECRET;
+    if (!kekSecret) throw new Error("KEK_SECRET is not configured on the server.");
+
+    const kek = crypto.scryptSync(kekSecret, 'l-line-stream-kek-salt', 32);
+    const encryptedBlob = Buffer.from(encryptedMasterKeyB64, 'base64');
+    
+    const iv = encryptedBlob.subarray(0, 12);
+    const authTag = encryptedBlob.subarray(encryptedBlob.length - 16);
+    const encryptedKey = encryptedBlob.subarray(12, encryptedBlob.length - 16);
+    
+    const decipher = crypto.createDecipheriv('aes-256-gcm', kek, iv);
+    decipher.setAuthTag(authTag);
+
+    return Buffer.concat([decipher.update(encryptedKey), decipher.final()]);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const adminApp = await initializeAdminApp();
@@ -60,7 +77,7 @@ export async function POST(req: NextRequest) {
        return NextResponse.json({ error: 'Forbidden: Subscription required' }, { status: 403 });
     }
 
-    // 4. Retrieve Master Key and Salt from secure collection
+    // 4. Retrieve and Decrypt Master Key
     const keyId = episodeData?.encryption?.keyId;
     if (!keyId) {
         return NextResponse.json({ error: 'Not Found: Encryption info missing for this video' }, { status: 404 });
@@ -70,11 +87,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not Found: Encryption key not found for this video' }, { status: 404 });
     }
     const videoKeyData = keyDoc.data() as VideoKey;
-    const masterKey = Buffer.from(videoKeyData.masterKey, 'base64');
+    const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
     const salt = Buffer.from(videoKeyData.salt, 'base64');
 
-    // 5. Generate a Derived Key for online session using HKDF
-    const info = Buffer.from(`${userId}|${deviceId}`);
+    // 5. Generate a Derived Key for online session using HKDF with a structured info
+    const sessionId = `online_sess_${crypto.randomBytes(12).toString('hex')}`;
+    const info = Buffer.concat([
+        Buffer.from("LSV_ONLINE_V1"),
+        Buffer.from(userId),
+        Buffer.from(deviceId),
+        Buffer.from(sessionId)
+    ]);
     const derivedKey = await hkdf('sha256', masterKey, salt, info, 32);
     
     // 6. Generate Watermark Seed
@@ -82,7 +105,7 @@ export async function POST(req: NextRequest) {
 
     // 7. Return Session Info
     return NextResponse.json({
-      sessionId: `online_sess_${crypto.randomBytes(12).toString('hex')}`,
+      sessionId: sessionId,
       derivedKey: derivedKey.toString('base64'),
       expiresIn: 3600, // Key is valid for 1 hour for this online session
       watermarkSeed: watermarkSeed,

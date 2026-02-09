@@ -122,9 +122,9 @@ export interface Episode {
 export interface VideoKey {
   keyId: string;
   videoId: string;
-  masterKey: string; // BASE64_32_BYTES_KEY
-  salt: string; // BASE64_16_BYTES_SALT for HKDF
-  rotation: number;
+  encryptedMasterKey: string; // KEK-encrypted master key, base64 encoded
+  salt: string; // Salt for HKDF, base64 encoded
+  keyVersion: number;
   createdAt: Timestamp;
 }
 
