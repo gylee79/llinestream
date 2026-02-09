@@ -154,11 +154,19 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
     const [userQuestion, setUserQuestion] = React.useState('');
     const [messages, setMessages] = React.useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
+    const [chatError, setChatError] = React.useState<string | null>(null);
     const isAIAvailable = episode.aiProcessingStatus === 'completed';
 
     React.useEffect(() => {
         if (!user || !firestore) return;
-        const q = query(collection(firestore, 'users', user.id, 'chats'), where('episodeId', '==', episode.id), orderBy('createdAt', 'asc'));
+        setIsLoading(true);
+        setChatError(null);
+        // This query requires a composite index on ('episodeId', 'createdAt') for the 'chats' collection group.
+        const q = query(
+            collection(firestore, 'users', user.id, 'chats'), 
+            where('episodeId', '==', episode.id), 
+            orderBy('createdAt', 'asc')
+        );
         
         const unsubscribe = onSnapshot(q, 
             (snapshot) => {
@@ -172,10 +180,13 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
                 });
                 setMessages(newMessages);
                 setIsLoading(false);
+                setChatError(null);
             },
             (error) => {
                 console.error("ChatView snapshot listener error:", error);
                 addLog('ERROR', `AI 채팅 기록 로딩 실패: ${error.message}`);
+                // Set a user-friendly error state instead of crashing the component
+                setChatError("채팅 기록을 불러오는 중 오류가 발생했습니다. Firestore 인덱스가 필요할 수 있습니다.");
                 setIsLoading(false);
             }
         );
@@ -197,18 +208,29 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
         <div className="flex flex-col h-full p-4">
             <ScrollArea className="flex-grow pr-4">
                 <div className="space-y-4">
-                    {messages.map(m => (
-                        <div key={m.id} className={cn("flex items-end gap-2", m.role === 'user' ? 'justify-end' : 'justify-start')}>
-                            {m.role === 'model' && <Bot className="h-8 w-8 p-1 bg-primary text-white rounded-full" />}
-                            <p className={cn("text-sm p-3 rounded-lg max-w-[80%]", m.role === 'user' ? 'bg-primary text-white' : 'bg-white border')}>{m.content}</p>
+                    {chatError ? (
+                        <div className="text-center text-red-500 p-4 bg-red-50 rounded-md">
+                            <AlertTriangle className="mx-auto h-8 w-8 mb-2"/>
+                            <p className="text-sm font-semibold">{chatError}</p>
                         </div>
-                    ))}
+                    ) : isLoading ? (
+                        <div className="text-center text-muted-foreground p-4">
+                            <Loader className="mx-auto h-8 w-8 animate-spin"/>
+                        </div>
+                    ) : (
+                        messages.map(m => (
+                            <div key={m.id} className={cn("flex items-end gap-2", m.role === 'user' ? 'justify-end' : 'justify-start')}>
+                                {m.role === 'model' && <Bot className="h-8 w-8 p-1 bg-primary text-white rounded-full" />}
+                                <p className={cn("text-sm p-3 rounded-lg max-w-[80%]", m.role === 'user' ? 'bg-primary text-white' : 'bg-white border')}>{m.content}</p>
+                            </div>
+                        ))
+                    )}
                     {isPending && <div className="text-xs text-muted-foreground animate-pulse">AI가 답변을 생각 중입니다...</div>}
                 </div>
             </ScrollArea>
             <div className="pt-4 border-t flex gap-2">
-                <Textarea value={userQuestion} onChange={(e) => setUserQuestion(e.target.value)} disabled={!isAIAvailable} className="h-10 min-h-0 resize-none" placeholder="비디오에 대해 질문하세요..." />
-                <Button onClick={handleAskQuestion} disabled={isPending || !isAIAvailable}><Send className="w-4 h-4"/></Button>
+                <Textarea value={userQuestion} onChange={(e) => setUserQuestion(e.target.value)} disabled={!isAIAvailable || !!chatError} className="h-10 min-h-0 resize-none" placeholder={isAIAvailable ? "비디오에 대해 질문하세요..." : "AI 분석 완료 후 사용 가능합니다."} />
+                <Button onClick={handleAskQuestion} disabled={isPending || !isAIAvailable || !!chatError}><Send className="w-4 h-4"/></Button>
             </div>
         </div>
     );
