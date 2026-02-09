@@ -20,10 +20,10 @@ if (!admin.apps.length) {
 
 setGlobalOptions({
   region: "us-central1",
-  secrets: ["GOOGLE_GENAI_API_KEY"],
+  secrets: ["GOOGLE_GENAI_API_KEY", "KEK_SECRET"],
   timeoutSeconds: 540,
   memory: "2GiB",
-  minInstances: 1,
+  minInstances: 0,
   serviceAccount: "firebase-adminsdk-fbsvc@studio-6929130257-b96ff.iam.gserviceaccount.com",
 });
 
@@ -49,15 +49,23 @@ function getMimeType(filePath: string): string {
 // 2. 지연 초기화 (Lazy Initialization)
 let genAI: GoogleGenerativeAI | null = null;
 let fileManager: GoogleAIFileManager | null = null;
+let kek: Buffer | null = null;
 
 function initializeTools() {
   const apiKey = process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) throw new Error("GOOGLE_GENAI_API_KEY is missing!");
+  
+  const kekSecret = process.env.KEK_SECRET;
+  if (!kekSecret) throw new Error("KEK_SECRET is not configured.");
 
   if (!genAI) genAI = new GoogleGenerativeAI(apiKey);
   if (!fileManager) fileManager = new GoogleAIFileManager(apiKey);
+  if (!kek) {
+    // KEK(Key Encryption Key)를 환경 변수에서 파생하여 메모리에만 저장
+    kek = crypto.scryptSync(kekSecret, 'l-line-stream-kek-salt', 32);
+  }
   
-  return { genAI, fileManager };
+  return { genAI, fileManager, kek };
 }
 
 // 3. NEW: File-based Encryption (AES-256-GCM)
@@ -66,13 +74,16 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
     const tempOutputPath = path.join(os.tmpdir(), `encrypted-${episodeId}`);
 
     try {
+        const { kek: localKek } = initializeTools();
+
         console.log(`[${episodeId}] Encryption: Starting download of ${inputFilePath}`);
         await bucket.file(inputFilePath).download({ destination: tempInputPath });
         console.log(`[${episodeId}] Encryption: Download complete.`);
 
-        // 1. Generate master key and IV
+        // 1. Generate master key, salt, and IV
         const masterKey = crypto.randomBytes(32); // 256 bits for AES-256
-        const iv = crypto.randomBytes(12);       // 96 bits is recommended for GCM
+        const salt = crypto.randomBytes(16);      // 16 bytes salt for HKDF
+        const iv = crypto.randomBytes(12);        // 96 bits (12 bytes) is recommended for GCM
 
         // 2. Create cipher
         const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
@@ -92,32 +103,39 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
         // 4. Get the GCM authentication tag
         const authTag = cipher.getAuthTag();
 
-        // 5. Construct the final encrypted file: [IV][AuthTag][EncryptedData]
-        const encryptedData = fs.readFileSync(tempOutputPath);
-        const finalBuffer = Buffer.concat([iv, authTag, encryptedData]);
+        // 5. Construct the final encrypted file: [IV][Ciphertext][AuthTag]
+        const ciphertext = fs.readFileSync(tempOutputPath);
+        const finalBuffer = Buffer.concat([iv, ciphertext, authTag]);
 
-        // 6. Upload the final .lsv file
+        // 6. Upload the final .lsv file (now private)
         const encryptedStoragePath = `episodes/${episodeId}/encrypted.lsv`;
         console.log(`[${episodeId}] Encryption: Uploading encrypted file to ${encryptedStoragePath}`);
         await bucket.file(encryptedStoragePath).save(finalBuffer, {
             contentType: 'application/octet-stream',
-            predefinedAcl: 'publicRead', // Make the encrypted file publicly readable
         });
         console.log(`[${episodeId}] Encryption: Upload complete.`);
 
-        // 7. Store the master key securely in `video_keys` collection
+        // 7. Encrypt the master key with the KEK
+        const kekIv = crypto.randomBytes(12);
+        const kekCipher = crypto.createCipheriv('aes-256-gcm', localKek, kekIv);
+        const encryptedMasterKey = Buffer.concat([kekCipher.update(masterKey), kekCipher.final()]);
+        const kekAuthTag = kekCipher.getAuthTag();
+        const encryptedMasterKeyBlob = Buffer.concat([kekIv, encryptedMasterKey, kekAuthTag]);
+        
+        // 8. Store the ENCRYPTED master key and salt securely in `video_keys` collection
         const keyId = `vidkey_${episodeId}`;
         const keyDocRef = db.collection('video_keys').doc(keyId);
         await keyDocRef.set({
             keyId,
             videoId: episodeId,
-            masterKey: masterKey.toString('base64'),
-            rotation: 1,
+            encryptedMasterKey: encryptedMasterKeyBlob.toString('base64'),
+            salt: salt.toString('base64'),
+            keyVersion: 1,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        console.log(`[${episodeId}] Encryption: Master key saved to video_keys/${keyId}`);
+        console.log(`[${episodeId}] Encryption: ENCRYPTED master key and salt saved to video_keys/${keyId}`);
 
-        // 8. Update the episode document with encryption metadata
+        // 9. Update the episode document with encryption metadata
         await docRef.update({
             'storage.encryptedPath': encryptedStoragePath,
             'storage.fileSize': finalBuffer.length,
@@ -392,3 +410,5 @@ interface EpisodeData {
   encryption?: { keyId?: string };
   [key: string]: any;
 }
+
+    
