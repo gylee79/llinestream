@@ -104,7 +104,7 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
         }
         
         writeStream.end();
-        await new Promise(resolve => writeStream.on('finish', resolve));
+        await new Promise<void>(resolve => writeStream.on('finish', () => resolve()));
 
         console.log(`[${episodeId}] Encryption: Chunked file encryption finished.`);
 
