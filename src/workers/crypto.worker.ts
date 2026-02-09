@@ -18,23 +18,27 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
         false, // extractable: false for security
         ['decrypt']
       );
+      
+      if (!chunkSize) {
+        throw new Error('Chunk size is not defined in encryption metadata.');
+      }
 
       // 2. Loop through the buffer, decrypting chunk by chunk
       let offset = 0;
-      const plaintextChunkSize = chunkSize || (1 * 1024 * 1024); // Default to 1MB if not provided
+      const plaintextChunkSize = chunkSize;
 
       while (offset < encryptedBuffer.byteLength) {
           const remainingBytes = encryptedBuffer.byteLength - offset;
           
-          // Determine the size of the plaintext for the current chunk
-          const currentPlaintextChunkSize = Math.min(plaintextChunkSize, remainingBytes - ivLength - tagLength);
+          // Size of the encrypted data in the current chunk
+          const ciphertextLength = Math.min(plaintextChunkSize, remainingBytes - ivLength - tagLength);
           
-          if (currentPlaintextChunkSize <= 0) break; // No more full chunks to process
+          if (ciphertextLength <= 0) break; // No more full chunks to process
 
-          const currentEncryptedBlockSize = ivLength + currentPlaintextChunkSize + tagLength;
+          const currentEncryptedBlockSize = ivLength + ciphertextLength + tagLength;
           
           if (remainingBytes < currentEncryptedBlockSize) {
-              throw new Error(`Incomplete chunk data. Remaining: ${remainingBytes}, Expected: ${currentEncryptedBlockSize}`);
+              throw new Error(`Incomplete chunk data. Remaining: ${remainingBytes}, Expected at least: ${currentEncryptedBlockSize}`);
           }
           
           const block = encryptedBuffer.slice(offset, offset + currentEncryptedBlockSize);
@@ -80,5 +84,3 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
 
 // This export is needed to satisfy the module system, even though it's a worker.
 export {};
-
-    
