@@ -6,23 +6,10 @@ import type { CryptoWorkerRequest, CryptoWorkerResponse, Episode } from '@/lib/t
 self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
   if (event.data.type === 'DECRYPT') {
     const { encryptedBuffer, derivedKeyB64, encryption } = event.data.payload;
-    const { ivLength, tagLength } = encryption;
+    const { ivLength, tagLength, chunkSize } = encryption;
 
-    // For debugging structural issues
-    console.debug('[CryptoWorker] Received decryption job:', {
-      totalLength: encryptedBuffer.byteLength,
-      ivLength,
-      tagLength,
-      expectedCiphertextLength: encryptedBuffer.byteLength - ivLength - tagLength,
-    });
-    
     try {
-      // 1. Basic structure validation
-      if (encryptedBuffer.byteLength <= ivLength + tagLength) {
-        throw new Error('Invalid encrypted buffer: The provided data is too small to contain a valid IV and authentication tag.');
-      }
-
-      // 2. Import the derived key
+      // 1. Import the derived key
       const keyBuffer = Buffer.from(derivedKeyB64, 'base64');
       const cryptoKey = await self.crypto.subtle.importKey(
         'raw', 
@@ -32,29 +19,53 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
         ['decrypt']
       );
 
-      // 3. Extract IV and the combined ciphertext + auth tag
-      const iv = encryptedBuffer.slice(0, ivLength);
-      // The WebCrypto API expects the auth tag to be concatenated at the end of the ciphertext.
-      const ciphertextWithTag = encryptedBuffer.slice(ivLength);
+      // 2. Loop through the buffer, decrypting chunk by chunk
+      let offset = 0;
+      const plaintextChunkSize = chunkSize || (1 * 1024 * 1024); // Default to 1MB if not provided
 
-      // 4. Decrypt the data
-      const decryptedData = await self.crypto.subtle.decrypt(
-        { 
-          name: 'AES-GCM', 
-          iv: iv,
-          tagLength: tagLength * 8, // tagLength must be in bits for the API
-        },
-        cryptoKey,
-        ciphertextWithTag
-      );
+      while (offset < encryptedBuffer.byteLength) {
+          const remainingBytes = encryptedBuffer.byteLength - offset;
+          
+          // Determine the size of the plaintext for the current chunk
+          const currentPlaintextChunkSize = Math.min(plaintextChunkSize, remainingBytes - ivLength - tagLength);
+          
+          if (currentPlaintextChunkSize <= 0) break; // No more full chunks to process
 
-      // 5. Send the decrypted data back to the main thread
-      const response: CryptoWorkerResponse = {
-        type: 'DECRYPT_SUCCESS',
-        payload: decryptedData,
-      };
-      // Transfer the buffer to avoid copying
-      self.postMessage(response, [decryptedData]);
+          const currentEncryptedBlockSize = ivLength + currentPlaintextChunkSize + tagLength;
+          
+          if (remainingBytes < currentEncryptedBlockSize) {
+              throw new Error(`Incomplete chunk data. Remaining: ${remainingBytes}, Expected: ${currentEncryptedBlockSize}`);
+          }
+          
+          const block = encryptedBuffer.slice(offset, offset + currentEncryptedBlockSize);
+          
+          const iv = block.slice(0, ivLength);
+          const ciphertextWithTag = block.slice(ivLength);
+          
+          // Decrypt the current chunk
+          const decryptedChunk = await self.crypto.subtle.decrypt(
+            { 
+              name: 'AES-GCM', 
+              iv: iv,
+              tagLength: tagLength * 8, // tagLength must be in bits
+            },
+            cryptoKey,
+            ciphertextWithTag
+          );
+
+          // Post each decrypted chunk back to the main thread
+          const chunkResponse: CryptoWorkerResponse = {
+              type: 'DECRYPT_CHUNK_SUCCESS',
+              payload: decryptedChunk,
+          };
+          self.postMessage(chunkResponse, [decryptedChunk]);
+
+          offset += currentEncryptedBlockSize;
+      }
+      
+      // 3. Signal that decryption is complete
+      const completeResponse: CryptoWorkerResponse = { type: 'DECRYPT_COMPLETE', payload: {} };
+      self.postMessage(completeResponse);
 
     } catch (error: any) {
       console.error('CryptoWorker Error:', error);

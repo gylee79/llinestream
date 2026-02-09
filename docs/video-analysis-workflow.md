@@ -138,7 +138,7 @@
             "fileEncryption": {
               "library": "Node.js Crypto",
               "algorithm": "AES-256-GCM",
-              "keyManagement": "Master key and salt are stored in 'video_keys'.",
+              "keyManagement": "Master key is encrypted with a KEK from environment variables before being stored in 'video_keys'.",
               "lsvFileFormat": {
                 "description": "The .lsv file is a concatenation of the IV, the ciphertext, and the GCM authentication tag.",
                 "layout": "[IV][Ciphertext][AuthTag]",
@@ -176,7 +176,7 @@
           "description": "Server generates and returns a session-specific derived key using HKDF-SHA256.",
           "file": "src/app/api/play-session/route.ts",
           "technicalDetails": {
-            "keyDerivation": "HKDF-SHA256(masterKey, salt, userInfo)"
+            "keyDerivation": "HKDF-SHA256(masterKey, salt, Buffer.concat([Buffer.from(\"LSV_ONLINE_V1\"), ...]))"
           }
         },
         {
@@ -207,7 +207,10 @@
         {
           "step": 11,
           "description": "Server generates a time-limited offline key using HKDF and returns it.",
-          "file": "src/app/api/offline-license/route.ts"
+          "file": "src/app/api/offline-license/route.ts",
+          "technicalDetails": {
+            "keyDerivation": "HKDF-SHA256(masterKey, salt, Buffer.concat([Buffer.from(\"LSV_OFFLINE_V1\"), ...]))"
+          }
         },
         {
           "step": 12,

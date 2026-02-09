@@ -69,10 +69,12 @@ export interface Course {
 }
 
 export interface EncryptionInfo {
-  algorithm: 'AES-256-GCM';
+  algorithm: 'AES-256-GCM' | 'AES-256-GCM-CHUNKED';
+  version: number;
   keyId: string;
   ivLength: 12;
   tagLength: 16;
+  chunkSize?: number; // For chunked encryption
 }
 
 export interface Episode {
@@ -310,6 +312,6 @@ export interface CryptoWorkerRequest {
 }
 
 export interface CryptoWorkerResponse {
-  type: 'DECRYPT_SUCCESS' | 'DECRYPT_ERROR';
-  payload: ArrayBuffer | { message: string };
+  type: 'DECRYPT_CHUNK_SUCCESS' | 'DECRYPT_COMPLETE' | 'DECRYPT_ERROR';
+  payload: ArrayBuffer | { message: string } | {};
 }
