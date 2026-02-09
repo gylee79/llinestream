@@ -23,7 +23,7 @@ setGlobalOptions({
   secrets: ["GOOGLE_GENAI_API_KEY"],
   timeoutSeconds: 540,
   memory: "2GiB",
-  minInstances: 1,
+  minInstances: 0,
   serviceAccount: "firebase-adminsdk-fbsvc@studio-6929130257-b96ff.iam.gserviceaccount.com",
 });
 

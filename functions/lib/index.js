@@ -56,6 +56,7 @@ if (!admin.apps.length) {
     secrets: ["GOOGLE_GENAI_API_KEY"],
     timeoutSeconds: 540,
     memory: "2GiB",
+    minInstances: 1,
     serviceAccount: "firebase-adminsdk-fbsvc@studio-6929130257-b96ff.iam.gserviceaccount.com",
 });
 const db = admin.firestore();
@@ -95,9 +96,10 @@ async function createEncryptedFile(episodeId, inputFilePath, docRef) {
         console.log(`[${episodeId}] Encryption: Starting download of ${inputFilePath}`);
         await bucket.file(inputFilePath).download({ destination: tempInputPath });
         console.log(`[${episodeId}] Encryption: Download complete.`);
-        // 1. Generate master key and IV
+        // 1. Generate master key, salt, and IV
         const masterKey = crypto.randomBytes(32); // 256 bits for AES-256
-        const iv = crypto.randomBytes(12); // 96 bits is recommended for GCM
+        const salt = crypto.randomBytes(16); // 16 bytes salt for HKDF
+        const iv = crypto.randomBytes(12); // 96 bits (12 bytes) is recommended for GCM
         // 2. Create cipher
         const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
         // 3. Encrypt using streams to handle large files
@@ -112,28 +114,28 @@ async function createEncryptedFile(episodeId, inputFilePath, docRef) {
         console.log(`[${episodeId}] Encryption: File encryption finished.`);
         // 4. Get the GCM authentication tag
         const authTag = cipher.getAuthTag();
-        // 5. Construct the final encrypted file: [IV][AuthTag][EncryptedData]
+        // 5. Construct the final encrypted file: [IV][Ciphertext][AuthTag]
         const encryptedData = fs.readFileSync(tempOutputPath);
-        const finalBuffer = Buffer.concat([iv, authTag, encryptedData]);
-        // 6. Upload the final .lsv file
+        const finalBuffer = Buffer.concat([iv, encryptedData, authTag]);
+        // 6. Upload the final .lsv file (now private)
         const encryptedStoragePath = `episodes/${episodeId}/encrypted.lsv`;
         console.log(`[${episodeId}] Encryption: Uploading encrypted file to ${encryptedStoragePath}`);
         await bucket.file(encryptedStoragePath).save(finalBuffer, {
             contentType: 'application/octet-stream',
-            predefinedAcl: 'publicRead', // Make the encrypted file publicly readable
         });
         console.log(`[${episodeId}] Encryption: Upload complete.`);
-        // 7. Store the master key securely in `video_keys` collection
+        // 7. Store the master key and salt securely in `video_keys` collection
         const keyId = `vidkey_${episodeId}`;
         const keyDocRef = db.collection('video_keys').doc(keyId);
         await keyDocRef.set({
             keyId,
             videoId: episodeId,
             masterKey: masterKey.toString('base64'),
+            salt: salt.toString('base64'), // Save the salt
             rotation: 1,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        console.log(`[${episodeId}] Encryption: Master key saved to video_keys/${keyId}`);
+        console.log(`[${episodeId}] Encryption: Master key and salt saved to video_keys/${keyId}`);
         // 8. Update the episode document with encryption metadata
         await docRef.update({
             'storage.encryptedPath': encryptedStoragePath,
@@ -248,11 +250,13 @@ async function runAiAnalysis(episodeId, filePath, docRef) {
         const rawText = result.response.text();
         let output;
         try {
+            // Attempt to find and parse JSON within markdown-style code blocks.
             const jsonMatch = rawText.match(/```(json)?\n([\s\S]*?)\n```/);
             if (jsonMatch && jsonMatch[2]) {
                 output = JSON.parse(jsonMatch[2]);
             }
             else {
+                // Fallback to parsing the whole string if no code block is found.
                 output = JSON.parse(rawText);
             }
         }
