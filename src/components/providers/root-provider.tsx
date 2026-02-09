@@ -1,4 +1,3 @@
-
 'use client';
 import React from 'react';
 import { usePathname } from 'next/navigation';
@@ -12,6 +11,10 @@ import CartSidebar from '@/components/cart/cart-sidebar';
 import { LandingPageProvider, useLandingPage } from '@/context/landing-page-context';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
+// New imports
+import { DebugLogProvider } from '@/context/debug-log-context';
+import DebugOverlay from '@/components/shared/debug-overlay';
+
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -61,10 +64,13 @@ export default function RootProvider({ children }: { children: React.ReactNode }
   return (
     <FirebaseClientProvider>
       <LandingPageProvider>
-        <CartProvider>
-          <AppLayout>{children}</AppLayout>
-          <Toaster />
-        </CartProvider>
+        <DebugLogProvider>
+          <CartProvider>
+            <AppLayout>{children}</AppLayout>
+            <Toaster />
+            <DebugOverlay />
+          </CartProvider>
+        </DebugLogProvider>
       </LandingPageProvider>
     </FirebaseClientProvider>
   );

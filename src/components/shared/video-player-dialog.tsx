@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark, OfflineVideoData } from '@/lib/types';
@@ -24,6 +23,7 @@ import { Skeleton } from '../ui/skeleton';
 import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/bookmark-actions';
 import { Input } from '../ui/input';
 import { saveVideo } from '@/lib/offline-db';
+import { useDebugLog } from '@/context/debug-log-context';
 
 
 // ========= TYPES AND INTERFACES =========
@@ -338,8 +338,46 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
   const videoRef = React.useRef<HTMLVideoElement>(null);
   
+  const { addLog } = useDebugLog();
+
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
   const { data: course } = useDoc<Course>(courseRef);
+
+  React.useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+
+    const handleError = (e: Event) => {
+        const error = (e.target as HTMLVideoElement).error;
+        if (!error) return;
+
+        let message = '';
+        switch (error.code) {
+            case error.MEDIA_ERR_ABORTED:
+                message = '사용자에 의해 비디오 로딩이 중단되었습니다.';
+                break;
+            case error.MEDIA_ERR_NETWORK:
+                message = '네트워크 오류로 인해 비디오 다운로드에 실패했습니다.';
+                break;
+            case error.MEDIA_ERR_DECODE:
+                message = '비디오에 문제가 있거나, 브라우저에서 지원하지 않는 형식으로 인해 디코딩에 실패했습니다.';
+                break;
+            case error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                message = '비디오를 찾을 수 없거나 형식을 지원하지 않습니다. (소스 문제)';
+                break;
+            default:
+                message = `알 수 없는 비디오 재생 오류가 발생했습니다. (코드: ${error.code})`;
+        }
+        addLog('ERROR', `비디오 태그 오류: ${message}`);
+        setPlayerError(message);
+    };
+
+    videoElement.addEventListener('error', handleError);
+
+    return () => {
+        videoElement.removeEventListener('error', handleError);
+    };
+  }, [addLog, isOpen]);
 
   const handleSeek = (timeInSeconds: number) => {
     if (videoRef.current) {
@@ -405,12 +443,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     let mediaSource: MediaSource | null = null;
     let sourceBuffer: SourceBuffer | null = null;
     let isMounted = true;
+    let abortController = new AbortController();
 
     const setupPlayback = async () => {
         if (!isMounted) return;
         setIsLoading(true);
         setPlayerError(null);
         setWatermarkSeed(null);
+        addLog('INFO', '▶️ 재생 준비 시작...');
 
         mediaSource = new MediaSource();
         if (videoRef.current) {
@@ -423,7 +463,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 let seed: string | null = null;
 
                 if (offlineVideoData) { // Offline Playback
+                    addLog('INFO', '📀 오프라인 데이터로 재생합니다.');
                     const keyBuffer = Buffer.from(offlineVideoData.license.offlineDerivedKey, 'base64');
+                    addLog('SUCCESS', '🔑 오프라인 키 로드 완료.');
                     const cryptoKey = await window.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
                     
                     const { ivLength, tagLength } = offlineVideoData.episode.encryption;
@@ -431,25 +473,53 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     const authTag = offlineVideoData.encryptedVideo.slice(ivLength, ivLength + tagLength);
                     const encryptedData = offlineVideoData.encryptedVideo.slice(ivLength + tagLength);
 
+                    addLog('INFO', '⚙️ 암호화된 비디오 복호화 시작...');
                     decryptedData = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv, tagLength: tagLength * 8 }, cryptoKey, encryptedData);
+                    addLog('SUCCESS', '✅ 복호화 성공!');
                     seed = offlineVideoData.license.watermarkSeed;
 
                 } else { // Online Streaming
                     if (!authUser) throw new Error("로그인이 필요합니다.");
+                    addLog('INFO', '☁️ 온라인 스트리밍을 시작합니다.');
+
                     const token = await authUser.getIdToken();
+                    addLog('SUCCESS', '1. 인증 토큰 획득 완료.');
 
-                    const sessionRes = await fetch('/api/play-session', { /* ... */ });
-                    if (!sessionRes.ok) throw new Error(`플레이 세션 시작 실패: ${await sessionRes.text()}`);
+                    addLog('INFO', '2. 보안 세션 요청 시작...');
+                    const sessionRes = await fetch('/api/play-session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ videoId: episode.id, deviceId: 'web-online' }),
+                        signal: abortController.signal,
+                    });
+                    if (!sessionRes.ok) {
+                      const errorText = await sessionRes.text();
+                      throw new Error(`보안 세션 시작 실패 (${sessionRes.status}): ${errorText}`);
+                    }
                     const { derivedKey: derivedKeyB64, watermarkSeed } = await sessionRes.json();
+                    addLog('SUCCESS', '2. 보안 세션 수립 완료 (임시 키 수신).');
                     
-                    const urlRes = await fetch('/api/video-url', { /* ... */ });
-                    if (!urlRes.ok) throw new Error(`비디오 URL 요청 실패: ${await urlRes.text()}`);
+                    addLog('INFO', '3. 비디오 URL 요청 시작...');
+                    const urlRes = await fetch('/api/video-url', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ videoId: episode.id }),
+                        signal: abortController.signal,
+                    });
+                    if (!urlRes.ok) {
+                      const errorText = await urlRes.text();
+                      throw new Error(`비디오 URL 요청 실패 (${urlRes.status}): ${errorText}`);
+                    }
                     const { signedUrl } = await urlRes.json();
+                    addLog('SUCCESS', '3. 서명된 URL 획득 완료.');
 
-                    const encryptedRes = await fetch(signedUrl);
+                    addLog('INFO', '4. 암호화된 비디오 다운로드 시작...');
+                    const encryptedRes = await fetch(signedUrl, { signal: abortController.signal });
                     if (!encryptedRes.ok) throw new Error(`비디오 파일 다운로드 실패 (상태: ${encryptedRes.status})`);
                     const encryptedBuffer = await encryptedRes.arrayBuffer();
+                    addLog('SUCCESS', `4. 다운로드 완료 (${(encryptedBuffer.byteLength / 1024 / 1024).toFixed(2)} MB).`);
                     
+                    addLog('INFO', '5. 실시간 복호화 시작...');
                     const { ivLength, tagLength } = episode.encryption;
                     const iv = encryptedBuffer.slice(0, ivLength);
                     const authTag = encryptedBuffer.slice(ivLength, ivLength + tagLength);
@@ -458,6 +528,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     const cryptoKey = await window.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
 
                     decryptedData = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv, tagLength: tagLength * 8 }, cryptoKey, encryptedData);
+                    addLog('SUCCESS', '5. 복호화 성공!');
                     seed = watermarkSeed;
                 }
 
@@ -471,11 +542,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     }
                 });
                 sourceBuffer.appendBuffer(decryptedData);
+                addLog('SUCCESS', '🎉 재생 준비 완료!');
                 setIsLoading(false);
 
             } catch (error: any) {
                 if (isMounted) {
-                    console.error("Player Initialization Error:", error);
+                    addLog('ERROR', error.message);
                     setPlayerError(error.message || "비디오를 재생할 수 없습니다.");
                     setIsLoading(false);
                 }
@@ -492,12 +564,13 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     }
     
     return () => { 
-        isMounted = false; 
+        isMounted = false;
+        abortController.abort("Component unmounted");
         if (mediaSource && videoRef.current?.src) {
             URL.revokeObjectURL(videoRef.current.src);
         }
     };
-  }, [isOpen, episode, offlineVideoData, authUser]);
+  }, [isOpen, episode, offlineVideoData, authUser, addLog]);
 
   const DownloadButton = () => {
     switch (downloadState) {
