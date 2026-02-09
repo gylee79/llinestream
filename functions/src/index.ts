@@ -93,9 +93,9 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
         // 4. Get the GCM authentication tag
         const authTag = cipher.getAuthTag();
 
-        // 5. Construct the final encrypted file: [IV][AuthTag][EncryptedData]
+        // 5. Construct the final encrypted file: [IV][Ciphertext][AuthTag]
         const encryptedData = fs.readFileSync(tempOutputPath);
-        const finalBuffer = Buffer.concat([iv, authTag, encryptedData]);
+        const finalBuffer = Buffer.concat([iv, encryptedData, authTag]);
 
         // 6. Upload the final .lsv file (now private)
         const encryptedStoragePath = `episodes/${episodeId}/encrypted.lsv`;

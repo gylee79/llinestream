@@ -40,8 +40,9 @@
         *   **과정:**
             1. 비디오 파일 하나당 유일무이한 **`마스터 암호화 키`(AES-256)**와 암호화에 사용할 **`솔트(Salt)`**를 생성합니다.
             2. 암호화 시, 매번 새로운 **12바이트 `IV`(초기화 벡터)**를 무작위로 생성합니다.
-            3. 마스터 키, IV, 솔트를 사용하여 원본 비디오 파일을 스트림 방식으로 완전히 암호화하고, 암호화된 데이터는 `.lsv` 확장자로 Firebase Storage의 **비공개(private) 경로**에 저장합니다. **암호화된 파일의 맨 앞에는 생성된 `IV`가 헤더로 추가**됩니다.
-            4. 생성된 **마스터 키와 솔트는 절대로 `episodes` 문서에 저장하지 않고**, 서버에서만 접근 가능한 별도의 컬렉션인 **`video_keys`에 안전하게 보관**합니다.
+            3. 마스터 키와 IV를 사용하여 원본 비디오 파일을 스트림 방식으로 완전히 암호화합니다.
+            4. 최종 암호화 파일(`.lsv`)은 **`[IV(12바이트)][암호화된 비디오 데이터...][인증 태그(16바이트)]`** 구조를 가지며, 비공개 경로에 저장됩니다.
+            5. 생성된 **마스터 키와 솔트는 절대로 `episodes` 문서에 저장하지 않고**, 서버에서만 접근 가능한 별도의 컬렉션인 **`video_keys`에 안전하게 보관**합니다.
 
 5.  **최종 결과 저장 및 정리**
     두 작업이 모두 완료되면, AI 분석 결과 파일 경로(`transcriptPath`, `subtitlePath`), 암호화된 비디오 파일 경로(`storage.encryptedPath`) 및 메타데이터(`encryption` 객체)를 모두 Firestore의 해당 에피소드 문서에 업데이트하고 상태를 `'completed'`로 변경합니다. 마지막으로, 더 이상 필요 없는 원본 비디오 파일을 Storage에서 삭제하여 저장 공간을 절약하고 보안을 강화합니다.
@@ -66,7 +67,7 @@
     *   **기술:** **Web Worker**, **Web Crypto API (`crypto.subtle.decrypt`)**, Media Source Extensions (MSE)
     *   **과정:**
         1. 메인 스레드는 발급받은 서명된 URL을 통해 암호화된 `.lsv` 파일을 다운로드하고, 서버로부터 받은 `세션 키`와 함께 **Web Worker(백그라운드 스레드)로 전달**합니다.
-        2. **Web Worker**는 전달받은 암호화된 비디오 파일의 헤더에서 **`IV`를 먼저 추출**합니다.
+        2. **Web Worker**는 전달받은 암호화된 비디오 파일의 헤더에서 **`IV`를 먼저 추출**하고, 나머지 부분(암호화된 데이터 + 인증 태그)을 가져옵니다.
         3. 세션 키와 추출된 IV를 사용하여 JavaScript Crypto API로 암호화된 데이터를 **실시간으로 풀면서(복호화)**, 복호화된 데이터 조각(chunk)을 다시 메인 스레드로 전송합니다. 이 과정은 UI를 전혀 방해하지 않습니다.
         4. 메인 스레드는 복호화된 데이터 조각을 `MediaSource` 버퍼에 주입하고, HTML5 `<video>` 요소는 버퍼에 주입된 데이터를 일반 비디오처럼 재생합니다.
 
@@ -105,7 +106,7 @@
 ```json
 {
   "workflow": "LlineStream Video Processing & Playback",
-  "version": "3.0-HKDF-Worker",
+  "version": "3.1-HKDF-Worker",
   "parts": [
     {
       "name": "Part 1: Video Upload & Backend Processing",
@@ -137,7 +138,8 @@
             "fileEncryption": {
               "library": "Node.js Crypto",
               "algorithm": "AES-256-GCM",
-              "keyManagement": "Master key and a new random salt are stored in 'video_keys'. A random IV is prepended to the encrypted file header."
+              "keyManagement": "Master key and salt are stored in 'video_keys'.",
+              "lsvFileFormat": "[IV (12 bytes)][Encrypted Video Data...][GCM Auth Tag (16 bytes)]"
             }
           }
         },
@@ -181,7 +183,7 @@
           "description": "The Web Worker decrypts the video chunks in the background and sends them back to the main thread for playback via Media Source Extensions.",
           "file": "src/workers/crypto.worker.ts",
           "technicalDetails": {
-            "decryption": "Uses Web Crypto API (AES-GCM) with the derived key and the IV extracted from the file header. `extractable` set to `false`."
+            "decryption": "Uses Web Crypto API (AES-GCM) with the derived key and the IV extracted from the file header. `extractable` is set to `false`."
           }
         }
       ]
