@@ -69,7 +69,7 @@ export interface Course {
 }
 
 export interface EncryptionInfo {
-  algorithm: 'AES-256-GCM' | 'AES-256-GCM-CHUNKED';
+  algorithm: 'AES-256-GCM' | 'AES-256-GCM-CHUNKED' | 'AES-256-GCM-CHUNKED-V3';
   version: number;
   keyId: string;
   ivLength: 12;
@@ -312,8 +312,6 @@ export interface CryptoWorkerRequest {
 }
 
 export interface CryptoWorkerResponse {
-  type: 'DECRYPT_CHUNK_SUCCESS' | 'DECRYPT_COMPLETE' | 'DECRYPT_ERROR';
-  payload: ArrayBuffer | { message: string } | {};
+  type: 'DECRYPT_COMPLETE' | 'DECRYPT_ERROR';
+  payload: ArrayBuffer | { message: string };
 }
-
-    

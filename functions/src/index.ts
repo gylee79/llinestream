@@ -134,9 +134,9 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
             const encryptedChunk = Buffer.concat([cipher.update(chunk), cipher.final()]);
             const authTag = cipher.getAuthTag();
 
-            const chunkLength = iv.length + encryptedChunk.length + authTag.length;
+            const chunkBodyLength = iv.length + encryptedChunk.length + authTag.length;
             const lengthBuffer = Buffer.alloc(4);
-            lengthBuffer.writeUInt32BE(chunkLength, 0);
+            lengthBuffer.writeUInt32BE(chunkBodyLength, 0);
 
             // Write [ChunkLength(4)][IV (12)][Ciphertext (chunk size)][AuthTag (16)]
             writeStream.write(lengthBuffer);

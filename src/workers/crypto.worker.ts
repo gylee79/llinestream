@@ -66,10 +66,10 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
       // 3. Concatenate all decrypted chunks and send back as a single buffer
       const finalPlaintextBuffer = Buffer.concat(decryptedChunks);
       const response: CryptoWorkerResponse = {
-          type: 'DECRYPT_SUCCESS',
+          type: 'DECRYPT_COMPLETE',
           payload: finalPlaintextBuffer,
       };
-      self.postMessage(response, [finalPlaintextBuffer]);
+      self.postMessage(response, [finalPlaintextBuffer.buffer]);
 
     } catch (error: any) {
       console.error('CryptoWorker Error:', error);

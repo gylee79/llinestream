@@ -93,7 +93,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       sessionId: sessionId,
       derivedKey: derivedKey.toString('base64'),
-      expiresIn: 3600, // Key is valid for 1 hour for this online session
+      expiresAt: Date.now() + 3600 * 1000, // Key is valid for 1 hour for this online session
+      scope: 'ONLINE_STREAM_ONLY',
       watermarkSeed: watermarkSeed,
     });
 
