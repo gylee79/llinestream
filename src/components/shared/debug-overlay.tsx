@@ -65,17 +65,6 @@ export default function DebugOverlay() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <Button
-        size="icon"
-        className={cn(
-            "fixed bottom-6 right-6 z-[101] h-14 w-14 rounded-full shadow-lg transition-all",
-            isOpen ? 'bg-destructive hover:bg-destructive/90' : 'bg-primary'
-        )}
-        onClick={() => setIsOpen(prev => !prev)}
-      >
-        <Bug className="h-6 w-6" />
-      </Button>
     </>
   );
 }
