@@ -1,11 +1,9 @@
-
 'use client';
 
-import type { Episode, Instructor, Course, User, Bookmark, OfflineVideoData, CryptoWorkerRequest, CryptoWorkerResponse, PlayerState, ChatLog, ChatMessage } from '@/lib/types';
+import type { Episode, Instructor, Course, User, Bookmark, OfflineVideoData, CryptoWorkerResponse, PlayerState, ChatLog, ChatMessage, OfflineLicense } from '@/lib/types';
 import React from 'react';
 import { Button } from '../ui/button';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection, useAuth } from '@/firebase';
-import { logEpisodeView } from '@/lib/actions/log-view';
 import { Textarea } from '../ui/textarea';
 import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark as BookmarkIcon, Trash2, Download, AlertTriangle, CheckCircle, RotateCcw } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
@@ -19,7 +17,6 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogClose, Dia
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '../ui/card';
-import Link from 'next/link';
 import { Skeleton } from '../ui/skeleton';
 import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/bookmark-actions';
 import { Input } from '../ui/input';
@@ -81,7 +78,6 @@ const DownloadButton = ({
     }
 };
 
-// ... (Existing sub-components like SyllabusView, ChatView, etc. remain the same)
 const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSeconds: number) => void; }) => {
     // New, more detailed status handling
     if (episode.aiProcessingStatus === 'failed') {
@@ -199,7 +195,6 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
             (error) => {
                 console.error("ChatView snapshot listener error:", error);
                 addLog('ERROR', `AI 채팅 기록 로딩 실패: ${error.message}`);
-                // Set a user-friendly error state instead of crashing the component
                 setChatError("채팅 기록을 불러오는 중 오류가 발생했습니다. Firestore 인덱스가 필요할 수 있습니다.");
                 setIsLoading(false);
             }
@@ -427,7 +422,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     const workerRef = React.useRef<Worker | null>(null);
     const mediaSourceRef = React.useRef<MediaSource | null>(null);
     const activeRequestIdRef = React.useRef<string | null>(null);
-    const retryCountRef = React.useRef<number>(0);
     
     const { addLog } = useDebugLogDispatch();
 
@@ -459,16 +453,20 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ videoId: episode.id, deviceId: 'web-offline' }),
             });
-            
-            if (licenseRes.status === 403) {
-                const errorData = await licenseRes.json();
-                setDownloadState('forbidden');
-                setDownloadDisabledReason(errorData.error || '이 콘텐츠는 오프라인 저장이 허용되지 않습니다.');
-                toast({ variant: 'default', title: '오프라인 저장 불가', description: '구독이 필요한 콘텐츠입니다.' });
-                return;
+
+            if (!licenseRes.ok) {
+                 const errorData = await licenseRes.json();
+                 if (licenseRes.status === 403) {
+                    setDownloadState('forbidden');
+                    setDownloadDisabledReason(errorData.error || '이 콘텐츠는 오프라인 저장이 허용되지 않습니다.');
+                    toast({ variant: 'default', title: '오프라인 저장 불가', description: '구독이 필요한 콘텐츠입니다.' });
+                 } else { // Handle 500 or other errors
+                    throw new Error(`오프라인 라이선스 발급 실패: (${licenseRes.status}) ${errorData.error || ''}`);
+                 }
+                 return;
             }
-            if (!licenseRes.ok) throw new Error(`오프라인 라이선스 발급 실패: (${licenseRes.status})`);
-            const license = await licenseRes.json();
+            
+            const license: OfflineLicense = await licenseRes.json();
             
             setDownloadState('downloading');
             const urlRes = await fetch('/api/video-url', {
@@ -509,7 +507,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         workerRef.current?.terminate();
         workerRef.current = null;
         activeRequestIdRef.current = null;
-        retryCountRef.current = 0;
         
         const video = videoRef.current;
         const ms = mediaSourceRef.current;
@@ -535,6 +532,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         if (videoRef.current) {
             videoRef.current.src = URL.createObjectURL(mediaSourceRef.current);
         } else {
+            // This case should ideally not happen if the component mounts correctly.
             setPlayerState('error-fatal');
             setPlayerMessage('비디오 요소를 찾을 수 없습니다.');
             return;
@@ -542,7 +540,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
         workerRef.current.onmessage = (event: MessageEvent<CryptoWorkerResponse>) => {
             const { type, payload } = event.data;
-            if (payload.requestId !== activeRequestIdRef.current) return; // Discard stale responses
+            if (payload.requestId !== activeRequestIdRef.current) return;
 
             if (type === 'DECRYPT_SUCCESS') {
                 const decryptedData = payload.decryptedChunk as ArrayBuffer;
@@ -581,7 +579,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 let encryptedBuffer: ArrayBuffer;
                 
                 if (offlineVideoData) {
-                    // Offline Playback Logic
                     addLog('INFO', '📀 오프라인 데이터로 재생합니다.');
                     if (new Date() > new Date(offlineVideoData.license.expiresAt)) {
                         setPlayerState('license-expired');
@@ -592,7 +589,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     derivedKeyB64 = offlineVideoData.license.offlineDerivedKey;
                     setWatermarkSeed(offlineVideoData.license.watermarkSeed);
                 } else {
-                    // Online Playback Logic
                     if (!authUser) throw new Error("로그인이 필요합니다.");
                     addLog('INFO', '☁️ 온라인 스트리밍을 시작합니다.');
 
@@ -627,7 +623,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 if (activeRequestIdRef.current !== requestId) return;
 
                 setPlayerState('decrypting');
-                const workerRequest: CryptoWorkerRequest = {
+                const workerRequest = {
                     type: 'DECRYPT_CHUNK',
                     payload: { requestId: requestId, encryptedBuffer, derivedKeyB64, encryption: episode.encryption, chunkIndex: 0 }
                 };
@@ -647,29 +643,15 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     }, [cleanup, offlineVideoData, authUser, episode, addLog]);
 
     React.useEffect(() => {
-        if (isOpen) {
+        if (isOpen && videoRef.current) { // Ensure video element is mounted
             const initialRequestId = uuidv4();
             startPlayback(initialRequestId);
-        } else {
+        } else if (!isOpen) {
             cleanup();
         }
+        
         return cleanup;
     }, [isOpen, startPlayback, cleanup]);
-
-    React.useEffect(() => {
-      const videoElement = videoRef.current;
-      if (!videoElement) return;
-
-      const handleTimeUpdate = () => {
-          // Log view logic here
-      };
-
-      videoElement.addEventListener('timeupdate', handleTimeUpdate);
-      return () => {
-        videoElement.removeEventListener('timeupdate', handleTimeUpdate);
-      };
-    }, [isOpen]);
-    
     
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>

@@ -1,7 +1,7 @@
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { initializeAdminApp, decryptMasterKey } from '@/lib/firebase-admin';
+import { initializeAdminApp, decryptMasterKey, loadKEK } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { toJSDate } from '@/lib/date-helpers';
 import * as crypto from 'crypto';
@@ -13,6 +13,16 @@ const hkdf = promisify(crypto.hkdf);
 
 export async function POST(req: NextRequest) {
   try {
+    // Attempt to load the KEK early to fail fast if it's not configured.
+    // This prevents other logic from running unnecessarily.
+    try {
+        await loadKEK();
+    } catch (kekError: any) {
+        console.error('[OFFLINE-LICENSE-PRECHECK-FAILURE]', kekError.message);
+        // This is a server configuration error, so we return a 500.
+        return NextResponse.json({ error: `서버 설정 오류: ${kekError.message}` }, { status: 500 });
+    }
+
     const adminApp = await initializeAdminApp();
     const db = admin.firestore(adminApp);
     const auth = admin.auth(adminApp);
@@ -103,6 +113,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
     console.error('[offline-license API Error]', error);
+    // Return a 500 for any other unexpected errors during processing.
     return NextResponse.json({ error: `Internal Server Error: ${errorMessage}` }, { status: 500 });
   }
 }

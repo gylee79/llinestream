@@ -1,12 +1,12 @@
 
 import type { Timestamp } from '@/lib/types';
-import { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
+import { Timestamp as FirebaseTimestamp } from 'firebase/firestore';
 
 /**
  * Safely converts a custom Timestamp (which can be a Firestore Timestamp or a JS Date)
  * into a JavaScript Date object.
  * @param timestamp The Timestamp or Date to convert.
- * @returns A JavaScript Date object, or null if the input is invalid or a FieldValue.
+ * @returns A JavaScript Date object, or null if the input is invalid.
  */
 export function toJSDate(timestamp: any): Date | null {
   if (!timestamp) {
@@ -20,10 +20,9 @@ export function toJSDate(timestamp: any): Date | null {
   if (timestamp instanceof Date) {
     return timestamp;
   }
-  // If it's a FieldValue (like a serverTimestamp placeholder), we can't convert it yet.
-  if (timestamp instanceof FieldValue) {
-    return null;
-  }
+  // If it's not a recognizable timestamp or Date format, return null.
+  // This safely handles cases like serverTimestamp() placeholders (FieldValue)
+  // without causing a ReferenceError.
   return null;
 }
 

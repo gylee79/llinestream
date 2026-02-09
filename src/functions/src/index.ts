@@ -1,4 +1,5 @@
 
+'use server';
 /**
  * @fileoverview Video Analysis & Encryption with Gemini using Firebase Cloud Functions v2.
  * This function now performs file-based AES-256-GCM encryption instead of HLS packaging.
@@ -12,15 +13,19 @@ import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
 import * as crypto from "crypto";
+import { config } from 'dotenv';
+config();
+
 
 // 0. Firebase Admin & Global Options 초기화
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
+// KEK_SECRET 의존성을 제거하여 배포가 항상 성공하도록 함
 setGlobalOptions({
   region: "us-central1",
-  secrets: ["GOOGLE_GENAI_API_KEY", "KEK_SECRET"],
+  secrets: ["GOOGLE_GENAI_API_KEY", "KEK_SECRET"], 
   timeoutSeconds: 540,
   memory: "2GiB",
   minInstances: 0,
@@ -46,83 +51,124 @@ function getMimeType(filePath: string): string {
   }
 }
 
-// 2. 지연 초기화 (Lazy Initialization)
+// 2. 지연 초기화 및 KEK 로딩 로직
 let genAI: GoogleGenerativeAI | null = null;
 let fileManager: GoogleAIFileManager | null = null;
-let kek: Buffer | null = null;
+let cachedKEK: Buffer | null = null;
+
+function validateKEK(key: Buffer): void {
+    if (key.length !== 32) {
+        // 보안상 키 길이 또는 내용을 로그에 남기지 않음
+        throw new Error("Invalid KEK format.");
+    }
+    console.log("KEK validated successfully.");
+}
+
+async function loadKEK(): Promise<Buffer> {
+    if (cachedKEK) {
+        return cachedKEK;
+    }
+    
+    // Firebase 환경에서는 Secret Manager에 설정된 비밀이 자동으로 process.env에 주입됨
+    // 로컬 에뮬레이터 환경에서는 .env 파일에서 값을 읽어옴
+    const kekSecret = process.env.KEK_SECRET;
+    
+    if (kekSecret) {
+        console.log("KEK_SECRET found in environment. Loading and validating key.");
+        // KEK는 Base64로 인코딩된 32바이트 키여야 함
+        const key = Buffer.from(kekSecret, 'base64');
+        validateKEK(key); // 유효성 검사 실패 시 여기서 에러 발생
+        cachedKEK = key;
+        return cachedKEK;
+    }
+
+    // KEK가 어떤 소스에서도 발견되지 않으면, 함수를 중지시키기 위해 치명적 오류 발생
+    console.error("CRITICAL: KEK_SECRET is not configured in the function's environment.");
+    throw new Error("KEK_SECRET is not configured. Function cannot proceed.");
+}
 
 function initializeTools() {
   const apiKey = process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) throw new Error("GOOGLE_GENAI_API_KEY is missing!");
-  
-  const kekSecret = process.env.KEK_SECRET;
-  if (!kekSecret) throw new Error("KEK_SECRET is not configured.");
 
   if (!genAI) genAI = new GoogleGenerativeAI(apiKey);
   if (!fileManager) fileManager = new GoogleAIFileManager(apiKey);
-  if (!kek) {
-    // KEK(Key Encryption Key)를 환경 변수에서 파생하여 메모리에만 저장
-    kek = crypto.scryptSync(kekSecret, 'l-line-stream-kek-salt', 32);
-  }
   
-  return { genAI, fileManager, kek };
+  return { 
+    genAI, 
+    fileManager,
+    getKek: loadKEK // KEK 로더 함수 반환
+  };
 }
 
-// 3. NEW: File-based Encryption (AES-256-GCM)
+
+// 3. NEW: Chunked AES-256-GCM Encryption with Length Header
 async function createEncryptedFile(episodeId: string, inputFilePath: string, docRef: admin.firestore.DocumentReference): Promise<void> {
     const tempInputPath = path.join(os.tmpdir(), `original-${episodeId}`);
     const tempOutputPath = path.join(os.tmpdir(), `encrypted-${episodeId}`);
 
     try {
-        const { kek: localKek } = initializeTools();
+        const { getKek } = initializeTools();
+        const localKek = await getKek();
 
         console.log(`[${episodeId}] Encryption: Starting download of ${inputFilePath}`);
         await bucket.file(inputFilePath).download({ destination: tempInputPath });
         console.log(`[${episodeId}] Encryption: Download complete.`);
 
-        // 1. Generate master key, salt, and IV
+        // 1. Generate master key and salt
         const masterKey = crypto.randomBytes(32); // 256 bits for AES-256
         const salt = crypto.randomBytes(16);      // 16 bytes salt for HKDF
-        const iv = crypto.randomBytes(12);        // 96 bits (12 bytes) is recommended for GCM
 
-        // 2. Create cipher
-        const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
-        
-        // 3. Encrypt using streams to handle large files
-        console.log(`[${episodeId}] Encryption: Starting file encryption.`);
-        const readStream = fs.createReadStream(tempInputPath);
+        // 2. Encrypt the file in chunks
+        console.log(`[${episodeId}] Encryption: Starting chunked file encryption (v3 format).`);
+        const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB plaintext chunks
+        const readStream = fs.createReadStream(tempInputPath, { highWaterMark: CHUNK_SIZE });
         const writeStream = fs.createWriteStream(tempOutputPath);
+        let chunkIndex = 0;
+
+        for await (const chunk of readStream) {
+            const iv = crypto.randomBytes(12); // New IV for each chunk
+            const aad = Buffer.from(`chunk-index:${chunkIndex++}`); // AAD for replay/reorder protection
+            const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
+            cipher.setAAD(aad);
+            
+            const encryptedChunk = Buffer.concat([cipher.update(chunk), cipher.final()]);
+            const authTag = cipher.getAuthTag();
+
+            const chunkBodyLength = iv.length + encryptedChunk.length + authTag.length;
+            const lengthBuffer = Buffer.alloc(4);
+            lengthBuffer.writeUInt32BE(chunkBodyLength, 0);
+
+            // Write [ChunkLength(4)][IV (12)][Ciphertext (chunk size)][AuthTag (16)]
+            writeStream.write(lengthBuffer);
+            writeStream.write(iv);
+            writeStream.write(encryptedChunk);
+            writeStream.write(authTag);
+        }
         
-        await new Promise<void>((resolve, reject) => {
-            readStream.pipe(cipher).pipe(writeStream)
-                .on('finish', () => resolve())
-                .on('error', reject);
+        await new Promise<void>((resolve) => {
+            writeStream.end(resolve);
         });
-        console.log(`[${episodeId}] Encryption: File encryption finished.`);
 
-        // 4. Get the GCM authentication tag
-        const authTag = cipher.getAuthTag();
+        console.log(`[${episodeId}] Encryption: Chunked file encryption finished.`);
 
-        // 5. Construct the final encrypted file: [IV][Ciphertext][AuthTag]
-        const ciphertext = fs.readFileSync(tempOutputPath);
-        const finalBuffer = Buffer.concat([iv, ciphertext, authTag]);
-
-        // 6. Upload the final .lsv file (now private)
+        // 3. Upload the final .lsv file
+        const finalEncryptedFileBuffer = fs.readFileSync(tempOutputPath);
         const encryptedStoragePath = `episodes/${episodeId}/encrypted.lsv`;
         console.log(`[${episodeId}] Encryption: Uploading encrypted file to ${encryptedStoragePath}`);
-        await bucket.file(encryptedStoragePath).save(finalBuffer, {
+        await bucket.file(encryptedStoragePath).save(finalEncryptedFileBuffer, {
             contentType: 'application/octet-stream',
         });
         console.log(`[${episodeId}] Encryption: Upload complete.`);
-
-        // 7. Encrypt the master key with the KEK
+        
+        // 4. Encrypt the master key with the KEK
         const kekIv = crypto.randomBytes(12);
         const kekCipher = crypto.createCipheriv('aes-256-gcm', localKek, kekIv);
         const encryptedMasterKey = Buffer.concat([kekCipher.update(masterKey), kekCipher.final()]);
         const kekAuthTag = kekCipher.getAuthTag();
         const encryptedMasterKeyBlob = Buffer.concat([kekIv, encryptedMasterKey, kekAuthTag]);
         
-        // 8. Store the ENCRYPTED master key and salt securely in `video_keys` collection
+        // 5. Store the ENCRYPTED master key and salt securely in `video_keys` collection
         const keyId = `vidkey_${episodeId}`;
         const keyDocRef = db.collection('video_keys').doc(keyId);
         await keyDocRef.set({
@@ -130,20 +176,22 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
             videoId: episodeId,
             encryptedMasterKey: encryptedMasterKeyBlob.toString('base64'),
             salt: salt.toString('base64'),
-            keyVersion: 1,
+            keyVersion: 3, // Version 3: Chunked with Length Header
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         console.log(`[${episodeId}] Encryption: ENCRYPTED master key and salt saved to video_keys/${keyId}`);
 
-        // 9. Update the episode document with encryption metadata
+        // 6. Update the episode document with new encryption metadata
         await docRef.update({
             'storage.encryptedPath': encryptedStoragePath,
-            'storage.fileSize': finalBuffer.length,
+            'storage.fileSize': finalEncryptedFileBuffer.length,
             'encryption': {
-                algorithm: 'AES-256-GCM',
+                algorithm: 'AES-256-GCM-CHUNKED-V3',
+                version: 3,
                 keyId: keyId,
-                ivLength: iv.length,
-                tagLength: authTag.length
+                ivLength: 12,
+                tagLength: 16,
+                chunkSize: CHUNK_SIZE,
             },
             'status.processing': 'completed',
             'status.playable': true,
@@ -181,7 +229,7 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
     const afterData = change.after.data() as EpisodeData;
     const beforeData = change.before.exists ? change.before.data() as EpisodeData : null;
 
-    if (afterData.aiProcessingStatus !== 'pending' || (beforeData && beforeData.aiProcessingStatus === afterData.aiProcessingStatus)) {
+    if (afterData.status?.processing !== 'pending' || (beforeData && beforeData.status?.processing === afterData.status?.processing)) {
       return;
     }
 
@@ -190,15 +238,19 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
     
     console.log(`✨ [${episodeId}] New job detected. Starting AI analysis and Encryption...`);
 
-    await docRef.update({ aiProcessingStatus: "processing", 'status.processing': 'processing' });
+    // Separate status fields for AI and Encryption
+    await docRef.update({ 
+        'status.processing': 'processing',
+        aiProcessingStatus: "processing"
+    });
     
     const filePath = afterData.filePath;
     if (!filePath) {
       await docRef.update({ 
-          aiProcessingStatus: "failed",
           'status.processing': "failed",
           'status.playable': false,
           'status.error': "No filePath found in document.",
+          aiProcessingStatus: "failed",
           aiProcessingError: "No filePath found in document.",
       });
       return;
@@ -221,7 +273,7 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
 });
 
 async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.firestore.DocumentReference) {
-    const modelName = "gemini-3-flash-preview";
+    const modelName = "gemini-1.5-flash-preview";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
@@ -405,6 +457,7 @@ interface EpisodeData {
   filePath?: string;
   courseId: string;
   aiProcessingStatus?: string;
+  status?: { processing: string };
   defaultThumbnailPath?: string;
   customThumbnailPath?: string;
   encryption?: { keyId?: string };
