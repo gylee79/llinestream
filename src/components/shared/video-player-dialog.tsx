@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Episode, Instructor, Course, User, Bookmark, OfflineVideoData, CryptoWorkerRequest, CryptoWorkerResponse, PlayerState } from '@/lib/types';
+import type { Episode, Instructor, Course, User, Bookmark, OfflineVideoData, CryptoWorkerRequest, CryptoWorkerResponse, PlayerState, ChatLog, ChatMessage } from '@/lib/types';
 import React from 'react';
 import { Button } from '../ui/button';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection, useAuth } from '@/firebase';
@@ -149,6 +149,7 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
 
 const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
     const firestore = useFirestore();
+    const { addLog } = useDebugLogDispatch();
     const [isPending, startTransition] = React.useTransition();
     const [userQuestion, setUserQuestion] = React.useState('');
     const [messages, setMessages] = React.useState<ChatMessage[]>([]);
@@ -158,20 +159,28 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
     React.useEffect(() => {
         if (!user || !firestore) return;
         const q = query(collection(firestore, 'users', user.id, 'chats'), where('episodeId', '==', episode.id), orderBy('createdAt', 'asc'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const logs = snapshot.docs.map(doc => doc.data() as ChatLog);
-            const newMessages = logs.flatMap(log => {
-                const logDate = (log.createdAt as FirebaseTimestamp)?.toDate() || new Date();
-                return [
-                    { id: `${log.id}-q`, role: 'user' as const, content: log.question, createdAt: logDate },
-                    { id: `${log.id}-a`, role: 'model' as const, content: log.answer, createdAt: new Date(logDate.getTime() + 1) }
-                ];
-            });
-            setMessages(newMessages);
-            setIsLoading(false);
-        });
+        
+        const unsubscribe = onSnapshot(q, 
+            (snapshot) => {
+                const logs = snapshot.docs.map(doc => doc.data() as ChatLog);
+                const newMessages = logs.flatMap(log => {
+                    const logDate = (log.createdAt as FirebaseTimestamp)?.toDate() || new Date();
+                    return [
+                        { id: `${log.id}-q`, role: 'user' as const, content: log.question, createdAt: logDate },
+                        { id: `${log.id}-a`, role: 'model' as const, content: log.answer, createdAt: new Date(logDate.getTime() + 1) }
+                    ];
+                });
+                setMessages(newMessages);
+                setIsLoading(false);
+            },
+            (error) => {
+                console.error("ChatView snapshot listener error:", error);
+                addLog('ERROR', `AI 채팅 기록 로딩 실패: ${error.message}`);
+                setIsLoading(false);
+            }
+        );
         return unsubscribe;
-    }, [user, episode.id, firestore]);
+    }, [user, episode.id, firestore, addLog]);
 
     const handleAskQuestion = () => {
         if (!userQuestion.trim() || isPending) return;
@@ -618,11 +627,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
        <DialogContent className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[96vw] md:h-[92vh] md:rounded-2xl overflow-hidden shadow-2xl">
-         <div className="flex h-12 items-center justify-between border-b bg-white pl-4 pr-12 flex-shrink-0 relative">
+         <DialogHeader className="flex h-12 items-center justify-between border-b bg-white pl-4 pr-12 flex-shrink-0 relative">
             <div className="flex-1 min-w-0">
                 <DialogTitle className="text-base font-bold truncate">
                     {course?.name} <ChevronRight className="inline w-4 h-4 mx-1 text-muted-foreground"/> {episode.title}
                 </DialogTitle>
+                <DialogDescription className="sr-only">비디오 재생 및 관련 정보 다이얼로그</DialogDescription>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0 ml-4">
                 {!offlineVideoData && <DownloadButton downloadState={downloadState} handleDownload={handleDownload} />}
@@ -631,7 +641,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 <X className="h-4 w-4" />
                 <span className="sr-only">Close</span>
             </DialogClose>
-        </div>
+        </DialogHeader>
         
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 bg-muted/30 min-h-0">
             <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center aspect-video md:aspect-auto md:min-h-0">
