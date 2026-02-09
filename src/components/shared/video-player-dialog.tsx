@@ -23,7 +23,7 @@ import { Skeleton } from '../ui/skeleton';
 import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/bookmark-actions';
 import { Input } from '../ui/input';
 import { saveVideo } from '@/lib/offline-db';
-import { useDebugLog } from '@/context/debug-log-context';
+import { useDebugLogDispatch } from '@/context/debug-log-context';
 
 
 // ========= TYPES AND INTERFACES =========
@@ -338,7 +338,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
   const videoRef = React.useRef<HTMLVideoElement>(null);
   
-  const { addLog } = useDebugLog();
+  const { addLog } = useDebugLogDispatch();
 
   const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
   const { data: course } = useDoc<Course>(courseRef);
@@ -482,6 +482,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     if (!authUser) throw new Error("로그인이 필요합니다.");
                     addLog('INFO', '☁️ 온라인 스트리밍을 시작합니다.');
 
+                    addLog('INFO', '1. 인증 토큰 요청 시작...');
                     const token = await authUser.getIdToken();
                     addLog('SUCCESS', '1. 인증 토큰 획득 완료.');
 
@@ -535,6 +536,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 if (!isMounted) return;
 
                 setWatermarkSeed(seed);
+                addLog('INFO', '6. 미디어 버퍼에 데이터 추가 시작...');
                 sourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.42E01E, mp4a.40.2"');
                 sourceBuffer.addEventListener('updateend', () => {
                     if (mediaSource?.readyState === 'open' && !sourceBuffer?.updating) {
@@ -542,7 +544,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     }
                 });
                 sourceBuffer.appendBuffer(decryptedData);
-                addLog('SUCCESS', '🎉 재생 준비 완료!');
+                addLog('SUCCESS', '🎉 재생 준비 완료! 플레이어가 비디오를 재생합니다.');
                 setIsLoading(false);
 
             } catch (error: any) {
@@ -570,7 +572,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             URL.revokeObjectURL(videoRef.current.src);
         }
     };
-  }, [isOpen, episode, offlineVideoData, authUser]);
+  // The dependency array needs to be stable. `addLog` is now stable thanks to the context split.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, episode, offlineVideoData, authUser, addLog]);
 
   const DownloadButton = () => {
     switch (downloadState) {

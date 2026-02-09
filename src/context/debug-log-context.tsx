@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useState, useCallback, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useCallback, useContext, ReactNode, useMemo } from 'react';
 
 export type LogType = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
 
@@ -31,13 +31,17 @@ const translateError = (message: string): string => {
     return `🔴 [오류] ${message}`;
 };
 
-interface DebugLogContextType {
+interface DebugLogState {
   logs: LogEntry[];
+}
+
+interface DebugLogActions {
   addLog: (type: LogType, message: string) => void;
   clearLogs: () => void;
 }
 
-const DebugLogContext = createContext<DebugLogContextType | undefined>(undefined);
+const DebugLogStateContext = createContext<DebugLogState | undefined>(undefined);
+const DebugLogDispatchContext = createContext<DebugLogActions | undefined>(undefined);
 
 export const DebugLogProvider = ({ children }: { children: ReactNode }) => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -54,7 +58,6 @@ export const DebugLogProvider = ({ children }: { children: ReactNode }) => {
       processedMessage = `⚠️ ${message}`;
     }
 
-
     const newLog: LogEntry = {
       id: `${Date.now()}-${Math.random()}`,
       timestamp: new Date(),
@@ -68,17 +71,36 @@ export const DebugLogProvider = ({ children }: { children: ReactNode }) => {
     setLogs([]);
   }, []);
 
+  const dispatchValue = useMemo(() => ({ addLog, clearLogs }), [addLog, clearLogs]);
+
   return (
-    <DebugLogContext.Provider value={{ logs, addLog, clearLogs }}>
-      {children}
-    </DebugLogContext.Provider>
+    <DebugLogStateContext.Provider value={{ logs }}>
+      <DebugLogDispatchContext.Provider value={dispatchValue}>
+        {children}
+      </DebugLogDispatchContext.Provider>
+    </DebugLogStateContext.Provider>
   );
 };
 
-export const useDebugLog = () => {
-  const context = useContext(DebugLogContext);
+export const useDebugLogState = () => {
+  const context = useContext(DebugLogStateContext);
   if (!context) {
-    throw new Error('useDebugLog must be used within a DebugLogProvider');
+    throw new Error('useDebugLogState must be used within a DebugLogProvider');
   }
   return context;
 };
+
+export const useDebugLogDispatch = () => {
+    const context = useContext(DebugLogDispatchContext);
+    if (!context) {
+      throw new Error('useDebugLogDispatch must be used within a DebugLogProvider');
+    }
+    return context;
+}
+
+export const useDebugLog = (): DebugLogState & DebugLogActions => {
+  return {
+    ...useDebugLogState(),
+    ...useDebugLogDispatch(),
+  }
+}

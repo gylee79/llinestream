@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Bug, Trash2 } from 'lucide-react';
-import { useDebugLog, type LogEntry } from '@/context/debug-log-context';
+import { useDebugLogState, useDebugLogDispatch, type LogEntry } from '@/context/debug-log-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -20,7 +20,8 @@ const getLogColor = (type: LogEntry['type']) => {
 };
 
 export default function DebugOverlay() {
-  const { logs, clearLogs } = useDebugLog();
+  const { logs } = useDebugLogState();
+  const { clearLogs } = useDebugLogDispatch();
   const [isOpen, setIsOpen] = useState(false);
 
   return (
