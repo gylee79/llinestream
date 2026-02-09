@@ -1,4 +1,4 @@
-
+'use server';
 /**
  * @fileoverview Video Analysis & Encryption with Gemini using Firebase Cloud Functions v2.
  * This function now performs file-based AES-256-GCM encryption instead of HLS packaging.
@@ -101,7 +101,7 @@ function initializeTools() {
 }
 
 
-// 3. NEW: Chunked AES-256-GCM Encryption
+// 3. NEW: Chunked AES-256-GCM Encryption with Length Header
 async function createEncryptedFile(episodeId: string, inputFilePath: string, docRef: admin.firestore.DocumentReference): Promise<void> {
     const tempInputPath = path.join(os.tmpdir(), `original-${episodeId}`);
     const tempOutputPath = path.join(os.tmpdir(), `encrypted-${episodeId}`);
@@ -119,19 +119,27 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
         const salt = crypto.randomBytes(16);      // 16 bytes salt for HKDF
 
         // 2. Encrypt the file in chunks
-        console.log(`[${episodeId}] Encryption: Starting chunked file encryption.`);
+        console.log(`[${episodeId}] Encryption: Starting chunked file encryption (v3 format).`);
         const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB plaintext chunks
         const readStream = fs.createReadStream(tempInputPath, { highWaterMark: CHUNK_SIZE });
         const writeStream = fs.createWriteStream(tempOutputPath);
+        let chunkIndex = 0;
 
         for await (const chunk of readStream) {
             const iv = crypto.randomBytes(12); // New IV for each chunk
+            const aad = Buffer.from(`chunk-index:${chunkIndex++}`); // AAD for replay/reorder protection
             const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
+            cipher.setAAD(aad);
             
             const encryptedChunk = Buffer.concat([cipher.update(chunk), cipher.final()]);
             const authTag = cipher.getAuthTag();
 
-            // Write [IV (12)][Ciphertext (chunk size)][AuthTag (16)] to the stream
+            const chunkLength = iv.length + encryptedChunk.length + authTag.length;
+            const lengthBuffer = Buffer.alloc(4);
+            lengthBuffer.writeUInt32BE(chunkLength, 0);
+
+            // Write [ChunkLength(4)][IV (12)][Ciphertext (chunk size)][AuthTag (16)]
+            writeStream.write(lengthBuffer);
             writeStream.write(iv);
             writeStream.write(encryptedChunk);
             writeStream.write(authTag);
@@ -167,7 +175,7 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
             videoId: episodeId,
             encryptedMasterKey: encryptedMasterKeyBlob.toString('base64'),
             salt: salt.toString('base64'),
-            keyVersion: 2, // Increment version for new chunked format
+            keyVersion: 3, // Version 3: Chunked with Length Header
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         console.log(`[${episodeId}] Encryption: ENCRYPTED master key and salt saved to video_keys/${keyId}`);
@@ -177,8 +185,8 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
             'storage.encryptedPath': encryptedStoragePath,
             'storage.fileSize': finalEncryptedFileBuffer.length,
             'encryption': {
-                algorithm: 'AES-256-GCM-CHUNKED',
-                version: 2,
+                algorithm: 'AES-256-GCM-CHUNKED-V3',
+                version: 3,
                 keyId: keyId,
                 ivLength: 12,
                 tagLength: 16,
