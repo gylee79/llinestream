@@ -2,7 +2,7 @@
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { initializeAdminApp } from '@/lib/firebase-admin';
+import { initializeAdminApp, decryptMasterKey } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { toJSDate } from '@/lib/date-helpers';
 import * as crypto from 'crypto';
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
        return NextResponse.json({ error: 'Forbidden: Subscription required' }, { status: 403 });
     }
 
-    // 4. Retrieve Master Key
+    // 4. Retrieve and Decrypt Master Key
     const keyId = episodeData?.encryption?.keyId;
     if (!keyId) {
         return NextResponse.json({ error: 'Not Found: Encryption info missing for this video' }, { status: 404 });
@@ -70,7 +70,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not Found: Encryption key not found for this video' }, { status: 404 });
     }
     const videoKeyData = keyDoc.data() as VideoKey;
-    const masterKey = Buffer.from(videoKeyData.masterKey, 'base64');
+    if (!videoKeyData.encryptedMasterKey) {
+        return NextResponse.json({ error: 'Internal Server Error: Master key is missing from key data.' }, { status: 500 });
+    }
+    const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
     const salt = Buffer.from(videoKeyData.salt, 'base64');
 
     // 5. Generate a Derived Key for online session using HKDF with a structured info
@@ -100,5 +103,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Internal Server Error: ${errorMessage}` }, { status: 500 });
   }
 }
-
-    

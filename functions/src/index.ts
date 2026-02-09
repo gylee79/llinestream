@@ -3,9 +3,6 @@
  * @fileoverview Video Analysis & Encryption with Gemini using Firebase Cloud Functions v2.
  * This function now performs file-based AES-256-GCM encryption instead of HLS packaging.
  */
-import { config } from 'dotenv';
-config(); // Load .env file for local development
-
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
@@ -21,7 +18,7 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-// KEK_SECRET 종속성을 제거하여 배포가 항상 성공하도록 함
+// KEK_SECRET 의존성을 제거하여 배포가 항상 성공하도록 함
 setGlobalOptions({
   region: "us-central1",
   secrets: ["GOOGLE_GENAI_API_KEY"], 
@@ -50,31 +47,56 @@ function getMimeType(filePath: string): string {
   }
 }
 
-// 2. 지연 초기화 (Lazy Initialization)
+// 2. 지연 초기화 및 KEK 로딩 로직
 let genAI: GoogleGenerativeAI | null = null;
 let fileManager: GoogleAIFileManager | null = null;
-let kek: Buffer | null = null;
+let cachedKEK: Buffer | null = null;
+
+function validateKEK(key: Buffer): void {
+    if (key.length !== 32) {
+        // 보안상 키 길이 또는 내용을 로그에 남기지 않음
+        throw new Error("Invalid KEK format.");
+    }
+    console.log("KEK validated successfully.");
+}
+
+async function loadKEK(): Promise<Buffer> {
+    if (cachedKEK) {
+        return cachedKEK;
+    }
+    
+    // Firebase 환경에서는 Secret Manager에 설정된 비밀이 자동으로 process.env에 주입됨
+    // 로컬 에뮬레이터 환경에서는 .env 파일에서 값을 읽어옴
+    const kekSecret = process.env.KEK_SECRET;
+    
+    if (kekSecret) {
+        console.log("KEK_SECRET found in environment. Loading and validating key.");
+        // KEK는 Base64로 인코딩된 32바이트 키여야 함
+        const key = Buffer.from(kekSecret, 'base64');
+        validateKEK(key); // 유효성 검사 실패 시 여기서 에러 발생
+        cachedKEK = key;
+        return cachedKEK;
+    }
+
+    // KEK가 어떤 소스에서도 발견되지 않으면, 함수를 중지시키기 위해 치명적 오류 발생
+    console.error("CRITICAL: KEK_SECRET is not configured in the function's environment.");
+    throw new Error("KEK_SECRET is not configured. Function cannot proceed.");
+}
 
 function initializeTools() {
   const apiKey = process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) throw new Error("GOOGLE_GENAI_API_KEY is missing!");
-  
-  // 런타임에 KEK를 환경변수에서 로드
-  const kekSecret = process.env.KEK_SECRET;
-  if (!kekSecret) {
-      console.error("CRITICAL: KEK_SECRET is not configured in the function's environment or .env file.");
-      throw new Error("KEK_SECRET is not configured.");
-  }
 
   if (!genAI) genAI = new GoogleGenerativeAI(apiKey);
   if (!fileManager) fileManager = new GoogleAIFileManager(apiKey);
-  if (!kek) {
-    // KEK(Key Encryption Key)를 환경 변수에서 파생하여 메모리에만 저장
-    kek = crypto.scryptSync(kekSecret, 'l-line-stream-kek-salt', 32);
-  }
   
-  return { genAI, fileManager, kek };
+  return { 
+    genAI, 
+    fileManager,
+    getKek: loadKEK // KEK 로더 함수 반환
+  };
 }
+
 
 // 3. NEW: Chunked AES-256-GCM Encryption
 async function createEncryptedFile(episodeId: string, inputFilePath: string, docRef: admin.firestore.DocumentReference): Promise<void> {
@@ -82,7 +104,8 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
     const tempOutputPath = path.join(os.tmpdir(), `encrypted-${episodeId}`);
 
     try {
-        const { kek: localKek } = initializeTools();
+        const { getKek } = initializeTools();
+        const localKek = await getKek();
 
         console.log(`[${episodeId}] Encryption: Starting download of ${inputFilePath}`);
         await bucket.file(inputFilePath).download({ destination: tempInputPath });
@@ -193,7 +216,7 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
     const afterData = change.after.data() as EpisodeData;
     const beforeData = change.before.exists ? change.before.data() as EpisodeData : null;
 
-    if (afterData.aiProcessingStatus !== 'pending' || (beforeData && beforeData.aiProcessingStatus === afterData.aiProcessingStatus)) {
+    if (afterData.status?.processing !== 'pending' || (beforeData && beforeData.status?.processing === afterData.status?.processing)) {
       return;
     }
 
@@ -421,6 +444,7 @@ interface EpisodeData {
   filePath?: string;
   courseId: string;
   aiProcessingStatus?: string;
+  status?: { processing: string };
   defaultThumbnailPath?: string;
   customThumbnailPath?: string;
   encryption?: { keyId?: string };
