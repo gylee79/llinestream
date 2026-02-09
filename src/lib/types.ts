@@ -313,3 +313,5 @@ export interface CryptoWorkerResponse {
   type: 'DECRYPT_SUCCESS' | 'DECRYPT_ERROR';
   payload: ArrayBuffer | { message: string };
 }
+
+    

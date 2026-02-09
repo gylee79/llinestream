@@ -69,3 +69,5 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
 
 // This export is needed to satisfy the module system, even though it's a worker.
 export {};
+
+    
