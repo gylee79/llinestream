@@ -570,7 +570,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             URL.revokeObjectURL(videoRef.current.src);
         }
     };
-  }, [isOpen, episode, offlineVideoData, authUser, addLog]);
+  }, [isOpen, episode, offlineVideoData, authUser]);
 
   const DownloadButton = () => {
     switch (downloadState) {
