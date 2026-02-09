@@ -301,9 +301,9 @@ export interface OfflineLicense {
   videoId: string;
   userId: string;
   deviceId: string;
-  issuedAt: number;
-  expiresAt: number;
-  lastCheckedAt?: number;
+  issuedAt: number; // server time (ms)
+  expiresAt: number; // issuedAt + 7 days
+  lastCheckedAt: number;
   scope: "OFFLINE_PLAYBACK";
   watermarkSeed: string;
   offlineDerivedKey: string;
@@ -326,8 +326,7 @@ export interface OfflineVideoInfo {
   expiresAt: Date;
 }
 
-// ========= Web Worker Types (v5.3) =========
-
+// ========= Web Worker Types (v5.3 FINAL) =========
 export type CryptoWorkerRequest =
   | {
       type: 'INIT_ONLINE_STREAM';
@@ -357,8 +356,6 @@ export type CryptoWorkerRequest =
       payload: {
         requestId: string;
         chunkIndex: number;
-        byteStart: number;
-        byteEnd: number;
       };
     }
   | {
@@ -401,3 +398,5 @@ export type CryptoWorkerResponse =
         code: 'INVALID_SCOPE' | 'INTEGRITY_ERROR' | 'OFFSET_MAP_FAILED' | 'UNKNOWN_WORKER_ERROR';
       };
     };
+
+    

@@ -132,6 +132,8 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             aiProcessingError: null,
             aiGeneratedContent: null,
             transcriptPath: '',
+            subtitlePath: '',
+            aiModel: '',
         };
 
         await episodeRef.set(newEpisode);
@@ -255,3 +257,5 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         return { success: false, message: `에피소드 업데이트 실패: ${errorMessage}` };
     }
 }
+
+    

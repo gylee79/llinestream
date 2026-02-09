@@ -32,12 +32,17 @@ export async function resetAIEpisodeStatus(episodeId: string): Promise<{ success
 
     await episodeRef.update({
         aiProcessingStatus: 'pending', // Set to 'pending' to re-trigger the unified workflow
+        status: { // Also reset the main processing status
+            processing: 'pending',
+            playable: false,
+            error: null,
+        },
         aiProcessingError: null,
     });
     
     revalidatePath('/admin/content');
 
-    return { success: true, message: `'${doc.data()?.title}' 에피소드에 대한 AI 분석이 재시작됩니다.` };
+    return { success: true, message: `'${doc.data()?.title}' 에피소드에 대한 AI 분석 및 암호화가 재시작됩니다.` };
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
@@ -45,3 +50,5 @@ export async function resetAIEpisodeStatus(episodeId: string): Promise<{ success
     return { success: false, message: `AI 분석 상태 리셋 실패: ${errorMessage}` };
   }
 }
+
+    

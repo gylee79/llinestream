@@ -68,13 +68,13 @@ const AIStatusIndicator = ({ episode }: {
     const modelName = episode.aiModel || '?';
     
     const statusContent = () => {
-        if (isPending || episode.aiProcessingStatus === 'processing') {
+        if (isPending || episode.aiProcessingStatus === 'processing' || episode.status?.processing === 'processing') {
             return (
                 <Tooltip>
                     <TooltipTrigger>
                         <Loader className="h-4 w-4 text-blue-500 animate-spin" />
                     </TooltipTrigger>
-                    <TooltipContent><p>AI 분석 처리 중...</p></TooltipContent>
+                    <TooltipContent><p>AI 분석 및 암호화 처리 중...</p></TooltipContent>
                 </Tooltip>
             );
         }
@@ -536,6 +536,8 @@ useEffect(() => {
     </>
   );
 }
+
+    
 
     
 

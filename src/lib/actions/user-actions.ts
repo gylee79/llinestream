@@ -81,3 +81,5 @@ export async function updateUserProfileAndLog(payload: UpdateProfilePayload): Pr
         return { success: false, message: `프로필 업데이트 실패: ${errorMessage}` };
     }
 }
+
+    

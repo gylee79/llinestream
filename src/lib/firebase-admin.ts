@@ -104,3 +104,5 @@ export async function initializeAdminApp(): Promise<App> {
     throw new Error('Could not initialize Firebase Admin SDK. Please check your credentials.');
   }
 }
+
+    
