@@ -12,6 +12,9 @@ import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
 import * as crypto from "crypto";
+import { config } from 'dotenv';
+config();
+
 
 // 0. Firebase Admin & Global Options 초기화
 if (!admin.apps.length) {
@@ -134,8 +137,9 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
             writeStream.write(authTag);
         }
         
-        writeStream.end();
-        await new Promise<void>((resolve) => writeStream.on('finish', () => resolve()));
+        await new Promise<void>((resolve) => {
+            writeStream.end(resolve);
+        });
 
         console.log(`[${episodeId}] Encryption: Chunked file encryption finished.`);
 
