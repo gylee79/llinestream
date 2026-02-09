@@ -94,8 +94,8 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
         const authTag = cipher.getAuthTag();
 
         // 5. Construct the final encrypted file: [IV][Ciphertext][AuthTag]
-        const encryptedData = fs.readFileSync(tempOutputPath);
-        const finalBuffer = Buffer.concat([iv, encryptedData, authTag]);
+        const ciphertext = fs.readFileSync(tempOutputPath);
+        const finalBuffer = Buffer.concat([iv, ciphertext, authTag]);
 
         // 6. Upload the final .lsv file (now private)
         const encryptedStoragePath = `episodes/${episodeId}/encrypted.lsv`;

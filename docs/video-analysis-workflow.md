@@ -139,7 +139,13 @@
               "library": "Node.js Crypto",
               "algorithm": "AES-256-GCM",
               "keyManagement": "Master key and salt are stored in 'video_keys'.",
-              "lsvFileFormat": "[IV (12 bytes)][Encrypted Video Data...][GCM Auth Tag (16 bytes)]"
+              "lsvFileFormat": {
+                "description": "The .lsv file is a concatenation of the IV, the ciphertext, and the GCM authentication tag.",
+                "layout": "[IV][Ciphertext][AuthTag]",
+                "ivLength": 12,
+                "tagLength": 16,
+                "tagPosition": "tail"
+              }
             }
           }
         },
@@ -183,7 +189,7 @@
           "description": "The Web Worker decrypts the video chunks in the background and sends them back to the main thread for playback via Media Source Extensions.",
           "file": "src/workers/crypto.worker.ts",
           "technicalDetails": {
-            "decryption": "Uses Web Crypto API (AES-GCM) with the derived key and the IV extracted from the file header. `extractable` is set to `false`."
+            "decryption": "Uses Web Crypto API (AES-GCM). The IV is extracted from the file header. The remainder of the buffer (ciphertext + auth tag) is passed to the decrypt function. The key is not extractable (`extractable: false`)."
           }
         }
       ]
@@ -217,4 +223,3 @@
     }
   ]
 }
-```

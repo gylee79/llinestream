@@ -6,9 +6,23 @@ import type { CryptoWorkerRequest, CryptoWorkerResponse, Episode } from '@/lib/t
 self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
   if (event.data.type === 'DECRYPT') {
     const { encryptedBuffer, derivedKeyB64, encryption } = event.data.payload;
+    const { ivLength, tagLength } = encryption;
+
+    // For debugging structural issues
+    console.debug('[CryptoWorker] Received decryption job:', {
+      totalLength: encryptedBuffer.byteLength,
+      ivLength,
+      tagLength,
+      expectedCiphertextLength: encryptedBuffer.byteLength - ivLength - tagLength,
+    });
     
     try {
-      // 1. Import the derived key
+      // 1. Basic structure validation
+      if (encryptedBuffer.byteLength <= ivLength + tagLength) {
+        throw new Error('Invalid encrypted buffer: The provided data is too small to contain a valid IV and authentication tag.');
+      }
+
+      // 2. Import the derived key
       const keyBuffer = Buffer.from(derivedKeyB64, 'base64');
       const cryptoKey = await self.crypto.subtle.importKey(
         'raw', 
@@ -18,25 +32,23 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
         ['decrypt']
       );
 
-      // 2. Extract IV and encrypted data from the buffer
-      const { ivLength, tagLength } = encryption;
+      // 3. Extract IV and the combined ciphertext + auth tag
       const iv = encryptedBuffer.slice(0, ivLength);
-      // The authTag is implicitly handled by AES-GCM; we just need to provide the correct tagLength.
-      // The encrypted data starts after the IV. The tag is at the end of the ciphertext.
-      const encryptedData = encryptedBuffer.slice(ivLength);
+      // The WebCrypto API expects the auth tag to be concatenated at the end of the ciphertext.
+      const ciphertextWithTag = encryptedBuffer.slice(ivLength);
 
-      // 3. Decrypt the data
+      // 4. Decrypt the data
       const decryptedData = await self.crypto.subtle.decrypt(
         { 
           name: 'AES-GCM', 
           iv: iv,
-          tagLength: tagLength * 8, // a requiremnet of SubtleCrypto's API, in bits
+          tagLength: tagLength * 8, // tagLength must be in bits for the API
         },
         cryptoKey,
-        encryptedData
+        ciphertextWithTag
       );
 
-      // 4. Send the decrypted data back to the main thread
+      // 5. Send the decrypted data back to the main thread
       const response: CryptoWorkerResponse = {
         type: 'DECRYPT_SUCCESS',
         payload: decryptedData,
