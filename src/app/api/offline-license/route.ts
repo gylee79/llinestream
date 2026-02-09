@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       scope: 'OFFLINE_PLAYBACK', // CRITICAL: Explicit Scope
       watermarkSeed,
       watermarkMode: "normal", // Default, server can change based on risk
-      offlineDerivedKey: offlineDerivedKey.toString('base64'),
+      offlineDerivedKey: Buffer.from(offlineDerivedKey).toString('base64'),
     };
 
     return NextResponse.json(license);
