@@ -137,3 +137,112 @@ type PlayerState =
     -   **루팅/탈옥 기기에서의 보호:** 변조된 운영체제 환경에서의 보안을 보장하지 않음.
 
 **결론:** v5.3은 상용 DRM 솔루션을 도입하기 전, 웹 표준 기술(Web Crypto, IndexedDB) 내에서 구현할 수 있는 최고 수준의 **보안 억제책(Deterrent)** 이다.
+---
+
+## 부록 A: v5.3 구현 잠금 (Implementation Lock)
+
+**본 문서는 AI가 v5.3을 구현할 때 발생할 수 있는 모든 해석, 추정, 생략을 금지하기 위한 구현 잠금 문서(Implementation Lock)이다. 이 문서의 규칙은 상위 모든 설명보다 우선하며, 위반은 버그로 간주한다.**
+
+### A. 오프라인 재생 Seek 처리 규칙 (절대 변경 불가)
+
+#### A-1. 오프라인 Seek의 정의
+- 오프라인 재생은 네트워크를 절대 사용하지 않는다
+- HTTP Range 요청 금지
+- 청크 재요청 / 재시도 로직 금지
+
+#### A-2. Seek 동작 규칙
+오프라인 Seek 시 반드시 다음 순서를 따른다:
+1.  **Chunk Offset Map 재사용**: 다운로드 시 생성된 Offset Map을 그대로 사용. 재계산 금지.
+2.  **Worker 내부 상태 리셋**:
+    - 현재 decrypt 큐 즉시 중단
+    - 기존 appendBuffer 작업 즉시 중단
+3.  **메모리 내 ArrayBuffer 슬라이싱**:
+    - .lsv ArrayBuffer에서 `offsetMap[targetChunkIndex]` 범위만 slice
+4.  **복호화 재시작**:
+    - 단일 청크 단위 복호화
+    - 실패 시 즉시 error-fatal
+
+#### A-3. 금지 사항
+- ❌ 온라인 스트리밍 로직 재사용
+- ❌ fetch / retry / backoff 호출
+- ❌ recovering 상태 진입
+
+**오프라인 Seek 실패는 항상 치명적 오류(error-fatal)이다.**
+
+### B. 워터마크 렌더링 실패 정의 (명시적)
+
+다음 중 하나라도 발생하면 워터마크 렌더링 실패로 간주한다.
+
+#### B-1. 실패 조건
+- watermarkSeed가 존재하지 않음
+- `<canvas>` 또는 `<div>` 오버레이 생성 실패
+- 렌더 루프(requestAnimationFrame) 2회 연속 중단
+- opacity / position 갱신 실패
+- visibility 변경 후 워터마크 미복구
+
+#### B-2. 대응 규칙
+- **온라인 재생**: warning 로그 + 재시도 1회
+- **오프라인 재생**: 즉시 error-fatal
+
+**워터마크는 UX 요소가 아닌 보안 컴포넌트로 취급한다.**
+
+### C. 오프라인 라이선스 시간 조작 방지 규칙 (필수)
+
+#### C-1. 필수 필드
+오프라인 라이선스 객체는 반드시 다음 필드를 포함한다:
+```json
+{
+  "expiresAt": number,
+  "issuedAt": number,
+  "lastCheckedAt": number
+}
+```
+
+#### C-2. 검증 규칙 (모두 강제)
+- `now < issuedAt` → `error-fatal`
+- `now < lastCheckedAt` → `error-fatal`
+- `now > expiresAt` → `license-expired`
+
+#### C-3. `lastCheckedAt` 갱신
+- 재생 종료 시
+- 일시정지 후 재개 시
+- 앱 포그라운드 복귀 시
+
+**시스템 시간 롤백 감지는 선택 사항이 아니라 필수 보안 규칙이다.**
+
+### D. IndexedDB 저장 형식 강제
+
+#### D-1. 저장 금지
+- ❌ 평문 비디오 데이터
+- ❌ raw secret key
+- ❌ scope 없는 라이선스
+
+#### D-2. 저장 허용 형식
+- `.lsv` → 암호문 ArrayBuffer 그대로
+- `key` → CryptoKey 또는 wrappedKey
+- `license` → 구조화 객체 + signature(optional)
+
+#### D-3. 로드 시 검증
+- `scope` 불일치 → 즉시 `error-fatal`
+- `deviceId` 불일치 → 즉시 `error-fatal`
+
+### E. AI 구현 일반 금지 규칙
+
+AI는 다음 행동을 절대 하지 않는다:
+- “더 나은 UX”를 이유로 보안 규칙 완화
+- 네트워크 오류를 오프라인에서 복구 시도
+- 워터마크 실패를 무시하고 재생 지속
+- `error-fatal`을 `error-retryable`로 downgrade
+
+### F. 최종 선언
+
+본 문서(v5.3 + Appendix)는 비-DRM 환경에서 더 이상 개선이나 확장이 필요 없는 최종 상태로 간주한다.
+이후 변경은 상용 DRM 도입 시점에서만 허용된다.
+
+**본 문서 위반 = 보안 결함**
+
+---
+📌 **AI 최종 명령 (요약)**
+
+“이 문서를 구현하되, 해석하지 말고 그대로 실행하라.
+누락·완화·재해석은 모두 오류다.”
