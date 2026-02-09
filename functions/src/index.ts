@@ -3,6 +3,9 @@
  * @fileoverview Video Analysis & Encryption with Gemini using Firebase Cloud Functions v2.
  * This function now performs file-based AES-256-GCM encryption instead of HLS packaging.
  */
+import { config } from 'dotenv';
+config(); // Load .env file for local development
+
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
@@ -18,9 +21,10 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
+// KEK_SECRET 종속성을 제거하여 배포가 항상 성공하도록 함
 setGlobalOptions({
   region: "us-central1",
-  secrets: ["GOOGLE_GENAI_API_KEY"],
+  secrets: ["GOOGLE_GENAI_API_KEY"], 
   timeoutSeconds: 540,
   memory: "2GiB",
   minInstances: 0,
@@ -49,15 +53,27 @@ function getMimeType(filePath: string): string {
 // 2. 지연 초기화 (Lazy Initialization)
 let genAI: GoogleGenerativeAI | null = null;
 let fileManager: GoogleAIFileManager | null = null;
+let kek: Buffer | null = null;
 
 function initializeTools() {
   const apiKey = process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) throw new Error("GOOGLE_GENAI_API_KEY is missing!");
   
+  // 런타임에 KEK를 환경변수에서 로드
+  const kekSecret = process.env.KEK_SECRET;
+  if (!kekSecret) {
+      console.error("CRITICAL: KEK_SECRET is not configured in the function's environment or .env file.");
+      throw new Error("KEK_SECRET is not configured.");
+  }
+
   if (!genAI) genAI = new GoogleGenerativeAI(apiKey);
   if (!fileManager) fileManager = new GoogleAIFileManager(apiKey);
+  if (!kek) {
+    // KEK(Key Encryption Key)를 환경 변수에서 파생하여 메모리에만 저장
+    kek = crypto.scryptSync(kekSecret, 'l-line-stream-kek-salt', 32);
+  }
   
-  return { genAI, fileManager };
+  return { genAI, fileManager, kek };
 }
 
 // 3. NEW: Chunked AES-256-GCM Encryption
@@ -66,7 +82,7 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
     const tempOutputPath = path.join(os.tmpdir(), `encrypted-${episodeId}`);
 
     try {
-        initializeTools();
+        const { kek: localKek } = initializeTools();
 
         console.log(`[${episodeId}] Encryption: Starting download of ${inputFilePath}`);
         await bucket.file(inputFilePath).download({ destination: tempInputPath });
@@ -109,20 +125,27 @@ async function createEncryptedFile(episodeId: string, inputFilePath: string, doc
         });
         console.log(`[${episodeId}] Encryption: Upload complete.`);
         
-        // 4. Store the master key and salt securely in `video_keys` collection
+        // 4. Encrypt the master key with the KEK
+        const kekIv = crypto.randomBytes(12);
+        const kekCipher = crypto.createCipheriv('aes-256-gcm', localKek, kekIv);
+        const encryptedMasterKey = Buffer.concat([kekCipher.update(masterKey), kekCipher.final()]);
+        const kekAuthTag = kekCipher.getAuthTag();
+        const encryptedMasterKeyBlob = Buffer.concat([kekIv, encryptedMasterKey, kekAuthTag]);
+        
+        // 5. Store the ENCRYPTED master key and salt securely in `video_keys` collection
         const keyId = `vidkey_${episodeId}`;
         const keyDocRef = db.collection('video_keys').doc(keyId);
         await keyDocRef.set({
             keyId,
             videoId: episodeId,
-            masterKey: masterKey.toString('base64'),
+            encryptedMasterKey: encryptedMasterKeyBlob.toString('base64'),
             salt: salt.toString('base64'),
             keyVersion: 2, // Increment version for new chunked format
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        console.log(`[${episodeId}] Encryption: master key and salt saved to video_keys/${keyId}`);
+        console.log(`[${episodeId}] Encryption: ENCRYPTED master key and salt saved to video_keys/${keyId}`);
 
-        // 5. Update the episode document with new encryption metadata
+        // 6. Update the episode document with new encryption metadata
         await docRef.update({
             'storage.encryptedPath': encryptedStoragePath,
             'storage.fileSize': finalEncryptedFileBuffer.length,
@@ -403,5 +426,3 @@ interface EpisodeData {
   encryption?: { keyId?: string };
   [key: string]: any;
 }
-
-    
