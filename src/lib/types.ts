@@ -303,11 +303,12 @@ export interface OfflineLicense {
   deviceId: string;
   issuedAt: number; // server time (ms)
   expiresAt: number; // issuedAt + 7 days
-  lastCheckedAt: number;
+  lastCheckedAt?: number;
   scope: "OFFLINE_PLAYBACK";
   watermarkSeed: string;
   offlineDerivedKey: string;
 }
+
 
 export interface OfflineVideoData {
   episode: Episode;
