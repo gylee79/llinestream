@@ -13,7 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { collection, query, where, orderBy, onSnapshot, Timestamp as FirebaseTimestamp, doc } from 'firebase/firestore';
-import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogClose, DialogHeader } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '../ui/card';
@@ -656,7 +656,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
        <DialogContent className="max-w-none w-full h-full p-0 flex flex-col border-0 md:max-w-[96vw] md:h-[92vh] md:rounded-2xl overflow-hidden shadow-2xl">
-         <DialogHeader className="flex flex-row h-12 items-center justify-between border-b bg-white pl-4 pr-12 flex-shrink-0 relative">
+         <div className="flex flex-row h-12 items-center justify-between border-b bg-white pl-4 pr-12 flex-shrink-0 relative">
             <div className="flex-1 min-w-0">
                 <DialogTitle className="text-base font-bold truncate">
                     {course?.name} <ChevronRight className="inline w-4 h-4 mx-1 text-muted-foreground"/> {episode.title}
@@ -672,11 +672,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     />
                 )}
             </div>
-             <DialogClose className="absolute right-4 top-1/2 -translate-y-1/2 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-            </DialogClose>
-        </DialogHeader>
+        </div>
         
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 bg-muted/30 min-h-0">
             <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center aspect-video md:aspect-auto md:min-h-0">
@@ -708,3 +704,5 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
+
+    
