@@ -124,7 +124,7 @@ async function createEncryptedFile(episodeId, inputFilePath, docRef) {
             writeStream.write(authTag);
         }
         writeStream.end();
-        await new Promise(resolve => writeStream.on('finish', resolve));
+        await new Promise(resolve => writeStream.on('finish', () => resolve()));
         console.log(`[${episodeId}] Encryption: Chunked file encryption finished.`);
         // 3. Upload the final .lsv file
         const finalEncryptedFileBuffer = fs.readFileSync(tempOutputPath);

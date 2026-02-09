@@ -1,13 +1,12 @@
 
 # [최종] 비디오 처리, 보안 재생 및 오프라인 워크플로우 (v4.0)
 
-**목표:** 관리자가 비디오를 업로드하는 순간부터 최종 사용자가 온라인/오프라인에서 끊김 없이 안전하게 시청하기까지의 전 과정을 자동화합니다. KEK를 사용한 이중 키 암호화, Chunked 스트리밍, 동적 워터마크 기술로 콘텐츠를 보호하는 서버리스 파이프라인입니다.
+**목표:** 관리자가 비디오를 업로드하는 순간부터 최종 사용자가 온라인/오프라인에서 끊김 없이 안전하게 시청하기까지의 전 과정을 자동화합니다. Chunked 스트리밍, 동적 워터마크 기술로 콘텐츠를 보호하는 서버리스 파이프라인입니다.
 
 **핵심 기술 스택:**
 - **AI 모델:** gemini-3-flash-preview
-- **마스터 키 암호화 (1차):** **KEK (Key Encryption Key)** - 환경변수 기반
-- **파일 암호화 (2차):** **Chunked AES-256-GCM** (스트리밍 안정성)
-- **세션 키 암호화 (3차):** **HKDF-SHA256 (RFC 5869)** (사용자별 임시 키 생성)
+- **파일 암호화:** **Chunked AES-256-GCM** (스트리밍 안정성)
+- **세션 키 암호화:** **HKDF-SHA256 (RFC 5869)** (사용자별 임시 키 생성)
 - **실행 환경:** Firebase Cloud Functions (v2)
 - **데이터베이스:** Firestore
 - **파일 저장소:** Firebase Storage
@@ -37,15 +36,14 @@
         *   **상태 분리:** 이 작업이 실패하더라도 비디오 암호화 및 재생에는 영향을 주지 않습니다. `aiProcessingStatus` 필드로 상태를 별도 관리합니다.
 
     *   **작업 B: 청크 기반 암호화 (`createEncryptedFile`)**
-        *   **기술:** Node.js `crypto`, **Chunked AES-256-GCM**, **KEK**
+        *   **기술:** Node.js `crypto`, **Chunked AES-256-GCM**
         *   **과정:**
             1.  비디오 하나당 유일무이한 **`마스터 암호화 키`(AES-256)**와 **`솔트(Salt)`**를 생성합니다.
             2.  원본 비디오 파일을 **1MB 단위의 청크(chunk)로** 나누어 순차적으로 처리합니다.
             3.  **각 청크마다** 새로운 **12바이트 `IV`(초기화 벡터)**를 생성하고, 마스터 키를 사용해 청크를 암호화한 뒤 **16바이트 `인증 태그(Auth Tag)`**를 생성합니다.
             4.  암호화된 청크들을 **`[IV(12)][암호화된 데이터...][인증 태그(16)]`** 구조로 계속 이어 붙여 최종 암호화 파일(`.lsv`)을 완성합니다.
             5.  최종 파일을 비공개 경로(`episodes/{episodeId}/encrypted.lsv`)에 업로드합니다.
-            6.  **(핵심 보안)** 생성된 **마스터 키**를 그대로 저장하지 않고, 서버 환경변수에만 존재하는 비밀 **`KEK(Key Encryption Key)`**를 사용하여 **한 번 더 암호화**합니다.
-            7.  **'암호화된 마스터 키'**와 `솔트(Salt)`를 `video_keys` 컬렉션의 `vidkey_{episodeId}` 문서에 안전하게 보관합니다.
+            6.  생성된 **마스터 키**와 `솔트(Salt)`를 `video_keys` 컬렉션의 `vidkey_{episodeId}` 문서에 안전하게 보관합니다. 이 컬렉션은 서버만 접근 가능합니다.
 
 5.  **최종 결과 저장 및 정리**
     두 작업이 완료되면, AI 분석 결과 파일 경로, 암호화된 비디오 파일 경로 및 메타데이터(`encryption` 객체)를 모두 Firestore의 해당 에피소드 문서에 업데이트하고 상태를 `'completed'`로 변경합니다. 마지막으로, 원본 비디오 파일을 삭제하여 저장 공간을 절약하고 보안을 강화합니다.
@@ -54,7 +52,7 @@
 
 ## Part 2. 보안 온라인 스트리밍 (사용자)
 
-사용자가 영상을 재생하면, 아래의 3중 암호화 해제 과정이 실시간으로 진행됩니다.
+사용자가 영상을 재생하면, 아래의 암호 해독 과정이 실시간으로 진행됩니다.
 
 1.  **보안 URL 발급 요청 (`video-player-dialog.tsx` → `/api/video-url`)**
     클라이언트는 서버에 `videoId`와 인증 토큰을 보내 비공개 암호화 파일(`.lsv`)에 5분간 접근할 수 있는 **서명된 URL(Signed URL)**을 발급받습니다.
@@ -63,13 +61,12 @@
     URL을 받은 클라이언트는 서버에 `videoId`와 `deviceId`를 보내 재생 세션을 요청합니다.
 
 3.  **세션 키(Derived Key) 생성 (서버, `/api/play-session/route.ts`)**
-    *   **기술:** **KEK**, Node.js `crypto.hkdf` (**HKDF-SHA256**)
+    *   **기술:** Node.js `crypto.hkdf` (**HKDF-SHA256**)
     *   **과정:**
-        1.  서버는 `video_keys` 금고에서 해당 비디오의 **'암호화된 마스터 키'**를 꺼냅니다.
-        2.  환경변수의 **KEK**를 사용하여 '암호화된 마스터 키'의 암호를 풀어 **원본 마스터 키를 메모리 상에서만 복원**합니다.
-        3.  복원된 마스터 키, 솔트(salt), 그리고 표준화된 `info` 값을 **HKDF-SHA256 알고리즘**에 입력하여 **오직 이 세션에서만 유효한 일회성 `세션 키(Derived Key)`**를 생성합니다.
+        1.  서버는 `video_keys` 금고에서 해당 비디오의 **`마스터 키`**와 **`솔트`**를 꺼냅니다.
+        2.  가져온 마스터 키, 솔트, 그리고 표준화된 `info` 값을 **HKDF-SHA256 알고리즘**에 입력하여 **오직 이 세션에서만 유효한 일회성 `세션 키(Derived Key)`**를 생성합니다.
             *   **표준 `info` 구조:** `Buffer.concat([Buffer.from("LSV_ONLINE_V1"), ...])`
-        4.  생성된 세션 키를 클라이언트에 전달합니다.
+        3.  생성된 세션 키를 클라이언트에 전달합니다.
 
 4.  **실시간 청크 단위 복호화 및 재생 (클라이언트, `crypto.worker.ts`)**
     *   **기술:** **Web Worker**, **Web Crypto API (`crypto.subtle.decrypt`)**, Media Source Extensions (MSE)
@@ -88,7 +85,7 @@
     사용자가 다운로드 버튼을 클릭하면, 클라이언트는 먼저 `navigator.storage.estimate()`를 사용해 기기의 잔여 저장 공간을 확인합니다. 공간이 충분하면, 서버에 `videoId`와 `deviceId`를 전송하여 오프라인 라이선스를 요청합니다.
 
 2.  **오프라인 키 생성 (서버, `/api/offline-license/route.ts`)**
-    서버는 구독 권한을 확인하고, 온라인 재생과 동일한 방식으로 KEK를 사용해 마스터 키를 복원합니다. 이번에는 **만료 시간(예: 7일 후)을 포함**하고 **`LSV_OFFLINE_V1`** 접두사를 사용한 표준 `info` 값으로 **HKDF 알고리즘**을 실행하여 **오프라인용 세션 키**를 생성합니다.
+    서버는 구독 권한을 확인하고, `video_keys`에서 마스터 키를 가져옵니다. 이번에는 **만료 시간(예: 7일 후)을 포함**하고 **`LSV_OFFLINE_V1`** 접두사를 사용한 표준 `info` 값으로 **HKDF 알고리즘**을 실행하여 **오프라인용 세션 키**를 생성합니다.
 
 3.  **라이선스 발급 및 저장 (`lib/offline-db.ts`)**
     서버는 `오프라인용 세션 키`, `만료 시간`, `워터마크 시드`를 포함한 **오프라인 라이선스**를 클라이언트에 전달합니다. 클라이언트는 암호화된 `.lsv` 파일 전체와 이 라이선스를 함께 브라우저의 `IndexedDB`에 안전하게 저장합니다.
@@ -112,7 +109,7 @@
 ```json
 {
   "workflow": "LlineStream Video Processing & Playback",
-  "version": "4.0-Chunked-KEK-HKDF",
+  "version": "4.0-Chunked",
   "parts": [
     {
       "name": "Part 1: Video Upload & Backend Processing",
@@ -151,8 +148,7 @@
                 "layout": "[IV(12)][Ciphertext(1MB)][AuthTag(16)]...repeat"
               },
               "keyManagement": {
-                "level_1": "A unique Master Key is generated per video.",
-                "level_2": "The Master Key is encrypted using a KEK from environment variables before being stored in 'video_keys'."
+                "description": "A unique Master Key is generated per video and stored in the 'video_keys' collection, protected by Firestore Security Rules."
               }
             }
           }
@@ -176,10 +172,9 @@
         },
         {
           "step": 7,
-          "description": "Server decrypts the master key using KEK, then generates and returns a session-specific derived key using standardized HKDF.",
+          "description": "Server generates and returns a session-specific derived key using standardized HKDF.",
           "file": "src/app/api/play-session/route.ts",
           "technicalDetails": {
-            "masterKeyDecryption": "Uses KEK from process.env to decrypt 'encryptedMasterKey' from 'video_keys'.",
             "keyDerivation": "HKDF-SHA256(masterKey, salt, Buffer.concat([Buffer.from(\"LSV_ONLINE_V1\"), ...]))"
           }
         },
@@ -201,3 +196,5 @@
   ]
 }
 ```
+
+    

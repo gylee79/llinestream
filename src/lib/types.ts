@@ -124,7 +124,7 @@ export interface Episode {
 export interface VideoKey {
   keyId: string;
   videoId: string;
-  encryptedMasterKey: string; // KEK-encrypted master key, base64 encoded
+  masterKey: string; 
   salt: string; // Salt for HKDF, base64 encoded
   keyVersion: number;
   createdAt: Timestamp;
@@ -315,3 +315,5 @@ export interface CryptoWorkerResponse {
   type: 'DECRYPT_CHUNK_SUCCESS' | 'DECRYPT_COMPLETE' | 'DECRYPT_ERROR';
   payload: ArrayBuffer | { message: string } | {};
 }
+
+    
