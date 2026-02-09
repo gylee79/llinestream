@@ -8,8 +8,6 @@
 ## 1. 버전 히스토리
 
 - **v5.2 (Current): True Streaming & Partial Recovery**
-  - `v5.2.6` (제안) Observability 강화 (청크 재시도, seek 버퍼링 시간 등)
-  - `v5.2.5` (제안) Risk-Adaptive 워터마크 도입
   - `v5.2.4` (구현) 오프라인 라이선스 키 스코프 정식 분리 및 검증
   - `v5.2.3` (구현) 단일 청크 손상 시 부분 복구(재시도) 로직 도입
   - `v5.2.2` (구현) `buffering-seek` 상태 추가 및 플레이어 UX 확장

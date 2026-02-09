@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
     const salt = Buffer.from(videoKeyData.salt, 'base64');
 
-    // 5. Generate Offline Derived Key using HKDF with a structured info (v5.2)
+    // 5. Generate Offline Derived Key using HKDF with a structured info (v5.2.4)
     const expiresAt = add(new Date(), { days: 7 });
     const info = Buffer.concat([
         Buffer.from("LSV_OFFLINE_V1"), // Standardized info prefix
@@ -93,9 +93,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       derivedKeyB64: offlineDerivedKey.toString('base64'),
       expiresAt: expiresAt.toISOString(),
-      scope: 'OFFLINE_PLAYBACK', // v5.2 Explicit Scope
+      scope: 'OFFLINE_PLAYBACK', // v5.2.4 Explicit Scope
       watermarkSeed: watermarkSeed,
-      videoId: videoId, // Included for client-side verification
+      videoId: videoId,
       deviceId: deviceId,
     });
 

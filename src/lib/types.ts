@@ -323,6 +323,7 @@ export type CryptoWorkerRequest =
   | {
       type: 'INIT_STREAM';
       payload: {
+        requestId: string;
         signedUrl: string;
         sessionKey: {
           derivedKeyB64: string;
@@ -336,11 +337,17 @@ export type CryptoWorkerRequest =
   | {
       type: 'DECRYPT_CHUNK';
       payload: {
+        requestId: string;
         chunkIndex: number;
+        byteStart: number;
+        byteEnd: number;
       };
     }
   | {
       type: 'ABORT';
+      payload: {
+        requestId: string;
+      }
     };
 
 // Worker to Main thread
@@ -348,12 +355,14 @@ export type CryptoWorkerResponse =
   | {
       type: 'INIT_SUCCESS';
       payload: {
+        requestId: string;
         offsetMap: { byteStart: number; byteEnd: number }[];
       };
     }
   | {
       type: 'DECRYPT_SUCCESS';
       payload: {
+        requestId: string;
         chunkIndex: number;
         decryptedChunk: ArrayBuffer;
       };
@@ -361,16 +370,18 @@ export type CryptoWorkerResponse =
   | {
       type: 'RECOVERABLE_ERROR';
       payload: {
+        requestId: string;
         message: string;
-        code: 'KEY_EXPIRED' | 'INVALID_SCOPE' | 'NETWORK_ERROR' | 'CHUNK_DECRYPT_FAILED';
+        code: 'KEY_EXPIRED' | 'NETWORK_ERROR' | 'CHUNK_DECRYPT_FAILED';
         chunkIndex?: number;
       };
     }
   | {
       type: 'FATAL_ERROR';
       payload: {
+        requestId: string;
         message: string;
-        code: 'INTEGRITY_ERROR' | 'UNKNOWN_WORKER_ERROR';
+        code: 'INVALID_SCOPE' | 'INTEGRITY_ERROR' | 'OFFSET_MAP_FAILED' | 'UNKNOWN_WORKER_ERROR';
       };
     };
 

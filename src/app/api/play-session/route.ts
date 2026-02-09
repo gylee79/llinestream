@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
     const salt = Buffer.from(videoKeyData.salt, 'base64');
 
-    // 5. Generate a Derived Key for online session using HKDF with a structured info
+    // 5. Generate a Derived Key for online session using HKDF with a structured info (v5.2.4)
     const sessionId = `online_sess_${crypto.randomBytes(12).toString('hex')}`;
     const info = Buffer.concat([
         Buffer.from("LSV_ONLINE_V1"),
@@ -84,15 +84,15 @@ export async function POST(req: NextRequest) {
         Buffer.from(deviceId),
         Buffer.from(sessionId)
     ]);
-    const derivedKey = await hkdf('sha256', masterKey, salt, info, 32);
+    const derivedKeyB64 = (await hkdf('sha256', masterKey, salt, info, 32)).toString('base64');
     
     // 6. Generate Watermark Seed
     const watermarkSeed = crypto.createHash('sha256').update(userId).digest('hex');
 
-    // 7. Return Session Info (PATCH v5.1.3: Add scope)
+    // 7. Return Session Info with explicit scope
     return NextResponse.json({
       sessionId: sessionId,
-      derivedKey: derivedKey.toString('base64'),
+      derivedKeyB64: derivedKeyB64,
       expiresAt: Date.now() + 3600 * 1000, // Key is valid for 1 hour for this online session
       scope: 'ONLINE_STREAM_ONLY',
       watermarkSeed: watermarkSeed,
@@ -104,3 +104,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Internal Server Error: ${errorMessage}` }, { status: 500 });
   }
 }
+
+    
