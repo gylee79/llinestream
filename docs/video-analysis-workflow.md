@@ -4,7 +4,7 @@
 **목표:** 관리자가 비디오를 업로드하는 순간부터 최종 사용자가 온라인/오프라인에서 안전하게 시청하기까지의 전 과정을 자동화하고, 강력한 이중 암호화 및 워터마크 기술로 콘텐츠를 보호하는 서버리스 파이프라인입니다.
 
 **기술 스택:**
-- **AI 모델:** Google Gemini 1.5 Flash
+- **AI 모델:** gemini-3-flash-preview
 - **파일 암호화 (1차):** AES-256-GCM (파일 전체 암호화)
 - **세션 키 암호화 (2차):** HMAC-SHA256 (사용자별 임시 키 생성)
 - **실행 환경:** Firebase Cloud Functions (v2)
@@ -30,7 +30,7 @@
 4.  **AI 분석 및 암호화 병렬 처리 (`functions/src/index.ts`)**
     Cloud Function 내에서 두 가지 핵심 작업이 `Promise.allSettled`를 통해 동시에 시작됩니다.
     *   **작업 A: AI 콘텐츠 분석 (`runAiAnalysis`):**
-        *   **기술:** Google Gemini 1.5 Flash, Google AI File Manager
+        *   **기술:** gemini-3-flash-preview, Google AI File Manager
         *   **과정:** 원본 비디오 파일을 Google AI 서버에 업로드하고, "이 비디오를 분석하여 요약, 전체 대본, 시간대별 자막/설명이 포함된 타임라인을 한국어 JSON으로 만들어줘" 라고 구조화된 데이터 출력을 요청합니다.
         *   **결과:** AI가 생성한 결과물 중, 용량이 큰 **`transcript`(대본)는 별도의 `.txt` 파일**로, `timeline` 데이터는 **`.vtt` 자막 파일로 변환**하여 각각 Storage에 저장합니다. 대본을 제외한 나머지 분석 결과(요약, 타임라인 등)는 JSON 문자열 형태로 Firestore 문서의 `aiGeneratedContent` 필드에 저장됩니다.
 
@@ -140,7 +140,7 @@
           "technicalDetails": {
             "aiAnalysis": {
               "library": "@google/generative-ai",
-              "model": "gemini-1.5-flash",
+              "model": "gemini-3-flash-preview",
               "function": "runAiAnalysis",
               "output": "JSON summary, VTT subtitles, and a separate TXT transcript file."
             },
