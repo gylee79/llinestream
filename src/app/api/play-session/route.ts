@@ -6,9 +6,6 @@ import * as admin from 'firebase-admin';
 import { toJSDate } from '@/lib/date-helpers';
 import * as crypto from 'crypto';
 import type { VideoKey, User, Episode } from '@/lib/types';
-import { promisify } from 'util';
-
-const hkdf = promisify(crypto.hkdf);
 
 export async function POST(req: NextRequest) {
   try {
@@ -77,7 +74,7 @@ export async function POST(req: NextRequest) {
     // 5. Generate a Derived Key for online session using HKDF with a structured info (v5.3 Spec)
     const sessionId = `online_sess_${crypto.randomBytes(12).toString('hex')}`;
     const info = Buffer.from(`LSV_ONLINE_V1${userId}${deviceId}${sessionId}`);
-    const derivedKeyB64 = (await hkdf('sha256', masterKey, salt, info, 32)).toString('base64');
+    const derivedKeyB64 = crypto.hkdfSync('sha256', masterKey, salt, info, 32).toString('base64');
     
     // 6. Generate Watermark Seed
     const watermarkSeed = crypto.createHash('sha256').update(userId + videoId + deviceId).digest('hex');

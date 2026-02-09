@@ -58,9 +58,9 @@ const MyCoursesPage = () => {
       grouped.set(episode.courseId, courseEpisodes);
     });
     // Sort episodes within each course
-    for (const episodes of grouped.values()) {
+    grouped.forEach(episodes => {
         episodes.sort((a, b) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
-    }
+    });
     return grouped;
   }, [allEpisodes]);
 

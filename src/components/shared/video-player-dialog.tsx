@@ -486,7 +486,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 episode: episode,
                 courseName: course.name,
                 downloadedAt: new Date(),
-                expiresAt: new Date(license.expiresAt),
                 encryptedVideo,
                 license: license,
             });
@@ -704,5 +703,3 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
-
-    

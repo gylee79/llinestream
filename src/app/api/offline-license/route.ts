@@ -7,9 +7,6 @@ import { toJSDate } from '@/lib/date-helpers';
 import * as crypto from 'crypto';
 import type { VideoKey, User, Episode, OfflineLicense } from '@/lib/types';
 import { add } from 'date-fns';
-import { promisify } from 'util';
-
-const hkdf = promisify(crypto.hkdf);
 
 export async function POST(req: NextRequest) {
   try {
@@ -89,7 +86,7 @@ export async function POST(req: NextRequest) {
     const issuedAt = Date.now();
     const expiresAt = add(issuedAt, { days: 7 }).getTime();
     const info = Buffer.from(`LSV_OFFLINE_V1${userId}${deviceId}${expiresAt}`); // As per spec
-    const offlineDerivedKey = await hkdf('sha256', masterKey, salt, info, 32);
+    const offlineDerivedKey = crypto.hkdfSync('sha256', masterKey, salt, info, 32);
     
     // 6. Generate Watermark Seed
     const watermarkSeed = crypto.createHash('sha256').update(userId + videoId + deviceId).digest('hex');

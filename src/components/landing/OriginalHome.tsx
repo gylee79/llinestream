@@ -194,7 +194,7 @@ export default function OriginalHome() {
       if (!viewLogs || !allEpisodes) return [];
       const episodeMap = new Map(allEpisodes.map(e => [e.id, e]));
       const validLogs = viewLogs.filter(log => log.duration >= 5);
-      const uniqueEpisodeIds = [...new Set(validLogs.map(log => log.episodeId))];
+      const uniqueEpisodeIds = Array.from(new Set(validLogs.map(log => log.episodeId)));
       return uniqueEpisodeIds.map(episodeId => episodeMap.get(episodeId)).filter(Boolean) as Episode[];
   }, [viewLogs, allEpisodes]);
 
@@ -210,9 +210,9 @@ export default function OriginalHome() {
     });
 
     // Sort classifications within each group by orderIndex
-    for (const group of grouped.values()) {
+    grouped.forEach((group) => {
         group.sort((a, b) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
-    }
+    });
 
     const result = new Map<string, string[]>();
     grouped.forEach((value, key) => {

@@ -38,7 +38,7 @@ export default function ContinueWatching() {
         const validLogs = viewLogs.filter(log => log.duration >= 5);
 
         // Get unique episode IDs from the sorted logs, maintaining order (most recent first)
-        const uniqueEpisodeIds = [...new Set(validLogs.map(log => log.episodeId))];
+        const uniqueEpisodeIds = Array.from(new Set(validLogs.map(log => log.episodeId)));
         
         return uniqueEpisodeIds.slice(0, 10).map(episodeId => episodeMap.get(episodeId)).filter(Boolean) as Episode[];
     }, [viewLogs, allEpisodes]);
