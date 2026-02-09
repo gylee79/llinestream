@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     // 6. Generate Watermark Seed
     const watermarkSeed = crypto.createHash('sha256').update(userId).digest('hex');
 
-    // 7. Return Session Info
+    // 7. Return Session Info (PATCH v5.1.3: Add scope)
     return NextResponse.json({
       sessionId: sessionId,
       derivedKey: derivedKey.toString('base64'),
