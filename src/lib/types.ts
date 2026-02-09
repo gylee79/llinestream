@@ -303,9 +303,10 @@ export interface OfflineLicense {
   deviceId: string;
   issuedAt: number; // server time (ms)
   expiresAt: number; // issuedAt + 7 days
-  lastCheckedAt?: number;
+  lastCheckedAt: number;
   scope: "OFFLINE_PLAYBACK";
   watermarkSeed: string;
+  watermarkMode: "normal" | "aggressive";
   offlineDerivedKey: string;
 }
 
@@ -338,7 +339,6 @@ export type CryptoWorkerRequest =
           scope: 'ONLINE_STREAM_ONLY';
         };
         encryption: Episode['encryption'];
-        episodeId: string;
         signedUrl: string;
       };
     }
@@ -349,7 +349,6 @@ export type CryptoWorkerRequest =
         license: OfflineLicense;
         encryptedBuffer: ArrayBuffer;
         encryption: Episode['encryption'];
-        episodeId: string;
       };
     }
   | {
@@ -387,7 +386,7 @@ export type CryptoWorkerResponse =
       payload: {
         requestId: string;
         message: string;
-        code: 'KEY_EXPIRED' | 'NETWORK_ERROR' | 'CHUNK_DECRYPT_FAILED';
+        code: 'NETWORK_ERROR' | 'CHUNK_DECRYPT_FAILED';
         chunkIndex?: number;
       };
     }
@@ -399,5 +398,3 @@ export type CryptoWorkerResponse =
         code: 'INVALID_SCOPE' | 'INTEGRITY_ERROR' | 'OFFSET_MAP_FAILED' | 'UNKNOWN_WORKER_ERROR';
       };
     };
-
-    

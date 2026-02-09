@@ -1,4 +1,3 @@
-
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -6,7 +5,7 @@ import { initializeAdminApp, decryptMasterKey } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { toJSDate } from '@/lib/date-helpers';
 import * as crypto from 'crypto';
-import type { VideoKey, User } from '@/lib/types';
+import type { VideoKey, User, Episode } from '@/lib/types';
 import { promisify } from 'util';
 
 const hkdf = promisify(crypto.hkdf);
@@ -49,19 +48,18 @@ export async function POST(req: NextRequest) {
     if (!episodeDoc.exists) {
         return NextResponse.json({ error: 'Not Found: Video not found' }, { status: 404 });
     }
-    const episodeData = episodeDoc.data();
+    const episodeData = episodeDoc.data() as Episode;
     
-    // Check if the user has an active subscription for the course this episode belongs to
-    const courseId = episodeData?.courseId;
+    const courseId = episodeData.courseId;
     const subscription = userData.activeSubscriptions?.[courseId];
     const isSubscribed = subscription && new Date() < toJSDate(subscription.expiresAt)!;
 
-    if (!isSubscribed && !episodeData?.isFree) {
+    if (!isSubscribed && !episodeData.isFree) {
        return NextResponse.json({ error: 'Forbidden: Subscription required' }, { status: 403 });
     }
 
     // 4. Retrieve and Decrypt Master Key
-    const keyId = episodeData?.encryption?.keyId;
+    const keyId = episodeData.encryption.keyId;
     if (!keyId) {
         return NextResponse.json({ error: 'Not Found: Encryption info missing for this video' }, { status: 404 });
     }
@@ -76,27 +74,22 @@ export async function POST(req: NextRequest) {
     const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
     const salt = Buffer.from(videoKeyData.salt, 'base64');
 
-    // 5. Generate a Derived Key for online session using HKDF with a structured info (v5.2.4)
+    // 5. Generate a Derived Key for online session using HKDF with a structured info (v5.3 Spec)
     const sessionId = `online_sess_${crypto.randomBytes(12).toString('hex')}`;
-    const info = Buffer.concat([
-        Buffer.from("LSV_ONLINE_V1"),
-        Buffer.from(userId),
-        Buffer.from(deviceId),
-        Buffer.from(sessionId)
-    ]);
+    const info = Buffer.from(`LSV_ONLINE_V1${userId}${deviceId}${sessionId}`);
     const derivedKeyB64 = (await hkdf('sha256', masterKey, salt, info, 32)).toString('base64');
     
     // 6. Generate Watermark Seed
     const watermarkSeed = crypto.createHash('sha256').update(userId + videoId + deviceId).digest('hex');
 
-    // 7. Return Session Info with explicit scope
+    // 7. Return Session Info with explicit scope and watermark info
     return NextResponse.json({
       sessionId: sessionId,
       derivedKeyB64: derivedKeyB64,
       expiresAt: Date.now() + 3600 * 1000, // Key is valid for 1 hour for this online session
-      scope: 'ONLINE_STREAM_ONLY',
+      scope: 'ONLINE_STREAM_ONLY', // CRITICAL: Explicit Scope
       watermarkSeed: watermarkSeed,
-      watermarkMode: "normal", // Default watermark mode
+      watermarkMode: "normal", // Default, server can change based on risk
     });
 
   } catch (error) {

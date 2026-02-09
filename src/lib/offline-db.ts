@@ -29,6 +29,7 @@ const initDB = (): Promise<IDBDatabase> => {
 };
 
 export const saveVideo = async (data: OfflineVideoData): Promise<void> => {
+  // As per v5.3 Spec 1.1
   if (navigator.storage && navigator.storage.estimate) {
     const { quota, usage } = await navigator.storage.estimate();
     const availableSpace = (quota || 0) - (usage || 0);
@@ -45,9 +46,10 @@ export const saveVideo = async (data: OfflineVideoData): Promise<void> => {
 
   const dbInstance = await initDB();
   return new Promise((resolve, reject) => {
+    // As per v5.3 Spec Appendix D-4: Single transaction
     const transaction = dbInstance.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
-    const request = store.put(data);
+    const request = store.put(data); // Atomic put of the whole record
 
     request.onsuccess = () => resolve();
     request.onerror = () => reject(new Error('비디오 저장에 실패했습니다.'));
@@ -99,8 +101,9 @@ export const deleteVideo = async (episodeId: string): Promise<void> => {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(new Error('비디오 삭제에 실패했습니다.'));
     });
-  };
+};
 
+// As per v5.3 Spec C-3
 export const updateLicenseCheckTime = async (episodeId: string): Promise<void> => {
   const dbInstance = await initDB();
   const transaction = dbInstance.transaction(STORE_NAME, 'readwrite');
@@ -123,5 +126,3 @@ export const updateLicenseCheckTime = async (episodeId: string): Promise<void> =
     };
   });
 };
-
-    

@@ -1,4 +1,3 @@
-
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -6,7 +5,7 @@ import { initializeAdminApp, decryptMasterKey } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { toJSDate } from '@/lib/date-helpers';
 import * as crypto from 'crypto';
-import type { VideoKey, User } from '@/lib/types';
+import type { VideoKey, User, Episode, OfflineLicense } from '@/lib/types';
 import { add } from 'date-fns';
 import { promisify } from 'util';
 
@@ -50,18 +49,18 @@ export async function POST(req: NextRequest) {
     if (!episodeDoc.exists) {
         return NextResponse.json({ error: 'Not Found: Video not found' }, { status: 404 });
     }
-    const episodeData = episodeDoc.data();
+    const episodeData = episodeDoc.data() as Episode;
     
-    const courseId = episodeData?.courseId;
+    const courseId = episodeData.courseId;
     const subscription = userData.activeSubscriptions?.[courseId];
     const isSubscribed = subscription && new Date() < toJSDate(subscription.expiresAt)!;
 
-    if (!isSubscribed && !episodeData?.isFree) {
+    if (!isSubscribed && !episodeData.isFree) {
        return NextResponse.json({ error: 'Forbidden: Subscription required for download' }, { status: 403 });
     }
 
     // 4. Retrieve and Decrypt Master Key
-    const keyId = episodeData?.encryption?.keyId;
+    const keyId = episodeData.encryption.keyId;
     if (!keyId) {
         return NextResponse.json({ error: 'Not Found: Encryption info missing for this video' }, { status: 404 });
     }
@@ -76,29 +75,30 @@ export async function POST(req: NextRequest) {
     const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
     const salt = Buffer.from(videoKeyData.salt, 'base64');
 
-    // 5. Generate Offline Derived Key using HKDF with a structured info (v5.2.4)
-    const expiresAt = add(new Date(), { days: 7 });
-    const info = Buffer.concat([
-        Buffer.from("LSV_OFFLINE_V1"), // Standardized info prefix
-        Buffer.from(userId),
-        Buffer.from(deviceId),
-        Buffer.from(expiresAt.toISOString()) // Bind key to expiration
-    ]);
+    // 5. Generate Offline Derived Key using HKDF with a structured info (v5.3 Spec)
+    const issuedAt = Date.now();
+    const expiresAt = add(issuedAt, { days: 7 }).getTime();
+    const info = Buffer.from(`LSV_OFFLINE_V1${userId}${deviceId}${expiresAt}`); // As per spec
     const offlineDerivedKey = await hkdf('sha256', masterKey, salt, info, 32);
     
     // 6. Generate Watermark Seed
     const watermarkSeed = crypto.createHash('sha256').update(userId + videoId + deviceId).digest('hex');
 
-    // 7. Return Offline License
-    return NextResponse.json({
-      derivedKeyB64: offlineDerivedKey.toString('base64'),
-      expiresAt: expiresAt.toISOString(),
-      scope: 'OFFLINE_PLAYBACK', // v5.2.4 Explicit Scope
-      watermarkSeed: watermarkSeed,
-      videoId: videoId,
-      deviceId: deviceId,
-      watermarkMode: "normal", // Default watermark mode
-    });
+    // 7. Construct and return Offline License (v5.3 FINAL spec)
+    const license: OfflineLicense = {
+      videoId,
+      userId,
+      deviceId,
+      issuedAt,
+      expiresAt,
+      lastCheckedAt: issuedAt, // Initialize with issuedAt
+      scope: 'OFFLINE_PLAYBACK', // CRITICAL: Explicit Scope
+      watermarkSeed,
+      watermarkMode: "normal", // Default, server can change based on risk
+      offlineDerivedKey: offlineDerivedKey.toString('base64'),
+    };
+
+    return NextResponse.json(license);
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
