@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark, OfflineVideoData, CryptoWorkerRequest, CryptoWorkerResponse } from '@/lib/types';
@@ -414,7 +413,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             expiresAt: new Date(license.expiresAt),
             encryptedVideo,
             license: {
-                offlineDerivedKey: license.offlineDerivedKey,
+                offlineDerivedKey: license.derivedKeyB64,
                 watermarkSeed: license.watermarkSeed,
             },
         });
@@ -475,7 +474,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     });
                     if (!sessionRes.ok) throw new Error(`보안 세션 시작 실패 (${sessionRes.status}): ${await sessionRes.text()}`);
                     const sessionData = await sessionRes.json();
-                    derivedKeyB64 = sessionData.derivedKey;
+                    derivedKeyB64 = sessionData.derivedKeyB64;
                     seed = sessionData.watermarkSeed;
                     addLog('SUCCESS', '2. 보안 세션 수립 완료 (임시 키 수신).');
 
