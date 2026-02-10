@@ -48,13 +48,11 @@ const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const fs = __importStar(require("fs"));
 const crypto = __importStar(require("crypto"));
-const dotenv_1 = require("dotenv");
-(0, dotenv_1.config)();
 // 0. Firebase Admin & Global Options 초기화
 if (!admin.apps.length) {
     admin.initializeApp();
 }
-// KEK_SECRET 의존성을 제거하여 배포가 항상 성공하도록 함
+// KEK_SECRET은 Secret Manager를 통해 런타임에 주입되므로, secrets 배열에 포함시킵니다.
 (0, v2_1.setGlobalOptions)({
     region: "us-central1",
     secrets: ["GOOGLE_GENAI_API_KEY", "KEK_SECRET"],
@@ -95,7 +93,6 @@ async function loadKEK() {
         return cachedKEK;
     }
     // Firebase 환경에서는 Secret Manager에 설정된 비밀이 자동으로 process.env에 주입됨
-    // 로컬 에뮬레이터 환경에서는 .env 파일에서 값을 읽어옴
     const kekSecret = process.env.KEK_SECRET;
     if (kekSecret) {
         console.log("KEK_SECRET found in environment. Loading and validating key.");
@@ -271,7 +268,7 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)("episodes/{epis
     }
 });
 async function runAiAnalysis(episodeId, filePath, docRef) {
-    const modelName = "gemini-3-flash-preview";
+    const modelName = "gemini-1.5-flash-preview";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
