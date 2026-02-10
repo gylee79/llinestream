@@ -22,7 +22,7 @@ setGlobalOptions({
   region: "us-central1",
   secrets: [
     "GOOGLE_GENAI_API_KEY",
-    {secret: "KEK_SECRET", version: "2"}
+    "KEK_SECRET"
   ],
   timeoutSeconds: 540,
   memory: "2GiB",
@@ -57,7 +57,9 @@ let cachedKEK: Buffer | null = null;
 function validateKEK(key: Buffer): void {
     if (key.length !== 32) {
         // Log the incorrect length for debugging, but not the key itself.
-        throw new Error(`Invalid KEK format. Expected a 32-byte key, but received ${key.length} bytes after Base64 decoding.`);
+        const errorMessage = `Invalid KEK format. Expected a 32-byte key, but received ${key.length} bytes after Base64 decoding.`;
+        console.error(`CRITICAL: ${errorMessage}`);
+        throw new Error(errorMessage);
     }
 }
 

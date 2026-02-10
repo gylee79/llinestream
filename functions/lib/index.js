@@ -56,7 +56,7 @@ if (!admin.apps.length) {
     region: "us-central1",
     secrets: [
         "GOOGLE_GENAI_API_KEY",
-        { key: "KEK_SECRET", version: "2" }
+        { secret: "KEK_SECRET", version: "2" }
     ],
     timeoutSeconds: 540,
     memory: "2GiB",
