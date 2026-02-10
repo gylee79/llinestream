@@ -1,4 +1,3 @@
-
 /**
  * @fileoverview Video Analysis & Encryption with Gemini using Firebase Cloud Functions v2.
  * This function now performs file-based AES-256-GCM encryption instead of HLS packaging.
@@ -57,10 +56,9 @@ let cachedKEK: Buffer | null = null;
 
 function validateKEK(key: Buffer): void {
     if (key.length !== 32) {
-        // 보안상 키 길이 또는 내용을 로그에 남기지 않음
-        throw new Error("Invalid KEK format.");
+        // Log the incorrect length for debugging, but not the key itself.
+        throw new Error(`Invalid KEK format. Expected a 32-byte key, but received ${key.length} bytes after Base64 decoding.`);
     }
-    console.log("KEK validated successfully.");
 }
 
 async function loadKEK(): Promise<Buffer> {

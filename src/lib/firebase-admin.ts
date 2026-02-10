@@ -13,8 +13,8 @@ let cachedKEK: Buffer | null = null;
 
 function validateKEK(key: Buffer): void {
     if (key.length !== 32) {
-        // Do not log the key or its length for security reasons.
-        throw new Error('Invalid KEK format.');
+        // Log the incorrect length for debugging, but not the key itself.
+        throw new Error(`Invalid KEK format. Expected a 32-byte key, but received ${key.length} bytes after Base64 decoding.`);
     }
 }
 
