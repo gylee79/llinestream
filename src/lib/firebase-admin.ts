@@ -34,9 +34,14 @@ export async function loadKEK(): Promise<Buffer> {
     if (kekSecret) {
         console.log("KEK_SECRET found in Next.js server environment. Loading and validating key.");
         const key = Buffer.from(kekSecret, 'base64');
-        validateKEK(key);
-        cachedKEK = key;
-        return cachedKEK;
+        try {
+            validateKEK(key);
+            cachedKEK = key;
+            return cachedKEK;
+        } catch (e: any) {
+            console.error(`CRITICAL: KEK_SECRET validation failed. ${e.message}`);
+            throw e; // re-throw the validation error
+        }
     }
 
     console.error("CRITICAL: KEK_SECRET environment variable is not configured for the Next.js server environment.");

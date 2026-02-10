@@ -22,7 +22,7 @@ setGlobalOptions({
   region: "us-central1",
   secrets: [
     "GOOGLE_GENAI_API_KEY",
-    "KEK_SECRET" 
+    {key: "KEK_SECRET", version: "2"}
   ],
   timeoutSeconds: 540,
   memory: "2GiB",
