@@ -1,4 +1,4 @@
-'use server';
+
 /**
  * @fileoverview Video Analysis & Encryption with Gemini using Firebase Cloud Functions v2.
  * This function now performs file-based AES-256-GCM encryption instead of HLS packaging.
@@ -69,7 +69,6 @@ async function loadKEK(): Promise<Buffer> {
     }
     
     // For deployed functions, use the secret from Secret Manager injected as an env var.
-    // For local emulator, it will fall back to the value from the .env file (loaded by Firebase CLI).
     const kekSecret = process.env.KEK_SECRET;
     
     if (kekSecret) {

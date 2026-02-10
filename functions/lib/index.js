@@ -52,16 +52,12 @@ const crypto = __importStar(require("crypto"));
 if (!admin.apps.length) {
     admin.initializeApp();
 }
-// Define a unique environment variable name for the KEK secret to avoid deployment conflicts.
-const KEK_SECRET_ENV_VAR = 'PROD_KEK_SECRET';
 // KEK_SECRET is injected via Secret Manager in production.
 (0, v2_1.setGlobalOptions)({
     region: "us-central1",
     secrets: [
         "GOOGLE_GENAI_API_KEY",
-        // This tells Cloud Functions to fetch 'KEK_SECRET' from Secret Manager
-        // and inject it into the environment as 'PROD_KEK_SECRET'.
-        { secret: "KEK_SECRET", env: KEK_SECRET_ENV_VAR }
+        "KEK_SECRET"
     ],
     timeoutSeconds: 540,
     memory: "2GiB",
@@ -99,9 +95,9 @@ async function loadKEK() {
     if (cachedKEK) {
         return cachedKEK;
     }
-    // For deployed functions, use the aliased secret from Secret Manager.
+    // For deployed functions, use the secret from Secret Manager injected as an env var.
     // For local emulator, it will fall back to the value from the .env file (loaded by Firebase CLI).
-    const kekSecret = process.env[KEK_SECRET_ENV_VAR] || process.env.KEK_SECRET;
+    const kekSecret = process.env.KEK_SECRET;
     if (kekSecret) {
         console.log("KEK_SECRET found in environment. Loading and validating key.");
         const key = Buffer.from(kekSecret, 'base64');
