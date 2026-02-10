@@ -25,7 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 
 const adminNavLinks = [
-  { href: '/admin/dashboard', label: '대시보드', icon: LayoutDashboard },
+  { href: '/admin', label: '대시보드', icon: LayoutDashboard },
   { href: '/admin/content', label: '콘텐츠 관리', icon: FolderKanban },
   { href: '/admin/users', label: '고객 관리', icon: Users },
   { href: '/admin/subscriptions', label: '구독/결제 관리', icon: CreditCard },
@@ -47,7 +47,7 @@ const AdminNav = ({ className }: { className?: string }) => {
               href={link.href}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
-                pathname.startsWith(link.href) && 'bg-muted text-primary'
+                (link.href === '/admin' ? pathname === '/admin' : pathname.startsWith(link.href)) && 'bg-muted text-primary'
               )}
             >
               <link.icon className="h-4 w-4" />
