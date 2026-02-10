@@ -525,13 +525,26 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     const startPlayback = React.useCallback(async (requestId: string) => {
         cleanup(); // Start fresh
         activeRequestIdRef.current = requestId;
+
+        // Check for processing errors BEFORE starting playback
+        if (episode.status?.processing === 'failed') {
+            setPlayerState('error-fatal');
+            setPlayerMessage(episode.status.error || '비디오 처리 중 알 수 없는 오류가 발생했습니다.');
+            return;
+        }
+
+        if (!episode.encryption?.keyId) {
+            setPlayerState('error-fatal');
+            setPlayerMessage('비디오 암호화 정보가 누락되었습니다. 관리자 페이지에서 재처리가 필요합니다.');
+            return;
+        }
+        
         workerRef.current = new Worker(new URL('../../workers/crypto.worker.ts', import.meta.url));
         mediaSourceRef.current = new MediaSource();
         
         if (videoRef.current) {
             videoRef.current.src = URL.createObjectURL(mediaSourceRef.current);
         } else {
-            // This case should ideally not happen if the component mounts correctly.
             setPlayerState('error-fatal');
             setPlayerMessage('비디오 요소를 찾을 수 없습니다.');
             return;

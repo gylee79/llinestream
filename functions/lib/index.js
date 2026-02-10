@@ -269,7 +269,7 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)("episodes/{epis
     }
 });
 async function runAiAnalysis(episodeId, filePath, docRef) {
-    const modelName = "gemini-1.5-flash-preview";
+    const modelName = "gemini-2.5-flash";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), path.basename(filePath));
