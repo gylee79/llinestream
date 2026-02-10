@@ -2,23 +2,44 @@
 
 import type { CryptoWorkerRequest, CryptoWorkerResponse, Episode } from '@/lib/types';
 
-// This worker is now STATELESS. It receives all necessary data in a single message
-// and returns the fully decrypted file in a single message.
+// --- Start of Browser-native Buffer replacements ---
+
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binaryString = self.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function stringToUint8Array(str: string): Uint8Array {
+    return new TextEncoder().encode(str);
+}
+
+function concatUint8Arrays(arrays: Uint8Array[]): Uint8Array {
+    const totalLength = arrays.reduce((acc, val) => acc + val.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const arr of arrays) {
+        result.set(arr, offset);
+        offset += arr.length;
+    }
+    return result;
+}
+
+// --- End of Buffer replacements ---
 
 async function importKey(derivedKeyB64: string): Promise<CryptoKey> {
-    const keyBuffer = Buffer.from(derivedKeyB64, 'base64');
+    const keyBuffer = base64ToUint8Array(derivedKeyB64);
     return self.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
 }
 
-// The main message handler.
 self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
-    // The client sends a 'DECRYPT_CHUNK' message with a non-standard payload.
-    // We handle it directly here.
-    const { type, payload } = event.data as any; // Use 'any' to accept the client's payload.
+    const { type, payload } = event.data as any;
 
     if (type !== 'DECRYPT_CHUNK') {
-        // This worker is now specialized for the client's specific request type.
-        // Ignore other message types.
         return;
     }
 
@@ -34,13 +55,12 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
 
     try {
         const key = await importKey(derivedKeyB64);
-        const decryptedChunks: Buffer[] = [];
+        const decryptedChunks: Uint8Array[] = [];
         const dataView = new DataView(encryptedBuffer);
         let currentOffset = 0;
         let chunkIndex = 0;
 
         while (currentOffset < encryptedBuffer.byteLength) {
-            // 1. Read chunk header (4 bytes, Big Endian) to get the length of the body.
             if (currentOffset + 4 > encryptedBuffer.byteLength) {
                 if (currentOffset !== encryptedBuffer.byteLength) {
                     console.warn(`Worker: Trailing data found at end of buffer (${encryptedBuffer.byteLength - currentOffset} bytes). Ignoring.`);
@@ -55,31 +75,26 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
                  break;
             }
             
-            // 2. Check if we have enough data for the full chunk body.
             if (currentOffset + chunkBodyLength > encryptedBuffer.byteLength) {
                 throw new Error(`Integrity error: Chunk ${chunkIndex} overflows buffer. Expected ${chunkBodyLength} bytes, but only ${encryptedBuffer.byteLength - currentOffset} remain.`);
             }
 
-            // 3. Slice the full chunk body from the main buffer.
             const chunkBody = encryptedBuffer.slice(currentOffset, currentOffset + chunkBodyLength);
             currentOffset += chunkBodyLength;
 
-            // 4. Extract IV, ciphertext, and auth tag from the chunk body.
             const iv = chunkBody.slice(0, encryption.ivLength);
             const authTag = chunkBody.slice(chunkBody.byteLength - encryption.tagLength);
             const ciphertext = chunkBody.slice(encryption.ivLength, chunkBody.byteLength - encryption.tagLength);
 
-            // 5. Set Additional Authenticated Data (AAD) for this chunk.
-            const aad = Buffer.from(`chunk-index:${chunkIndex}`);
+            const aad = stringToUint8Array(`chunk-index:${chunkIndex}`);
 
-            // 6. Decrypt the ciphertext.
             const decryptedChunk = await self.crypto.subtle.decrypt(
                 { name: 'AES-GCM', iv, tagLength: encryption.tagLength * 8, additionalData: aad },
                 key,
                 ciphertext
             );
             
-            decryptedChunks.push(Buffer.from(decryptedChunk));
+            decryptedChunks.push(new Uint8Array(decryptedChunk));
             chunkIndex++;
         }
 
@@ -87,20 +102,17 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
             throw new Error("Decryption produced no data. The input file might be empty or corrupt.");
         }
 
-        // 7. Concatenate all decrypted chunks into a single buffer.
-        const finalDecryptedBuffer = Buffer.concat(decryptedChunks).buffer;
+        const finalDecryptedBuffer = concatUint8Arrays(decryptedChunks).buffer;
 
-        // 8. Send the final result back to the main thread.
         const response: CryptoWorkerResponse = {
             type: 'DECRYPT_SUCCESS',
-            // @ts-ignore - The payload is intentionally structured to match the client's expectation of a single buffer.
+            // @ts-ignore
             payload: { requestId, chunkIndex: 0, decryptedChunk: finalDecryptedBuffer },
         };
         // @ts-ignore
         self.postMessage(response, [finalDecryptedBuffer]);
 
     } catch (error: any) {
-        // If anything fails (key import, decryption), send a fatal error.
         const response: CryptoWorkerResponse = {
             type: 'FATAL_ERROR',
             payload: { requestId, message: `Decryption failed: ${error.message}`, code: 'INTEGRITY_ERROR' },
