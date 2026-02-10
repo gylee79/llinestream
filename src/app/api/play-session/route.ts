@@ -8,6 +8,7 @@ import * as crypto from 'crypto';
 import type { VideoKey, User, Episode } from '@/lib/types';
 
 export async function POST(req: NextRequest) {
+  console.log(`[API /api/play-session] Received request at ${new Date().toISOString()}`);
   try {
     const adminApp = await initializeAdminApp();
     const db = admin.firestore(adminApp);

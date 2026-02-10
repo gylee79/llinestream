@@ -9,6 +9,7 @@ import type { VideoKey, User, Episode, OfflineLicense } from '@/lib/types';
 import { add } from 'date-fns';
 
 export async function POST(req: NextRequest) {
+  console.log(`[API /api/offline-license] Received request at ${new Date().toISOString()}`);
   try {
     // Attempt to load the KEK early to fail fast if it's not configured.
     // This prevents other logic from running unnecessarily.

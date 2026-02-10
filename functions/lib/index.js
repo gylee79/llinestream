@@ -85,10 +85,9 @@ let fileManager = null;
 let cachedKEK = null;
 function validateKEK(key) {
     if (key.length !== 32) {
-        // 보안상 키 길이 또는 내용을 로그에 남기지 않음
-        throw new Error("Invalid KEK format.");
+        // Log the incorrect length for debugging, but not the key itself.
+        throw new Error(`Invalid KEK format. Expected a 32-byte key, but received ${key.length} bytes after Base64 decoding.`);
     }
-    console.log("KEK validated successfully.");
 }
 async function loadKEK() {
     if (cachedKEK) {
