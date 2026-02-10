@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileoverview Video Analysis & Encryption with Gemini using Firebase Cloud Functions v2.
@@ -13,20 +12,19 @@ import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
 import * as crypto from "crypto";
-import { config } from 'dotenv';
-config();
-
 
 // 0. Firebase Admin & Global Options 초기화
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-// KEK_SECRET은 Secret Manager 대신 .env 파일을 통해 런타임에 주입될 수 있으므로,
-// 배포 시점의 의존성에서는 제거합니다.
+// KEK_SECRET is injected via Secret Manager in production.
 setGlobalOptions({
   region: "us-central1",
-  secrets: ["GOOGLE_GENAI_API_KEY"], 
+  secrets: [
+    "GOOGLE_GENAI_API_KEY",
+    "KEK_SECRET" 
+  ],
   timeoutSeconds: 540,
   memory: "2GiB",
   minInstances: 0,
@@ -70,13 +68,12 @@ async function loadKEK(): Promise<Buffer> {
         return cachedKEK;
     }
     
-    // Firebase 환경에서는 Secret Manager에 설정된 비밀이 자동으로 process.env에 주입됨
-    // 로컬 에뮬레이터 환경에서는 .env 파일에서 값을 읽어옴
+    // For deployed functions, use the secret from Secret Manager injected as an env var.
+    // For local emulator, it will fall back to the value from the .env file (loaded by Firebase CLI).
     const kekSecret = process.env.KEK_SECRET;
     
     if (kekSecret) {
         console.log("KEK_SECRET found in environment. Loading and validating key.");
-        // KEK는 Base64로 인코딩된 32바이트 키여야 함
         const key = Buffer.from(kekSecret, 'base64');
         validateKEK(key); // 유효성 검사 실패 시 여기서 에러 발생
         cachedKEK = key;
@@ -84,7 +81,7 @@ async function loadKEK(): Promise<Buffer> {
     }
 
     // KEK가 어떤 소스에서도 발견되지 않으면, 함수를 중지시키기 위해 치명적 오류 발생
-    console.error("CRITICAL: KEK_SECRET is not configured in the function's environment.");
+    console.error("CRITICAL: KEK_SECRET is not configured in the function's environment or via Secret Manager.");
     throw new Error("KEK_SECRET is not configured. Function cannot proceed.");
 }
 
@@ -274,7 +271,7 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
 });
 
 async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.firestore.DocumentReference) {
-    const modelName = "gemini-3-flash-preview";
+    const modelName = "gemini-1.5-flash-preview";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
