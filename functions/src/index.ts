@@ -19,10 +19,18 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-// KEK_SECRET은 Secret Manager를 통해 런타임에 주입되므로, secrets 배열에 포함시킵니다.
+// Define a unique environment variable name for the KEK secret to avoid deployment conflicts.
+const KEK_SECRET_ENV_VAR = 'PROD_KEK_SECRET';
+
+// KEK_SECRET is injected via Secret Manager in production.
 setGlobalOptions({
   region: "us-central1",
-  secrets: ["GOOGLE_GENAI_API_KEY", "KEK_SECRET"], 
+  secrets: [
+    "GOOGLE_GENAI_API_KEY",
+    // This tells Cloud Functions to fetch 'KEK_SECRET' from Secret Manager
+    // and inject it into the environment as 'PROD_KEK_SECRET'.
+    { secret: "KEK_SECRET", env: KEK_SECRET_ENV_VAR }
+  ],
   timeoutSeconds: 540,
   memory: "2GiB",
   minInstances: 0,
@@ -66,12 +74,12 @@ async function loadKEK(): Promise<Buffer> {
         return cachedKEK;
     }
     
-    // Firebase 환경에서는 Secret Manager에 설정된 비밀이 자동으로 process.env에 주입됨
-    const kekSecret = process.env.KEK_SECRET;
+    // For deployed functions, use the aliased secret from Secret Manager.
+    // For local emulator, it will fall back to the value from the .env file (loaded by Firebase CLI).
+    const kekSecret = process.env[KEK_SECRET_ENV_VAR] || process.env.KEK_SECRET;
     
     if (kekSecret) {
         console.log("KEK_SECRET found in environment. Loading and validating key.");
-        // KEK는 Base64로 인코딩된 32바이트 키여야 함
         const key = Buffer.from(kekSecret, 'base64');
         validateKEK(key); // 유효성 검사 실패 시 여기서 에러 발생
         cachedKEK = key;
@@ -79,7 +87,7 @@ async function loadKEK(): Promise<Buffer> {
     }
 
     // KEK가 어떤 소스에서도 발견되지 않으면, 함수를 중지시키기 위해 치명적 오류 발생
-    console.error("CRITICAL: KEK_SECRET is not configured in the function's environment.");
+    console.error("CRITICAL: KEK_SECRET is not configured in the function's environment or via Secret Manager.");
     throw new Error("KEK_SECRET is not configured. Function cannot proceed.");
 }
 
