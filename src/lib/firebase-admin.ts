@@ -1,5 +1,6 @@
 'use server';
 
+import 'server-only';
 import * as admin from 'firebase-admin';
 import { getApps, App } from 'firebase-admin/app';
 import { firebaseConfig } from '@/firebase/config';
@@ -104,5 +105,3 @@ export async function initializeAdminApp(): Promise<App> {
     throw new Error('Could not initialize Firebase Admin SDK. Please check your credentials.');
   }
 }
-
-    

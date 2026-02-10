@@ -1,8 +1,6 @@
 'use server';
 
-import { config } from 'dotenv';
-config();
-
+import 'server-only';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';

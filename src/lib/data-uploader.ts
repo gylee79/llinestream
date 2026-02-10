@@ -1,9 +1,6 @@
-
 'use server';
 
-import { config } from 'dotenv';
-config();
-
+import 'server-only';
 import * as admin from 'firebase-admin';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import { fields, classifications, courses, episodes, users, subscriptions, policies, instructors } from '@/lib/data';

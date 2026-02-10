@@ -1,8 +1,6 @@
 'use server';
 
-import { config } from 'dotenv';
-config();
-
+import 'server-only';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
@@ -81,5 +79,3 @@ export async function updateUserProfileAndLog(payload: UpdateProfilePayload): Pr
         return { success: false, message: `프로필 업데이트 실패: ${errorMessage}` };
     }
 }
-
-    

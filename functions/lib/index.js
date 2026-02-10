@@ -1,5 +1,4 @@
 "use strict";
-'use server';
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -96,7 +95,6 @@ async function loadKEK() {
         return cachedKEK;
     }
     // For deployed functions, use the secret from Secret Manager injected as an env var.
-    // For local emulator, it will fall back to the value from the .env file (loaded by Firebase CLI).
     const kekSecret = process.env.KEK_SECRET;
     if (kekSecret) {
         console.log("KEK_SECRET found in environment. Loading and validating key.");

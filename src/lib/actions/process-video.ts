@@ -1,8 +1,6 @@
 'use server';
 
-import { config } from 'dotenv';
-config();
-
+import 'server-only';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
@@ -50,5 +48,3 @@ export async function resetAIEpisodeStatus(episodeId: string): Promise<{ success
     return { success: false, message: `AI 분석 상태 리셋 실패: ${errorMessage}` };
   }
 }
-
-    

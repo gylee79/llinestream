@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { config } from 'dotenv';
-config();
 import { Timestamp } from 'firebase-admin/firestore';
 import * as admin from 'firebase-admin';
 import * as PortOne from "@portone/server-sdk";
