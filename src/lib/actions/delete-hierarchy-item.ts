@@ -1,6 +1,5 @@
 'use server';
 
-import 'server-only';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import type { Episode, Course, Classification, Field } from '@/lib/types';
 import * as admin from 'firebase-admin';

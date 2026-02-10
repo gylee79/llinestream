@@ -1,6 +1,5 @@
 'use server';
 
-import 'server-only';
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 
