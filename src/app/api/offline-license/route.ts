@@ -9,6 +9,8 @@ import type { VideoKey, User, Episode, OfflineLicense } from '@/lib/types';
 import { add } from 'date-fns';
 
 export async function POST(req: NextRequest) {
+  // This log is added to force a new deployment and refresh environment variables.
+  console.log('[App Hosting] Forcing environment variable refresh via new deployment.');
   console.log(`[API /api/offline-license] Received request at ${new Date().toISOString()}`);
   try {
     // Attempt to load the KEK early to fail fast if it's not configured.

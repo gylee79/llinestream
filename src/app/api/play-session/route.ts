@@ -8,6 +8,8 @@ import * as crypto from 'crypto';
 import type { VideoKey, User, Episode } from '@/lib/types';
 
 export async function POST(req: NextRequest) {
+  // This log is added to force a new deployment and refresh environment variables.
+  console.log('[App Hosting] Forcing environment variable refresh via new deployment.');
   console.log(`[API /api/play-session] Received request at ${new Date().toISOString()}`);
   try {
     const adminApp = await initializeAdminApp();
