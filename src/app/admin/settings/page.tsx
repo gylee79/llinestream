@@ -31,6 +31,7 @@ import {
 import { Trash2, Download } from "lucide-react";
 import { createFullBackup } from '@/lib/actions/backup-actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { firebaseConfig } from "@/firebase/config";
 
 
 function HeroImageManager() {
@@ -110,7 +111,7 @@ function HeroImageManager() {
         let updatedSettings: Partial<HeroImageSettings> = JSON.parse(JSON.stringify(settings));
 
         try {
-            const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+            const bucketName = firebaseConfig.storageBucket;
             if (!bucketName) {
                 throw new Error('Firebase Storage bucket name is not configured.');
             }
