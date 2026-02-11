@@ -16,7 +16,22 @@ import * as crypto from "crypto";
 
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
-import { path as ffprobePath } from 'ffprobe-static';
+// Use require for ffprobe-static to avoid TS7016 error
+const { path: ffprobePath } = require('ffprobe-static');
+
+// Minimal Episode type definition for Cloud Function context
+interface Episode {
+  filePath?: string;
+  status?: {
+    processing: 'pending' | 'processing' | 'completed' | 'failed';
+    [key: string]: any;
+  };
+  keyId?: string;
+  aiProcessingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  aiProcessingError?: string | null;
+  [key: string]: any;
+}
+
 
 // 0. Firebase Admin, FFMpeg, & Global Options 초기화
 if (ffmpegPath) {
@@ -420,10 +435,3 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
-
-interface EpisodeData {
-  filePath?: string;
-  status?: { processing: string };
-  [key: string]: any;
-}
-
