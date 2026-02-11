@@ -150,36 +150,43 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         const codecString = `video/mp4; codecs="${videoStream.codec_tag_string}, ${audioStream?.codec_tag_string || 'mp4a.40.2'}"`;
         console.log(`[${episodeId}] 💡 Detected Codec String: ${codecString}`);
 
-        // 4. Split the fMP4 file into segments
-        console.log(`[${episodeId}] Pass 2: Splitting into segments...`);
-        const segmentPattern = 'segment_%04d.mp4';
+        // 4. Split the fMP4 file into DASH segments (Correct method for MSE)
+        console.log(`[${episodeId}] Pass 2: Splitting into DASH segments...`);
+        const mediaSegmentPattern = 'segment_%d.m4s';
         await new Promise<void>((resolve, reject) => {
             ffmpeg(fragmentedMp4Path)
                 .outputOptions([
                     '-c copy',
-                    '-f segment',
-                    '-segment_time 4',
-                    '-reset_timestamps 1'
+                    '-f dash',
+                    '-seg_duration 4',
+                    '-init_seg_name init.mp4',
+                    `-media_seg_name ${mediaSegmentPattern}`,
                 ])
-                .on('start', (commandLine) => console.log(`[${episodeId}] 🚀 FFMPEG SEGMENT COMMAND: ${commandLine}`))
-                .on('error', (err) => reject(new Error(`ffmpeg segmentation failed: ${err.message}`)))
+                .on('start', (commandLine) => console.log(`[${episodeId}] 🚀 FFMPEG DASH SEGMENT COMMAND: ${commandLine}`))
+                .on('error', (err) => reject(new Error(`ffmpeg DASH segmentation failed: ${err.message}`)))
                 .on('end', () => resolve())
-                .save(path.join(tempOutputDir, segmentPattern));
+                .save(path.join(tempOutputDir, 'manifest.mpd')); // output is an mpd, which we ignore
         });
-        console.log(`[${episodeId}] ✅ Pass 2: Segmentation complete.`);
+        console.log(`[${episodeId}] ✅ Pass 2: DASH segmentation complete.`);
+
 
         // 5. Analyze segment files and prepare for encryption
         const createdFiles = await fs.readdir(tempOutputDir);
-        console.log(`[${episodeId}] 🔎 Segment file structure analysis:`, createdFiles);
-        
-        const initSegmentName = createdFiles.find(f => f.startsWith('segment_'));
-        if (!initSegmentName) throw new Error("Init segment not found after ffmpeg processing.");
-        
-        await fs.rename(path.join(tempOutputDir, initSegmentName), path.join(tempOutputDir, 'init.mp4'));
-        console.log(`[${episodeId}] ✅ Renamed ${initSegmentName} to init.mp4.`);
+        console.log(`[${episodeId}] 🔎 DASH segment file structure analysis:`, createdFiles);
+        const initSegmentName = 'init.mp4';
+        if (!createdFiles.includes(initSegmentName)) {
+            throw new Error("DASH init segment (init.mp4) not found after ffmpeg processing.");
+        }
 
-        const mediaSegmentNames = createdFiles.filter(f => f !== initSegmentName).sort();
-        const allSegmentsToProcess = ['init.mp4', ...mediaSegmentNames];
+        const mediaSegmentNames = createdFiles
+            .filter(f => f.startsWith('segment_') && f.endsWith('.m4s'))
+            .sort((a, b) => {
+                const numA = parseInt(a.match(/(\d+)/)?.[0] || '0');
+                const numB = parseInt(b.match(/(\d+)/)?.[0] || '0');
+                return numA - numB;
+            });
+        
+        const allSegmentsToProcess = [initSegmentName, ...mediaSegmentNames];
 
         // 6. Encrypt and Upload Segments
         console.log(`[${episodeId}] Encrypting and uploading segments...`);
@@ -211,7 +218,12 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
             
             const finalBuffer = Buffer.concat([iv, encryptedContent, authTag]);
             
-            const outputFileName = fileName.replace('.mp4', '.enc');
+            let outputFileName: string;
+            if (fileName === 'init.mp4') {
+                outputFileName = 'init.enc';
+            } else {
+                outputFileName = fileName.replace('.m4s', '.m4s.enc');
+            }
             const storagePath = `episodes/${episodeId}/segments/${outputFileName}`;
 
             await bucket.file(storagePath).save(finalBuffer, { contentType: 'application/octet-stream' });

@@ -1,3 +1,4 @@
+
 # 스트리밍 파이프라인 진단 로그 가이드 (v3 - 최종)
 
 이 문서는 비디오 업로드부터 재생까지 전 과정에 걸쳐 출력되는 상세 로그를 해석하는 방법을 안내합니다. 문제가 발생했을 때 이 로그를 통해 원인을 신속하게 파악할 수 있습니다.
@@ -10,16 +11,16 @@
 
 ### 1.1. FFmpeg 명령어 확인
 
-`ffmpeg`를 통해 비디오를 fMP4로 변환하고 세그먼트로 분할할 때 실행되는 실제 커맨드를 확인할 수 있습니다.
+`ffmpeg`를 통해 비디오를 fMP4로 변환하고, MSE 표준에 맞는 DASH 세그먼트로 분할할 때 실행되는 실제 커맨드를 확인할 수 있습니다.
 
 **✅ 정상 로그 예시:**
 ```log
-[<EPISODE_ID>] 🚀 FFMPEG TRANSCODE COMMAND: ffmpeg -i /tmp/lline-in-xxx/original_video ... -movflags frag_keyframe+empty_moov ... -g 48 -keyint_min 48 -sc_threshold 0 ... /tmp/lline-in-xxx/frag.mp4
-[<EPISODE_ID>] 🚀 FFMPEG SEGMENT COMMAND: ffmpeg -i /tmp/lline-in-xxx/frag.mp4 ... -f segment ... /tmp/lline-out-xxx/segment_%04d.mp4
+[<EPISODE_ID>] 🚀 FFMPEG TRANSCODE COMMAND: ffmpeg -i /tmp/lline-in-xxx/original_video ... -movflags frag_keyframe+empty_moov ... /tmp/lline-in-xxx/frag.mp4
+[<EPISODE_ID>] 🚀 FFMPEG DASH SEGMENT COMMAND: ffmpeg -i /tmp/lline-in-xxx/frag.mp4 ... -f dash -init_seg_name init.mp4 -media_seg_name segment_%d.m4s ... manifest.mpd
 ```
 - **확인 포인트:**
-    - **TRANSCODE 명령어:** `-movflags frag_keyframe+empty_moov` 옵션과 `-g 48`, `-keyint_min 48` 같은 GOP 고정 옵션이 포함되어 스트리밍에 최적화된 파일이 생성되는지 검증합니다.
-    - **SEGMENT 명령어:** 변환된 fMP4 파일을 대상으로 `-f segment` 옵션을 사용해 분할하는지 확인합니다.
+    - **TRANSCODE 명령어:** `-movflags frag_keyframe+empty_moov` 옵션이 포함되어 스트리밍에 최적화된 파일이 생성되는지 검증합니다.
+    - **DASH SEGMENT 명령어:** `-f dash` 옵션을 사용해 `init.mp4`와 `segment_*.m4s`를 생성하는지 확인합니다. `-f segment`는 더 이상 사용되지 않습니다.
 
 ### 1.2. 코덱 문자열 실제 검증
 
@@ -33,14 +34,13 @@
 
 ### 1.3. 세그먼트 생성 및 구조 분석
 
-세그먼트 분할 작업이 끝난 직후, 실제로 생성된 파일 목록을 출력하여 구조를 검증합니다.
+DASH 분할 작업이 끝난 직후, 실제로 생성된 파일 목록을 출력하여 구조를 검증합니다.
 
 **✅ 정상 로그 예시:**
 ```log
-[<EPISODE_ID>] 🔎 Segment file structure analysis: [ 'segment_0000.mp4', 'segment_0001.mp4', 'segment_0002.mp4' ]
-[<EPISODE_ID>] ✅ Renamed segment_0000.mp4 to init.mp4.
+[<EPISODE_ID>] 🔎 DASH segment file structure analysis: [ 'init.mp4', 'manifest.mpd', 'segment_1.m4s', 'segment_2.m4s' ]
 ```
-- **확인 포인트:** `segment_xxxx.mp4` 형태의 파일들이 생성되었는지, 그 중 첫 번째 파일이 `init.mp4`로 정상적으로 이름이 변경되었는지 확인합니다.
+- **확인 포인트:** `init.mp4` 파일과 `segment_*.m4s` 형태의 파일들이 생성되었는지 확인합니다. `manifest.mpd` 파일은 생성되지만 사용하지는 않습니다.
 
 ### 1.4. 암호화 크기 비교
 
@@ -49,7 +49,7 @@
 **✅ 정상 로그 예시:**
 ```log
 [<EPISODE_ID>] 📦 Segment 'init.mp4' | Original Size: 844 bytes -> Encrypted Size: 872 bytes
-[<EPISODE_ID>] 📦 Segment 'segment_0001.mp4' | Original Size: 642387 bytes -> Encrypted Size: 642415 bytes
+[<EPISODE_ID>] 📦 Segment 'segment_1.m4s' | Original Size: 642387 bytes -> Encrypted Size: 642415 bytes
 ```
 - **확인 포인트:** `Encrypted Size`가 `Original Size`보다 정확히 **28바이트** 큰지 확인합니다. (IV 12 + Tag 16)
 
@@ -63,9 +63,9 @@
 
 **가장 먼저 확인할 부분입니다.**
 1.  **`manifest.json`, `init.enc` 요청:** `Status`가 **`200 OK`** 인지 확인합니다.
-2.  **`segment_xxxx.enc` 요청:** `Status`가 **`200 OK` 또는 `206 Partial Content`** 인지 확인합니다.
+2.  **`segment_*.m4s.enc` 요청:** `Status`가 **`200 OK` 또는 `206 Partial Content`** 인지 확인합니다.
     - **중요:** 클라이언트가 `Range` 헤더를 포함하여 특정 부분만 요청했을 때 **`206 Partial Content`** 가 응답으로 와야 정상적인 탐색(seeking)이 가능합니다. 만약 `Range` 요청에도 `200 OK`가 온다면, 스토리지의 CORS 설정이 `Range` 헤더를 제대로 처리하지 못하고 있음을 의미합니다.
-3.  **응답 헤더 확인:** `segment_xxxx.enc` 요청을 클릭하고 `Response Headers` 탭에서 아래 헤더가 있는지 확인합니다.
+3.  **응답 헤더 확인:** `segment_*.m4s.enc` 요청을 클릭하고 `Response Headers` 탭에서 아래 헤더가 있는지 확인합니다.
     -   `Accept-Ranges: bytes`
     -   (206 응답 시) `Content-Range: bytes xxxx-yyyy/zzzz`
 
@@ -85,7 +85,7 @@
 [Worker] ❌ Decryption failed... Decryption failed in worker: The operation failed...
 [Worker] ❌ Decryption Error Name: IntegrityError
 ```
- - **확인 포인트:** `error.name`이 `IntegrityError`라면, 암호화된 데이터가 변조되었거나 암호화에 사용된 키와 복호화 키가 일치하지 않음을 의미합니다.
+ - **확인 포인트:** `error.name`이 `IntegrityError`라면, 암호화된 데이터가 변조되었거나 암호화에 사용된 키와 복호화 키, 또는 AAD(추가 인증 데이터)가 일치하지 않음을 의미합니다.
 
 ### 2.3. 플레이어 재생 파이프라인 추적
 
@@ -95,7 +95,7 @@
 ```log
 🔌 MediaSource state: open
 💡 Codec '...' is supported by this browser.
-[0] ➡️ Fetching segment: episodes/<ID>/init.enc
+[0] ➡️ Fetching segment: episodes/<ID>/segments/init.enc
 ...
 [Worker] ✅ Decryption success...
 [0] 🟢 Appending segment...

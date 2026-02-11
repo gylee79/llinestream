@@ -38,6 +38,10 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
   try {
     const keyBuffer = base64ToUint8Array(derivedKeyB64);
     const cryptoKey = await importKey(keyBuffer.buffer);
+
+    // NEW: Parse index from requestId to construct AAD (Authenticated Additional Data)
+    const segmentIndex = parseInt(requestId.split('-').pop() || '0');
+    const aad = new TextEncoder().encode(`fragment-index:${segmentIndex}`);
     
     // Structure: [IV (12 bytes)][Ciphertext + AuthTag]
     const iv = encryptedSegment.slice(0, encryption.ivLength);
@@ -48,6 +52,7 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
         name: 'AES-GCM',
         iv: iv,
         tagLength: encryption.tagLength * 8, // Convert bytes to bits
+        additionalData: aad, // Add AAD for integrity check
       },
       cryptoKey,
       ciphertextWithTag
