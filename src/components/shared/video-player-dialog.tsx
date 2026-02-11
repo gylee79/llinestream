@@ -582,6 +582,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     if (!sb || sb.buffered.length === 0) return;
 
                     console.log(`[${currentSegmentIndexRef.current-1}] ✅ Append complete.`);
+                    console.log('Timestamp Offset:', sb.timestampOffset);
+                    console.log('Current Time:', videoRef.current?.currentTime);
                     console.log('Buffered ranges:');
                     let lastEnd = 0;
                     for (let i = 0; i < sb.buffered.length; i++) {

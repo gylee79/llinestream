@@ -99,10 +99,13 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
                 .videoCodec('libx264')
                 .audioCodec('aac')
                 .outputOptions([
-                    '-profile:v baseline', // Changed from high to baseline for max compatibility
+                    '-profile:v baseline',
                     '-level 3.0',
-                    '-pix_fmt yuv420p',    // Safari compatibility
-                    '-movflags frag_keyframe+empty_moov' // Create a streamable fMP4
+                    '-pix_fmt yuv420p',
+                    '-g 48', // GOP size for 2-second keyframe interval at 24fps
+                    '-keyint_min 48',
+                    '-sc_threshold 0',
+                    '-movflags frag_keyframe+empty_moov'
                 ])
                 .toFormat('mp4')
                 .on('start', (commandLine) => console.log(`[${episodeId}] 🚀 FFMPEG TRANSCODE COMMAND: ${commandLine}`))
@@ -136,9 +139,9 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         await new Promise<void>((resolve, reject) => {
             ffmpeg(fragmentedMp4Path)
                 .outputOptions([
-                    '-c copy',            // Copy codecs, no re-encoding
-                    '-f segment',         // Use the segment muxer
-                    '-segment_time 4',    // 4-second segments
+                    '-c copy',
+                    '-f segment',
+                    '-segment_time 4',
                     '-reset_timestamps 1'
                 ])
                 .on('start', (commandLine) => console.log(`[${episodeId}] 🚀 FFMPEG SEGMENT COMMAND: ${commandLine}`))
@@ -152,7 +155,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         const createdFiles = await fs.readdir(tempOutputDir);
         console.log(`[${episodeId}] 🔎 Segment file structure analysis:`, createdFiles);
         
-        const initSegmentName = createdFiles.find(f => f.startsWith('segment_')); // ffmpeg names it like other segments, usually the first
+        const initSegmentName = createdFiles.find(f => f.startsWith('segment_'));
         if (!initSegmentName) throw new Error("Init segment not found after ffmpeg processing.");
         
         await fs.rename(path.join(tempOutputDir, initSegmentName), path.join(tempOutputDir, 'init.mp4'));
@@ -179,14 +182,13 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
             const localFilePath = path.join(tempOutputDir, fileName);
             const content = await fs.readFile(localFilePath);
             
-            const iv = crypto.randomBytes(12); // New IV for each segment
+            const iv = crypto.randomBytes(12);
             const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
-            cipher.setAAD(Buffer.from(`fragment-index:${index}`)); // Add AAD
+            cipher.setAAD(Buffer.from(`fragment-index:${index}`));
             
             const encryptedContent = Buffer.concat([cipher.update(content), cipher.final()]);
             const authTag = cipher.getAuthTag();
             
-            // Final structure: [IV (12)][Ciphertext + AuthTag]
             const finalBuffer = Buffer.concat([iv, encryptedContent, authTag]);
             
             const outputFileName = fileName.replace('.mp4', '.enc');
@@ -245,7 +247,6 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
             'status.error': error.message || 'An unknown error occurred during video processing.'
         });
     } finally {
-        // Clean up temporary directories
         await fs.rm(tempInputDir, { recursive: true, force: true });
         await fs.rm(tempOutputDir, { recursive: true, force: true });
         console.log(`[${episodeId}] Cleaned up temporary files.`);
@@ -335,18 +336,13 @@ export async function runAiAnalysis(episodeId: string, filePath: string, docRef:
       let output;
       
       try {
-        const jsonMatch = rawText.match(/```(json)?\n([\s\S]*?)\n```/);
-        if (jsonMatch && jsonMatch[2]) {
-            output = JSON.parse(jsonMatch[2]);
-        } else {
-             const startIndex = rawText.indexOf('{');
-             const endIndex = rawText.lastIndexOf('}');
-             if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
-                 throw new Error("AI response does not contain a valid JSON object.");
-             }
-             const jsonString = rawText.substring(startIndex, endIndex + 1);
-             output = JSON.parse(jsonString);
+        const startIndex = rawText.indexOf('{');
+        const endIndex = rawText.lastIndexOf('}');
+        if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+          throw new Error("AI response does not contain a valid JSON object.");
         }
+        const jsonString = rawText.substring(startIndex, endIndex + 1);
+        output = JSON.parse(jsonString);
       } catch (jsonError: any) {
           console.error(`[${episodeId}] AI JSON parsing error. Raw output:`, rawText);
           throw new Error(`JSON 파싱 실패: ${jsonError.message}.`);

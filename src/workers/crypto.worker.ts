@@ -55,7 +55,17 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
     const hexPreview = Array.from(new Uint8Array(decryptedSegment.slice(0, 8)))
       .map(b => b.toString(16).padStart(2, '0'))
       .join(' ');
-    console.log(`[Worker] ✅ Decryption success for requestId ${requestId}. First 8 bytes (hex): ${hexPreview}`);
+    
+    // Enhanced init segment validation
+    let validationLog = '';
+    if (requestId.endsWith('-0')) { // Assuming the init segment request ID is unique
+        const segmentText = new TextDecoder().decode(decryptedSegment.slice(0, 512));
+        const hasFtyp = segmentText.includes('ftyp');
+        const hasMoov = segmentText.includes('moov');
+        validationLog = ` | Init Segment Validation: ftyp=${hasFtyp}, moov=${hasMoov}`;
+    }
+    
+    console.log(`[Worker] ✅ Decryption success for requestId ${requestId}. First 8 bytes (hex): ${hexPreview}${validationLog}`);
 
 
     const response: CryptoWorkerResponse = {
