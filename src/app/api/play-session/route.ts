@@ -1,3 +1,4 @@
+
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -8,8 +9,6 @@ import * as crypto from 'crypto';
 import type { VideoKey, User, Episode } from '@/lib/types';
 
 export async function POST(req: NextRequest) {
-  // This log is added to force a new deployment and refresh environment variables.
-  console.log('[App Hosting] Forcing environment variable refresh via new deployment.');
   console.log(`[API /api/play-session] Received request at ${new Date().toISOString()}`);
   try {
     const adminApp = await initializeAdminApp();
@@ -22,16 +21,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 });
     }
     const idToken = authorization.split('Bearer ')[1];
-
-    let decodedToken;
-    try {
-      decodedToken = await auth.verifyIdToken(idToken);
-    } catch (error) {
-      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
-    }
+    const decodedToken = await auth.verifyIdToken(idToken);
     const userId = decodedToken.uid;
 
-    // 2. Get videoId and deviceId from request body
+    // 2. Get videoId and deviceId
     const { videoId, deviceId } = await req.json();
     if (!videoId || !deviceId) {
       return NextResponse.json({ error: 'Bad Request: videoId and deviceId are required' }, { status: 400 });
@@ -39,19 +32,14 @@ export async function POST(req: NextRequest) {
 
     // 3. Verify User Subscription
     const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) {
-      return NextResponse.json({ error: 'Forbidden: User not found' }, { status: 403 });
-    }
+    if (!userDoc.exists) return NextResponse.json({ error: 'Forbidden: User not found' }, { status: 403 });
     const userData = userDoc.data() as User;
     
     const episodeDoc = await db.collection('episodes').doc(videoId).get();
-    if (!episodeDoc.exists) {
-        return NextResponse.json({ error: 'Not Found: Video not found' }, { status: 404 });
-    }
+    if (!episodeDoc.exists) return NextResponse.json({ error: 'Not Found: Video not found' }, { status: 404 });
     const episodeData = episodeDoc.data() as Episode;
     
-    const courseId = episodeData.courseId;
-    const subscription = userData.activeSubscriptions?.[courseId];
+    const subscription = userData.activeSubscriptions?.[episodeData.courseId];
     const isSubscribed = subscription && new Date() < toJSDate(subscription.expiresAt)!;
 
     if (!isSubscribed && !episodeData.isFree) {
@@ -59,39 +47,37 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Retrieve and Decrypt Master Key
-    const keyId = episodeData.encryption.keyId;
-    if (!keyId) {
-        return NextResponse.json({ error: 'Not Found: Encryption info missing for this video' }, { status: 404 });
-    }
+    const keyId = episodeData.keyId; // Use the new keyId field
+    if (!keyId) return NextResponse.json({ error: 'Not Found: Encryption info missing for this video' }, { status: 404 });
+    
     const keyDoc = await db.collection('video_keys').doc(keyId).get();
-    if (!keyDoc.exists) {
-      return NextResponse.json({ error: 'Not Found: Encryption key not found for this video' }, { status: 404 });
-    }
+    if (!keyDoc.exists) return NextResponse.json({ error: 'Not Found: Encryption key not found for this video' }, { status: 404 });
+    
     const videoKeyData = keyDoc.data() as VideoKey;
-    if (!videoKeyData.encryptedMasterKey) {
-        return NextResponse.json({ error: 'Internal Server Error: Master key is missing from key data.' }, { status: 500 });
-    }
     const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
-    const salt = Buffer.from(videoKeyData.salt, 'base64');
 
-    // 5. Generate a Derived Key for online session using HKDF with a structured info (v5.3 Spec)
+    // 5. Generate a Derived Key for online session (no longer needs salt from DB)
     const sessionId = `online_sess_${crypto.randomBytes(12).toString('hex')}`;
     const info = Buffer.from(`LSV_ONLINE_V1${userId}${deviceId}${sessionId}`);
     
+    // For segment-based encryption, we will send the master key itself for the session,
+    // as each segment has its own IV. HKDF is not strictly needed here anymore, but
+    // we keep it for consistency with offline and to prevent direct master key exposure.
+    const salt = crypto.randomBytes(16); // Generate a temporary salt for this session's derivation
     const derivedKey = crypto.hkdfSync('sha256', masterKey, salt, info, 32);
     const derivedKeyB64 = Buffer.from(derivedKey).toString('base64');
     
     // 6. Generate Watermark Seed
     const watermarkSeed = crypto.createHash('sha256').update(userId + videoId + deviceId).digest('hex');
 
-    // 7. Return Session Info with explicit scope and watermark info
+    // 7. Return Session Info
     return NextResponse.json({
       sessionId: sessionId,
       derivedKeyB64: derivedKeyB64,
-      expiresAt: Date.now() + 3600 * 1000, // Key is valid for 1 hour for this online session
-      scope: 'ONLINE_STREAM_ONLY', // CRITICAL: Explicit Scope
+      expiresAt: Date.now() + 3600 * 1000,
+      scope: 'ONLINE_STREAM_ONLY',
       watermarkSeed: watermarkSeed,
-      watermarkMode: "normal", // Default, server can change based on risk
+      watermarkMode: "normal",
     });
 
   } catch (error) {

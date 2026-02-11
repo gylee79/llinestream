@@ -1,37 +1,33 @@
+
 'use server';
 
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
 import type { UseEmblaCarouselType } from 'embla-carousel-react';
 
-// This union type can represent a client-side Timestamp or a server-side FieldValue for server timestamps.
 export type Timestamp = FirebaseTimestamp | FieldValue;
 
 export type PlayerState =
   | 'idle'
-  | 'requesting-key'
-  | 'downloading'
-  | 'decrypting'
-  | 'buffering-seek'
-  | 'ready'
-  | 'playing'
-  | 'paused'
+  | 'fetching_manifest'
+  | 'fetching_init'
+  | 'appending_init'
+  | 'fetching_segment'
+  | 'appending_segment'
+  | 'ended'
   | 'recovering'
   | 'error-fatal'
-  | 'error-retryable'
   | 'license-expired'
-  | 'offline-downloading'
-  | 'offline-ready'
-  | 'offline-playing';
+  | 'requesting-key';
 
 export interface User {
-  id: string; // This will be the document ID from Firestore, added on the client
+  id: string;
   name: string;
   email: string;
   phone: string;
-  dob: string; // Date of Birth YYYY-MM-DD
+  dob: string; 
   role: 'user' | 'admin';
   activeSubscriptions: {
-    [courseId: string]: { // Changed from classificationId to courseId
+    [courseId: string]: {
       expiresAt: Timestamp;
       purchasedAt: Timestamp;
     };
@@ -40,7 +36,7 @@ export interface User {
 }
 
 export interface Field {
-  id: string; // This will be the document ID from Firestore, added on the client
+  id: string;
   name: string;
   description: string;
   thumbnailUrl: string;
@@ -49,18 +45,17 @@ export interface Field {
 }
 
 export interface Classification {
-  id:string; // This will be the document ID from Firestore, added on the client
+  id:string;
   fieldId: string;
   name: string;
   description: string;
   thumbnailUrl: string;
   thumbnailPath?: string;
   orderIndex?: number;
-  // prices field is removed from here
 }
 
 export interface Course {
-  id: string; // This will be the document ID from Firestore, added on the client
+  id: string;
   classificationId: string;
   instructorId?: string;
   name: string;
@@ -70,12 +65,10 @@ export interface Course {
   introImageUrls?: string[];
   introImagePaths?: string[];
   orderIndex?: number;
-  // New fields for richer display
   level?: '입문' | '초급' | '중급' | '고급';
   tags?: string[];
   rating?: number;
   reviewCount?: number;
-  // prices field is added here
   prices: {
     day1: number;
     day30: number;
@@ -85,14 +78,12 @@ export interface Course {
   createdAt?: Timestamp;
 }
 
-export interface EncryptionInfo {
-  algorithm: 'AES-256-GCM' | 'AES-256-GCM-CHUNKED' | 'AES-256-GCM-CHUNKED-V3';
-  version: number;
-  keyId: string;
-  ivLength: 12;
-  tagLength: 16;
-  chunkSize?: number; // For chunked encryption
+export interface VideoManifest {
+  codec: string;
+  init: string; // path to init.enc
+  segments: Array<{ path: string; }>;
 }
+
 
 export interface Episode {
   id: string;
@@ -109,50 +100,32 @@ export interface Episode {
   customThumbnailUrl?: string;
   customThumbnailPath?: string;
   
-  // File & Storage Information (Legacy & New)
-  filePath?: string; // Path to the original uploaded file (will be deleted after processing)
-  storage: {
-    encryptedPath: string;
-    fileSize: number;
-  };
-  subtitlePath?: string;
-  transcriptPath?: string; // Path to the transcript file in Storage
+  // File Processing & Status
+  filePath?: string; // Original uploaded file path, deleted after processing
+  manifestPath?: string; // Path to the manifest.json in storage
+  codec?: string; // e.g., 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"'
+  keyId?: string; // ID of the master key in `video_keys` collection
 
-  // Encryption Information
-  encryption: EncryptionInfo;
-
-  // Processing Status
-  aiProcessingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
-  aiProcessingError?: string | null;
-  aiModel?: string;
   status: {
     processing: 'pending' | 'processing' | 'completed' | 'failed';
     playable: boolean;
     error?: string | null;
   };
   
-  // AI Generated Content (summary, timeline etc. without large transcript)
-  aiGeneratedContent?: string | null;
+  // AI Generated Content
+  aiProcessingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  aiProcessingError?: string | null;
+  aiModel?: string;
+  aiGeneratedContent?: string | null; // summary, timeline etc.
   
   createdAt: Timestamp;
 }
-
 
 export interface VideoKey {
   keyId: string;
   videoId: string;
   encryptedMasterKey: string; 
-  salt: string; // Salt for HKDF, base64 encoded
-  keyVersion: number;
   createdAt: Timestamp;
-}
-
-
-export interface ViewHistoryItem {
-  id: string; // Should be episodeId
-  courseId: string;
-  lastWatched: Timestamp;
-  progress: number; // 0 to 1
 }
 
 export interface EpisodeViewLog {
@@ -165,24 +138,22 @@ export interface EpisodeViewLog {
   courseId: string;
   startedAt: Timestamp;
   endedAt: Timestamp;
-  duration: number; // Watched duration in seconds
+  duration: number;
 }
 
-
 export interface Policy {
-  id: string; // This will be the document ID from Firestore, added on the client
+  id: string;
   slug: 'terms' | 'privacy' | 'refund';
   title: string;
   content: string;
 }
 
 export interface Subscription {
-    id: string; // This will be the document ID from Firestore (same as paymentId)
+    id: string;
     userId: string;
-    courseId: string; // Changed from classificationId
+    courseId: string;
     purchasedAt: Timestamp;
     expiresAt: Timestamp;
-    // For record-keeping
     amount: number;
     orderName: string;
     paymentId: string;
@@ -222,7 +193,7 @@ export interface Instructor {
   name: string;
   email: string;
   phone: string;
-  dob: string; // YYYY-MM-DD
+  dob: string;
   createdAt: Timestamp;
 }
 
@@ -244,7 +215,7 @@ export interface EpisodeComment {
   userName: string;
   userRole: 'user' | 'admin';
   content: string;
-  rating?: number; // 1-5, optional
+  rating?: number;
   createdAt: Timestamp;
 }
 
@@ -268,15 +239,6 @@ export interface ChatLog {
     createdAt: Timestamp;
 }
 
-export interface EpisodeAiChunk {
-  episodeId: string;
-  courseId: string;
-  classificationId: string;
-  fieldId: string;
-  content: string;
-  createdAt: Timestamp;
-}
-
 export type AiSearchScope = 'episode' | 'course' | 'classification' | 'field';
 
 export interface AITutorSettings {
@@ -288,10 +250,9 @@ export interface Bookmark {
   userId: string;
   episodeId: string;
   courseId: string;
-  timestamp: number; // in seconds
-  note?: string; // Optional note
+  timestamp: number;
+  note?: string;
   createdAt: Timestamp;
-   // denormalized for admin view
   userName?: string;
   userEmail?: string;
   episodeTitle?: string;
@@ -301,8 +262,8 @@ export interface OfflineLicense {
   videoId: string;
   userId: string;
   deviceId: string;
-  issuedAt: number; // server time (ms)
-  expiresAt: number; // issuedAt + 7 days
+  issuedAt: number;
+  expiresAt: number;
   lastCheckedAt: number;
   scope: "OFFLINE_PLAYBACK";
   watermarkSeed: string;
@@ -310,14 +271,15 @@ export interface OfflineLicense {
   offlineDerivedKey: string;
 }
 
-
 export interface OfflineVideoData {
   episode: Episode;
   courseName: string;
   downloadedAt: Date;
   license: OfflineLicense;
-  encryptedVideo: ArrayBuffer;
+  manifest: VideoManifest; // Changed from single buffer to manifest
+  segments: Map<string, ArrayBuffer>; // Map from segment path to buffer
 }
+
 
 export interface OfflineVideoInfo {
   episodeId: string;
@@ -328,73 +290,27 @@ export interface OfflineVideoInfo {
   expiresAt: Date;
 }
 
-// ========= Web Worker Types (v5.3 FINAL) =========
-export type CryptoWorkerRequest =
-  | {
-      type: 'INIT_ONLINE_STREAM';
-      payload: {
-        requestId: string;
-        sessionKey: {
-          derivedKeyB64: string;
-          scope: 'ONLINE_STREAM_ONLY';
-        };
-        encryption: Episode['encryption'];
-        signedUrl: string;
-      };
-    }
-  | {
-      type: 'INIT_OFFLINE_PLAYBACK';
-      payload: {
-        requestId: string;
-        license: OfflineLicense;
-        encryptedBuffer: ArrayBuffer;
-        encryption: Episode['encryption'];
-      };
-    }
-  | {
-      type: 'DECRYPT_CHUNK';
-      payload: {
-        requestId: string;
-        chunkIndex: number;
-      };
-    }
-  | {
-      type: 'ABORT';
-      payload: {
-        requestId: string;
-      }
-    };
+export type CryptoWorkerRequest = {
+  type: 'DECRYPT_SEGMENT';
+  payload: {
+    requestId: string;
+    encryptedSegment: ArrayBuffer;
+    derivedKeyB64: string;
+  };
+};
 
 export type CryptoWorkerResponse =
-  | {
-      type: 'INIT_SUCCESS';
-      payload: {
-        requestId: string;
-        offsetMap: { byteStart: number; byteEnd: number }[];
-      };
-    }
   | {
       type: 'DECRYPT_SUCCESS';
       payload: {
         requestId: string;
-        chunkIndex: number;
-        decryptedChunk: ArrayBuffer;
+        decryptedSegment: ArrayBuffer;
       };
     }
   | {
-      type: 'RECOVERABLE_ERROR';
+      type: 'DECRYPT_FAILURE';
       payload: {
         requestId: string;
         message: string;
-        code: 'NETWORK_ERROR' | 'CHUNK_DECRYPT_FAILED';
-        chunkIndex?: number;
-      };
-    }
-  | {
-      type: 'FATAL_ERROR';
-      payload: {
-        requestId: string;
-        message: string;
-        code: 'INVALID_SCOPE' | 'INTEGRITY_ERROR' | 'OFFSET_MAP_FAILED' | 'UNKNOWN_WORKER_ERROR';
       };
     };

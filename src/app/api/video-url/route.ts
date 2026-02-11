@@ -1,3 +1,4 @@
+
 'use server';
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeAdminApp } from '@/lib/firebase-admin';
@@ -18,18 +19,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 });
     }
     const idToken = authorization.split('Bearer ')[1];
-
-    let decodedToken;
-    try {
-      decodedToken = await auth.verifyIdToken(idToken);
-    } catch (error) {
-      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
-    }
+    const decodedToken = await auth.verifyIdToken(idToken);
     const userId = decodedToken.uid;
 
-    const { videoId } = await req.json();
-    if (!videoId) {
-      return NextResponse.json({ error: 'Bad Request: videoId is required' }, { status: 400 });
+    const { videoId, fileName } = await req.json();
+    if (!videoId || !fileName) {
+      return NextResponse.json({ error: 'Bad Request: videoId and fileName are required' }, { status: 400 });
     }
 
     // 2. Verify Subscription/Access Rights
@@ -45,28 +40,27 @@ export async function POST(req: NextRequest) {
     }
     const episodeData = episodeDoc.data() as Episode;
 
-    const courseId = episodeData?.courseId;
-    const subscription = userData.activeSubscriptions?.[courseId];
+    const subscription = userData.activeSubscriptions?.[episodeData.courseId];
     const isSubscribed = subscription && new Date() < toJSDate(subscription.expiresAt)!;
 
-    if (!isSubscribed && !episodeData?.isFree) {
+    if (!isSubscribed && !episodeData.isFree) {
        return NextResponse.json({ error: 'Forbidden: Subscription required' }, { status: 403 });
     }
 
-    // 3. Generate Signed URL for the private file
-    const encryptedPath = episodeData.storage?.encryptedPath;
-    if (!encryptedPath) {
-        return NextResponse.json({ error: 'Not Found: Encrypted video path is missing.' }, { status: 404 });
+    // 3. Construct file path and generate Signed URL
+    const filePath = fileName; // The path is now passed directly from client (e.g., episodes/{id}/manifest.json)
+    if (!filePath) {
+        return NextResponse.json({ error: 'Not Found: File path is missing in episode data.' }, { status: 404 });
     }
 
     const [signedUrl] = await storage
     .bucket()
-    .file(encryptedPath)
+    .file(filePath)
     .getSignedUrl({
       version: 'v4',
       action: 'read',
-      expires: Date.now() + 15 * 60 * 1000, // URL expires in 15 minutes
-      virtualHostedStyle: true,
+      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+      virtualHostedStyle: true, // Crucial for Range requests
     });
 
   return NextResponse.json({ signedUrl });

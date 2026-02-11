@@ -1,11 +1,10 @@
+
 /// <reference lib="webworker" />
 
-// This worker is a stateless chunk decryptor.
-// It receives an encrypted chunk and a key, decrypts it, and returns the result.
+import type { CryptoWorkerRequest, CryptoWorkerResponse } from '@/lib/types';
 
 /**
  * Converts a Base64 string to a Uint8Array.
- * self.atob is used because this is a worker environment.
  */
 const base64ToUint8Array = (base64: string): Uint8Array => {
   const binaryString = self.atob(base64);
@@ -18,76 +17,66 @@ const base64ToUint8Array = (base64: string): Uint8Array => {
 };
 
 /**
- * Imports a raw AES-GCM key for use with the Web Crypto API.
+ * Imports a raw AES-GCM key.
  */
 const importKey = (keyBuffer: Uint8Array): Promise<CryptoKey> => {
   return self.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
 };
 
-// Main message handler for the worker.
-self.onmessage = async (event: MessageEvent) => {
-  // Worker expects a payload with specific data for decryption.
-  // This is part of a larger state machine handled by the main thread.
-  if (event.data.type !== 'DECRYPT_CHUNK') {
+/**
+ * Main message handler for the worker. This worker is stateless.
+ * It receives an encrypted segment, decrypts it, and returns the result.
+ */
+self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
+  if (event.data.type !== 'DECRYPT_SEGMENT') {
     return;
   }
-  const { requestId, encryptedBuffer, derivedKeyB64, encryption, chunkIndex } = event.data.payload;
+  
+  const { requestId, encryptedSegment, derivedKeyB64 } = event.data.payload;
 
-  // Validate the incoming data.
-  if (!encryptedBuffer || !derivedKeyB64 || !encryption) {
-    self.postMessage({
-      type: 'FATAL_ERROR',
-      payload: { requestId, message: 'Incomplete data for decryption.', code: 'UNKNOWN_WORKER_ERROR' },
-    });
+  if (!encryptedSegment || !derivedKeyB64) {
+    const response: CryptoWorkerResponse = {
+      type: 'DECRYPT_FAILURE',
+      payload: { requestId, message: 'Incomplete data for decryption.' },
+    };
+    self.postMessage(response);
     return;
   }
 
   try {
-    // 1. Convert the Base64 key string into a usable CryptoKey.
     const keyBuffer = base64ToUint8Array(derivedKeyB64);
     const cryptoKey = await importKey(keyBuffer);
-
-    // 2. Extract IV and the ciphertext (which includes the auth tag) from the buffer.
-    // The buffer structure is: [IV (12 bytes)][Ciphertext (variable)][AuthTag (16 bytes)]
-    const iv = encryptedBuffer.slice(0, encryption.ivLength);
-    const ciphertextWithTag = encryptedBuffer.slice(encryption.ivLength);
     
-    // 3. Recreate the Authenticated-Additional-Data (AAD) for integrity check.
-    // This must match the AAD used during encryption.
-    const aad = new TextEncoder().encode(`chunk-index:${chunkIndex}`);
+    // The encrypted segment is structured as: [IV (12 bytes)][Ciphertext + AuthTag (variable)]
+    const iv = encryptedSegment.slice(0, 12);
+    const ciphertextWithTag = encryptedSegment.slice(12);
 
-    // 4. Decrypt the data. The Web Crypto API handles splitting the tag from the ciphertext internally.
-    const decryptedChunk = await self.crypto.subtle.decrypt(
+    const decryptedSegment = await self.crypto.subtle.decrypt(
       {
         name: 'AES-GCM',
         iv: iv,
-        additionalData: aad,
-        tagLength: encryption.tagLength * 8, // API expects tag length in bits.
+        tagLength: 128, // 16 bytes * 8 bits/byte
       },
       cryptoKey,
       ciphertextWithTag
     );
 
-    // 5. Send the decrypted data back to the main thread.
-    // The ArrayBuffer is marked as "transferable" for performance.
-    self.postMessage(
-      {
-        type: 'DECRYPT_SUCCESS',
-        payload: { requestId, chunkIndex, decryptedChunk },
-      },
-      [decryptedChunk]
-    );
+    const response: CryptoWorkerResponse = {
+      type: 'DECRYPT_SUCCESS',
+      payload: { requestId, decryptedSegment },
+    };
+    
+    self.postMessage(response, [decryptedSegment]);
 
   } catch (error: any) {
-    // If decryption fails, it's a fatal error for this chunk.
-    self.postMessage({
-      type: 'FATAL_ERROR',
+    const response: CryptoWorkerResponse = {
+      type: 'DECRYPT_FAILURE',
       payload: {
         requestId,
-        message: `Decryption failed in worker for chunk ${chunkIndex}: ${error.message}`,
-        code: 'INTEGRITY_ERROR',
+        message: `Decryption failed in worker: ${error.message}`,
       },
-    });
+    };
+    self.postMessage(response);
   }
 };
 
