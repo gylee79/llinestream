@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Retrieve and Decrypt Master Key
-    const keyId = episodeData.keyId; // Use the new keyId field
+    const keyId = episodeData.encryption?.keyId;
     if (!keyId) return NextResponse.json({ error: 'Not Found: Encryption info missing for this video' }, { status: 404 });
     
     const keyDoc = await db.collection('video_keys').doc(keyId).get();
@@ -86,3 +86,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Internal Server Error: ${errorMessage}` }, { status: 500 });
   }
 }
+

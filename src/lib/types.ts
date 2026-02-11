@@ -84,6 +84,13 @@ export interface VideoManifest {
   segments: Array<{ path: string; }>;
 }
 
+export interface EncryptionInfo {
+  algorithm: 'AES-256-GCM';
+  ivLength: number;
+  tagLength: number;
+  keyId: string;
+  fragmentEncrypted: boolean;
+}
 
 export interface Episode {
   id: string;
@@ -104,7 +111,8 @@ export interface Episode {
   filePath?: string; // Original uploaded file path, deleted after processing
   manifestPath?: string; // Path to the manifest.json in storage
   codec?: string; // e.g., 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"'
-  keyId?: string; // ID of the master key in `video_keys` collection
+  
+  encryption: EncryptionInfo;
 
   status: {
     processing: 'pending' | 'processing' | 'completed' | 'failed';
@@ -317,3 +325,4 @@ export type CryptoWorkerResponse =
         message: string;
       };
     };
+

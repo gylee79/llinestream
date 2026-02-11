@@ -26,7 +26,9 @@ interface Episode {
     processing: 'pending' | 'processing' | 'completed' | 'failed';
     [key: string]: any;
   };
-  keyId?: string;
+  encryption?: {
+    keyId: string;
+  };
   aiProcessingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
   aiProcessingError?: string | null;
   [key: string]: any;
@@ -240,12 +242,20 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
             contentType: 'application/json',
         });
         
-        // 9. Update Firestore document
+        // 9. Update Firestore document with encryption metadata
+        const encryptionInfo = {
+            algorithm: 'AES-256-GCM',
+            ivLength: 12,
+            tagLength: 16,
+            keyId: keyId,
+            fragmentEncrypted: true,
+        };
+
         await docRef.update({
             duration: Math.round(duration),
             codec: manifest.codec,
             manifestPath: manifestPath,
-            keyId: keyId,
+            encryption: encryptionInfo,
             'storage.fileSize': totalEncryptedSize,
             'status.processing': 'completed',
             'status.playable': true,
@@ -416,7 +426,7 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
     }
     
     try {
-        const keyId = event.data?.data()?.keyId || `vidkey_${episodeId}`;
+        const keyId = event.data?.data()?.encryption?.keyId || `vidkey_${episodeId}`;
         await db.collection('video_keys').doc(keyId).delete();
         console.log(`[DELETE SUCCESS] Encryption key ${keyId} deleted.`);
     } catch (error) {
@@ -435,4 +445,3 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
-

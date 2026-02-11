@@ -170,46 +170,63 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Episode",
       "type": "object",
-      "description": "Represents an individual video within a course.",
+      "description": "Represents an individual video, its metadata, processing status, and security information.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the episode entity."
+        "id": { "type": "string", "description": "Unique identifier for the episode entity." },
+        "courseId": { "type": "string", "description": "Reference to Course. (Relationship: Course 1:N Episode)" },
+        "instructorId": { "type": "string", "description": "Reference to Instructor. (Relationship: Instructor 1:N Episode)" },
+        "title": { "type": "string", "description": "Title of the episode." },
+        "description": { "type": "string", "description": "Description of the episode." },
+        "duration": { "type": "number", "description": "Duration of the episode in seconds." },
+        "isFree": { "type": "boolean", "description": "Indicates whether the episode is free to watch." },
+        "orderIndex": { "type": "number", "description": "The order of the episode within a course." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when the episode was created." },
+        
+        "thumbnailUrl": { "type": "string", "description": "The primary thumbnail URL to display, which could be the custom or default one." },
+        "defaultThumbnailUrl": { "type": "string", "description": "URL of the default thumbnail auto-generated from the video." },
+        "defaultThumbnailPath": { "type": "string", "description": "Storage path for the default thumbnail." },
+        "customThumbnailUrl": { "type": "string", "description": "URL of the custom thumbnail uploaded by the admin." },
+        "customThumbnailPath": { "type": "string", "description": "Storage path for the custom thumbnail." },
+        
+        "filePath": { "type": "string", "description": "Temporary path to the original raw video file. This is deleted after processing." },
+        "storage": {
+          "type": "object",
+          "description": "Information about the securely stored video file.",
+          "properties": {
+            "encryptedPath": { "type": "string", "description": "The full path to the encrypted .lsv video file in Firebase Storage." },
+            "fileSize": { "type": "number", "description": "The size of the encrypted file in bytes." }
+          }
         },
-        "courseId": {
-          "type": "string",
-          "description": "Reference to Course. (Relationship: Course 1:N Episode)"
+        "subtitlePath": { "type": "string", "description": "Storage path for the generated VTT subtitle file." },
+        "transcriptPath": { "type": "string", "description": "Storage path for the full AI-generated transcript text file." },
+        
+        "encryption": {
+          "type": "object",
+          "description": "Metadata about the file encryption used.",
+          "properties": {
+            "algorithm": { "type": "string", "enum": ["AES-256-GCM"], "description": "The encryption algorithm used." },
+            "keyId": { "type": "string", "description": "The ID of the master key stored in the `video_keys` collection." },
+            "ivLength": { "type": "number", "description": "Length of the Initialization Vector (IV) in bytes." },
+            "tagLength": { "type": "number", "description": "Length of the GCM authentication tag in bytes." }
+          }
         },
-        "instructorId": {
-            "type": "string",
-            "description": "Reference to Instructor. (Relationship: Instructor 1:N Episode)"
+        
+        "status": {
+          "type": "object",
+          "description": "The processing status of the video file itself (encryption, etc.).",
+          "properties": {
+            "processing": { "type": "string", "enum": ["pending", "processing", "completed", "failed"], "description": "The state of the video encryption process." },
+            "playable": { "type": "boolean", "description": "Whether the video is fully processed and ready for playback." },
+            "error": { "type": ["string", "null"], "description": "Any error message from the file processing." }
+          }
         },
-        "title": {
-          "type": "string",
-          "description": "Title of the episode."
-        },
-        "videoUrl": {
-          "type": "string",
-          "description": "URL of the video file.",
-          "format": "uri"
-        },
-        "duration": {
-          "type": "number",
-          "description": "Duration of the episode in seconds."
-        },
-        "isFree": {
-          "type": "boolean",
-          "description": "Indicates whether the episode is free to watch."
-        }
+        
+        "aiProcessingStatus": { "type": "string", "enum": ["pending", "processing", "completed", "failed"], "description": "The state of the AI analysis process." },
+        "aiProcessingError": { "type": ["string", "null"], "description": "Any error message from the AI analysis." },
+        "aiModel": { "type": "string", "description": "The name of the AI model used for analysis." },
+        "aiGeneratedContent": { "type": ["string", "null"], "description": "A JSON string containing AI analysis results like summary and timeline (excluding the full transcript)." }
       },
-      "required": [
-        "id",
-        "courseId",
-        "title",
-        "videoUrl",
-        "duration",
-        "isFree"
-      ]
+      "required": ["id", "courseId", "title", "duration", "isFree"]
     },
     "Subscription": {
       "$schema": "http://json-schema.org/draft-07/schema#",
