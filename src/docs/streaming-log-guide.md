@@ -64,7 +64,7 @@
 **가장 먼저 확인할 부분입니다.**
 1.  **`manifest.json`, `init.enc` 요청:** `Status`가 **`200 OK`** 인지 확인합니다.
 2.  **`segment_xxxx.enc` 요청:** `Status`가 **`200 OK` 또는 `206 Partial Content`** 인지 확인합니다.
-    - **중요:** 클라이언트가 `Range` 헤더 없이 세그먼트 전체를 요청하는 경우 `200 OK`는 정상일 수 있습니다. 하지만, `Range` 헤더를 포함하여 요청했을 때 `206 Partial Content`가 아닌 `200 OK`가 응답으로 온다면, 이는 스토리지의 CORS 설정이 `Range` 헤더를 제대로 처리하지 못하고 있음을 의미합니다.
+    - **중요:** 클라이언트가 `Range` 헤더를 포함하여 특정 부분만 요청했을 때 `206 Partial Content`가 아닌 `200 OK`가 응답으로 온다면, 이는 스토리지의 CORS 설정이 `Range` 헤더를 제대로 처리하지 못하고 있음을 의미합니다.
 3.  **응답 헤더 확인:** `segment_xxxx.enc` 요청을 클릭하고 `Response Headers` 탭에서 아래 헤더가 있는지 확인합니다.
     -   `Accept-Ranges: bytes`
     -   (206 응답 시) `Content-Range: bytes xxxx-yyyy/zzzz`

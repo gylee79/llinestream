@@ -317,7 +317,7 @@ const PlayerStatusOverlay = ({ playerState, playerMessage }: { playerState: Play
         case 'playing':
         case 'paused':
         case 'ready':
-            return null;
+             return null;
         case 'requesting-key':
         case 'downloading':
         case 'decrypting':
@@ -486,33 +486,35 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         workerRef.current = new Worker(new URL('../../workers/crypto.worker.ts', import.meta.url));
 
         const fetchAndProcessNextSegment = async () => {
-          if (!sourceBufferRef.current || sourceBufferRef.current.updating) return;
+            if (!sourceBufferRef.current || sourceBufferRef.current.updating) {
+                console.log(`[${currentSegmentIndexRef.current}] ⏸️ Waiting for buffer. Updating: ${sourceBufferRef.current?.updating}`);
+                return;
+            }
 
-          const segmentIndex = currentSegmentIndexRef.current;
-          if (segmentIndex >= segmentQueueRef.current.length) {
-              if (mediaSourceRef.current?.readyState === 'open') {
-                console.log('🏁 All segments appended. Ending stream.');
-                mediaSourceRef.current.endOfStream();
-              }
-              return;
-          }
+            const segmentIndex = currentSegmentIndexRef.current;
+            if (segmentIndex >= segmentQueueRef.current.length) {
+                if (mediaSourceRef.current?.readyState === 'open' && !sourceBufferRef.current.updating) {
+                    console.log('🏁 All segments appended. Ending stream.');
+                    mediaSourceRef.current.endOfStream();
+                }
+                return;
+            }
 
-          try {
-            const segmentPath = segmentQueueRef.current[segmentIndex];
-            console.log(`[${segmentIndex}] ➡️ Fetching segment: ${segmentPath}`);
-            const token = await authUser?.getIdToken();
-            const url = await getSignedUrl(token!, episode.id, segmentPath);
-            const res = await fetch(url);
-            const encryptedSegment = await res.arrayBuffer();
+            try {
+                const segmentPath = segmentQueueRef.current[segmentIndex];
+                console.log(`[${segmentIndex}] ➡️ Fetching segment: ${segmentPath}`);
+                const token = await authUser?.getIdToken();
+                const url = await getSignedUrl(token!, episode.id, segmentPath);
+                const res = await fetch(url);
+                const encryptedSegment = await res.arrayBuffer();
 
-            const reqId = `${requestId}-${segmentIndex}`;
-            workerRef.current?.postMessage({
-              type: 'DECRYPT_SEGMENT',
-              payload: { requestId: reqId, encryptedSegment, derivedKeyB64: (window as any).__DERIVED_KEY__ }
-            });
-          } catch (e: any) {
-            console.error(`Error fetching segment ${segmentIndex}:`, e);
-          }
+                workerRef.current?.postMessage({
+                  type: 'DECRYPT_SEGMENT',
+                  payload: { requestId: `${requestId}-${segmentIndex}`, encryptedSegment, derivedKeyB64: (window as any).__DERIVED_KEY__ }
+                });
+            } catch (e: any) {
+                console.error(`Error fetching segment ${segmentIndex}:`, e);
+            }
         };
 
         workerRef.current.onmessage = (event: MessageEvent<CryptoWorkerResponse>) => {
@@ -520,17 +522,31 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             if (type === 'DECRYPT_SUCCESS') {
                 const { decryptedSegment } = payload;
                 const sb = sourceBufferRef.current;
-                if (sb && !sb.updating) {
-                    try {
-                       console.log("updating:", sb.updating);
-                       console.log(`[${currentSegmentIndexRef.current}] 🟢 Appending segment...`);
-                       sb.appendBuffer(decryptedSegment);
-                    } catch(e: any) {
-                       console.error('🔴 appendBuffer error:', e);
-                       setPlayerState('error-fatal');
-                       setPlayerMessage(`미디어 버퍼 추가 실패: ${e.message}`);
+                
+                const waitForUpdateEnd = () => new Promise<void>(resolve => {
+                    if (!sb || !sb.updating) {
+                        resolve();
+                        return;
                     }
-                }
+                    const onUpdateEnd = () => {
+                        sb.removeEventListener('updateend', onUpdateEnd);
+                        resolve();
+                    };
+                    sb.addEventListener('updateend', onUpdateEnd);
+                });
+
+                (async () => {
+                    await waitForUpdateEnd();
+                    try {
+                        console.log(`[${currentSegmentIndexRef.current}] 🟢 Appending segment...`);
+                        sb?.appendBuffer(decryptedSegment);
+                    } catch (e: any) {
+                        console.error('🔴 appendBuffer error:', e);
+                        setPlayerState('error-fatal');
+                        setPlayerMessage(`미디어 버퍼 추가 실패: ${e.message}`);
+                    }
+                })();
+
             } else {
                 setPlayerState('error-fatal');
                 setPlayerMessage(`복호화 실패: ${payload.message}`);
@@ -568,6 +584,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 }
 
                 const mimeCodec = manifest.codec;
+                console.log(`Attempting to use codec: ${mimeCodec}`);
                 if (!MediaSource.isTypeSupported(mimeCodec)) {
                     throw new Error(`코덱을 지원하지 않습니다: ${mimeCodec}`);
                 }
@@ -579,7 +596,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 sourceBuffer.addEventListener('updateend', () => {
                     const sb = sourceBufferRef.current;
                     if (!sb || sb.buffered.length === 0) return;
-
+                    
                     console.log(`[${currentSegmentIndexRef.current}] ✅ Append complete.`);
                     console.log('Timestamp Offset:', sb.timestampOffset);
                     console.log('Current Time:', videoRef.current?.currentTime);
@@ -596,6 +613,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     const newSegmentDuration = lastEnd - (sb.buffered.length > 1 ? sb.buffered.end(sb.buffered.length-2) : 0);
                     console.log(`New segment duration: ${newSegmentDuration.toFixed(3)}s`);
 
+                    console.log(`updating:`, sb.updating);
                     console.log(`🔌 MediaSource state: ${ms.readyState}`);
                     currentSegmentIndexRef.current++;
                     fetchAndProcessNextSegment();
