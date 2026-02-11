@@ -610,7 +610,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 sourceBufferRef.current = sourceBuffer;
 
                 sourceBuffer.addEventListener('updateend', () => {
-                    console.log(`[${currentSegmentIndexRef.current-1}] ✅ Append complete. Buffered:`, sourceBuffer.buffered.length > 0 ? `start: ${sourceBuffer.buffered.start(0)}, end: ${sourceBuffer.buffered.end(0)}` : 'empty');
+                    if (!sourceBuffer.buffered.length) return;
+                    console.log(`[${currentSegmentIndexRef.current-1}] ✅ Append complete. Buffered:`, `start: ${sourceBuffer.buffered.start(0)}, end: ${sourceBuffer.buffered.end(0)}`);
                     console.log(`🔌 MediaSource state: ${ms.readyState}`);
                     appendNextSegment();
                 });

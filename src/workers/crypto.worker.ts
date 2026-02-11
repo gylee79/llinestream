@@ -19,7 +19,7 @@ const base64ToUint8Array = (base64: string): Uint8Array => {
 /**
  * Imports a raw AES-GCM key.
  */
-const importKey = (keyBuffer: Uint8Array): Promise<CryptoKey> => {
+const importKey = (keyBuffer: ArrayBuffer): Promise<CryptoKey> => {
   return self.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
 };
 
@@ -45,7 +45,7 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
 
   try {
     const keyBuffer = base64ToUint8Array(derivedKeyB64);
-    const cryptoKey = await importKey(keyBuffer);
+    const cryptoKey = await importKey(keyBuffer.buffer);
     
     // The encrypted segment is structured as: [IV (12 bytes)][Ciphertext + AuthTag (variable)]
     const iv = encryptedSegment.slice(0, 12);

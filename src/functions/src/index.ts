@@ -427,3 +427,9 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
+
+interface EpisodeData {
+  filePath?: string;
+  status?: { processing: string };
+  [key: string]: any;
+}
