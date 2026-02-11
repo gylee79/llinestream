@@ -3,9 +3,6 @@
 
 import type { CryptoWorkerRequest, CryptoWorkerResponse } from '@/lib/types';
 
-/**
- * Converts a Base64 string to a Uint8Array.
- */
 const base64ToUint8Array = (base64: string): Uint8Array => {
   const binaryString = self.atob(base64);
   const len = binaryString.length;
@@ -16,17 +13,11 @@ const base64ToUint8Array = (base64: string): Uint8Array => {
   return bytes;
 };
 
-/**
- * Imports a raw AES-GCM key.
- */
 const importKey = (keyBuffer: ArrayBuffer): Promise<CryptoKey> => {
+  console.log('[Worker] Using AES-GCM with tagLength: 128 bits');
   return self.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
 };
 
-/**
- * Main message handler for the worker. This worker is stateless.
- * It receives an encrypted segment, decrypts it, and returns the result.
- */
 self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
   if (event.data.type !== 'DECRYPT_SEGMENT') {
     return;
@@ -47,7 +38,7 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
     const keyBuffer = base64ToUint8Array(derivedKeyB64);
     const cryptoKey = await importKey(keyBuffer.buffer);
     
-    // The encrypted segment is structured as: [IV (12 bytes)][Ciphertext + AuthTag (variable)]
+    // Structure: [IV (12 bytes)][Ciphertext + AuthTag]
     const iv = encryptedSegment.slice(0, 12);
     const ciphertextWithTag = encryptedSegment.slice(12);
 
@@ -76,6 +67,7 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
 
   } catch (error: any) {
     console.error(`[Worker] ❌ Decryption failed for requestId ${requestId}:`, error);
+    console.error('[Worker] ❌ Decryption Error Name:', error.name);
     const response: CryptoWorkerResponse = {
       type: 'DECRYPT_FAILURE',
       payload: {
@@ -87,5 +79,4 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
   }
 };
 
-// Required for TS to treat this as a module.
 export {};

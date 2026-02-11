@@ -91,10 +91,31 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         console.log(`[${episodeId}] Downloading source: ${inputFilePath}`);
         await bucket.file(inputFilePath).download({ destination: localInputPath });
 
-        // 2. Probe for codec and duration info
-        console.log(`[${episodeId}] Probing video file...`);
+        // 2. Transcode to a single fragmented MP4 file first (robust method)
+        console.log(`[${episodeId}] Pass 1: Transcoding to fragmented MP4...`);
+        const fragmentedMp4Path = path.join(tempInputDir, 'frag.mp4');
+        await new Promise<void>((resolve, reject) => {
+            ffmpeg(localInputPath)
+                .videoCodec('libx264')
+                .audioCodec('aac')
+                .outputOptions([
+                    '-profile:v baseline', // Changed from high to baseline for max compatibility
+                    '-level 3.0',
+                    '-pix_fmt yuv420p',    // Safari compatibility
+                    '-movflags frag_keyframe+empty_moov' // Create a streamable fMP4
+                ])
+                .toFormat('mp4')
+                .on('start', (commandLine) => console.log(`[${episodeId}] 🚀 FFMPEG TRANSCODE COMMAND: ${commandLine}`))
+                .on('error', (err) => reject(new Error(`ffmpeg transcoding failed: ${err.message}`)))
+                .on('end', () => resolve())
+                .save(fragmentedMp4Path);
+        });
+        console.log(`[${episodeId}] ✅ Pass 1: Transcoding complete.`);
+        
+        // 3. Probe the generated fMP4 to get accurate codec info
+        console.log(`[${episodeId}] Probing generated fMP4 for codec info...`);
         const probeData = await new Promise<ffmpeg.FfprobeData>((resolve, reject) => {
-            ffmpeg.ffprobe(localInputPath, (err, data) => {
+            ffmpeg.ffprobe(fragmentedMp4Path, (err, data) => {
                 if (err) return reject(new Error(`ffprobe failed: ${err.message}`));
                 resolve(data);
             });
@@ -104,38 +125,20 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         const audioStream = probeData.streams.find(s => s.codec_type === 'audio');
         const duration = probeData.format.duration || 0;
 
-        if (!videoStream) throw new Error("No video stream found in the input file.");
+        if (!videoStream) throw new Error("No video stream found in the generated fMP4 file.");
 
-        // 3. Transcode to fragmented MP4
-        const fragmentedMp4Path = path.join(tempInputDir, 'frag.mp4');
-        await new Promise<void>((resolve, reject) => {
-            ffmpeg(localInputPath)
-                .videoCodec('libx264')
-                .audioCodec('aac')
-                .audioBitrate('128k')
-                .videoBitrate('2000k')
-                .outputOptions([
-                    '-profile:v baseline', // Changed from high to baseline for max compatibility
-                    '-level 3.0',
-                    '-pix_fmt yuv420p',
-                    '-movflags frag_keyframe+empty_moov'
-                ])
-                .toFormat('mp4')
-                .on('start', (commandLine) => console.log(`[${episodeId}] 🚀 FFMPEG TRANSCODE COMMAND: ${commandLine}`))
-                .on('error', (err) => reject(new Error(`ffmpeg transcoding failed: ${err.message}`)))
-                .on('end', () => resolve())
-                .save(fragmentedMp4Path);
-        });
-        console.log(`[${episodeId}] ✅ Transcoding to fragmented MP4 successful.`);
+        const codecString = `video/mp4; codecs="${videoStream.codec_tag_string}, ${audioStream?.codec_tag_string || 'mp4a.40.2'}"`;
+        console.log(`[${episodeId}] 💡 Detected Codec String: ${codecString}`);
 
-        // 4. Split into init and media segments
+        // 4. Split the fMP4 file into segments
+        console.log(`[${episodeId}] Pass 2: Splitting into segments...`);
         const segmentPattern = 'segment_%04d.mp4';
         await new Promise<void>((resolve, reject) => {
             ffmpeg(fragmentedMp4Path)
                 .outputOptions([
-                    '-c copy',
-                    '-f segment',
-                    '-segment_time 4', // 4-second segments
+                    '-c copy',            // Copy codecs, no re-encoding
+                    '-f segment',         // Use the segment muxer
+                    '-segment_time 4',    // 4-second segments
                     '-reset_timestamps 1'
                 ])
                 .on('start', (commandLine) => console.log(`[${episodeId}] 🚀 FFMPEG SEGMENT COMMAND: ${commandLine}`))
@@ -143,34 +146,27 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
                 .on('end', () => resolve())
                 .save(path.join(tempOutputDir, segmentPattern));
         });
+        console.log(`[${episodeId}] ✅ Pass 2: Segmentation complete.`);
 
-        // 5. DEBUG: Log created segment files
+        // 5. Analyze segment files and prepare for encryption
         const createdFiles = await fs.readdir(tempOutputDir);
         console.log(`[${episodeId}] 🔎 Segment file structure analysis:`, createdFiles);
         
-        // Find init segment (ffmpeg names it like other segments, usually the first)
-        const initSegmentName = createdFiles.find(f => f.startsWith('segment_'));
+        const initSegmentName = createdFiles.find(f => f.startsWith('segment_')); // ffmpeg names it like other segments, usually the first
         if (!initSegmentName) throw new Error("Init segment not found after ffmpeg processing.");
-        console.log(`[${episodeId}] ✅ Init segment found: ${initSegmentName}`);
         
-        const initSegmentPath = path.join(tempOutputDir, initSegmentName);
-        const finalInitSegmentName = 'init.mp4';
-        await fs.rename(initSegmentPath, path.join(tempOutputDir, finalInitSegmentName));
-        console.log(`[${episodeId}] ✅ Renamed ${initSegmentName} to ${finalInitSegmentName}.`);
+        await fs.rename(path.join(tempOutputDir, initSegmentName), path.join(tempOutputDir, 'init.mp4'));
+        console.log(`[${episodeId}] ✅ Renamed ${initSegmentName} to init.mp4.`);
 
         const mediaSegmentNames = createdFiles.filter(f => f !== initSegmentName).sort();
-        const allSegmentsToProcess = [finalInitSegmentName, ...mediaSegmentNames];
-        
+        const allSegmentsToProcess = ['init.mp4', ...mediaSegmentNames];
+
         // 6. Encrypt and Upload Segments
         console.log(`[${episodeId}] Encrypting and uploading segments...`);
         const { getKek } = initializeTools();
         const kek = await getKek();
         const masterKey = crypto.randomBytes(32);
         
-        const codecString = videoStream.codec_tag_string === 'avc1'
-            ? `video/mp4; codecs="avc1.42E01E, mp4a.40.2"` // Correct for Baseline Profile Level 3.0
-            : `video/mp4; codecs="${videoStream.codec_tag_string}, ${audioStream?.codec_tag_string || 'mp4a.40.2'}"`;
-
         const manifest = {
             codec: codecString,
             init: `episodes/${episodeId}/init.enc`,
@@ -183,12 +179,14 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
             const localFilePath = path.join(tempOutputDir, fileName);
             const content = await fs.readFile(localFilePath);
             
-            const iv = crypto.randomBytes(12);
+            const iv = crypto.randomBytes(12); // New IV for each segment
             const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
+            cipher.setAAD(Buffer.from(`fragment-index:${index}`)); // Add AAD
             
             const encryptedContent = Buffer.concat([cipher.update(content), cipher.final()]);
             const authTag = cipher.getAuthTag();
             
+            // Final structure: [IV (12)][Ciphertext + AuthTag]
             const finalBuffer = Buffer.concat([iv, encryptedContent, authTag]);
             
             const outputFileName = fileName.replace('.mp4', '.enc');
@@ -228,9 +226,9 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         // 9. Update Firestore document
         await docRef.update({
             duration: Math.round(duration),
-            codec: manifest.codec, // Store the determined codec
+            codec: manifest.codec,
             manifestPath: manifestPath,
-            keyId: keyId, // Store keyId on episode doc for easy lookup
+            keyId: keyId,
             'storage.fileSize': totalEncryptedSize,
             'status.processing': 'completed',
             'status.playable': true,
@@ -266,7 +264,6 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
     const afterData = change.after.data() as Episode;
     const beforeData = change.before.exists ? change.before.data() as Episode : null;
 
-    // Trigger only on creation or manual reset of the main processing status
     if (afterData.status?.processing !== 'pending' || beforeData?.status?.processing === 'pending') {
         return;
     }
@@ -290,7 +287,6 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
       return;
     }
     
-    // Run tasks sequentially to avoid resource contention
     await processAndEncryptVideo(episodeId, filePath, docRef);
     await runAiAnalysis(episodeId, filePath, docRef);
 
@@ -300,9 +296,8 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
 });
 
 
-// This remains largely the same
 export async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.firestore.DocumentReference) {
-    const modelName = "gemini-1.5-flash-latest"; // Using the latest model
+    const modelName = "gemini-1.5-flash-latest";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
@@ -338,14 +333,20 @@ export async function runAiAnalysis(episodeId: string, filePath: string, docRef:
       
       const rawText = result.response.text();
       let output;
+      
       try {
-        const startIndex = rawText.indexOf('{');
-        const endIndex = rawText.lastIndexOf('}');
-        if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
-            throw new Error("AI response does not contain a valid JSON object.");
+        const jsonMatch = rawText.match(/```(json)?\n([\s\S]*?)\n```/);
+        if (jsonMatch && jsonMatch[2]) {
+            output = JSON.parse(jsonMatch[2]);
+        } else {
+             const startIndex = rawText.indexOf('{');
+             const endIndex = rawText.lastIndexOf('}');
+             if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+                 throw new Error("AI response does not contain a valid JSON object.");
+             }
+             const jsonString = rawText.substring(startIndex, endIndex + 1);
+             output = JSON.parse(jsonString);
         }
-        const jsonString = rawText.substring(startIndex, endIndex + 1);
-        output = JSON.parse(jsonString);
       } catch (jsonError: any) {
           console.error(`[${episodeId}] AI JSON parsing error. Raw output:`, rawText);
           throw new Error(`JSON 파싱 실패: ${jsonError.message}.`);
@@ -354,7 +355,6 @@ export async function runAiAnalysis(episodeId: string, filePath: string, docRef:
       const transcriptPath = `episodes/${episodeId}/ai/transcript.txt`;
       await bucket.file(transcriptPath).save(output.transcript || "", { contentType: 'text/plain' });
 
-      // Create and save VTT content
       let subtitlePath: string | null = null;
       if (output.timeline && Array.isArray(output.timeline) && output.timeline.length > 0) {
         const vttContent = `WEBVTT\n\n${output.timeline
@@ -373,7 +373,7 @@ export async function runAiAnalysis(episodeId: string, filePath: string, docRef:
         aiModel: modelName,
         aiGeneratedContent: JSON.stringify({ summary: output.summary, timeline: output.timeline }),
         transcriptPath: transcriptPath,
-        subtitlePath: subtitlePath, // Save VTT path
+        subtitlePath: subtitlePath,
         aiProcessingError: null,
       });
 
@@ -396,7 +396,6 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
     const { episodeId } = event.params;
     console.log(`[DELETE TRIGGER] Cleaning up for episode ${episodeId}.`);
     
-    // Delete all files in the episode's storage folder
     const prefix = `episodes/${episodeId}/`;
     try {
         await bucket.deleteFiles({ prefix });
@@ -405,7 +404,6 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
         console.error(`[DELETE FAILED] Could not delete storage files for episode ${episodeId}.`, error);
     }
     
-    // Delete the encryption key
     try {
         const keyId = event.data?.data()?.keyId || `vidkey_${episodeId}`;
         await db.collection('video_keys').doc(keyId).delete();
@@ -423,7 +421,6 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
             await file.delete();
         }
     } catch (error) {
-        // Log but don't throw, as cleanup failure shouldn't fail the whole process
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
