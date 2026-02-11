@@ -6,7 +6,8 @@
       "Content-Type",
       "Content-Length",
       "Content-Range",
-      "Accept-Ranges"
+      "Access-Control-Allow-Origin",
+      "Range"
     ],
     "maxAgeSeconds": 3600
   }
