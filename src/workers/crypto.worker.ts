@@ -4,7 +4,7 @@ import type { CryptoWorkerRequest, CryptoWorkerResponse, Episode } from '@/lib/t
 
 // --- Start of Browser-native Buffer replacements ---
 
-function base64ToUint8Array(base64: string): Uint8Array {
+function base64ToUint8Array(base64: string) {
   const binaryString = self.atob(base64);
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
@@ -14,11 +14,11 @@ function base64ToUint8Array(base64: string): Uint8Array {
   return bytes;
 }
 
-function stringToUint8Array(str: string): Uint8Array {
+function stringToUint8Array(str: string) {
     return new TextEncoder().encode(str);
 }
 
-function concatUint8Arrays(arrays: Uint8Array[]): Uint8Array {
+function concatUint8Arrays(arrays: Uint8Array[]) {
     const totalLength = arrays.reduce((acc, val) => acc + val.length, 0);
     const result = new Uint8Array(totalLength);
     let offset = 0;

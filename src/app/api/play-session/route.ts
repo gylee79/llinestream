@@ -78,9 +78,8 @@ export async function POST(req: NextRequest) {
     const sessionId = `online_sess_${crypto.randomBytes(12).toString('hex')}`;
     const info = Buffer.from(`LSV_ONLINE_V1${userId}${deviceId}${sessionId}`);
     
-    // CORRECTED: The redundant and potentially problematic Buffer.from() wrapper is removed.
     const derivedKey = crypto.hkdfSync('sha256', masterKey, salt, info, 32);
-    const derivedKeyB64 = derivedKey.toString('base64');
+    const derivedKeyB64 = Buffer.from(derivedKey).toString('base64');
     
     // 6. Generate Watermark Seed
     const watermarkSeed = crypto.createHash('sha256').update(userId + videoId + deviceId).digest('hex');
