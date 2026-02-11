@@ -485,7 +485,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         
         workerRef.current = new Worker(new URL('../../workers/crypto.worker.ts', import.meta.url));
 
-        const appendNextSegment = async () => {
+        const fetchAndProcessNextSegment = async () => {
           if (!sourceBufferRef.current || sourceBufferRef.current.updating) return;
 
           const segmentIndex = currentSegmentIndexRef.current;
@@ -510,7 +510,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
               type: 'DECRYPT_SEGMENT',
               payload: { requestId: reqId, encryptedSegment, derivedKeyB64: (window as any).__DERIVED_KEY__ }
             });
-            currentSegmentIndexRef.current++;
           } catch (e: any) {
             console.error(`Error fetching segment ${segmentIndex}:`, e);
           }
@@ -523,8 +522,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 const sb = sourceBufferRef.current;
                 if (sb && !sb.updating) {
                     try {
-                       console.log('sourceBuffer.updating:', sb.updating);
-                       console.log(`[${currentSegmentIndexRef.current-1}] 🟢 Appending segment...`);
+                       console.log("updating:", sb.updating);
+                       console.log(`[${currentSegmentIndexRef.current}] 🟢 Appending segment...`);
                        sb.appendBuffer(decryptedSegment);
                     } catch(e: any) {
                        console.error('🔴 appendBuffer error:', e);
@@ -581,7 +580,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     const sb = sourceBufferRef.current;
                     if (!sb || sb.buffered.length === 0) return;
 
-                    console.log(`[${currentSegmentIndexRef.current-1}] ✅ Append complete.`);
+                    console.log(`[${currentSegmentIndexRef.current}] ✅ Append complete.`);
                     console.log('Timestamp Offset:', sb.timestampOffset);
                     console.log('Current Time:', videoRef.current?.currentTime);
                     console.log('Buffered ranges:');
@@ -598,13 +597,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     console.log(`New segment duration: ${newSegmentDuration.toFixed(3)}s`);
 
                     console.log(`🔌 MediaSource state: ${ms.readyState}`);
-                    appendNextSegment();
+                    currentSegmentIndexRef.current++;
+                    fetchAndProcessNextSegment();
                 });
                 
                 segmentQueueRef.current = [manifest.init, ...manifest.segments.map(s => s.path)];
                 currentSegmentIndexRef.current = 0;
 
-                appendNextSegment();
+                fetchAndProcessNextSegment();
 
             } catch (e: any) {
                 console.error("Playback setup failed:", e);
