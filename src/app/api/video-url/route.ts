@@ -60,14 +60,16 @@ export async function POST(req: NextRequest) {
     }
 
     const [signedUrl] = await storage
-      .bucket()
-      .file(encryptedPath)
-      .getSignedUrl({
-        action: 'read',
-        expires: Date.now() + 5 * 60 * 1000, // 5 minutes
-      });
+    .bucket()
+    .file(encryptedPath)
+    .getSignedUrl({
+      version: 'v4',
+      action: 'read',
+      expires: Date.now() + 15 * 60 * 1000, // URL expires in 15 minutes
+      virtualHostedStyle: true,
+    });
 
-    return NextResponse.json({ signedUrl });
+  return NextResponse.json({ signedUrl });
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
