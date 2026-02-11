@@ -193,6 +193,9 @@ async function processAndEncryptVideo(episodeId, inputFilePath, docRef) {
         const masterKey = crypto.randomBytes(32);
         const manifest = {
             codec: codecString,
+            duration: Math.round(duration),
+            segmentDuration: 4,
+            segmentCount: mediaSegmentNames.length,
             init: `episodes/${episodeId}/init.enc`,
             segments: [],
         };
@@ -233,12 +236,19 @@ async function processAndEncryptVideo(episodeId, inputFilePath, docRef) {
         await bucket.file(manifestPath).save(JSON.stringify(manifest, null, 2), {
             contentType: 'application/json',
         });
-        // 9. Update Firestore document
+        // 9. Update Firestore document with encryption metadata
+        const encryptionInfo = {
+            algorithm: 'AES-256-GCM',
+            ivLength: 12,
+            tagLength: 16,
+            keyId: keyId,
+            fragmentEncrypted: true,
+        };
         await docRef.update({
             duration: Math.round(duration),
             codec: manifest.codec,
             manifestPath: manifestPath,
-            keyId: keyId,
+            encryption: encryptionInfo,
             'storage.fileSize': totalEncryptedSize,
             'status.processing': 'completed',
             'status.playable': true,
@@ -294,7 +304,7 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)("episodes/{epis
     console.log(`✅ [${episodeId}] All jobs finished.`);
 });
 async function runAiAnalysis(episodeId, filePath, docRef) {
-    const modelName = "gemini-3-flash-preview";
+    const modelName = "gemini-1.5-flash-latest";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), `ai-in-${episodeId}`);
@@ -391,7 +401,7 @@ exports.deleteFilesOnEpisodeDelete = (0, firestore_1.onDocumentDeleted)("episode
         console.error(`[DELETE FAILED] Could not delete storage files for episode ${episodeId}.`, error);
     }
     try {
-        const keyId = event.data?.data()?.keyId || `vidkey_${episodeId}`;
+        const keyId = event.data?.data()?.encryption?.keyId || `vidkey_${episodeId}`;
         await db.collection('video_keys').doc(keyId).delete();
         console.log(`[DELETE SUCCESS] Encryption key ${keyId} deleted.`);
     }
