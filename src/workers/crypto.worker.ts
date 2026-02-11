@@ -1,7 +1,7 @@
 
 /// <reference lib="webworker" />
 
-import type { CryptoWorkerRequest, CryptoWorkerResponse } from '@/lib/types';
+import type { CryptoWorkerRequest, CryptoWorkerResponse, EncryptionInfo } from '@/lib/types';
 
 const base64ToUint8Array = (base64: string): Uint8Array => {
   const binaryString = self.atob(base64);
@@ -14,7 +14,6 @@ const base64ToUint8Array = (base64: string): Uint8Array => {
 };
 
 const importKey = (keyBuffer: ArrayBuffer): Promise<CryptoKey> => {
-  console.log('[Worker] Using AES-GCM with tagLength: 128 bits');
   return self.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
 };
 
@@ -23,9 +22,9 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
     return;
   }
   
-  const { requestId, encryptedSegment, derivedKeyB64 } = event.data.payload;
+  const { requestId, encryptedSegment, derivedKeyB64, encryption } = event.data.payload;
 
-  if (!encryptedSegment || !derivedKeyB64) {
+  if (!encryptedSegment || !derivedKeyB64 || !encryption) {
     const response: CryptoWorkerResponse = {
       type: 'DECRYPT_FAILURE',
       payload: { requestId, message: 'Incomplete data for decryption.' },
@@ -33,20 +32,22 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
     self.postMessage(response);
     return;
   }
+  
+  console.log(`[Worker] Received decryption request ${requestId}. Tag length bits: ${encryption.tagLength * 8}`);
 
   try {
     const keyBuffer = base64ToUint8Array(derivedKeyB64);
     const cryptoKey = await importKey(keyBuffer.buffer);
     
     // Structure: [IV (12 bytes)][Ciphertext + AuthTag]
-    const iv = encryptedSegment.slice(0, 12);
-    const ciphertextWithTag = encryptedSegment.slice(12);
+    const iv = encryptedSegment.slice(0, encryption.ivLength);
+    const ciphertextWithTag = encryptedSegment.slice(encryption.ivLength);
 
     const decryptedSegment = await self.crypto.subtle.decrypt(
       {
         name: 'AES-GCM',
         iv: iv,
-        tagLength: 128, // 16 bytes * 8 bits/byte
+        tagLength: encryption.tagLength * 8, // Convert bytes to bits
       },
       cryptoKey,
       ciphertextWithTag

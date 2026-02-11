@@ -8,16 +8,16 @@ export type Timestamp = FirebaseTimestamp | FieldValue;
 
 export type PlayerState =
   | 'idle'
-  | 'fetching_manifest'
-  | 'fetching_init'
-  | 'appending_init'
-  | 'fetching_segment'
-  | 'appending_segment'
-  | 'ended'
+  | 'playing'
+  | 'paused'
+  | 'ready'
   | 'recovering'
   | 'error-fatal'
+  | 'error-retryable'
   | 'license-expired'
-  | 'requesting-key';
+  | 'requesting-key'
+  | 'downloading'
+  | 'decrypting';
 
 export interface User {
   id: string;
@@ -114,6 +114,10 @@ export interface Episode {
   
   encryption: EncryptionInfo;
 
+  storage: {
+    fileSize: number;
+  };
+  
   status: {
     processing: 'pending' | 'processing' | 'completed' | 'failed';
     playable: boolean;
@@ -306,7 +310,7 @@ export type CryptoWorkerRequest = {
     requestId: string;
     encryptedSegment: ArrayBuffer;
     derivedKeyB64: string;
-    // No longer passing full encryption info, worker logic is simpler
+    encryption: EncryptionInfo;
   };
 };
 
@@ -325,4 +329,3 @@ export type CryptoWorkerResponse =
         message: string;
       };
     };
-

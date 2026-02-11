@@ -471,7 +471,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             return;
         }
 
-        if (!episode.manifestPath || !episode.keyId || !episode.codec) {
+        if (!episode.manifestPath || !episode.encryption?.keyId || !episode.codec) {
             setPlayerState('error-fatal');
             setPlayerMessage('필수 재생 정보(manifest, keyId, codec)가 누락되었습니다.');
             return;
@@ -486,16 +486,17 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         workerRef.current = new Worker(new URL('../../workers/crypto.worker.ts', import.meta.url));
 
         const fetchAndProcessNextSegment = async () => {
-            if (!sourceBufferRef.current || sourceBufferRef.current.updating) {
-                console.log(`[${currentSegmentIndexRef.current}] ⏸️ Waiting for buffer. Updating: ${sourceBufferRef.current?.updating}`);
+            const sb = sourceBufferRef.current;
+            if (!sb || sb.updating) {
+                console.log(`[${currentSegmentIndexRef.current}] ⏸️ Waiting for buffer. Updating: ${sb?.updating}`);
                 return;
             }
 
             const segmentIndex = currentSegmentIndexRef.current;
             if (segmentIndex >= segmentQueueRef.current.length) {
-                if (mediaSourceRef.current?.readyState === 'open' && !sourceBufferRef.current.updating) {
+                if (ms.readyState === 'open' && !sb.updating) {
                     console.log('🏁 All segments appended. Ending stream.');
-                    mediaSourceRef.current.endOfStream();
+                    ms.endOfStream();
                 }
                 return;
             }
@@ -510,7 +511,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
                 workerRef.current?.postMessage({
                   type: 'DECRYPT_SEGMENT',
-                  payload: { requestId: `${requestId}-${segmentIndex}`, encryptedSegment, derivedKeyB64: (window as any).__DERIVED_KEY__ }
+                  payload: { requestId: `${requestId}-${segmentIndex}`, encryptedSegment, derivedKeyB64: (window as any).__DERIVED_KEY__, encryption: episode.encryption }
                 });
             } catch (e: any) {
                 console.error(`Error fetching segment ${segmentIndex}:`, e);
@@ -523,20 +524,11 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 const { decryptedSegment } = payload;
                 const sb = sourceBufferRef.current;
                 
-                const waitForUpdateEnd = () => new Promise<void>(resolve => {
-                    if (!sb || !sb.updating) {
-                        resolve();
+                const append = () => {
+                    if (sb?.updating) {
+                        sb.addEventListener('updateend', append, { once: true });
                         return;
                     }
-                    const onUpdateEnd = () => {
-                        sb.removeEventListener('updateend', onUpdateEnd);
-                        resolve();
-                    };
-                    sb.addEventListener('updateend', onUpdateEnd);
-                });
-
-                (async () => {
-                    await waitForUpdateEnd();
                     try {
                         console.log(`[${currentSegmentIndexRef.current}] 🟢 Appending segment...`);
                         sb?.appendBuffer(decryptedSegment);
@@ -545,7 +537,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         setPlayerState('error-fatal');
                         setPlayerMessage(`미디어 버퍼 추가 실패: ${e.message}`);
                     }
-                })();
+                }
+                append();
 
             } else {
                 setPlayerState('error-fatal');
