@@ -488,14 +488,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         const fetchAndProcessNextSegment = async () => {
             const sb = sourceBufferRef.current;
             if (!sb || sb.updating) {
-                console.log(`[${currentSegmentIndexRef.current}] ⏸️ Waiting for buffer. Updating: ${sb?.updating}`);
+                if (sb?.updating) addLog('INFO', `[${currentSegmentIndexRef.current}] ⏸️ Waiting for buffer. Updating: true`);
                 return;
             }
 
             const segmentIndex = currentSegmentIndexRef.current;
             if (segmentIndex >= segmentQueueRef.current.length) {
                 if (ms.readyState === 'open' && !sb.updating) {
-                    console.log('🏁 All segments appended. Ending stream.');
+                    addLog('SUCCESS', '🏁 All segments appended. Ending stream.');
                     ms.endOfStream();
                 }
                 return;
@@ -503,7 +503,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             try {
                 const segmentPath = segmentQueueRef.current[segmentIndex];
-                console.log(`[${segmentIndex}] ➡️ Fetching segment: ${segmentPath}`);
+                addLog('INFO', `[${segmentIndex}] ➡️ Fetching segment: ${segmentPath}`);
                 const token = await authUser?.getIdToken();
                 const url = await getSignedUrl(token!, episode.id, segmentPath);
                 const res = await fetch(url);
@@ -515,6 +515,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 });
             } catch (e: any) {
                 console.error(`Error fetching segment ${segmentIndex}:`, e);
+                addLog('ERROR', `Segment fetch failed: ${e.message}`);
             }
         };
 
@@ -530,10 +531,11 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         return;
                     }
                     try {
-                        console.log(`[${currentSegmentIndexRef.current}] 🟢 Appending segment...`);
+                        addLog('INFO', `[${currentSegmentIndexRef.current}] 🟢 Appending segment...`);
                         sb?.appendBuffer(decryptedSegment);
                     } catch (e: any) {
-                        console.error('🔴 appendBuffer error:', e);
+                        console.error("🔴 appendBuffer error:", e);
+                        addLog('ERROR', `appendBuffer failed: ${e.message}`);
                         setPlayerState('error-fatal');
                         setPlayerMessage(`미디어 버퍼 추가 실패: ${e.message}`);
                     }
@@ -541,16 +543,17 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 append();
 
             } else {
+                addLog('ERROR', `Decryption failed: ${payload.message}`);
                 setPlayerState('error-fatal');
                 setPlayerMessage(`복호화 실패: ${payload.message}`);
             }
         };
         
         ms.addEventListener('sourceopen', async () => {
-            console.log(`🔌 MediaSource state: ${ms.readyState}`);
+            addLog('INFO', `🔌 MediaSource state: ${ms.readyState}`);
             
-            ms.addEventListener('sourceended', () => console.log('🔌 MediaSource state: ended'));
-            ms.addEventListener('sourceclose', () => console.log('🔌 MediaSource state: closed'));
+            ms.addEventListener('sourceended', () => addLog('INFO','🔌 MediaSource state: ended'));
+            ms.addEventListener('sourceclose', () => addLog('INFO','🔌 MediaSource state: closed'));
             
             try {
                 let manifest: VideoManifest;
@@ -571,43 +574,33 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     setWatermarkSeed(sessionData.watermarkSeed);
                     (window as any).__DERIVED_KEY__ = derivedKeyB64;
 
+                    addLog('INFO', 'Fetching manifest...');
                     const manifestUrl = await getSignedUrl(token, episode.id, episode.manifestPath!);
                     const manifestRes = await fetch(manifestUrl);
                     manifest = await manifestRes.json();
                 }
 
                 const mimeCodec = manifest.codec;
-                console.log(`Attempting to use codec: ${mimeCodec}`);
-                if (!MediaSource.isTypeSupported(mimeCodec)) {
+                addLog('INFO', `💡 Codec: ${mimeCodec}`);
+                const isSupported = MediaSource.isTypeSupported(mimeCodec);
+                addLog('INFO', `💡 isTypeSupported: ${isSupported}`);
+
+                if (!isSupported) {
                     throw new Error(`코덱을 지원하지 않습니다: ${mimeCodec}`);
                 }
-                console.log(`💡 Codec '${mimeCodec}' is supported by this browser.`);
                 
                 const sourceBuffer = ms.addSourceBuffer(mimeCodec);
                 sourceBufferRef.current = sourceBuffer;
 
+                sourceBuffer.addEventListener('error', (e) => {
+                    console.error("❌ SourceBuffer Error:", e);
+                    addLog('ERROR', `SourceBuffer Error: ${e.toString()}`);
+                });
+
                 sourceBuffer.addEventListener('updateend', () => {
                     const sb = sourceBufferRef.current;
-                    if (!sb || sb.buffered.length === 0) return;
-                    
-                    console.log(`[${currentSegmentIndexRef.current}] ✅ Append complete.`);
-                    console.log('Timestamp Offset:', sb.timestampOffset);
-                    console.log('Current Time:', videoRef.current?.currentTime);
-                    console.log('Buffered ranges:');
-                    let lastEnd = 0;
-                    for (let i = 0; i < sb.buffered.length; i++) {
-                        const start = sb.buffered.start(i);
-                        const end = sb.buffered.end(i);
-                        console.log(`  range ${i}: ${start.toFixed(3)} ~ ${end.toFixed(3)}`);
-                        if (i === sb.buffered.length - 1) {
-                           lastEnd = end;
-                        }
-                    }
-                    const newSegmentDuration = lastEnd - (sb.buffered.length > 1 ? sb.buffered.end(sb.buffered.length-2) : 0);
-                    console.log(`New segment duration: ${newSegmentDuration.toFixed(3)}s`);
-
-                    console.log(`updating:`, sb.updating);
-                    console.log(`🔌 MediaSource state: ${ms.readyState}`);
+                    if (!sb) return;
+                    addLog('SUCCESS', `[${currentSegmentIndexRef.current}] ✅ Append complete.`);
                     currentSegmentIndexRef.current++;
                     fetchAndProcessNextSegment();
                 });
@@ -619,6 +612,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             } catch (e: any) {
                 console.error("Playback setup failed:", e);
+                addLog('ERROR', `Playback setup failed: ${e.message}`);
                 setPlayerState('error-fatal');
                 setPlayerMessage(e.message);
             }

@@ -99,6 +99,7 @@ function initializeTools() {
 // ==========================================
 
 async function processAndEncryptVideo(episodeId: string, inputFilePath: string, docRef: admin.firestore.DocumentReference): Promise<void> {
+    const DEBUG = true; // 강제 디버그 모드
     const tempInputDir = await fs.mkdtemp(path.join(os.tmpdir(), `lline-in-${episodeId}-`));
     const tempOutputDir = await fs.mkdtemp(path.join(os.tmpdir(), `lline-out-${episodeId}-`));
     const localInputPath = path.join(tempInputDir, 'original_video');
@@ -125,7 +126,9 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
                     '-movflags frag_keyframe+empty_moov'
                 ])
                 .toFormat('mp4')
-                .on('start', (commandLine) => console.log(`[${episodeId}] 🚀 FFMPEG TRANSCODE COMMAND: ${commandLine}`))
+                .on('start', (commandLine) => {
+                    if (DEBUG) console.log(`[${episodeId}] 🚀 FFMPEG TRANSCODE COMMAND: ${commandLine}`);
+                })
                 .on('error', (err) => reject(new Error(`ffmpeg transcoding failed: ${err.message}`)))
                 .on('end', () => resolve())
                 .save(fragmentedMp4Path);
@@ -148,7 +151,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         if (!videoStream) throw new Error("No video stream found in the generated fMP4 file.");
 
         const codecString = `video/mp4; codecs="${videoStream.codec_tag_string}, ${audioStream?.codec_tag_string || 'mp4a.40.2'}"`;
-        console.log(`[${episodeId}] 💡 Detected Codec String: ${codecString}`);
+        if (DEBUG) console.log(`[${episodeId}] 💡 Detected Codec String:`, codecString);
 
         // 4. Split the fMP4 file into DASH segments (Correct method for MSE)
         console.log(`[${episodeId}] Pass 2: Splitting into DASH segments...`);
@@ -162,7 +165,9 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
                     '-init_seg_name init.mp4',
                     `-media_seg_name ${mediaSegmentPattern}`,
                 ])
-                .on('start', (commandLine) => console.log(`[${episodeId}] 🚀 FFMPEG DASH SEGMENT COMMAND: ${commandLine}`))
+                .on('start', (commandLine) => {
+                    if (DEBUG) console.log(`[${episodeId}] 🚀 FFMPEG DASH SEGMENT COMMAND: ${commandLine}`);
+                })
                 .on('error', (err) => reject(new Error(`ffmpeg DASH segmentation failed: ${err.message}`)))
                 .on('end', () => resolve())
                 .save(path.join(tempOutputDir, 'manifest.mpd')); // output is an mpd, which we ignore
@@ -171,13 +176,14 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
 
 
         // 5. Analyze segment files and prepare for encryption
+        if (DEBUG) console.log(`[${episodeId}] 📂 DASH output dir:`, tempOutputDir);
         const createdFiles = await fs.readdir(tempOutputDir);
-        console.log(`[${episodeId}] 🔎 DASH segment file structure analysis:`, createdFiles);
-        const initSegmentName = 'init.mp4';
-        if (!createdFiles.includes(initSegmentName)) {
-            throw new Error("DASH init segment (init.mp4) not found after ffmpeg processing.");
+        if (DEBUG) console.log(`[${episodeId}] 🔎 DASH segment file structure analysis:`, createdFiles);
+        
+        if (!createdFiles.includes("init.mp4")) {
+            throw new Error(`[${episodeId}] ❌ init.mp4 NOT FOUND`);
         }
-
+        
         const mediaSegmentNames = createdFiles
             .filter(f => f.startsWith('segment_') && f.endsWith('.m4s'))
             .sort((a, b) => {
@@ -185,8 +191,13 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
                 const numB = parseInt(b.match(/(\d+)/)?.[0] || '0');
                 return numA - numB;
             });
-        
-        const allSegmentsToProcess = [initSegmentName, ...mediaSegmentNames];
+            
+        if (DEBUG) console.log(`[${episodeId}] 📊 Segment count:`, mediaSegmentNames.length);
+        if (mediaSegmentNames.length === 0) {
+            throw new Error(`[${episodeId}] ❌ NO MEDIA SEGMENTS CREATED`);
+        }
+
+        const allSegmentsToProcess = ['init.mp4', ...mediaSegmentNames];
 
         // 6. Encrypt and Upload Segments
         console.log(`[${episodeId}] Encrypting and uploading segments...`);
@@ -217,6 +228,13 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
             const authTag = cipher.getAuthTag();
             
             const finalBuffer = Buffer.concat([iv, encryptedContent, authTag]);
+
+            if (DEBUG) {
+                console.log(`[${episodeId}] 📦 Segment '${fileName}' | Original Size: ${content.length} -> Encrypted Size: ${finalBuffer.length}`);
+                if (finalBuffer.length !== content.length + 28) {
+                    throw new Error(`[${episodeId}] ❌ Encryption size mismatch for ${fileName}. Expected ${content.length + 28}, but got ${finalBuffer.length}.`);
+                }
+            }
             
             let outputFileName: string;
             if (fileName === 'init.mp4') {
@@ -227,8 +245,6 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
             const storagePath = `episodes/${episodeId}/segments/${outputFileName}`;
 
             await bucket.file(storagePath).save(finalBuffer, { contentType: 'application/octet-stream' });
-            
-            console.log(`[${episodeId}] 📦 Segment '${fileName}' | Original Size: ${content.length} bytes -> Encrypted Size: ${finalBuffer.length} bytes`);
             
             if (fileName !== 'init.mp4') {
                 manifest.segments.push({ path: storagePath });
@@ -253,6 +269,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         
         // 8. Upload manifest
         const manifestPath = `episodes/${episodeId}/manifest.json`;
+        if (DEBUG) console.log(`[${episodeId}] 🧾 Manifest content:`, JSON.stringify(manifest, null, 2));
         await bucket.file(manifestPath).save(JSON.stringify(manifest, null, 2), {
             contentType: 'application/json',
         });
