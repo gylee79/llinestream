@@ -11,7 +11,7 @@
 아래 명령어를 복사하여 터미널에 붙여넣고 실행하세요.
 
 ```bash
-gsutil cors set cors.json gs://studio-6929130257-b96ff.appspot.com
+gsutil cors set cors.json gs://studio-6929130257-b96ff.firebasestorage.app
 ```
 
 **참고:**
