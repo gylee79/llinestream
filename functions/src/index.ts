@@ -192,7 +192,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
             duration: Math.round(duration),
             segmentDuration: 4,
             segmentCount: mediaSegmentNames.length,
-            init: `episodes/${episodeId}/init.enc`,
+            init: `episodes/${episodeId}/segments/init.enc`,
             segments: [] as { path: string }[],
         };
         
@@ -212,7 +212,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
             const finalBuffer = Buffer.concat([iv, encryptedContent, authTag]);
             
             const outputFileName = fileName.replace('.mp4', '.enc');
-            const storagePath = `episodes/${episodeId}/${outputFileName}`;
+            const storagePath = `episodes/${episodeId}/segments/${outputFileName}`;
 
             await bucket.file(storagePath).save(finalBuffer, { contentType: 'application/octet-stream' });
             
