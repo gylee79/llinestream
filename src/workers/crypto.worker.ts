@@ -60,6 +60,12 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
       cryptoKey,
       ciphertextWithTag
     );
+    
+    const hexPreview = Array.from(new Uint8Array(decryptedSegment.slice(0, 8)))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join(' ');
+    console.log(`[Worker] ✅ Decryption success for requestId ${requestId}. First 8 bytes (hex): ${hexPreview}`);
+
 
     const response: CryptoWorkerResponse = {
       type: 'DECRYPT_SUCCESS',
@@ -69,6 +75,7 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
     self.postMessage(response, [decryptedSegment]);
 
   } catch (error: any) {
+    console.error(`[Worker] ❌ Decryption failed for requestId ${requestId}:`, error);
     const response: CryptoWorkerResponse = {
       type: 'DECRYPT_FAILURE',
       payload: {

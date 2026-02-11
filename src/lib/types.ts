@@ -117,6 +117,8 @@ export interface Episode {
   aiProcessingError?: string | null;
   aiModel?: string;
   aiGeneratedContent?: string | null; // summary, timeline etc.
+  transcriptPath?: string;
+  subtitlePath?: string;
   
   createdAt: Timestamp;
 }
@@ -276,8 +278,8 @@ export interface OfflineVideoData {
   courseName: string;
   downloadedAt: Date;
   license: OfflineLicense;
-  manifest: VideoManifest; // Changed from single buffer to manifest
-  segments: Map<string, ArrayBuffer>; // Map from segment path to buffer
+  manifest: VideoManifest;
+  segments: Map<string, ArrayBuffer>;
 }
 
 
@@ -296,6 +298,7 @@ export type CryptoWorkerRequest = {
     requestId: string;
     encryptedSegment: ArrayBuffer;
     derivedKeyB64: string;
+    // No longer passing full encryption info, worker logic is simpler
   };
 };
 
