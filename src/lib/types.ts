@@ -83,7 +83,7 @@ export interface VideoManifest {
   duration: number;
   segmentDuration: number;
   segmentCount: number;
-  init: string; // path to init.enc
+  init: string;
   segments: Array<{ path: string; }>;
 }
 
@@ -142,6 +142,7 @@ export interface VideoKey {
   keyId: string;
   videoId: string;
   encryptedMasterKey: string; 
+  salt: string; 
   createdAt: Timestamp;
 }
 
