@@ -1,15 +1,8 @@
+
 'use client';
 
 import React, { createContext, useState, useCallback, useContext, ReactNode, useMemo } from 'react';
-
-export type LogType = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
-
-export interface LogEntry {
-  id: string;
-  timestamp: Date;
-  type: LogType;
-  message: string;
-}
+import type { LogEntry, LogType } from '@/lib/types';
 
 const errorTranslation: { [key: string]: string } = {
   'Access to fetch': '🔴 [보안] 창고(Storage) 보안 설정이 막혀 있습니다. CORS 설정을 확인하세요.',

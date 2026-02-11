@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -26,6 +27,17 @@ export default function DebugOverlay() {
 
   return (
     <>
+      <div className="fixed bottom-6 right-6 z-[100]">
+        <Button
+          variant={isOpen ? "secondary" : "default"}
+          size="icon"
+          className="rounded-full h-14 w-14 shadow-2xl"
+          onClick={() => setIsOpen(prev => !prev)}
+        >
+          <Bug className="w-6 h-6" />
+        </Button>
+      </div>
+
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -33,7 +45,7 @@ export default function DebugOverlay() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.9 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="fixed bottom-24 right-6 z-[100]"
+            className="fixed bottom-24 right-6 z-[99]"
           >
             <Card className="w-96 h-[50vh] flex flex-col shadow-2xl">
               <CardHeader>

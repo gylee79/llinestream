@@ -333,3 +333,12 @@ export type CryptoWorkerResponse =
         message: string;
       };
     };
+
+export type LogType = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
+
+export interface LogEntry {
+  id: string;
+  timestamp: Date;
+  type: LogType;
+  message: string;
+}
