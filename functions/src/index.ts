@@ -316,17 +316,16 @@ async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.
       const rawText = result.response.text();
       let output;
       try {
-          // Attempt to find and parse JSON within markdown-style code blocks.
-          const jsonMatch = rawText.match(/```(json)?\n([\s\S]*?)\n```/);
-          if (jsonMatch && jsonMatch[2]) {
-              output = JSON.parse(jsonMatch[2]);
-          } else {
-              // Fallback to parsing the whole string if no code block is found.
-              output = JSON.parse(rawText);
+          const startIndex = rawText.indexOf('{');
+          const endIndex = rawText.lastIndexOf('}');
+          if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+            throw new Error("AI 응답에서 유효한 JSON 객체를 찾을 수 없습니다.");
           }
+          const jsonString = rawText.substring(startIndex, endIndex + 1);
+          output = JSON.parse(jsonString);
       } catch (jsonError: any) {
           console.error(`[${episodeId}] AI analysis failed: JSON parsing error. Raw output was:`, rawText);
-          throw new Error(`JSON parsing failed: ${jsonError.message}.`);
+          throw new Error(`JSON 파싱 실패: ${jsonError.message}.`);
       }
       
       // NEW: Separate transcript from the main content
