@@ -54,12 +54,13 @@ const fs = __importStar(require("fs/promises"));
 const crypto = __importStar(require("crypto"));
 const fluent_ffmpeg_1 = __importDefault(require("fluent-ffmpeg"));
 const ffmpeg_static_1 = __importDefault(require("ffmpeg-static"));
-const ffprobe_static_1 = require("ffprobe-static");
+// Use require for ffprobe-static to avoid TS7016 error
+const { path: ffprobePath } = require('ffprobe-static');
 // 0. Firebase Admin, FFMpeg, & Global Options 초기화
 if (ffmpeg_static_1.default) {
     fluent_ffmpeg_1.default.setFfmpegPath(ffmpeg_static_1.default);
 }
-fluent_ffmpeg_1.default.setFfprobePath(ffprobe_static_1.path);
+fluent_ffmpeg_1.default.setFfprobePath(ffprobePath);
 if (!admin.apps.length) {
     admin.initializeApp();
 }
