@@ -80,6 +80,9 @@ export interface Course {
 
 export interface VideoManifest {
   codec: string;
+  duration: number;
+  segmentDuration: number;
+  segmentCount: number;
   init: string; // path to init.enc
   segments: Array<{ path: string; }>;
 }

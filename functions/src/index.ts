@@ -189,6 +189,9 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         
         const manifest = {
             codec: codecString,
+            duration: Math.round(duration),
+            segmentDuration: 4,
+            segmentCount: mediaSegmentNames.length,
             init: `episodes/${episodeId}/init.enc`,
             segments: [] as { path: string }[],
         };
@@ -323,7 +326,7 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
 
 
 export async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.firestore.DocumentReference) {
-    const modelName = "gemini-3-flash-preview";
+    const modelName = "gemini-1.5-flash-latest";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
