@@ -14,7 +14,7 @@ const base64ToUint8Array = (base64: string): Uint8Array => {
 };
 
 const importKey = (keyBuffer: ArrayBuffer): Promise<CryptoKey> => {
-  return self.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
+  return self.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-256-GCM' }, false, ['decrypt']);
 };
 
 self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
@@ -22,34 +22,31 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
     return;
   }
   
-  const { requestId, encryptedSegment, derivedKeyB64, encryption } = event.data.payload;
+  const { requestId, encryptedSegment, derivedKeyB64, encryption, storagePath } = event.data.payload;
 
-  if (!encryptedSegment || !derivedKeyB64 || !encryption) {
+  if (!encryptedSegment || !derivedKeyB64 || !encryption || !storagePath) {
     const response: CryptoWorkerResponse = {
       type: 'DECRYPT_FAILURE',
-      payload: { requestId, message: 'Incomplete data for decryption.' },
+      payload: { requestId, message: 'Incomplete data for decryption (missing segment, key, encryption info, or storagePath).' },
     };
     self.postMessage(response);
     return;
   }
   
-  console.log(`[Worker] Received decryption request ${requestId}. Tag length bits: ${encryption.tagLength * 8}`);
-
   try {
     const keyBuffer = base64ToUint8Array(derivedKeyB64);
     const cryptoKey = await importKey(keyBuffer.buffer);
 
-    // NEW: Parse index from requestId to construct AAD (Authenticated Additional Data)
-    const segmentIndex = parseInt(requestId.split('-').pop() || '0');
-    const aad = new TextEncoder().encode(`fragment-index:${segmentIndex}`);
+    // From Spec 3 & 6.3: Use the segment's storage path as AAD.
+    const aad = new TextEncoder().encode(`path:${storagePath}`);
     
-    // Structure: [IV (12 bytes)][Ciphertext + AuthTag]
+    // From Spec 3: [IV(12)][CIPHERTEXT][TAG(16)]
     const iv = encryptedSegment.slice(0, encryption.ivLength);
     const ciphertextWithTag = encryptedSegment.slice(encryption.ivLength);
 
     const decryptedSegment = await self.crypto.subtle.decrypt(
       {
-        name: 'AES-GCM',
+        name: 'AES-256-GCM',
         iv: iv,
         tagLength: encryption.tagLength * 8, // Convert bytes to bits
         additionalData: aad, // Add AAD for integrity check
@@ -58,22 +55,6 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
       ciphertextWithTag
     );
     
-    const hexPreview = Array.from(new Uint8Array(decryptedSegment.slice(0, 8)))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join(' ');
-    
-    // Enhanced init segment validation
-    let validationLog = '';
-    if (requestId.endsWith('-0')) { // Assuming the init segment request ID is unique
-        const segmentText = new TextDecoder().decode(decryptedSegment.slice(0, 512));
-        const hasFtyp = segmentText.includes('ftyp');
-        const hasMoov = segmentText.includes('moov');
-        validationLog = ` | Init Segment Validation: ftyp=${hasFtyp}, moov=${hasMoov}`;
-    }
-    
-    console.log(`[Worker] ✅ Decryption success for requestId ${requestId}. First 8 bytes (hex): ${hexPreview}${validationLog}`);
-
-
     const response: CryptoWorkerResponse = {
       type: 'DECRYPT_SUCCESS',
       payload: { requestId, decryptedSegment },
@@ -83,7 +64,6 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
 
   } catch (error: any) {
     console.error(`[Worker] ❌ Decryption failed for requestId ${requestId}:`, error);
-    console.error('[Worker] ❌ Decryption Error Name:', error.name);
     const response: CryptoWorkerResponse = {
       type: 'DECRYPT_FAILURE',
       payload: {

@@ -1,9 +1,10 @@
+
 'use server';
 
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
-import type { Episode, Timestamp, EncryptionInfo } from '@/lib/types';
+import type { Episode, Timestamp, EncryptionInfo, PipelineStatus, AiStatus } from '@/lib/types';
 import { Storage } from 'firebase-admin/storage';
 import { extractPathFromUrl } from '@/lib/utils';
 
@@ -21,7 +22,7 @@ type SaveMetadataPayload = {
     selectedCourseId: string;
     instructorId: string;
     duration: number;
-    filePath: string;
+    filePath: string; // This is now storage.rawPath
     fileSize: number;
     // Default thumbnail is required for new episodes
     defaultThumbnailUrl: string;
@@ -40,10 +41,9 @@ type UpdateEpisodePayload = {
     isFree: boolean;
     duration: number;
     
-    // New files data
     newVideoData?: { downloadUrl: string; filePath: string; fileSize: number; };
     newDefaultThumbnailData?: { downloadUrl: string; filePath: string; };
-    newCustomThumbnailData?: { downloadUrl: string | null; filePath: string | null; }; // null indicates deletion
+    newCustomThumbnailData?: { downloadUrl: string | null; filePath: string | null; };
 
     // Old file URLs for path extraction
     oldDefaultThumbnailUrl?: string;
@@ -72,7 +72,7 @@ const deleteStorageFileByPath = async (storage: Storage, filePath: string | unde
 
 
 /**
- * Saves the metadata of an already uploaded episode to Firestore.
+ * Saves the metadata for a new episode to trigger the backend processing pipeline.
  */
 export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise<UploadResult> {
     const { 
@@ -88,56 +88,53 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
     try {
         const adminApp = await initializeAdminApp();
         const db = admin.firestore(adminApp);
-
-        // Get the current number of episodes in the course to set the orderIndex
         const courseEpisodesQuery = db.collection('episodes').where('courseId', '==', selectedCourseId);
         const courseEpisodesSnap = await courseEpisodesQuery.get();
         const newOrderIndex = courseEpisodesSnap.size;
         
         const episodeRef = db.collection('episodes').doc(episodeId);
         
-        // Define the initial structure based on the new architecture
         const newEpisode: Omit<Episode, 'id'> = {
             courseId: selectedCourseId,
-            instructorId: instructorId || '',
-            title: title || '',
-            description: description || '',
-            duration: duration,
-            isFree: isFree || false,
+            instructorId: instructorId,
+            title, description, duration, isFree,
             orderIndex: newOrderIndex,
-            thumbnailUrl: customThumbnailUrl || defaultThumbnailUrl, // Use custom if available
-            defaultThumbnailUrl: defaultThumbnailUrl,
-            defaultThumbnailPath: defaultThumbnailPath,
-            customThumbnailUrl: customThumbnailUrl || '',
-            customThumbnailPath: customThumbnailPath || '',
             createdAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
             
-            // New fields for encryption and status
-            filePath: filePath, // Store original path temporarily
             storage: {
-                encryptedPath: '', // Will be filled by the cloud function
-                fileSize: 0,
+                rawPath: filePath,
+                encryptedBasePath: `episodes/${episodeId}/segments/`,
+                manifestPath: `episodes/${episodeId}/segments/manifest.json`,
+                thumbnailBasePath: `episodes/${episodeId}/thumbnails/`,
             },
-            encryption: {} as EncryptionInfo, // Will be filled by the cloud function
+            
+            thumbnails: {
+                default: defaultThumbnailUrl,
+                defaultPath: defaultThumbnailPath,
+                custom: customThumbnailUrl || undefined,
+                customPath: customThumbnailPath || undefined,
+            },
+            thumbnailUrl: customThumbnailUrl || defaultThumbnailUrl,
+
             status: {
-                processing: 'pending',
+                pipeline: 'pending', // This will trigger the Cloud Function
+                step: 'idle',
                 playable: false,
-                error: null,
+                progress: 0,
+                jobId: '',
             },
-            aiProcessingStatus: 'pending',
-            aiProcessingError: null,
-            aiGeneratedContent: null,
-            transcriptPath: '',
-            subtitlePath: '',
-            aiModel: '',
+            ai: {
+                status: 'idle',
+            },
+            // This will be populated by the backend function.
+            // Explicitly define it to match the type.
+            encryption: {} as any,
         };
 
         await episodeRef.set(newEpisode);
-
-        // Firestore Trigger in Cloud Functions will now handle the encryption and AI processing.
         
         revalidatePath('/admin/content', 'layout');
-        return { success: true, message: `에피소드 '${title}'의 정보가 성공적으로 저장되었으며, 암호화 및 AI 분석이 백그라운드에서 자동으로 시작됩니다.` };
+        return { success: true, message: `에피소드 '${title}'가 등록되었으며, 비디오 처리가 곧 시작됩니다.` };
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : '알 수 없는 서버 오류가 발생했습니다.';
@@ -146,14 +143,11 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
     }
 }
 
-/**
- * Updates an existing episode's metadata and handles deletion of old files.
- */
+
 export async function updateEpisode(payload: UpdateEpisodePayload): Promise<UploadResult> {
     const { 
         episodeId, courseId, instructorId, title, description, isFree, duration,
-        newVideoData, newDefaultThumbnailData, newCustomThumbnailData,
-        oldDefaultThumbnailUrl, oldCustomThumbnailUrl
+        newVideoData, newDefaultThumbnailData, newCustomThumbnailData
     } = payload;
     
     if (!episodeId || !courseId || !title || !instructorId) {
@@ -172,74 +166,48 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
         }
         const currentData = currentDoc.data() as Episode;
         
-        let shouldResetProcessingState = false;
-
-        // --- File Deletion Logic ---
-        const oldFilePath = currentData.filePath; // The original uploaded file path
-        if (newVideoData?.filePath && oldFilePath && newVideoData.filePath !== oldFilePath) {
-          await deleteStorageFileByPath(storage, oldFilePath);
-          // Also delete old encrypted file and vtt
-          if (currentData.storage?.encryptedPath) {
-            await deleteStorageFileByPath(storage, currentData.storage.encryptedPath);
-          }
-           if (currentData.subtitlePath) {
-            await deleteStorageFileByPath(storage, currentData.subtitlePath);
-          }
-          shouldResetProcessingState = true;
-        }
-        
-        const oldDefaultThumbnailPath = extractPathFromUrl(oldDefaultThumbnailUrl);
-        if (newDefaultThumbnailData?.filePath && oldDefaultThumbnailPath && newDefaultThumbnailData.filePath !== oldDefaultThumbnailPath) {
-          await deleteStorageFileByPath(storage, oldDefaultThumbnailPath);
-        }
-
-        const oldCustomThumbnailPath = extractPathFromUrl(oldCustomThumbnailUrl);
-        if (newCustomThumbnailData?.filePath === null && oldCustomThumbnailPath) {
-            await deleteStorageFileByPath(storage, oldCustomThumbnailPath);
-        } 
-        else if (newCustomThumbnailData?.filePath && oldCustomThumbnailPath && newCustomThumbnailData.filePath !== oldCustomThumbnailPath) {
-           await deleteStorageFileByPath(storage, oldCustomThumbnailPath);
-        }
-
         // --- Data Update Logic ---
         const dataToUpdate: { [key: string]: any } = {
-            title,
-            description,
-            isFree,
-            courseId,
-            instructorId,
-            duration,
+            title, description, isFree, courseId, instructorId, duration
         };
 
+        // If a new video is uploaded, we need to delete all old processed files and reset the status
         if (newVideoData) {
-            dataToUpdate.filePath = newVideoData.filePath;
+            console.log(`New video uploaded for ${episodeId}. Deleting old processed files.`);
+            // Delete old raw file
+            await deleteStorageFileByPath(storage, currentData.storage.rawPath);
+            // Delete entire old encrypted segment folder
+            const oldEncryptedPrefix = currentData.storage.encryptedBasePath;
+            if (oldEncryptedPrefix) {
+                await storage.bucket().deleteFiles({ prefix: oldEncryptedPrefix });
+            }
+            
+            dataToUpdate['storage.rawPath'] = newVideoData.filePath;
+            // Reset status to trigger re-processing
+            dataToUpdate['status.pipeline'] = 'pending';
+            dataToUpdate['status.step'] = 'idle';
+            dataToUpdate['status.error'] = null;
+            dataToUpdate['status.playable'] = false;
+            dataToUpdate['ai.status'] = 'idle';
+            dataToUpdate['ai.error'] = null;
         }
 
-        if (shouldResetProcessingState) {
-            dataToUpdate.transcriptPath = '';
-            dataToUpdate.aiGeneratedContent = null;
-            dataToUpdate.subtitlePath = admin.firestore.FieldValue.delete();
-            dataToUpdate.aiProcessingStatus = 'pending';
-            dataToUpdate.status = { // Reset status object completely
-                processing: 'pending',
-                playable: false,
-                error: null
-            };
-            dataToUpdate.aiProcessingError = null;
-        }
-
+        // Thumbnail updates
         if (newDefaultThumbnailData) {
-            dataToUpdate.defaultThumbnailUrl = newDefaultThumbnailData.downloadUrl;
-            dataToUpdate.defaultThumbnailPath = newDefaultThumbnailData.filePath;
+            await deleteStorageFileByPath(storage, currentData.thumbnails.defaultPath);
+            dataToUpdate['thumbnails.default'] = newDefaultThumbnailData.downloadUrl;
+            dataToUpdate['thumbnails.defaultPath'] = newDefaultThumbnailData.filePath;
+        }
+
+        if (newCustomThumbnailData) { // This handles both new upload and deletion (null)
+            await deleteStorageFileByPath(storage, currentData.thumbnails.customPath);
+            dataToUpdate['thumbnails.custom'] = newCustomThumbnailData.downloadUrl ?? undefined;
+            dataToUpdate['thumbnails.customPath'] = newCustomThumbnailData.filePath ?? undefined;
         }
         
-        if (newCustomThumbnailData) {
-            dataToUpdate.customThumbnailUrl = newCustomThumbnailData.downloadUrl ?? '';
-            dataToUpdate.customThumbnailPath = newCustomThumbnailData.filePath ?? '';
-        }
-
-        const finalCustomUrl = newCustomThumbnailData ? newCustomThumbnailData.downloadUrl : currentData?.customThumbnailUrl;
-        const finalDefaultUrl = newDefaultThumbnailData ? newDefaultThumbnailData.downloadUrl : currentData?.defaultThumbnailUrl;
+        // Update the master thumbnailUrl
+        const finalCustomUrl = newCustomThumbnailData ? newCustomThumbnailData.downloadUrl : currentData.thumbnails.custom;
+        const finalDefaultUrl = newDefaultThumbnailData ? newDefaultThumbnailData.downloadUrl : currentData.thumbnails.default;
         dataToUpdate.thumbnailUrl = finalCustomUrl || finalDefaultUrl || '';
 
         await episodeRef.update(dataToUpdate);

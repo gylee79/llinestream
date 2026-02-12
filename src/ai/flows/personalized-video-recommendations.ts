@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview This file implements the personalized video recommendations flow.
@@ -56,12 +57,14 @@ const trendingContentTool = ai.defineTool({
   ]; // Replace with actual trending videos.
 });
 
-const videoRecommendationPrompt = ai.definePrompt({
-  name: 'videoRecommendationPrompt',
-  input: {schema: VideoRecommendationInputSchema},
-  output: {schema: VideoRecommendationOutputSchema},
-  tools: [trendingContentTool],
-  prompt: `You are a video recommendation expert.
+const videoRecommendationFlow = ai.defineFlow(
+  {
+    name: 'videoRecommendationFlow',
+    inputSchema: VideoRecommendationInputSchema,
+    outputSchema: VideoRecommendationOutputSchema,
+    model: 'gemini-3-flash-preview',
+    tools: [trendingContentTool],
+    prompt: `You are a video recommendation expert.
 
   Based on the user's viewing history and preferences, recommend videos that they might like.
   Consider the user's viewing history to understand their interests.
@@ -73,16 +76,9 @@ const videoRecommendationPrompt = ai.definePrompt({
 
   Format your response as a JSON object with a "recommendedVideoIds" field containing an array of video IDs.
   `,
-});
-
-const videoRecommendationFlow = ai.defineFlow(
-  {
-    name: 'videoRecommendationFlow',
-    inputSchema: VideoRecommendationInputSchema,
-    outputSchema: VideoRecommendationOutputSchema,
   },
   async input => {
-    const {output} = await videoRecommendationPrompt(input);
-    return output!;
+    const llmResponse = await ai.runFlow(videoRecommendationFlow, input);
+    return llmResponse;
   }
 );

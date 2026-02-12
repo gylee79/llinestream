@@ -78,22 +78,61 @@ export interface Course {
   createdAt?: Timestamp;
 }
 
-export interface VideoManifest {
-  codec: string;
-  duration: number;
-  segmentDuration: number;
-  segmentCount: number;
-  init: string;
-  segments: Array<{ path: string; }>;
+// From Spec 4.3
+export interface EncryptionInfo {
+  algorithm: "AES-256-GCM";
+  ivLength: 12;
+  tagLength: 16;
+  keyId: string;
+  kekVersion: 1;
+  aadMode: "path";
+  segmentDurationSec: 4;
+  fragmentEncrypted: true;
 }
 
-export interface EncryptionInfo {
-  algorithm: 'AES-256-GCM';
-  ivLength: number;
-  tagLength: number;
-  keyId: string;
-  fragmentEncrypted: boolean;
+// From Spec 4.1
+export interface PipelineStatus {
+    pipeline: "queued" | "processing" | "failed" | "completed";
+    step: "validate" | "ffmpeg" | "encrypt" | "verify" | "manifest" | "keys" | "done" | "idle";
+    playable: boolean;
+    progress: number;
+    jobId?: string;
+    startedAt?: Timestamp;
+    updatedAt?: Timestamp;
+    lastHeartbeatAt?: Timestamp;
+    error?: {
+        step: string;
+        code: string;
+        message: string;
+        hint?: string;
+        raw: string;
+        debugLogPath?: string;
+        ts: Timestamp;
+    } | null;
 }
+
+// From Spec 4.4
+export interface AiStatus {
+    status: "queued" | "processing" | "failed" | "completed" | "blocked" | "idle";
+    jobId?: string;
+    model?: string;
+    attempts?: number;
+    lastHeartbeatAt?: Timestamp;
+    error?: {
+        code: string;
+        message: string;
+        raw: string;
+        debugLogPath?: string;
+        ts: Timestamp;
+    } | null;
+    resultPaths?: {
+        transcript?: string;
+        summary?: string;
+        chapters?: string;
+        quiz?: string;
+    };
+}
+
 
 export interface Episode {
   id: string;
@@ -101,48 +140,69 @@ export interface Episode {
   instructorId: string;
   title: string;
   description?: string;
-  duration: number; // in seconds
+  duration: number;
   isFree: boolean;
   orderIndex?: number;
-  thumbnailUrl: string;
-  defaultThumbnailUrl?: string;
-  defaultThumbnailPath?: string;
-  customThumbnailUrl?: string;
-  customThumbnailPath?: string;
-  
-  // File Processing & Status
-  filePath?: string; // Original uploaded file path, deleted after processing
-  manifestPath?: string; // Path to the manifest.json in storage
-  codec?: string; // e.g., 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"'
-  
-  encryption: EncryptionInfo;
-
-  storage: {
-    fileSize: number;
-  };
-  
-  status: {
-    processing: 'pending' | 'processing' | 'completed' | 'failed';
-    playable: boolean;
-    error?: string | null;
-  };
-  
-  // AI Generated Content
-  aiProcessingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
-  aiProcessingError?: string | null;
-  aiModel?: string;
-  aiGeneratedContent?: string | null; // summary, timeline etc.
-  transcriptPath?: string;
-  subtitlePath?: string;
-  
   createdAt: Timestamp;
+  
+  // From Spec 4.2
+  storage: {
+      rawPath: string; // Original file path, to be archived
+      encryptedBasePath: string; // e.g., episodes/{id}/segments/
+      manifestPath: string;
+      aiAudioPath?: string;
+      thumbnailBasePath?: string; // e.g., episodes/{id}/thumbnails/
+  };
+
+  // Replaces flat thumbnail URLs/paths
+  thumbnails: {
+      default: string; // URL
+      defaultPath: string;
+      custom?: string; // URL
+      customPath?: string;
+  };
+  thumbnailUrl: string; // Keep for simple display logic (denormalized from custom or default)
+
+  // Combined Status Objects from Spec
+  status: PipelineStatus;
+  ai: AiStatus;
+
+  // From Spec 4.3
+  encryption: EncryptionInfo;
 }
+
+export interface Job {
+  id: string;
+  type: "VIDEO_PIPELINE" | "AI_ANALYSIS";
+  episodeId: string;
+  status: "queued" | "running" | "failed" | "succeeded" | "dead";
+  attempts: number;
+  maxAttempts: number;
+  createdAt: Timestamp;
+  startedAt?: Timestamp;
+  finishedAt?: Timestamp;
+  lastHeartbeatAt?: Timestamp;
+  error?: {
+    code: string;
+    message: string;
+    raw: string;
+    ts: Timestamp;
+  }
+}
+
+export interface VideoManifest {
+  codec: string;
+  duration: number;
+  init: string;
+  segments: Array<{ path: string; }>;
+}
+
 
 export interface VideoKey {
   keyId: string;
   videoId: string;
   encryptedMasterKey: string; 
-  salt: string; 
+  kekVersion: 1;
   createdAt: Timestamp;
 }
 
@@ -276,18 +336,24 @@ export interface Bookmark {
   episodeTitle?: string;
 }
 
+// From Spec 12.2
 export interface OfflineLicense {
   videoId: string;
   userId: string;
   deviceId: string;
-  issuedAt: number;
-  expiresAt: number;
-  lastCheckedAt: number;
-  scope: "OFFLINE_PLAYBACK";
-  watermarkSeed: string;
-  watermarkMode: "normal" | "aggressive";
-  offlineDerivedKey: string;
+  issuedAt: number; // timestamp
+  expiresAt: number; // timestamp
+  keyId: string;
+  kekVersion: 1;
+  policy: {
+      maxDevices: 1,
+      allowScreenCapture: false
+  },
+  // This signature is crucial but requires a server private key.
+  // The client must verify it with a public key.
+  signature: string; 
 }
+
 
 export interface OfflineVideoData {
   episode: Episode;
@@ -315,6 +381,7 @@ export type CryptoWorkerRequest = {
     encryptedSegment: ArrayBuffer;
     derivedKeyB64: string;
     encryption: EncryptionInfo;
+    storagePath: string; // Added for AAD
   };
 };
 

@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview AI Tutor flow for answering questions about a video episode.
@@ -54,35 +55,23 @@ const videoTutorFlow = ai.defineFlow(
     const adminApp = await initializeAdminApp();
     const db = admin.firestore(adminApp);
     
-    // This helper function processes the raw analysis JSON string to remove milliseconds from timestamps
-    const processAnalysisContent = (content: string) => {
-        try {
-            const analysis = JSON.parse(content);
-            if (analysis.timeline && Array.isArray(analysis.timeline)) {
-                analysis.timeline = analysis.timeline.map((item: any) => ({
-                    ...item,
-                    startTime: removeMilliseconds(item.startTime),
-                    endTime: removeMilliseconds(item.endTime),
-                }));
-            }
-            return analysis;
-        } catch (e) {
-            // If parsing fails, just return a summary object to avoid breaking the flow.
-            return { summary: content };
-        }
-    };
-    
     try {
-      // Fetch AI settings to determine the scope
-      const aiSettingsDoc = await db.collection('settings').doc('aiTutor').get();
-      const scope = (aiSettingsDoc.data()?.defaultSearchScope as AiSearchScope) || 'field'; // Default to 'field'
-      console.log(`[Tutor-Flow] Using search scope: ${scope}`);
-
       // 1. Get the full hierarchy for the given episode
       const episodeDoc = await db.collection('episodes').doc(episodeId).get();
       if (!episodeDoc.exists) throw new Error(`Episode with ID ${episodeId} not found.`);
       const episodeData = episodeDoc.data() as Episode;
 
+      // From Spec 9: AI Analyzer Guard Conditions
+      const { pipeline, playable } = episodeData.status;
+      const { manifestPath } = episodeData.storage;
+      const { status: aiStatus } = episodeData.ai;
+
+      if (pipeline !== 'completed' || !playable || !manifestPath || aiStatus === 'blocked') {
+         const errorMessage = `AI 튜터를 사용할 수 없습니다. (이유: ${aiStatus === 'blocked' ? episodeData.ai.error?.code : '영상 처리 미완료'})`;
+         console.warn(`[Tutor-Flow] Guard Blocked for ${episodeId}: ${errorMessage}`);
+         return { answer: errorMessage };
+      }
+      
       const courseDoc = await db.collection('courses').doc(episodeData.courseId).get();
       if (!courseDoc.exists) throw new Error(`Course ${episodeData.courseId} not found.`);
       const courseData = courseDoc.data() as Course;
@@ -102,71 +91,34 @@ const videoTutorFlow = ai.defineFlow(
           episodeTitleMap.set(doc.id, doc.data().title);
       });
 
-      // 2. Build context based on the selected scope
-      let context = "";
-      let query: admin.firestore.Query | null = null;
-      
-      switch (scope) {
-        case 'episode':
-            // This case is handled below, as it doesn't need a query
-            break;
-        case 'course':
-            query = db.collection('episode_ai_chunks').where('courseId', '==', courseData.id);
-            break;
-        case 'classification':
-            query = db.collection('episode_ai_chunks').where('classificationId', '==', classificationData.id);
-            break;
-        case 'field':
-        default:
-            query = db.collection('episode_ai_chunks').where('fieldId', '==', fieldDoc.id);
-            break;
-      }
-      
-      if (query) {
-        const querySnapshot = await query.get();
-        console.log(`[Tutor-Flow] Scope: ${scope}. Found ${querySnapshot.size} chunks.`);
-        if (!querySnapshot.empty) {
-            const chunks = querySnapshot.docs.map(doc => {
-                const chunkData = doc.data();
-                return {
-                    episodeId: chunkData.episodeId,
-                    episodeTitle: episodeTitleMap.get(chunkData.episodeId) || '알 수 없는 영상',
-                    analysis: processAnalysisContent(chunkData.content)
-                };
-            });
-            context = JSON.stringify(chunks, null, 2);
-        }
-      } else if (scope === 'episode' && episodeData.aiGeneratedContent) {
-           console.log(`[Tutor-Flow] Scope: episode. Using content from episode ${episodeId}.`);
-           context = JSON.stringify([{
-              episodeId: episodeId,
-              episodeTitle: episodeData.title,
-              analysis: processAnalysisContent(episodeData.aiGeneratedContent)
-           }], null, 2);
+      // 2. Build context
+      // Note: This implementation is simplified. A real production system would use a vector database (e.g., Vertex AI Vector Search)
+      // for semantic search across many documents, rather than stuffing all text into the context.
+      // For now, we'll fetch the transcript directly if it exists.
+      const transcriptPath = episodeData.ai.resultPaths?.transcript;
+      let context = "No transcript available.";
+
+      if (transcriptPath) {
+          const file = admin.storage(adminApp).bucket().file(transcriptPath);
+          const [exists] = await file.exists();
+          if (exists) {
+              const [buffer] = await file.download();
+              context = buffer.toString('utf-8');
+          }
       }
 
-
-      if (!context) {
-        const fallbackMessage = "죄송합니다, 현재 선택된 범위에는 답변의 근거가 될 분석 내용이 아직 없습니다. 다른 검색 범위를 선택하거나 잠시 후 다시 시도해주세요."
-        console.log(`[Tutor-Flow] No AI-generated content found for scope '${scope}'.`);
-        return { answer: fallbackMessage };
-      }
-      
       // 3. Generate the answer using Gemini with the constructed context
       const llmResponse = await ai.generate({
         model: googleAI.model('gemini-3-flash-preview'),
         system: `You are a friendly and helpful Korean AI Tutor. You MUST answer all questions in Korean.
-        You will be given a JSON object or an array of JSON objects as context. Each object represents the detailed analysis of a video, including 'episodeId', 'episodeTitle', and 'analysis' (which contains transcript, summary, timeline, etc.).
+        You will be given a full video transcript as context.
         The user is currently watching the episode titled '${episodeData.title}'.
 
-        Based ONLY on the provided JSON context, answer the user's question.
-        - When referencing information from the *currently playing video*, simply state "이 영상에서는..." or "현재 영상에서는...". **Do NOT mention the title of the current video**, as the user is already watching it. For example, instead of saying "현재 영상인 '영상 제목'에서는...", you MUST say "이 영상에서는...".
-        - IMPORTANT: When citing timestamps, you MUST format them as HH:MM:SS and exclude any milliseconds. For example, use "00:01:23초" instead of "00:01:23.456초". For a time range, use a format like "00:01:23초 - 00:01:45초".
-        - When referencing information from a *different video*, you MUST state the name of that video using the 'episodeTitle' field. For example: "네, 관련 내용이 '${"다른 영상 제목"}' 편에 있습니다."
-        - Analyze the structured data, especially the 'timeline' for time-specific events and descriptions.
-        - If the context doesn't contain the answer, you MUST state that the information is not in the provided videos and you cannot answer in Korean. Do not use outside knowledge.
+        Based ONLY on the provided transcript, answer the user's question.
+        - When referencing information, simply state the fact. **Do NOT mention the title of the current video**, as the user is already watching it.
+        - If the transcript doesn't contain the answer, you MUST state that the information is not in the provided video and you cannot answer in Korean. Do not use outside knowledge.
 
-        Context:
+        Transcript:
         ---
         ${context}
         ---`,
@@ -208,5 +160,3 @@ const videoTutorFlow = ai.defineFlow(
     }
   }
 );
-
-    
