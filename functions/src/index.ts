@@ -20,19 +20,7 @@ import ffmpegPath from 'ffmpeg-static';
 const { path: ffprobePath } = require('ffprobe-static');
 
 // Minimal Episode type definition for Cloud Function context
-interface Episode {
-  filePath?: string;
-  status?: {
-    processing: 'pending' | 'processing' | 'completed' | 'failed';
-    [key: string]: any;
-  };
-  encryption?: {
-    keyId: string;
-  };
-  aiProcessingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
-  aiProcessingError?: string | null;
-  [key: string]: any;
-}
+import type { Episode } from '../../src/lib/types';
 
 
 // 0. Firebase Admin, FFMpeg, & Global Options 초기화
@@ -98,7 +86,7 @@ function initializeTools() {
 // NEW: Video Processing Pipeline (fMP4)
 // ==========================================
 
-async function processAndEncryptVideo(episodeId: string, inputFilePath: string, docRef: admin.firestore.DocumentReference): Promise<void> {
+async function processAndEncryptVideo(episodeId: string, inputFilePath: string, docRef: admin.firestore.DocumentReference): Promise<boolean> {
     const DEBUG = true; // 강제 디버그 모드
     const tempInputDir = await fs.mkdtemp(path.join(os.tmpdir(), `lline-in-${episodeId}-`));
     const tempOutputDir = await fs.mkdtemp(path.join(os.tmpdir(), `lline-out-${episodeId}-`));
@@ -295,6 +283,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         });
 
         console.log(`[${episodeId}] ✅ Processing complete. Manifest created at ${manifestPath}`);
+        return true;
 
     } catch (error: any) {
         console.error(`[${episodeId}] ❌ Video processing failed:`, error);
@@ -303,6 +292,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
             'status.playable': false,
             'status.error': error.message || 'An unknown error occurred during video processing.'
         });
+        return false;
     } finally {
         await fs.rm(tempInputDir, { recursive: true, force: true });
         await fs.rm(tempOutputDir, { recursive: true, force: true });
@@ -345,16 +335,26 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
       return;
     }
     
-    await processAndEncryptVideo(episodeId, filePath, docRef);
-    await runAiAnalysis(episodeId, filePath, docRef);
+    const encryptionSuccess = await processAndEncryptVideo(episodeId, filePath, docRef);
+    if (!encryptionSuccess) {
+        console.error(`[${episodeId}] ❌ Halting pipeline. Video encryption failed. Original file will be kept for manual review.`);
+        return;
+    }
 
+    const aiSuccess = await runAiAnalysis(episodeId, filePath, docRef);
+     if (!aiSuccess) {
+        console.error(`[${episodeId}] ❌ Halting pipeline. AI analysis failed. Original file will be kept for manual review.`);
+        return;
+    }
+
+    // This part only runs if BOTH previous steps succeeded.
     console.log(`[${episodeId}] Deleting original source file: ${filePath}`);
     await deleteStorageFileByPath(filePath);
     console.log(`✅ [${episodeId}] All jobs finished.`);
 });
 
 
-export async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.firestore.DocumentReference) {
+export async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.firestore.DocumentReference): Promise<boolean> {
     const modelName = "gemini-1.5-flash-latest";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     
@@ -431,6 +431,7 @@ export async function runAiAnalysis(episodeId: string, filePath: string, docRef:
       });
 
       console.log(`[${episodeId}] ✅ AI analysis succeeded!`);
+      return true;
 
     } catch (error: any) {
       console.error(`❌ [${episodeId}] AI analysis failed.`, error);
@@ -438,6 +439,7 @@ export async function runAiAnalysis(episodeId: string, filePath: string, docRef:
         aiProcessingStatus: "failed",
         aiProcessingError: error.message || String(error),
       });
+      return false;
     } finally {
       if (uploadedFile) { try { await localFileManager.deleteFile(uploadedFile.name); } catch (e) {} }
       try { await fs.rm(tempFilePath, { force: true }); } catch (e) {}
@@ -477,7 +479,5 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
-
-    
 
     
