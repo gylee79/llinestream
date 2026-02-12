@@ -48,7 +48,7 @@ if (!admin.apps.length) {
 setGlobalOptions({
   region: "us-central1",
   secrets: ["GOOGLE_GENAI_API_KEY", "KEK_SECRET"],
-  timeoutSeconds: 900, // Increased timeout for video processing
+  timeoutSeconds: 540, // Increased timeout for video processing
   memory: "4GiB",     // Increased memory for ffmpeg
   cpu: 2,             // Increased CPU for ffmpeg
   minInstances: 0,
@@ -477,5 +477,7 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
+
+    
 
     
