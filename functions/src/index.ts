@@ -175,8 +175,8 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         const mediaSegmentNames = createdFiles
             .filter(f => f.startsWith('segment_') && f.endsWith('.m4s'))
             .sort((a, b) => {
-                const numA = parseInt(a.match(/(\d+)/)?.[0] || '0');
-                const numB = parseInt(b.match(/(\d+)/)?.[0] || '0');
+                const numA = parseInt(a.match(/(\\d+)/)?.[0] || '0');
+                const numB = parseInt(b.match(/(\\d+)/)?.[0] || '0');
                 return numA - numB;
             });
             
@@ -414,9 +414,9 @@ export async function runAiAnalysis(episodeId: string, filePath: string, docRef:
             .map((item: any) => {
                 const start = item.startTime || '00:00:00.000';
                 const end = item.endTime || '00:00:00.000';
-                return `${start} --> ${end}\n${item.subtitle}`;
+                return `${start} --> ${end}\\n${item.subtitle}`;
             })
-            .join('\n\n')}`;
+            .join('\\n\\n')}`;
         subtitlePath = `episodes/${episodeId}/subtitles/subtitle.vtt`;
         await bucket.file(subtitlePath).save(vttContent, { contentType: 'text/vtt' });
       }
@@ -479,6 +479,8 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
+
+    
 
     
 
