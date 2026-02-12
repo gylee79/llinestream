@@ -117,7 +117,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             thumbnailUrl: customThumbnailUrl || defaultThumbnailUrl,
 
             status: {
-                pipeline: 'pending', // This will trigger the Cloud Function
+                pipeline: 'queued', // This will trigger the Cloud Function
                 step: 'idle',
                 playable: false,
                 progress: 0,
@@ -184,7 +184,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             
             dataToUpdate['storage.rawPath'] = newVideoData.filePath;
             // Reset status to trigger re-processing
-            dataToUpdate['status.pipeline'] = 'pending';
+            dataToUpdate['status.pipeline'] = 'queued';
             dataToUpdate['status.step'] = 'idle';
             dataToUpdate['status.error'] = null;
             dataToUpdate['status.playable'] = false;

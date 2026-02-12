@@ -168,7 +168,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         const masterKey = crypto.randomBytes(32); // Spec 6.6
         const encryptedBasePath = `episodes/${episodeId}/segments/`;
 
-        for (const [index, fileName] of allSegmentsToProcess.entries()) {
+        for (const fileName of allSegmentsToProcess) {
             const localFilePath = path.join(tempOutputDir, fileName);
             const content = await fs.readFile(localFilePath);
             const iv = crypto.randomBytes(12); // Spec 3
@@ -325,8 +325,8 @@ export const videoPipelineTrigger = onDocumentWritten("episodes/{episodeId}", as
     const docRef = change.after.ref;
 
     // --- Video Processing Trigger ---
-    // Trigger only when a new video is uploaded (status.pipeline goes to 'pending')
-    if (afterData.status?.pipeline === 'pending' && beforeData?.status?.pipeline !== 'pending') {
+    // Trigger only when a new video is uploaded (status.pipeline goes to 'queued')
+    if (afterData.status?.pipeline === 'queued' && beforeData?.status?.pipeline !== 'queued') {
         console.log(`✨ [${episodeId}] New video pipeline job detected.`);
         const success = await processAndEncryptVideo(episodeId, afterData.storage.rawPath, docRef);
         

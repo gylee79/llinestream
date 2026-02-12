@@ -30,7 +30,7 @@ export async function resetAIEpisodeStatus(episodeId: string): Promise<{ success
 
     // From Spec 1 & 7: Reset both pipeline and AI status to trigger the whole flow.
     await episodeRef.update({
-        'status.pipeline': 'pending',
+        'status.pipeline': 'queued',
         'status.step': 'idle',
         'status.error': null,
         'status.playable': false,
