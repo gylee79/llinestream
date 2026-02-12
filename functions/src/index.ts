@@ -17,7 +17,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
 // Use require for ffprobe-static to avoid TS7016 error
 const { path: ffprobePath } = require('ffprobe-static');
-import type { Episode, PipelineStatus } from './lib/types';
+import type { Episode, PipelineStatus } from '../../src/lib/types';
 
 
 // 0. Initialize SDKs and Constants
@@ -337,12 +337,20 @@ export async function runAiAnalysis(episodeId: string, docRef: admin.firestore.D
 export const videoPipelineTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
     const { episodeId } = event.params;
     const change = event.data;
-    if (!change || !change.after.exists) {
+    if (!change) {
+        console.log(`[${episodeId}] No data change. Skipping processing.`);
+        return;
+    }
+    
+    // Make sure the document was created, not deleted
+    if (!change.after.exists) {
         console.log(`[${episodeId}] Document deleted. Skipping processing.`);
         return;
-    };
+    }
     
     const docRef = change.after.ref;
+    const afterData = change.after.data() as Episode;
+    const beforeData = change.before.exists ? change.before.data() as Episode : null;
 
     // --- DIAGNOSTIC LOGGING AND PRE-CHECKS ---
     console.log(`[${episodeId}] TRIGGERED: onDocumentWritten event received.`);
@@ -354,20 +362,12 @@ export const videoPipelineTrigger = onDocumentWritten("episodes/{episodeId}", as
         if (!hasKek || !hasGenAiKey) {
             throw new Error(`Required secrets are missing. KEK: ${hasKek}, GenAI Key: ${hasGenAiKey}. Function cannot start.`);
         }
-
-        const afterData = change.after.data() as Episode;
-        const beforeData = change.before.exists ? change.before.data() as Episode : null;
-
+        
         // --- Video Processing Trigger ---
+        // CRITICAL FIX: Only trigger if the pipeline status is newly set to 'queued'.
         if (afterData.status?.pipeline === 'queued' && beforeData?.status?.pipeline !== 'queued') {
-            console.log(`✨ [${episodeId}] New video pipeline job detected. Updating status to 'processing'.`);
+            console.log(`✨ [${episodeId}] New video pipeline job detected. Starting process...`);
             
-            await docRef.update({
-                'status.pipeline': 'processing',
-                'status.step': 'starting',
-                'status.lastHeartbeatAt': admin.firestore.FieldValue.serverTimestamp(),
-            });
-
             const success = await processAndEncryptVideo(episodeId, afterData.storage.rawPath, docRef);
             
             if (success) {
@@ -432,5 +432,3 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
-
-    
