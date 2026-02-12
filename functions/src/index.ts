@@ -16,7 +16,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
 // Use require for ffprobe-static to avoid TS7016 error
 const { path: ffprobePath } = require('ffprobe-static');
-import type { Episode, PipelineStatus, AiStatus } from './lib/types';
+import type { Episode, PipelineStatus } from './lib/types';
 
 
 // 0. Initialize SDKs and Constants

@@ -1,4 +1,3 @@
-
 'use server';
 
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
@@ -93,7 +92,7 @@ export interface EncryptionInfo {
 // From Spec 4.1
 export interface PipelineStatus {
     pipeline: "queued" | "processing" | "failed" | "completed";
-    step: "validate" | "ffmpeg" | "encrypt" | "verify" | "manifest" | "keys" | "done" | "idle";
+    step: "validate" | "ffmpeg" | "encrypt" | "verify" | "manifest" | "keys" | "done" | "idle" | "trigger-exception";
     playable: boolean;
     progress: number;
     jobId?: string;
