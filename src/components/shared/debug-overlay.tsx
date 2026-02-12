@@ -1,9 +1,9 @@
-
 'use client';
 
 import React, { useState } from 'react';
 import { Bug, Trash2 } from 'lucide-react';
-import { useDebugLogState, useDebugLogDispatch, type LogEntry } from '@/context/debug-log-context';
+import { useDebugLogState, useDebugLogDispatch } from '@/context/debug-log-context';
+import type { LogEntry } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
