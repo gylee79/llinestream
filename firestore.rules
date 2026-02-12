@@ -1,25 +1,9 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // --- Server-Only Collections ---
-    // Deny all client-side access to the keys. Only Admin SDK (functions, APIs) can access.
-    match /video_keys/{keyId} {
-      allow read, write: if false;
-    }
-    
-    // Allow admins to read audit logs, but no one can write them from client.
-    match /user_audit_logs/{logId} {
-        allow read: if request.auth.token.role == 'admin';
-        allow write: if false;
-    }
-
-    // --- Development Rule (Temporary) ---
-    // This allows access to all other collections during development.
-    // WARNING: Secure these rules before going to production.
     match /{document=**} {
-      allow read, write: if true; 
+      allow read, write: if true;
     }
   }
 }
