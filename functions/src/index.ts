@@ -1,8 +1,9 @@
 
 /**
- * @fileoverview Video Analysis & Encryption Pipeline (v6 - fMP4 Segment-based)
- * This version transcodes videos into fragmented MP4, splits them into segments,
+ * @fileoverview Video Analysis & Encryption Pipeline (v6.1 - fMP4 DASH Segment-based)
+ * This version transcodes videos into fragmented MP4, splits them into DASH segments,
  * and encrypts each segment individually for secure, efficient streaming.
+ * v6.1 removes `-c copy` for more robust DASH segmentation.
  */
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
@@ -147,7 +148,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         await new Promise<void>((resolve, reject) => {
             ffmpeg(fragmentedMp4Path)
                 .outputOptions([
-                    '-c copy',
+                    // '-c copy', // REMOVED for robustness. This prevents errors with non-standard files.
                     '-f dash',
                     '-seg_duration 4',
                     '-init_seg_name init.mp4',
@@ -338,6 +339,10 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
     const encryptionSuccess = await processAndEncryptVideo(episodeId, filePath, docRef);
     if (!encryptionSuccess) {
         console.error(`[${episodeId}] ❌ Halting pipeline. Video encryption failed. Original file will be kept for manual review.`);
+        await docRef.update({
+            aiProcessingStatus: "failed",
+            aiProcessingError: "비디오 암호화 단계가 실패하여 AI 분석을 건너뜁니다."
+        });
         return;
     }
 

@@ -86,7 +86,7 @@ await new Promise<void>((resolve, reject) => {
 await new Promise<void>((resolve, reject) => {
     ffmpeg(fragmentedMp4Path)
         .outputOptions([
-            '-c copy',
+            // '-c copy', // REMOVED for robustness
             '-f dash',
             '-seg_duration 4',
             '-init_seg_name init.mp4',
