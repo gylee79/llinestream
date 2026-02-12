@@ -1,3 +1,4 @@
+
 {
   "indexes": [
     {
@@ -13,14 +14,6 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "episodeId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionId": "chat_logs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
@@ -45,14 +38,6 @@
       "collectionId": "episode_view_logs",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "endedAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionId": "episode_view_logs",
-      "queryScope": "COLLECTION",
-      "fields": [
         { "fieldPath": "episodeId", "order": "ASCENDING" },
         { "fieldPath": "endedAt", "order": "DESCENDING" }
       ]
@@ -71,14 +56,6 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "episodeId", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionId": "bookmarks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
