@@ -1,4 +1,5 @@
 
+
 /**
  * @fileoverview LlineStream Video Processing Pipeline Spec v1 Implementation
  * Implements the deterministic, fail-fast video processing and AI analysis workflow.
@@ -139,15 +140,21 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         // STEP 2: FFMPEG (Transcode & Segment) - Spec 6.2
         await updatePipelineStatus(docRef, { pipeline: 'processing', step: 'ffmpeg', progress: 15, playable: false });
         const fragmentedMp4Path = path.join(tempInputDir, 'frag.mp4');
+
         await new Promise<void>((resolve, reject) => {
-            ffmpeg(localInputPath)
-                .videoCodec('libx264').audioCodec('aac')
+            const command = ffmpeg(localInputPath).videoCodec('libx264');
+            // Only add audio codec if an audio stream exists
+            if (audioStream) {
+                command.audioCodec('aac');
+            }
+            command
                 .outputOptions(['-profile:v baseline', '-level 3.0', '-pix_fmt yuv420p', '-g 48', '-keyint_min 48', '-sc_threshold 0', '-movflags frag_keyframe+empty_moov'])
                 .toFormat('mp4')
                 .on('error', (err) => reject(err))
                 .on('end', () => resolve())
                 .save(fragmentedMp4Path);
         }).catch(err => { throw { step: 'ffmpeg', error: err, hint: "Video transcoding failed." }; });
+
 
         await new Promise<void>((resolve, reject) => {
             ffmpeg(fragmentedMp4Path)
@@ -425,3 +432,5 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
+
+```
