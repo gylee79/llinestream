@@ -173,6 +173,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         
         const { getKek } = initializeTools();
         const masterKey = crypto.randomBytes(32); // Spec 6.6
+        const salt = crypto.randomBytes(16); // Generate a persistent salt for this video
         const encryptedBasePath = `episodes/${episodeId}/segments/`;
 
         for (const fileName of allSegmentsToProcess) {
@@ -213,6 +214,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         await db.collection('video_keys').doc(keyId).set({
             keyId, videoId: episodeId,
             encryptedMasterKey: encryptedMasterKeyBlob.toString('base64'),
+            salt: salt.toString('base64'), // Store the salt
             kekVersion: 1, // Spec 6.6
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
@@ -432,3 +434,4 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
+

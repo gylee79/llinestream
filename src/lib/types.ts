@@ -201,6 +201,7 @@ export interface VideoKey {
   keyId: string;
   videoId: string;
   encryptedMasterKey: string; 
+  salt: string;
   kekVersion: 1;
   createdAt: Timestamp;
 }
@@ -400,11 +401,4 @@ export type CryptoWorkerResponse =
       };
     };
 
-export type LogType = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
-
-export interface LogEntry {
-  id: string;
-  timestamp: Date;
-  type: LogType;
-  message: string;
-}
+    

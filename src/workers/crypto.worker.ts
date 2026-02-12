@@ -1,4 +1,3 @@
-
 /// <reference lib="webworker" />
 
 import type { CryptoWorkerRequest, CryptoWorkerResponse, EncryptionInfo } from '@/lib/types';
