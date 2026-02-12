@@ -437,5 +437,4 @@ const deleteStorageFileByPath = async (filePath) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
-`` `;
 //# sourceMappingURL=index.js.map

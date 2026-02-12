@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark, OfflineVideoData, CryptoWorkerResponse, PlayerState, ChatLog, ChatMessage, OfflineLicense, VideoManifest } from '@/lib/types';
@@ -22,7 +21,6 @@ import { Skeleton } from '../ui/skeleton';
 import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/bookmark-actions';
 import { Input } from '../ui/input';
 import { saveVideo } from '@/lib/offline-db';
-import { useDebugLogDispatch } from '@/context/debug-log-context';
 
 type DownloadState = 'idle' | 'checking' | 'downloading' | 'saving' | 'completed' | 'forbidden' | 'error';
 
@@ -159,7 +157,6 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
 
 const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
     const firestore = useFirestore();
-    const { addLog } = useDebugLogDispatch();
     const [isPending, startTransition] = React.useTransition();
     const [userQuestion, setUserQuestion] = React.useState('');
     const [messages, setMessages] = React.useState<ChatMessage[]>([]);
@@ -194,13 +191,12 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
             },
             (error) => {
                 console.error("ChatView snapshot listener error:", error);
-                addLog('ERROR', `AI 채팅 기록 로딩 실패: ${error.message}`);
                 setChatError("채팅 기록을 불러오는 중 오류가 발생했습니다. Firestore 인덱스가 필요할 수 있습니다.");
                 setIsLoading(false);
             }
         );
         return unsubscribe;
-    }, [user, episode.id, firestore, addLog]);
+    }, [user, episode.id, firestore]);
 
     const handleAskQuestion = () => {
         if (!userQuestion.trim() || isPending) return;
@@ -412,8 +408,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     const segmentQueueRef = React.useRef<string[]>([]);
     const currentSegmentIndexRef = React.useRef(0);
     
-    const { addLog } = useDebugLogDispatch();
-
     const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
     const { data: course } = useDoc<Course>(courseRef);
 
@@ -442,7 +436,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     };
     
     const cleanup = React.useCallback(() => {
-        addLog('INFO', 'Performing cleanup...');
         workerRef.current?.terminate();
         workerRef.current = null;
         activeRequestIdRef.current = null;
@@ -459,7 +452,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         sourceBufferRef.current = null;
         setPlayerState('idle');
 
-    }, [addLog]);
+    }, []);
 
     const startPlayback = React.useCallback(async (requestId: string) => {
         cleanup(); 
@@ -467,13 +460,13 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
         if (episode.status?.processing === 'failed') {
             setPlayerState('error-fatal');
-            setPlayerMessage(episode.status.error || '비디오 처리 중 오류 발생.');
+            setPlayerMessage(episode.status.error?.message || '비디오 처리 중 오류 발생.');
             return;
         }
 
-        if (!episode.manifestPath || !episode.encryption?.keyId || !episode.codec) {
+        if (!episode.storage.manifestPath || !episode.encryption?.keyId) {
             setPlayerState('error-fatal');
-            setPlayerMessage('필수 재생 정보(manifest, keyId, codec)가 누락되었습니다.');
+            setPlayerMessage('필수 재생 정보(manifest, keyId)가 누락되었습니다.');
             return;
         }
 
@@ -488,14 +481,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         const fetchAndProcessNextSegment = async () => {
             const sb = sourceBufferRef.current;
             if (!sb || sb.updating) {
-                if (sb?.updating) addLog('INFO', `[${currentSegmentIndexRef.current}] ⏸️ Waiting for buffer. Updating: true`);
+                if (sb?.updating) console.log(`[${currentSegmentIndexRef.current}] ⏸️ Waiting for buffer. Updating: true`);
                 return;
             }
 
             const segmentIndex = currentSegmentIndexRef.current;
             if (segmentIndex >= segmentQueueRef.current.length) {
                 if (ms.readyState === 'open' && !sb.updating) {
-                    addLog('SUCCESS', '🏁 All segments appended. Ending stream.');
+                    console.log('🏁 All segments appended. Ending stream.');
                     ms.endOfStream();
                 }
                 return;
@@ -503,7 +496,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             try {
                 const segmentPath = segmentQueueRef.current[segmentIndex];
-                addLog('INFO', `[${segmentIndex}] ➡️ Fetching segment: ${segmentPath}`);
+                console.log(`[${segmentIndex}] ➡️ Fetching segment: ${segmentPath}`);
                 const token = await authUser?.getIdToken();
                 const url = await getSignedUrl(token!, episode.id, segmentPath);
                 const res = await fetch(url);
@@ -511,11 +504,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
                 workerRef.current?.postMessage({
                   type: 'DECRYPT_SEGMENT',
-                  payload: { requestId: `${requestId}-${segmentIndex}`, encryptedSegment, derivedKeyB64: (window as any).__DERIVED_KEY__, encryption: episode.encryption }
+                  payload: { requestId: `${requestId}-${segmentIndex}`, encryptedSegment, derivedKeyB64: (window as any).__DERIVED_KEY__, encryption: episode.encryption, storagePath: segmentPath }
                 });
             } catch (e: any) {
                 console.error(`Error fetching segment ${segmentIndex}:`, e);
-                addLog('ERROR', `Segment fetch failed: ${e.message}`);
             }
         };
 
@@ -531,11 +523,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         return;
                     }
                     try {
-                        addLog('INFO', `[${currentSegmentIndexRef.current}] 🟢 Appending segment...`);
+                        console.log(`[${currentSegmentIndexRef.current}] 🟢 Appending segment...`);
                         sb?.appendBuffer(decryptedSegment);
                     } catch (e: any) {
                         console.error("🔴 appendBuffer error:", e);
-                        addLog('ERROR', `appendBuffer failed: ${e.message}`);
                         setPlayerState('error-fatal');
                         setPlayerMessage(`미디어 버퍼 추가 실패: ${e.message}`);
                     }
@@ -543,17 +534,16 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 append();
 
             } else {
-                addLog('ERROR', `Decryption failed: ${payload.message}`);
                 setPlayerState('error-fatal');
                 setPlayerMessage(`복호화 실패: ${payload.message}`);
             }
         };
         
         ms.addEventListener('sourceopen', async () => {
-            addLog('INFO', `🔌 MediaSource state: ${ms.readyState}`);
+            console.log(`🔌 MediaSource state: ${ms.readyState}`);
             
-            ms.addEventListener('sourceended', () => addLog('INFO','🔌 MediaSource state: ended'));
-            ms.addEventListener('sourceclose', () => addLog('INFO','🔌 MediaSource state: closed'));
+            ms.addEventListener('sourceended', () => console.log('🔌 MediaSource state: ended'));
+            ms.addEventListener('sourceclose', () => console.log('🔌 MediaSource state: closed'));
             
             try {
                 let manifest: VideoManifest;
@@ -574,16 +564,16 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     setWatermarkSeed(sessionData.watermarkSeed);
                     (window as any).__DERIVED_KEY__ = derivedKeyB64;
 
-                    addLog('INFO', 'Fetching manifest...');
-                    const manifestUrl = await getSignedUrl(token, episode.id, episode.manifestPath!);
+                    console.log('Fetching manifest...');
+                    const manifestUrl = await getSignedUrl(token, episode.id, episode.storage.manifestPath!);
                     const manifestRes = await fetch(manifestUrl);
                     manifest = await manifestRes.json();
                 }
 
                 const mimeCodec = manifest.codec;
-                addLog('INFO', `💡 Codec: ${mimeCodec}`);
+                console.log(`💡 Codec: ${mimeCodec}`);
                 const isSupported = MediaSource.isTypeSupported(mimeCodec);
-                addLog('INFO', `💡 isTypeSupported: ${isSupported}`);
+                console.log(`💡 isTypeSupported: ${isSupported}`);
 
                 if (!isSupported) {
                     throw new Error(`코덱을 지원하지 않습니다: ${mimeCodec}`);
@@ -594,13 +584,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
                 sourceBuffer.addEventListener('error', (e) => {
                     console.error("❌ SourceBuffer Error:", e);
-                    addLog('ERROR', `SourceBuffer Error: ${e.toString()}`);
                 });
 
                 sourceBuffer.addEventListener('updateend', () => {
                     const sb = sourceBufferRef.current;
                     if (!sb) return;
-                    addLog('SUCCESS', `[${currentSegmentIndexRef.current}] ✅ Append complete.`);
+                    console.log(`[${currentSegmentIndexRef.current}] ✅ Append complete.`);
                     currentSegmentIndexRef.current++;
                     fetchAndProcessNextSegment();
                 });
@@ -612,13 +601,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             } catch (e: any) {
                 console.error("Playback setup failed:", e);
-                addLog('ERROR', `Playback setup failed: ${e.message}`);
                 setPlayerState('error-fatal');
                 setPlayerMessage(e.message);
             }
         });
 
-    }, [cleanup, offlineVideoData, authUser, episode, addLog]);
+    }, [cleanup, offlineVideoData, authUser, episode]);
 
     React.useEffect(() => {
         if (isOpen && videoRef.current) {
