@@ -135,7 +135,13 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         const audioStream = probeData.streams.find(s => s.codec_type === 'audio');
         if (!videoStream) throw { step: 'validate', error: new Error("No video stream found.") };
         const duration = probeData.format.duration || 0;
-        const codecString = `video/mp4; codecs="${videoStream.codec_tag_string}, ${audioStream?.codec_tag_string || 'mp4a.40.2'}"`;
+        
+        // Construct codec string reliably
+        const videoCodec = 'avc1.42E01E'; // H.264 Baseline Profile Level 3.0
+        const audioCodec = 'mp4a.40.2';   // AAC
+        const codecString = audioStream
+            ? `video/mp4; codecs="${videoCodec}, ${audioCodec}"`
+            : `video/mp4; codecs="${videoCodec}"`;
 
         // STEP 2: FFMPEG (Transcode & Segment) - Spec 6.2
         await updatePipelineStatus(docRef, { pipeline: 'processing', step: 'ffmpeg', progress: 15, playable: false });
@@ -173,7 +179,6 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         
         const { getKek } = initializeTools();
         const masterKey = crypto.randomBytes(32); // Spec 6.6
-        const salt = crypto.randomBytes(16); // Generate a persistent salt for this video
         const encryptedBasePath = `episodes/${episodeId}/segments/`;
 
         for (const fileName of allSegmentsToProcess) {
@@ -214,7 +219,6 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         await db.collection('video_keys').doc(keyId).set({
             keyId, videoId: episodeId,
             encryptedMasterKey: encryptedMasterKeyBlob.toString('base64'),
-            salt: salt.toString('base64'), // Store the salt
             kekVersion: 1, // Spec 6.6
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
@@ -379,11 +383,13 @@ export const videoPipelineTrigger = onDocumentWritten("episodes/{episodeId}", as
                 await runAiAnalysis(episodeId, docRef, updatedData);
             }
             
+            // After all processing is awaited, check final status and delete raw file.
             const finalDoc = await docRef.get();
             const finalData = finalDoc.data() as Episode;
             if (finalData.status.pipeline === 'completed' && (finalData.ai.status === 'completed' || finalData.ai.status === 'blocked')) {
                 if (finalData.storage.rawPath) {
                     await deleteStorageFileByPath(finalData.storage.rawPath);
+                    await docRef.update({ 'storage.rawPath': admin.firestore.FieldValue.delete() });
                     console.log(`[${episodeId}] ✅ All jobs finished. Original file deleted.`);
                 }
             } else {
@@ -434,4 +440,5 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
+
 

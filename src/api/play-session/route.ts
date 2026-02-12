@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -60,17 +61,14 @@ export async function POST(req: NextRequest) {
     const videoKeyData = keyDoc.data() as VideoKey;
     const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
 
-    // 5. Generate a Derived Key for online session
+    // 5. Generate a session ID and Watermark Seed
     const sessionId = `online_sess_${crypto.randomBytes(12).toString('hex')}`;
-    const info = Buffer.from(`LSV_ONLINE_V1${userId}${deviceId}${sessionId}`);
-    const salt = crypto.randomBytes(16); // Temporary salt for this session's derivation
-    const derivedKey = crypto.hkdfSync('sha256', masterKey, salt, info, 32);
-    const derivedKeyB64 = Buffer.from(derivedKey).toString('base64');
-    
-    // 6. Generate Watermark Seed - Spec 13.2
     const watermarkSeed = crypto.createHash('sha256').update(`${userId}|${videoId}|${deviceId}|${sessionId}`).digest('hex');
+    
+    // CRITICAL FIX: Send the actual masterKey for decryption, not a derived one.
+    const derivedKeyB64 = masterKey.toString('base64');
 
-    // 7. Return Session Info - Spec 13.3
+    // 7. Return Session Info
     return NextResponse.json({
       sessionId: sessionId,
       derivedKeyB64: derivedKeyB64,

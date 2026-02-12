@@ -1,3 +1,4 @@
+
 'use server';
 
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
@@ -201,7 +202,6 @@ export interface VideoKey {
   keyId: string;
   videoId: string;
   encryptedMasterKey: string; 
-  salt: string;
   kekVersion: 1;
   createdAt: Timestamp;
 }
@@ -352,6 +352,7 @@ export interface OfflineLicense {
   // This signature is crucial but requires a server private key.
   // The client must verify it with a public key.
   signature: string; 
+  offlineDerivedKey: string;
 }
 
 

@@ -1,3 +1,4 @@
+
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -78,26 +79,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not Found: Encryption key not found for this video' }, { status: 404 });
     }
     const videoKeyData = keyDoc.data() as VideoKey;
-    if (!videoKeyData.encryptedMasterKey || !videoKeyData.salt) {
-        return NextResponse.json({ error: 'Internal Server Error: Master key or salt is missing from key data.' }, { status: 500 });
+    if (!videoKeyData.encryptedMasterKey) {
+        return NextResponse.json({ error: 'Internal Server Error: Master key is missing from key data.' }, { status: 500 });
     }
     const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
-    const salt = Buffer.from(videoKeyData.salt, 'base64');
 
-    // 5. Generate Offline Derived Key using HKDF
+    // 5. Generate Signature for the license
     const issuedAt = Date.now();
     const expiresAt = add(issuedAt, { days: 7 }).getTime();
-    const info = Buffer.from(`LSV_OFFLINE_V1${userId}${deviceId}${expiresAt}`);
-    const offlineDerivedKey = crypto.hkdfSync('sha256', masterKey, salt, info, 32);
-    
-    // 6. Generate Signature for the license
     const signaturePayload = JSON.stringify({ videoId, userId, deviceId, expiresAt });
     // In a real scenario, use a private key for signing
     // For this example, we'll use a HMAC with a secret from env.
     const signature = crypto.createHmac('sha256', await loadKEK()).update(signaturePayload).digest('hex');
 
-    // 7. Construct and return Offline License
-    const license: Omit<OfflineLicense, 'signature'> & { signature: string } = {
+    // 6. Construct and return Offline License
+    const license: Omit<OfflineLicense, 'signature' | 'offlineDerivedKey'> & { signature: string } = {
       videoId,
       userId,
       deviceId,
@@ -112,9 +108,10 @@ export async function POST(req: NextRequest) {
       signature: signature,
     };
 
+    // CRITICAL FIX: Send the actual masterKey for decryption, not a derived one.
     return NextResponse.json({
         ...license,
-        offlineDerivedKey: Buffer.from(offlineDerivedKey).toString('base64'),
+        offlineDerivedKey: masterKey.toString('base64'),
     });
 
   } catch (error) {
@@ -124,3 +121,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Internal Server Error: ${errorMessage}` }, { status: 500 });
   }
 }
+
