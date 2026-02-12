@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
@@ -401,11 +402,4 @@ export type CryptoWorkerResponse =
       };
     };
 
-export type LogType = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
-
-export interface LogEntry {
-  id: string;
-  timestamp: Date;
-  type: LogType;
-  message: string;
-}
+    
