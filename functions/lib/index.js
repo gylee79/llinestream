@@ -165,8 +165,12 @@ async function processAndEncryptVideo(episodeId, inputFilePath, docRef) {
         await updatePipelineStatus(docRef, { pipeline: 'processing', step: 'ffmpeg', progress: 15, playable: false });
         const fragmentedMp4Path = path.join(tempInputDir, 'frag.mp4');
         await new Promise((resolve, reject) => {
-            (0, fluent_ffmpeg_1.default)(localInputPath)
-                .videoCodec('libx264').audioCodec('aac')
+            const command = (0, fluent_ffmpeg_1.default)(localInputPath).videoCodec('libx264');
+            // Only add audio codec if an audio stream exists
+            if (audioStream) {
+                command.audioCodec('aac');
+            }
+            command
                 .outputOptions(['-profile:v baseline', '-level 3.0', '-pix_fmt yuv420p', '-g 48', '-keyint_min 48', '-sc_threshold 0', '-movflags frag_keyframe+empty_moov'])
                 .toFormat('mp4')
                 .on('error', (err) => reject(err))
@@ -433,4 +437,5 @@ const deleteStorageFileByPath = async (filePath) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
+`` `;
 //# sourceMappingURL=index.js.map
