@@ -111,8 +111,8 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             thumbnails: {
                 default: defaultThumbnailUrl,
                 defaultPath: defaultThumbnailPath,
-                custom: customThumbnailUrl || undefined,
-                customPath: customThumbnailPath || undefined,
+                custom: customThumbnailUrl || null,
+                customPath: customThumbnailPath || null,
             },
             thumbnailUrl: customThumbnailUrl || defaultThumbnailUrl,
 
@@ -201,8 +201,8 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
 
         if (newCustomThumbnailData) { // This handles both new upload and deletion (null)
             await deleteStorageFileByPath(storage, currentData.thumbnails.customPath);
-            dataToUpdate['thumbnails.custom'] = newCustomThumbnailData.downloadUrl ?? undefined;
-            dataToUpdate['thumbnails.customPath'] = newCustomThumbnailData.filePath ?? undefined;
+            dataToUpdate['thumbnails.custom'] = newCustomThumbnailData.downloadUrl ?? null;
+            dataToUpdate['thumbnails.customPath'] = newCustomThumbnailData.filePath ?? null;
         }
         
         // Update the master thumbnailUrl

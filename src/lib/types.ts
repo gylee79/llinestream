@@ -158,8 +158,8 @@ export interface Episode {
   thumbnails: {
       default: string; // URL
       defaultPath: string;
-      custom?: string; // URL
-      customPath?: string;
+      custom?: string | null; // URL
+      customPath?: string | null;
   };
   thumbnailUrl: string; // Keep for simple display logic (denormalized from custom or default)
 
