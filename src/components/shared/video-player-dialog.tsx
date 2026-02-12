@@ -458,7 +458,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         cleanup(); 
         activeRequestIdRef.current = requestId;
 
-        if (episode.status?.processing === 'failed') {
+        if (episode.status?.pipeline === 'failed') {
             setPlayerState('error-fatal');
             setPlayerMessage(episode.status.error?.message || '비디오 처리 중 오류 발생.');
             return;
@@ -502,6 +502,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 const res = await fetch(url);
                 const encryptedSegment = await res.arrayBuffer();
 
+                // CRITICAL: AAD Verification
+                // The 'storagePath' sent to the worker MUST EXACTLY MATCH the path used
+                // on the server to generate the AAD during encryption.
+                // The server uses `path:${storagePath}`. We pass the segmentPath from the manifest.
                 workerRef.current?.postMessage({
                   type: 'DECRYPT_SEGMENT',
                   payload: { requestId: `${requestId}-${segmentIndex}`, encryptedSegment, derivedKeyB64: (window as any).__DERIVED_KEY__, encryption: episode.encryption, storagePath: segmentPath }
