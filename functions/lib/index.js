@@ -197,8 +197,8 @@ async function processAndEncryptVideo(episodeId, inputFilePath, docRef) {
         const mediaSegmentNames = createdFiles
             .filter(f => f.startsWith('segment_') && f.endsWith('.m4s'))
             .sort((a, b) => {
-            const numA = parseInt(a.match(/(\d+)/)?.[0] || '0');
-            const numB = parseInt(b.match(/(\d+)/)?.[0] || '0');
+            const numA = parseInt(a.match(/(\\d+)/)?.[0] || '0');
+            const numB = parseInt(b.match(/(\\d+)/)?.[0] || '0');
             return numA - numB;
         });
         if (DEBUG)
@@ -289,6 +289,7 @@ async function processAndEncryptVideo(episodeId, inputFilePath, docRef) {
             'status.error': null,
         });
         console.log(`[${episodeId}] ✅ Processing complete. Manifest created at ${manifestPath}`);
+        return true;
     }
     catch (error) {
         console.error(`[${episodeId}] ❌ Video processing failed:`, error);
@@ -297,6 +298,7 @@ async function processAndEncryptVideo(episodeId, inputFilePath, docRef) {
             'status.playable': false,
             'status.error': error.message || 'An unknown error occurred during video processing.'
         });
+        return false;
     }
     finally {
         await fs.rm(tempInputDir, { recursive: true, force: true });
@@ -331,14 +333,23 @@ exports.analyzeVideoOnWrite = (0, firestore_1.onDocumentWritten)("episodes/{epis
         });
         return;
     }
-    await processAndEncryptVideo(episodeId, filePath, docRef);
-    await runAiAnalysis(episodeId, filePath, docRef);
+    const encryptionSuccess = await processAndEncryptVideo(episodeId, filePath, docRef);
+    if (!encryptionSuccess) {
+        console.error(`[${episodeId}] ❌ Halting pipeline. Video encryption failed. Original file will be kept for manual review.`);
+        return;
+    }
+    const aiSuccess = await runAiAnalysis(episodeId, filePath, docRef);
+    if (!aiSuccess) {
+        console.error(`[${episodeId}] ❌ Halting pipeline. AI analysis failed. Original file will be kept for manual review.`);
+        return;
+    }
+    // This part only runs if BOTH previous steps succeeded.
     console.log(`[${episodeId}] Deleting original source file: ${filePath}`);
     await deleteStorageFileByPath(filePath);
     console.log(`✅ [${episodeId}] All jobs finished.`);
 });
 async function runAiAnalysis(episodeId, filePath, docRef) {
-    const modelName = "gemini-1.5-flash-latest";
+    const modelName = "gemini-3-flash-preview";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), `ai-in-${episodeId}`);
@@ -402,6 +413,7 @@ async function runAiAnalysis(episodeId, filePath, docRef) {
             aiProcessingError: null,
         });
         console.log(`[${episodeId}] ✅ AI analysis succeeded!`);
+        return true;
     }
     catch (error) {
         console.error(`❌ [${episodeId}] AI analysis failed.`, error);
@@ -409,6 +421,7 @@ async function runAiAnalysis(episodeId, filePath, docRef) {
             aiProcessingStatus: "failed",
             aiProcessingError: error.message || String(error),
         });
+        return false;
     }
     finally {
         if (uploadedFile) {
