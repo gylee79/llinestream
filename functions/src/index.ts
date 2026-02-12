@@ -355,7 +355,7 @@ export const analyzeVideoOnWrite = onDocumentWritten("episodes/{episodeId}", asy
 
 
 export async function runAiAnalysis(episodeId: string, filePath: string, docRef: admin.firestore.DocumentReference) {
-    const modelName = "gemini-3-flash-preview";
+    const modelName = "gemini-1.5-flash-latest";
     console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
     
     const { genAI: localGenAI, fileManager: localFileManager } = initializeTools();
@@ -477,3 +477,5 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
+
+    
