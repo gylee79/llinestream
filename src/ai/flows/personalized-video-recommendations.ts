@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview This file implements the personalized video recommendations flow.
@@ -62,7 +61,7 @@ const videoRecommendationFlow = ai.defineFlow(
     name: 'videoRecommendationFlow',
     inputSchema: VideoRecommendationInputSchema,
     outputSchema: VideoRecommendationOutputSchema,
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.5-flash',
     tools: [trendingContentTool],
     prompt: `You are a video recommendation expert.
 

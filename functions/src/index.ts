@@ -252,7 +252,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
 // 3. AI Analysis Pipeline
 // ===============================================
 export async function runAiAnalysis(episodeId: string, docRef: admin.firestore.DocumentReference, episodeData: Episode): Promise<boolean> {
-    const modelName = "gemini-3-flash-preview"; // From SYSTEM_RULES.md
+    const modelName = "gemini-2.5-flash"; // From SYSTEM_RULES.md
     
     // --- SAFETY CHECK: Entire function wrapped in a try...catch block ---
     try {
@@ -434,4 +434,3 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
-

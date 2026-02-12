@@ -109,7 +109,7 @@ const videoTutorFlow = ai.defineFlow(
 
       // 3. Generate the answer using Gemini with the constructed context
       const llmResponse = await ai.generate({
-        model: googleAI.model('gemini-3-flash-preview'),
+        model: googleAI.model('gemini-2.5-flash'),
         system: `You are a friendly and helpful Korean AI Tutor. You MUST answer all questions in Korean.
         You will be given a full video transcript as context.
         The user is currently watching the episode titled '${episodeData.title}'.
