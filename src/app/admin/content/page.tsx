@@ -1,3 +1,4 @@
+'use client';
 
 import ContentTabs from "@/components/admin/content/content-tabs";
 
