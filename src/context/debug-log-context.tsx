@@ -65,9 +65,10 @@ export const DebugLogProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const dispatchValue = useMemo(() => ({ addLog, clearLogs }), [addLog, clearLogs]);
+  const stateValue = useMemo(() => ({ logs }), [logs]);
 
   return (
-    <DebugLogStateContext.Provider value={{ logs }}>
+    <DebugLogStateContext.Provider value={stateValue}>
       <DebugLogDispatchContext.Provider value={dispatchValue}>
         {children}
       </DebugLogDispatchContext.Provider>
