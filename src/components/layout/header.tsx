@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -52,9 +51,6 @@ import type { FooterSettings } from '@/lib/types';
 import { doc } from 'firebase/firestore';
 import ProfileDialog from '@/components/profile/profile-dialog';
 import BillingDialog from '@/components/profile/billing-dialog';
-import { useLandingPage } from '@/context/landing-page-context';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 
 const adminLink = { href: '/admin', label: '관리자', icon: Shield };
 
@@ -75,23 +71,12 @@ export default function Header() {
   const { data: settings } = useDoc<FooterSettings>(footerRef);
   const appName = settings?.appName || 'LlineStream';
   
-  const { preference, togglePreference } = useLandingPage();
-
-  const navLinks =
-    preference === 'about'
-      ? [ // Homepage version
-          { href: '/', label: '홈', icon: Home },
-          { href: '/about', label: '동영상강의', icon: BookOpen },
-          { href: '/contents', label: '영상 콘텐츠', icon: Clapperboard },
-          { href: '/pricing', label: '가격 안내', icon: CreditCard },
-        ]
-      : [ // App version
-          { href: '/', label: '홈', icon: Home },
-          { href: '/contents', label: '영상 콘텐츠', icon: Clapperboard },
-          { href: '/pricing', label: '가격 안내', icon: CreditCard },
-          { href: '/about', label: '아카데미소개', icon: Info },
-        ];
-
+  const navLinks = [
+    { href: '/', label: '홈', icon: Home },
+    { href: '/contents', label: '영상 콘텐츠', icon: Clapperboard },
+    { href: '/pricing', label: '가격 안내', icon: CreditCard },
+    { href: '/about', label: '아카데미소개', icon: Info },
+  ];
 
   const handleLogout = async () => {
     if (auth) {
@@ -167,9 +152,6 @@ export default function Header() {
           </div>
 
           <div className="flex items-center justify-end space-x-2 md:space-x-4">
-            <div className="flex items-center text-xs text-muted-foreground">
-              {preference === 'about' ? '홈페이지 버전' : '강의앱 버전'}
-            </div>
             
             {isUserLoading ? (
               <Avatar className="h-8 w-8">
@@ -202,19 +184,6 @@ export default function Header() {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
-                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                      <div className="flex w-full items-center justify-between">
-                        <Label htmlFor="header-landing-page-switch" className="flex cursor-pointer items-center gap-2 text-sm font-normal">
-                          <Settings className="h-4 w-4" />
-                          <span>{preference === 'original' ? '홈페이지로 전환' : '강의앱으로 전환'}</span>
-                        </Label>
-                        <Switch
-                          id="header-landing-page-switch"
-                          checked={preference === 'original'}
-                          onCheckedChange={togglePreference}
-                        />
-                      </div>
-                    </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => router.push('/my-courses')}>
                         <BookUser className="mr-2 h-4 w-4" />
                         <span>나의 강의실</span>
