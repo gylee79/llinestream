@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Bad Request: videoId and deviceId are required' }, { status: 400 });
     }
 
-    // 3. Verify User Subscription
+    // 3. Verify User Subscription & Video Playability
     const userDoc = await db.collection('users').doc(userId).get();
     if (!userDoc.exists) return NextResponse.json({ error: 'Forbidden: User not found' }, { status: 403 });
     const userData = userDoc.data() as User;
@@ -39,8 +39,12 @@ export async function POST(req: NextRequest) {
     if (!episodeDoc.exists) return NextResponse.json({ error: 'Not Found: Video not found' }, { status: 404 });
     const episodeData = episodeDoc.data() as Episode;
     
+    if (!episodeData.status.playable) {
+        return NextResponse.json({ error: `Forbidden: Video is not playable. Current status: ${episodeData.status.pipeline}` }, { status: 403 });
+    }
+
     const subscription = userData.activeSubscriptions?.[episodeData.courseId];
-    const isSubscribed = subscription && new Date() < toJSDate(subscription.expiresAt)!;
+    const isSubscribed = subscription && new Date() < (toJSDate(subscription.expiresAt) || new Date(0));
 
     if (!isSubscribed && !episodeData.isFree) {
        return NextResponse.json({ error: 'Forbidden: Subscription required' }, { status: 403 });
@@ -56,28 +60,19 @@ export async function POST(req: NextRequest) {
     const videoKeyData = keyDoc.data() as VideoKey;
     const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
 
-    // 5. Generate a Derived Key for online session (no longer needs salt from DB)
+    // 5. Generate a session ID and Watermark Seed
     const sessionId = `online_sess_${crypto.randomBytes(12).toString('hex')}`;
-    const info = Buffer.from(`LSV_ONLINE_V1${userId}${deviceId}${sessionId}`);
+    const watermarkSeed = crypto.createHash('sha256').update(`${userId}|${videoId}|${deviceId}|${sessionId}`).digest('hex');
     
-    // For segment-based encryption, we will send the master key itself for the session,
-    // as each segment has its own IV. HKDF is not strictly needed here anymore, but
-    // we keep it for consistency with offline and to prevent direct master key exposure.
-    const salt = crypto.randomBytes(16); // Generate a temporary salt for this session's derivation
-    const derivedKey = crypto.hkdfSync('sha256', masterKey, salt, info, 32);
-    const derivedKeyB64 = Buffer.from(derivedKey).toString('base64');
-    
-    // 6. Generate Watermark Seed
-    const watermarkSeed = crypto.createHash('sha256').update(userId + videoId + deviceId).digest('hex');
+    // CRITICAL FIX: Send the actual masterKey for decryption, not a derived one.
+    const derivedKeyB64 = masterKey.toString('base64');
 
     // 7. Return Session Info
     return NextResponse.json({
       sessionId: sessionId,
       derivedKeyB64: derivedKeyB64,
       expiresAt: Date.now() + 3600 * 1000,
-      scope: 'ONLINE_STREAM_ONLY',
       watermarkSeed: watermarkSeed,
-      watermarkMode: "normal",
     });
 
   } catch (error) {
@@ -86,4 +81,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Internal Server Error: ${errorMessage}` }, { status: 500 });
   }
 }
-

@@ -1,5 +1,4 @@
 
-
 /**
  * @fileoverview LlineStream Video Processing Pipeline Spec v1 Implementation
  * Implements the deterministic, fail-fast video processing and AI analysis workflow.
@@ -440,5 +439,3 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
         console.error(`Could not delete storage file at path ${filePath}.`, error);
     }
 };
-
-

@@ -10,7 +10,6 @@ import { add } from 'date-fns';
 
 export async function POST(req: NextRequest) {
   // This log is added to force a new deployment and refresh environment variables.
-  console.log('[App Hosting] Forcing environment variable refresh via new deployment.');
   console.log(`[API /api/offline-license] Received request at ${new Date().toISOString()}`);
   try {
     // Attempt to load the KEK early to fail fast if it's not configured.
@@ -83,32 +82,36 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Internal Server Error: Master key is missing from key data.' }, { status: 500 });
     }
     const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
-    const salt = Buffer.from(videoKeyData.salt, 'base64');
 
-    // 5. Generate Offline Derived Key using HKDF with a structured info (v5.3 Spec)
+    // 5. Generate Signature for the license
     const issuedAt = Date.now();
     const expiresAt = add(issuedAt, { days: 7 }).getTime();
-    const info = Buffer.from(`LSV_OFFLINE_V1${userId}${deviceId}${expiresAt}`); // As per spec
-    const offlineDerivedKey = crypto.hkdfSync('sha256', masterKey, salt, info, 32);
-    
-    // 6. Generate Watermark Seed
-    const watermarkSeed = crypto.createHash('sha256').update(userId + videoId + deviceId).digest('hex');
+    const signaturePayload = JSON.stringify({ videoId, userId, deviceId, expiresAt });
+    // In a real scenario, use a private key for signing
+    // For this example, we'll use a HMAC with a secret from env.
+    const signature = crypto.createHmac('sha256', await loadKEK()).update(signaturePayload).digest('hex');
 
-    // 7. Construct and return Offline License (v5.3 FINAL spec)
-    const license: OfflineLicense = {
+    // 6. Construct and return Offline License
+    const license: Omit<OfflineLicense, 'signature' | 'offlineDerivedKey'> & { signature: string } = {
       videoId,
       userId,
       deviceId,
       issuedAt,
       expiresAt,
-      lastCheckedAt: issuedAt, // Initialize with issuedAt
-      scope: 'OFFLINE_PLAYBACK', // CRITICAL: Explicit Scope
-      watermarkSeed,
-      watermarkMode: "normal", // Default, server can change based on risk
-      offlineDerivedKey: Buffer.from(offlineDerivedKey).toString('base64'),
+      keyId: videoKeyData.keyId,
+      kekVersion: videoKeyData.kekVersion,
+      policy: {
+          maxDevices: 1,
+          allowScreenCapture: false
+      },
+      signature: signature,
     };
 
-    return NextResponse.json(license);
+    // CRITICAL FIX: Send the actual masterKey for decryption, not a derived one.
+    return NextResponse.json({
+        ...license,
+        offlineDerivedKey: masterKey.toString('base64'),
+    });
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown server error';

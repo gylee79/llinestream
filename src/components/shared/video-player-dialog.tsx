@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark, OfflineVideoData, CryptoWorkerResponse, PlayerState, ChatLog, ChatMessage, OfflineLicense, VideoManifest } from '@/lib/types';
@@ -21,6 +22,8 @@ import { Skeleton } from '../ui/skeleton';
 import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/bookmark-actions';
 import { Input } from '../ui/input';
 import { saveVideo } from '@/lib/offline-db';
+import { getSignedUrl as getSignedUrlAction } from '@/lib/actions/get-signed-url';
+
 
 type DownloadState = 'idle' | 'checking' | 'downloading' | 'saving' | 'completed' | 'forbidden' | 'error';
 
@@ -78,7 +81,7 @@ const DownloadButton = ({
 };
 
 const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSeconds: number) => void; }) => {
-    if (episode.aiProcessingStatus === 'failed') {
+    if (episode.ai.status === 'failed') {
         return (
             <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
                 <AlertTriangle className="h-12 w-12 text-destructive" />
@@ -86,9 +89,9 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
                 <p className="text-sm text-muted-foreground mt-2 break-keep">
                     강의 요약 및 타임라인을 생성하지 못했습니다.
                 </p>
-                {episode.aiProcessingError && (
+                {episode.ai.error?.message && (
                     <p className="text-xs text-muted-foreground mt-2 break-keep max-w-sm p-2 bg-destructive/10 rounded-md">
-                        오류 원인: {episode.aiProcessingError}
+                        오류 원인: {episode.ai.error.message}
                     </p>
                 )}
                  <p className="text-xs text-muted-foreground mt-4 break-keep">
@@ -98,7 +101,12 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
         );
     }
     
-    if (episode.aiProcessingStatus !== 'completed' || !episode.aiGeneratedContent) {
+    // @ts-ignore - ai.resultPaths may not exist in all Episode types from history
+    const aiContentString = episode.ai.resultPaths?.summary;
+    // @ts-ignore
+    const aiContent = aiContentString ? JSON.parse(aiContentString) : null;
+    
+    if (episode.ai.status !== 'completed' || !aiContent) {
         return (
             <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
                 <Loader className="h-12 w-12 text-muted-foreground animate-spin" />
@@ -108,7 +116,7 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
     }
     
     try {
-        const data = JSON.parse(episode.aiGeneratedContent);
+        const data = aiContent;
         
         const parseTimeToSeconds = (timeStr: string): number => {
             if (!timeStr) return 0;
@@ -162,7 +170,7 @@ const ChatView = ({ episode, user }: { episode: Episode; user: any }) => {
     const [messages, setMessages] = React.useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [chatError, setChatError] = React.useState<string | null>(null);
-    const isAIAvailable = episode.aiProcessingStatus === 'completed';
+    const isAIAvailable = episode.ai.status === 'completed';
 
     React.useEffect(() => {
         if (!user || !firestore) return;
@@ -421,17 +429,60 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     };
 
     const handleDownload = React.useCallback(async () => {
-        // ... (Download logic remains the same)
+        if (!authUser || !course) {
+            setDownloadDisabledReason('사용자 또는 강좌 정보를 불러올 수 없습니다.');
+            setDownloadState('forbidden');
+            return;
+        }
+
+        setDownloadState('checking');
+        try {
+            const token = await authUser.getIdToken();
+            const res = await fetch('/api/offline-license', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+                body: JSON.stringify({ videoId: episode.id, deviceId: 'web-offline-v1' })
+            });
+
+            if (!res.ok) {
+                const { error } = await res.json();
+                throw new Error(error || '라이선스 발급에 실패했습니다.');
+            }
+            const license: OfflineLicense = await res.json();
+            
+            setDownloadState('downloading');
+            const manifestRes = await getSignedUrlAction(token, episode.id, episode.storage.manifestPath);
+            if (manifestRes.error) throw new Error(manifestRes.error);
+            
+            const manifestData: VideoManifest = await (await fetch(manifestRes.signedUrl!)).json();
+
+            setDownloadState('saving');
+            const dataToSave: OfflineVideoData = {
+                episode,
+                courseName: course.name,
+                downloadedAt: new Date(),
+                license,
+                manifest: manifestData,
+                segments: new Map() // Segments will be fetched and added by saveVideo
+            };
+            await saveVideo(dataToSave);
+
+            setDownloadState('completed');
+            toast({ title: '저장 완료', description: `'${episode.title}'을(를) 오프라인으로 저장했습니다.` });
+
+        } catch (error: any) {
+            console.error("Download failed:", error);
+            setDownloadState('error');
+            setDownloadDisabledReason(error.message);
+            toast({ variant: 'destructive', title: '저장 실패', description: error.message });
+        }
     }, [authUser, course, episode, toast]);
 
     const getSignedUrl = async (token: string, videoId: string, fileName: string) => {
-        const res = await fetch('/api/video-url', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ videoId, fileName }),
-        });
-        if (!res.ok) throw new Error(`URL 요청 실패 (${fileName}): ${res.statusText}`);
-        const { signedUrl } = await res.json();
+        const { signedUrl, error } = await getSignedUrlAction(token, videoId, fileName);
+        if (error || !signedUrl) {
+            throw new Error(`URL 요청 실패 (${fileName}): ${error || 'Unknown error'}`);
+        }
         return signedUrl;
     };
     
@@ -481,14 +532,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         const fetchAndProcessNextSegment = async () => {
             const sb = sourceBufferRef.current;
             if (!sb || sb.updating) {
-                if (sb?.updating) console.log(`[${currentSegmentIndexRef.current}] ⏸️ Waiting for buffer. Updating: true`);
                 return;
             }
 
             const segmentIndex = currentSegmentIndexRef.current;
             if (segmentIndex >= segmentQueueRef.current.length) {
                 if (ms.readyState === 'open' && !sb.updating) {
-                    console.log('🏁 All segments appended. Ending stream.');
                     ms.endOfStream();
                 }
                 return;
@@ -496,19 +545,29 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
             try {
                 const segmentPath = segmentQueueRef.current[segmentIndex];
-                console.log(`[${segmentIndex}] ➡️ Fetching segment: ${segmentPath}`);
-                const token = await authUser?.getIdToken();
-                const url = await getSignedUrl(token!, episode.id, segmentPath);
-                const res = await fetch(url);
-                const encryptedSegment = await res.arrayBuffer();
-
-                // CRITICAL: AAD Verification
-                // The 'storagePath' sent to the worker MUST EXACTLY MATCH the path used
-                // on the server to generate the AAD during encryption.
-                // The server uses `path:${storagePath}`. We pass the segmentPath from the manifest.
+                
+                let segmentBuffer: ArrayBuffer;
+                if(offlineVideoData) {
+                    segmentBuffer = offlineVideoData.segments.get(segmentPath)!;
+                    if(!segmentBuffer) throw new Error(`Offline segment not found: ${segmentPath}`);
+                } else {
+                    const token = await authUser?.getIdToken();
+                    const url = await getSignedUrl(token!, episode.id, segmentPath);
+                    const res = await fetch(url);
+                    segmentBuffer = await res.arrayBuffer();
+                }
+                
+                // CRITICAL: The 'storagePath' for AAD verification must EXACTLY match the path
+                // used on the server during encryption. Here, we pass the 'path' from the manifest.
                 workerRef.current?.postMessage({
                   type: 'DECRYPT_SEGMENT',
-                  payload: { requestId: `${requestId}-${segmentIndex}`, encryptedSegment, derivedKeyB64: (window as any).__DERIVED_KEY__, encryption: episode.encryption, storagePath: segmentPath }
+                  payload: { 
+                      requestId: `${requestId}-${segmentIndex}`, 
+                      encryptedSegment: segmentBuffer, 
+                      derivedKeyB64: (window as any).__DERIVED_KEY__, 
+                      encryption: episode.encryption, 
+                      storagePath: segmentPath 
+                  }
                 });
             } catch (e: any) {
                 console.error(`Error fetching segment ${segmentIndex}:`, e);
@@ -527,10 +586,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         return;
                     }
                     try {
-                        console.log(`[${currentSegmentIndexRef.current}] 🟢 Appending segment...`);
                         sb?.appendBuffer(decryptedSegment);
                     } catch (e: any) {
-                        console.error("🔴 appendBuffer error:", e);
                         setPlayerState('error-fatal');
                         setPlayerMessage(`미디어 버퍼 추가 실패: ${e.message}`);
                     }
@@ -544,17 +601,17 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         };
         
         ms.addEventListener('sourceopen', async () => {
-            console.log(`🔌 MediaSource state: ${ms.readyState}`);
-            
-            ms.addEventListener('sourceended', () => console.log('🔌 MediaSource state: ended'));
-            ms.addEventListener('sourceclose', () => console.log('🔌 MediaSource state: closed'));
-            
             try {
                 let manifest: VideoManifest;
                 let derivedKeyB64: string;
 
                 if (offlineVideoData) {
-                    // Offline logic would go here
+                    if (new Date() > new Date(offlineVideoData.license.expiresAt)) {
+                        throw new Error("오프라인 라이선스가 만료되었습니다.");
+                    }
+                    manifest = offlineVideoData.manifest;
+                    derivedKeyB64 = offlineVideoData.license.offlineDerivedKey;
+                    setWatermarkSeed(null); // No watermark for offline yet
                 } else {
                     if (!authUser) throw new Error("로그인 필요");
                     const token = await authUser.getIdToken();
@@ -566,34 +623,23 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     const sessionData = await sessionRes.json();
                     derivedKeyB64 = sessionData.derivedKeyB64;
                     setWatermarkSeed(sessionData.watermarkSeed);
-                    (window as any).__DERIVED_KEY__ = derivedKeyB64;
-
-                    console.log('Fetching manifest...');
+                    
                     const manifestUrl = await getSignedUrl(token, episode.id, episode.storage.manifestPath!);
                     const manifestRes = await fetch(manifestUrl);
                     manifest = await manifestRes.json();
                 }
 
-                const mimeCodec = manifest.codec;
-                console.log(`💡 Codec: ${mimeCodec}`);
-                const isSupported = MediaSource.isTypeSupported(mimeCodec);
-                console.log(`💡 isTypeSupported: ${isSupported}`);
+                (window as any).__DERIVED_KEY__ = derivedKeyB64;
 
-                if (!isSupported) {
+                const mimeCodec = manifest.codec;
+                if (!MediaSource.isTypeSupported(mimeCodec)) {
                     throw new Error(`코덱을 지원하지 않습니다: ${mimeCodec}`);
                 }
                 
                 const sourceBuffer = ms.addSourceBuffer(mimeCodec);
                 sourceBufferRef.current = sourceBuffer;
-
-                sourceBuffer.addEventListener('error', (e) => {
-                    console.error("❌ SourceBuffer Error:", e);
-                });
-
+                
                 sourceBuffer.addEventListener('updateend', () => {
-                    const sb = sourceBufferRef.current;
-                    if (!sb) return;
-                    console.log(`[${currentSegmentIndexRef.current}] ✅ Append complete.`);
                     currentSegmentIndexRef.current++;
                     fetchAndProcessNextSegment();
                 });

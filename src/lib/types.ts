@@ -401,5 +401,3 @@ export type CryptoWorkerResponse =
         message: string;
       };
     };
-
-    

@@ -1,6 +1,8 @@
 'use client';
 
-import type { OfflineVideoData, OfflineVideoInfo, OfflineLicense } from './types';
+import type { OfflineVideoData, OfflineVideoInfo, VideoManifest } from './types';
+import { getSignedUrl } from '@/lib/actions/get-signed-url';
+import { getAuth } from 'firebase/auth';
 
 const DB_NAME = 'LlineStreamOffline';
 const DB_VERSION = 1;
@@ -29,32 +31,40 @@ const initDB = (): Promise<IDBDatabase> => {
 };
 
 export const saveVideo = async (data: OfflineVideoData): Promise<void> => {
-  // As per v5.3 Spec 1.1
-  if (navigator.storage && navigator.storage.estimate) {
-    const { quota, usage } = await navigator.storage.estimate();
-    const availableSpace = (quota || 0) - (usage || 0);
-    const requiredSpace = data.encryptedVideo.byteLength;
+    const dbInstance = await initDB();
+    
+    // Fetch and store all segments
+    const segmentMap = new Map<string, ArrayBuffer>();
+    const segmentPaths = [data.manifest.init, ...data.manifest.segments.map(s => s.path)];
 
-    if (availableSpace < requiredSpace) {
-      throw new Error(
-        `저장 공간이 부족합니다. (필요: ${(requiredSpace / 1024 / 1024).toFixed(1)}MB, 사용 가능: ${(
-          availableSpace / 1024 / 1024
-        ).toFixed(1)}MB)`
-      );
+    for (const path of segmentPaths) {
+        const auth = getAuth();
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) throw new Error("Authentication token not found.");
+        
+        const { signedUrl, error } = await getSignedUrl(token, data.episode.id, path);
+        if (error || !signedUrl) throw new Error(error || "Failed to get signed URL for segment.");
+
+        const response = await fetch(signedUrl);
+        const segmentBuffer = await response.arrayBuffer();
+        segmentMap.set(path, segmentBuffer);
     }
-  }
+    
+    const dataToSave: OfflineVideoData = {
+        ...data,
+        segments: segmentMap,
+    };
 
-  const dbInstance = await initDB();
-  return new Promise((resolve, reject) => {
-    // As per v5.3 Spec Appendix D-4: Single transaction
-    const transaction = dbInstance.transaction(STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.put(data); // Atomic put of the whole record
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(new Error('비디오 저장에 실패했습니다.'));
-  });
+    return new Promise((resolve, reject) => {
+      const transaction = dbInstance.transaction(STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.put(dataToSave);
+  
+      request.onsuccess = () => resolve();
+      request.onerror = (e) => reject(new Error('비디오 저장에 실패했습니다: ' + (e.target as any)?.error?.message));
+    });
 };
+
 
 export const getDownloadedVideo = async (episodeId: string): Promise<OfflineVideoData | null> => {
   const dbInstance = await initDB();
@@ -101,28 +111,4 @@ export const deleteVideo = async (episodeId: string): Promise<void> => {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(new Error('비디오 삭제에 실패했습니다.'));
     });
-};
-
-// As per v5.3 Spec C-3
-export const updateLicenseCheckTime = async (episodeId: string): Promise<void> => {
-  const dbInstance = await initDB();
-  const transaction = dbInstance.transaction(STORE_NAME, 'readwrite');
-  const store = transaction.objectStore(STORE_NAME);
-  
-  const getRequest = store.get(episodeId);
-
-  return new Promise((resolve, reject) => {
-    getRequest.onerror = () => reject(new Error("라이선스 업데이트 실패: 비디오를 찾을 수 없습니다."));
-    getRequest.onsuccess = () => {
-      const data = getRequest.result as OfflineVideoData | undefined;
-      if (data) {
-        data.license.lastCheckedAt = Date.now();
-        const putRequest = store.put(data);
-        putRequest.onsuccess = () => resolve();
-        putRequest.onerror = () => reject(new Error("라이선스 마지막 확인 시간 업데이트에 실패했습니다."));
-      } else {
-        reject(new Error("라이선스 업데이트 실패: 데이터가 없습니다."));
-      }
-    };
-  });
 };
