@@ -33,8 +33,8 @@ import * as fs from "fs/promises";
 import * as crypto from "crypto";
 
 // --- AI and Media Processing Imports ---
-import { GoogleGenerativeAI, FileState } from "@google/generative-ai";
-import { GoogleAIFileManager } from "@google/generative-ai/server";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
 const { path: ffprobePath } = require('ffprobe-static');
@@ -58,14 +58,40 @@ interface PipelineStatus {
     step: "validate" | "ffmpeg" | "encrypt" | "verify" | "manifest" | "keys" | "done" | "idle" | "trigger-exception";
     playable: boolean;
     progress: number;
-    error?: { step: string; code: string; message: string; hint?: string; raw: string; ts: Timestamp; } | null;
+    jobId?: string;
+    startedAt?: Timestamp;
+    updatedAt?: Timestamp;
+    lastHeartbeatAt?: Timestamp;
+    error?: {
+        step: string;
+        code: string;
+        message: string;
+        hint?: string;
+        raw: string;
+        debugLogPath?: string;
+        ts: Timestamp;
+    } | null;
 }
 
 interface AiStatus {
     status: "queued" | "processing" | "failed" | "completed" | "blocked" | "idle";
+    jobId?: string;
     model?: string;
-    error?: { code: string; message: string; raw: string; ts: Timestamp; } | null;
-    resultPaths?: { transcript?: string; summary?: string; };
+    attempts?: number;
+    lastHeartbeatAt?: Timestamp;
+    error?: {
+        code: string;
+        message: string;
+        raw: string;
+        debugLogPath?: string;
+        ts: Timestamp;
+    } | null;
+    resultPaths?: {
+        transcript?: string;
+        summary?: string;
+        chapters?: string;
+        quiz?: string;
+    };
 }
 
 interface Episode {
@@ -109,7 +135,7 @@ const SEGMENT_DURATION_SEC = 4;
 
 let genAI: GoogleGenerativeAI | null = null;
 let fileManager: GoogleAIFileManager | null = null;
-let cachedKEK: Buffer | null = cachedKEK;
+let cachedKEK: Buffer | null = null;
 
 async function loadKEK(): Promise<Buffer> {
     if (cachedKEK) return cachedKEK;
@@ -461,5 +487,3 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
         }
     }
 });
-
-    
