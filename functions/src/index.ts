@@ -354,65 +354,80 @@ export async function runAiAnalysis(episodeId: string, docRef: admin.firestore.D
 // 4. Cloud Function Triggers
 // ===============================================
 
+/**
+ * Triggers the video encoding and encryption pipeline when an episode is created
+ * or its status is manually reset to 'queued'.
+ */
 export const videoPipelineTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
     const { episodeId } = event.params;
     const change = event.data;
-    if (!change) {
-        console.log(`[${episodeId}] No data change. Skipping processing.`);
-        return;
-    }
-    
-    // Make sure the document was created, not deleted
-    if (!change.after.exists) {
-        console.log(`[${episodeId}] Document deleted. Skipping processing.`);
-        return;
+    if (!change || !change.after.exists) {
+        return; // Document was deleted, no action needed.
     }
     
     const docRef = change.after.ref;
     const afterData = change.after.data() as Episode;
     const beforeData = change.before.exists ? change.before.data() as Episode : null;
 
-    // --- DIAGNOSTIC LOGGING AND PRE-CHECKS ---
-    console.log(`[${episodeId}] TRIGGERED: onDocumentWritten event received.`);
     try {
-        const hasKek = !!process.env.KEK_SECRET;
-        const hasGenAiKey = !!process.env.GOOGLE_GENAI_API_KEY;
-        console.log(`[${episodeId}] DIAGNOSTIC - KEK_SECRET loaded: ${hasKek}, GOOGLE_GENAI_API_KEY loaded: ${hasGenAiKey}`);
-
-        if (!hasKek || !hasGenAiKey) {
-            throw new Error(`Required secrets are missing. KEK: ${hasKek}, GenAI Key: ${hasGenAiKey}. Function cannot start.`);
+        if (!process.env.KEK_SECRET || !process.env.GOOGLE_GENAI_API_KEY) {
+            throw new Error(`Required secrets are missing. Function cannot start.`);
         }
         
-        // --- Video Processing Trigger ---
-        // CRITICAL FIX: Only trigger if the pipeline status is newly set to 'queued'.
+        // Trigger only if the pipeline status is newly set to 'queued'.
         if (afterData.status?.pipeline === 'queued' && beforeData?.status?.pipeline !== 'queued') {
             console.log(`✨ [${episodeId}] New video pipeline job detected. Starting process...`);
             
-            const success = await processAndEncryptVideo(episodeId, afterData.storage.rawPath, docRef);
-            
-            if (success) {
-                // Fetch the latest data before running AI analysis
-                const updatedDoc = await docRef.get();
-                const updatedData = updatedDoc.data() as Episode;
-                await runAiAnalysis(episodeId, docRef, updatedData);
-            }
-            
-            // After all processing is awaited, check final status and delete raw file.
-            const finalDoc = await docRef.get();
-            const finalData = finalDoc.data() as Episode;
-            if (finalData.status.pipeline === 'completed' && (finalData.ai.status === 'completed' || finalData.ai.status === 'blocked')) {
-                if (finalData.storage.rawPath) {
-                    await deleteStorageFileByPath(finalData.storage.rawPath);
-                    await docRef.update({ 'storage.rawPath': admin.firestore.FieldValue.delete() });
-                    console.log(`[${episodeId}] ✅ All jobs finished. Original file deleted.`);
-                }
-            } else {
-                console.warn(`[${episodeId}] ⚠️ Pipeline finished with errors. Original file at ${finalData.storage.rawPath} was NOT deleted for manual inspection.`);
-            }
+            // The AI analysis will be triggered by a separate function watching for the completion of this one.
+            await processAndEncryptVideo(episodeId, afterData.storage.rawPath, docRef);
         }
     } catch (e: any) {
         console.error(`[${episodeId}] UNHANDLED EXCEPTION in videoPipelineTrigger:`, e);
         await failPipeline(docRef, 'trigger-exception', e, '함수 트리거 레벨에서 예상치 못한 오류가 발생했습니다.');
+    }
+});
+
+/**
+ * Triggers the AI analysis pipeline after the video processing pipeline completes successfully.
+ * It also handles the final deletion of the raw video file.
+ */
+export const aiAnalysisTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
+    const { episodeId } = event.params;
+    const change = event.data;
+    if (!change || !change.after.exists || !change.before.exists) {
+        // This trigger requires both 'before' and 'after' states to detect the specific status change.
+        return;
+    }
+    
+    const docRef = change.after.ref;
+    const afterData = change.after.data() as Episode;
+    const beforeData = change.before.data() as Episode;
+
+    // Trigger only when the video pipeline has *just* been completed.
+    if (afterData.status?.pipeline === 'completed' && beforeData.status?.pipeline !== 'completed') {
+        console.log(`✅ [${episodeId}] Video pipeline finished. Starting AI analysis...`);
+        try {
+            await runAiAnalysis(episodeId, docRef, afterData);
+            
+            // After AI analysis is awaited, check the final status and decide whether to delete the raw file.
+            const finalDoc = await docRef.get();
+            const finalData = finalDoc.data() as Episode;
+            
+            // Only delete if AI analysis is definitively finished (completed or blocked).
+            if (finalData.ai.status === 'completed' || finalData.ai.status === 'blocked') {
+                if (finalData.storage.rawPath) {
+                    await deleteStorageFileByPath(finalData.storage.rawPath);
+                    await docRef.update({ 'storage.rawPath': admin.firestore.FieldValue.delete() });
+                    console.log(`[${episodeId}] ✅ AI job finished. Original raw file deleted.`);
+                }
+            } else {
+                 console.warn(`[${episodeId}] ⚠️ AI job did not complete successfully (status: ${finalData.ai.status}). Original file at ${finalData.storage.rawPath} was NOT deleted for manual inspection.`);
+            }
+        } catch (e: any) {
+            console.error(`[${episodeId}] UNHANDLED EXCEPTION in aiAnalysisTrigger:`, e);
+            // The runAiAnalysis function has its own error handling that updates the doc.
+            // This catch block is for truly unexpected errors in the trigger logic itself.
+        }
     }
 });
 
