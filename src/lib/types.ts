@@ -151,6 +151,7 @@ export interface Episode {
       manifestPath: string;
       aiAudioPath?: string;
       thumbnailBasePath?: string; // e.g., episodes/{id}/thumbnails/
+      fileSize?: number;
   };
 
   // Replaces flat thumbnail URLs/paths
