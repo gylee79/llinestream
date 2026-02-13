@@ -84,12 +84,13 @@ export async function POST(req: NextRequest) {
     }
     const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
 
-    // 5. Generate Signature for the license
+    // 5. Generate Signature for the license & Watermark
     const issuedAt = Date.now();
     const expiresAt = add(issuedAt, { days: 7 }).getTime();
-    const signaturePayload = JSON.stringify({ videoId, userId, deviceId, expiresAt });
-    // In a real scenario, use a private key for signing
-    // For this example, we'll use a HMAC with a secret from env.
+    const sessionId = `offline_sess_${crypto.randomBytes(12).toString('hex')}`;
+    const watermarkSeed = crypto.createHash('sha256').update(`${userId}|${videoId}|${deviceId}|${sessionId}`).digest('hex');
+    const signaturePayload = JSON.stringify({ videoId, userId, deviceId, expiresAt, watermarkSeed });
+
     const signature = crypto.createHmac('sha256', await loadKEK()).update(signaturePayload).digest('hex');
 
     // 6. Construct and return Offline License
@@ -101,6 +102,7 @@ export async function POST(req: NextRequest) {
       expiresAt,
       keyId: videoKeyData.keyId,
       kekVersion: videoKeyData.kekVersion,
+      watermarkSeed,
       policy: {
           maxDevices: 1,
           allowScreenCapture: false

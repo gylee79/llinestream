@@ -523,10 +523,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             setPlayerMessage('필수 재생 정보(manifest, keyId)가 누락되었습니다.');
             return;
         }
-
+        
         const ms = new MediaSource();
         mediaSourceRef.current = ms;
-
+        
         workerRef.current = new Worker(new URL('../../workers/crypto.worker.ts', import.meta.url));
 
         const fetchAndProcessNextSegment = async () => {
@@ -726,3 +726,5 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
+
+  

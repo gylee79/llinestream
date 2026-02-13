@@ -180,3 +180,5 @@ export const deleteVideo = async (episodeId: string): Promise<void> => {
         transaction.onerror = (e) => reject(new Error('비디오 삭제에 실패했습니다: ' + (e.target as any)?.error?.message));
     });
 };
+
+  
