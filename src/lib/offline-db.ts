@@ -1,6 +1,6 @@
 'use client';
 
-import type { OfflineVideoData, OfflineVideoInfo } from './types';
+import type { OfflineVideoData, OfflineVideoInfo, VideoManifest } from './types';
 import { getSignedUrl as getSignedUrlAction } from '@/lib/actions/get-signed-url';
 import { getAuth } from 'firebase/auth';
 

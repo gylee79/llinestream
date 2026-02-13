@@ -414,7 +414,8 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     const activeRequestIdRef = React.useRef<string | null>(null);
     const segmentQueueRef = React.useRef<string[]>([]);
     const currentSegmentIndexRef = React.useRef(0);
-    const decryptionKeyRef = React.useRef<string | null>(null); // Secure key storage
+    // This ref will securely hold the decryption key only in component memory.
+    const decryptionKeyRef = React.useRef<string | null>(null);
     
     const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
     const { data: course } = useDoc<Course>(courseRef);
@@ -490,6 +491,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         workerRef.current?.terminate();
         workerRef.current = null;
         activeRequestIdRef.current = null;
+        // Securely clear the key from memory.
         decryptionKeyRef.current = null;
         
         const video = videoRef.current;
@@ -524,10 +526,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
         const ms = new MediaSource();
         mediaSourceRef.current = ms;
-        if (videoRef.current) {
-            videoRef.current.src = URL.createObjectURL(ms);
-        } else { return; }
-        
+
         workerRef.current = new Worker(new URL('../../workers/crypto.worker.ts', import.meta.url));
 
         const fetchAndProcessNextSegment = async () => {
@@ -658,6 +657,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 setPlayerMessage(e.message);
             }
         });
+        
+        if (videoRef.current) {
+            videoRef.current.src = URL.createObjectURL(ms);
+        }
 
     }, [cleanup, offlineVideoData, authUser, episode]);
 
