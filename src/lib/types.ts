@@ -1,4 +1,3 @@
-
 'use server';
 
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
@@ -345,6 +344,7 @@ export interface OfflineLicense {
   expiresAt: number; // timestamp
   keyId: string;
   kekVersion: 1;
+  watermarkSeed: string; // Added for offline watermarking
   policy: {
       maxDevices: 1,
       allowScreenCapture: false

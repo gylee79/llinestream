@@ -1,4 +1,3 @@
-
 /**
  * @fileoverview LlineStream Video Processing Pipeline Spec v1 Implementation
  * Implements the deterministic, fail-fast video processing and AI analysis workflow.
@@ -179,6 +178,8 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         const { getKek } = initializeTools();
         const masterKey = crypto.randomBytes(32); // Spec 6.6
         const encryptedBasePath = `episodes/${episodeId}/segments/`;
+        
+        const processedSegmentPaths: { name: string, path: string }[] = [];
 
         for (const fileName of allSegmentsToProcess) {
             const localFilePath = path.join(tempOutputDir, fileName);
@@ -186,22 +187,36 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
             const iv = crypto.randomBytes(12); // Spec 3
             const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
             const outputFileName = fileName.replace('.mp4', '.enc').replace('.m4s', '.m4s.enc');
+            
+            // This is the single source of truth for the storage path
             const storagePath = `${encryptedBasePath}${outputFileName}`;
+            
             const aad = Buffer.from(`path:${storagePath}`); // Spec 3
             cipher.setAAD(aad);
             const encryptedContent = Buffer.concat([cipher.update(content), cipher.final()]);
             const authTag = cipher.getAuthTag();
             const finalBuffer = Buffer.concat([iv, encryptedContent, authTag]); // Spec 3
             await bucket.file(storagePath).save(finalBuffer, { contentType: 'application/octet-stream' });
+            
+            // Store the exact path used for AAD to build the manifest later
+            processedSegmentPaths.push({ name: fileName, path: storagePath });
         }
 
-        // STEP 5: Manifest - Spec 6.5 (Verify is done after this for simplicity)
+        // STEP 5: Manifest - Spec 6.5
         await updatePipelineStatus(docRef, { pipeline: 'processing', step: 'manifest', progress: 85, playable: false });
+        
+        const initSegment = processedSegmentPaths.find(s => s.name === 'init.mp4');
+        if (!initSegment) {
+            throw { step: 'manifest', error: new Error("Manifest creation failed: init segment path not found after processing.") };
+        }
+        
         const manifest = {
             codec: codecString,
             duration: Math.round(duration),
-            init: `${encryptedBasePath}init.enc`,
-            segments: mediaSegmentNames.map(name => ({ path: `${encryptedBasePath}${name.replace('.m4s', '.m4s.enc')}` })),
+            init: initSegment.path,
+            segments: processedSegmentPaths
+                .filter(s => s.name !== 'init.mp4')
+                .map(s => ({ path: s.path })),
         };
         const manifestPath = `episodes/${episodeId}/manifest.json`;
         await bucket.file(manifestPath).save(JSON.stringify(manifest, null, 2), { contentType: 'application/json' });

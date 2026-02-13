@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark, OfflineVideoData, CryptoWorkerResponse, PlayerState, ChatLog, ChatMessage, OfflineLicense, VideoManifest } from '@/lib/types';
@@ -415,6 +414,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     const activeRequestIdRef = React.useRef<string | null>(null);
     const segmentQueueRef = React.useRef<string[]>([]);
     const currentSegmentIndexRef = React.useRef(0);
+    const decryptionKeyRef = React.useRef<string | null>(null); // Secure key storage
     
     const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
     const { data: course } = useDoc<Course>(courseRef);
@@ -490,6 +490,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         workerRef.current?.terminate();
         workerRef.current = null;
         activeRequestIdRef.current = null;
+        decryptionKeyRef.current = null;
         
         const video = videoRef.current;
         if (video && video.src) {
@@ -559,12 +560,13 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 
                 // CRITICAL: The 'storagePath' for AAD verification must EXACTLY match the path
                 // used on the server during encryption. Here, we pass the 'path' from the manifest.
+                // The key is now sourced from a secure ref instead of the window object.
                 workerRef.current?.postMessage({
                   type: 'DECRYPT_SEGMENT',
                   payload: { 
                       requestId: `${requestId}-${segmentIndex}`, 
                       encryptedSegment: segmentBuffer, 
-                      derivedKeyB64: (window as any).__DERIVED_KEY__, 
+                      derivedKeyB64: decryptionKeyRef.current, 
                       encryption: episode.encryption, 
                       storagePath: segmentPath 
                   }
@@ -603,15 +605,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         ms.addEventListener('sourceopen', async () => {
             try {
                 let manifest: VideoManifest;
-                let derivedKeyB64: string;
-
+                
                 if (offlineVideoData) {
                     if (new Date() > new Date(offlineVideoData.license.expiresAt)) {
                         throw new Error("오프라인 라이선스가 만료되었습니다.");
                     }
                     manifest = offlineVideoData.manifest;
-                    derivedKeyB64 = offlineVideoData.license.offlineDerivedKey;
-                    setWatermarkSeed(null); // No watermark for offline yet
+                    decryptionKeyRef.current = offlineVideoData.license.offlineDerivedKey;
+                    setWatermarkSeed(offlineVideoData.license.watermarkSeed);
                 } else {
                     if (!authUser) throw new Error("로그인 필요");
                     const token = await authUser.getIdToken();
@@ -621,7 +622,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     });
                     if (!sessionRes.ok) throw new Error(`보안 세션 시작 실패: ${sessionRes.status}`);
                     const sessionData = await sessionRes.json();
-                    derivedKeyB64 = sessionData.derivedKeyB64;
+                    decryptionKeyRef.current = sessionData.derivedKeyB64;
                     setWatermarkSeed(sessionData.watermarkSeed);
                     
                     const manifestUrl = await getSignedUrl(token, episode.id, episode.storage.manifestPath!);
@@ -629,7 +630,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     manifest = await manifestRes.json();
                 }
 
-                (window as any).__DERIVED_KEY__ = derivedKeyB64;
+                if (!decryptionKeyRef.current) {
+                    throw new Error("Decryption key is missing.");
+                }
 
                 const mimeCodec = manifest.codec;
                 if (!MediaSource.isTypeSupported(mimeCodec)) {
