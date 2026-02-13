@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useTransition, useMemo } from 'react';
@@ -65,7 +64,7 @@ const AIStatusIndicator = ({ episode }: {
         });
     }
 
-    if (isPending || episode.aiProcessingStatus === 'processing') {
+    if (isPending || episode.ai.status === 'processing') {
          return (
             <Tooltip>
                 <TooltipTrigger>
@@ -76,7 +75,7 @@ const AIStatusIndicator = ({ episode }: {
         );
     }
     
-    switch (episode.aiProcessingStatus) {
+    switch (episode.ai.status) {
         case 'completed':
             return (
                 <Tooltip>
@@ -100,7 +99,7 @@ const AIStatusIndicator = ({ episode }: {
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                        <p>AI 분석 실패: {episode.aiProcessingError || '알 수 없는 오류'}</p>
+                        <p>AI 분석 실패: {episode.ai.error?.message || '알 수 없는 오류'}</p>
                         <p className="font-semibold">클릭하여 재시도</p>
                     </TooltipContent>
                 </Tooltip>
@@ -413,5 +412,3 @@ export default function VideoManager() {
     </>
   );
 }
-
-    
