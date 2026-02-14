@@ -100,7 +100,7 @@ const SEGMENT_DURATION_SEC = 4;
 // ===============================
 let genAI = null;
 let fileManager = null;
-let cachedKEK = cachedKEK;
+let cachedKEK = null;
 async function loadKEK() {
     if (cachedKEK)
         return cachedKEK;
@@ -290,12 +290,12 @@ async function runAiAnalysis(episodeId, docRef, episodeData) {
             const uploadResponse = await fileManager.uploadFile(tempFilePath, { mimeType: 'video/mp4', displayName: episodeId });
             uploadedFile = uploadResponse.file;
             let state = uploadedFile.state;
-            while (state === generative_ai_1.FileState.PROCESSING) {
+            while (state === server_1.FileState.PROCESSING) {
                 await new Promise(resolve => setTimeout(resolve, 10000)); // Increased delay for AI file processing
                 const freshFile = await fileManager.getFile(uploadedFile.name);
                 state = freshFile.state;
             }
-            if (state === generative_ai_1.FileState.FAILED)
+            if (state === server_1.FileState.FAILED)
                 throw new Error("Google AI file processing failed.");
             const model = genAI.getGenerativeModel({ model: modelName, generationConfig: { responseMimeType: "application/json" } });
             const prompt = `Analyze this video. Provide a detailed summary, a full transcript, and a timeline of key events with subtitles and descriptions. Output MUST be a JSON object with keys "summary", "transcript", "timeline". Timeline items must have "startTime", "endTime", "subtitle", "description". ALL OUTPUT MUST BE IN KOREAN.`;
