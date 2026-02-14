@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useTransition, useMemo, useEffect, useCallback } from 'react';
@@ -54,7 +53,7 @@ const AIStatusIndicator = ({ episode }: {
 
     const handleStartAnalysis = () => {
         startTransition(async () => {
-            const actionText = episode.aiProcessingStatus === 'completed' ? '재분석' : '분석';
+            const actionText = episode.ai.status === 'completed' ? '재분석' : '분석';
             toast({ title: `AI ${actionText} 요청`, description: `'${episode.title}'에 대한 ${actionText}을 시작합니다.` });
             const result = await resetAIEpisodeStatus(episode.id);
             if (result.success) {
@@ -65,10 +64,10 @@ const AIStatusIndicator = ({ episode }: {
         });
     };
 
-    const modelName = episode.aiModel || '?';
+    const modelName = episode.ai.model || '?';
     
     const statusContent = () => {
-        if (isPending || episode.aiProcessingStatus === 'processing' || episode.status?.processing === 'processing') {
+        if (isPending || episode.ai.status === 'processing' || episode.status.pipeline === 'processing') {
             return (
                 <Tooltip>
                     <TooltipTrigger>
@@ -79,7 +78,7 @@ const AIStatusIndicator = ({ episode }: {
             );
         }
         
-        switch (episode.aiProcessingStatus) {
+        switch (episode.ai.status) {
             case 'completed':
                 return (
                     <Tooltip>
@@ -103,12 +102,13 @@ const AIStatusIndicator = ({ episode }: {
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                            <p>AI 분석 실패: {episode.aiProcessingError || '알 수 없는 오류'}</p>
+                            <p>AI 분석 실패: {episode.ai.error?.message || '알 수 없는 오류'}</p>
                             <p className="font-semibold">클릭하여 재시도</p>
                         </TooltipContent>
                     </Tooltip>
                 );
-            case 'pending':
+            case 'queued':
+            case 'idle':
             default:
                 return (
                     <Tooltip>
@@ -132,7 +132,7 @@ const AIStatusIndicator = ({ episode }: {
 };
 
 const KeyStatusIndicator = ({ episode }: { episode: Episode }) => {
-    if (episode.status?.processing === 'failed') {
+    if (episode.status.pipeline === 'failed') {
         return (
              <Tooltip>
                 <TooltipTrigger>
@@ -143,7 +143,7 @@ const KeyStatusIndicator = ({ episode }: { episode: Episode }) => {
         )
     }
     
-    if (episode.status?.processing === 'completed' && episode.encryption?.keyId) {
+    if (episode.status.pipeline === 'completed' && episode.encryption?.keyId) {
         return (
             <Tooltip>
                 <TooltipTrigger>
@@ -154,7 +154,7 @@ const KeyStatusIndicator = ({ episode }: { episode: Episode }) => {
         );
     }
 
-    if (episode.status?.processing === 'processing' || episode.status?.processing === 'pending' || episode.aiProcessingStatus === 'processing' || episode.aiProcessingStatus === 'pending') {
+    if (episode.status.pipeline === 'processing' || episode.status.pipeline === 'queued' || episode.ai.status === 'processing' || episode.ai.status === 'queued') {
         return (
             <Tooltip>
                 <TooltipTrigger>
@@ -536,9 +536,3 @@ useEffect(() => {
     </>
   );
 }
-
-    
-
-    
-
-    

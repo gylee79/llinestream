@@ -34,7 +34,7 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
   
   try {
     const keyBuffer = base64ToUint8Array(derivedKeyB64);
-    const cryptoKey = await importKey(keyBuffer.buffer);
+    const cryptoKey = await importKey(keyBuffer.buffer as ArrayBuffer);
 
     // From Spec 3 & 6.3: Use the segment's storage path as AAD.
     const aad = new TextEncoder().encode(`path:${storagePath}`);

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -211,8 +210,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode, onSucce
             // Do not set video preview from a remote URL
             setVideoPreviewUrl(null); 
             
-            setDefaultThumbnailPreview(episode.defaultThumbnailUrl || null);
-            setCustomThumbnailPreview(episode.customThumbnailUrl || null);
+            setDefaultThumbnailPreview(episode.thumbnails.default || null);
+            setCustomThumbnailPreview(episode.thumbnails.custom || null);
 
             try {
               const courseDocRef = doc(firestore, 'courses', episode.courseId);
@@ -333,7 +332,7 @@ export default function VideoUploadDialog({ open, onOpenChange, episode, onSucce
             setUploadMessage('커스텀 썸네일 업로드 중...');
             const thumbPath = `episodes/${episodeId}/custom-thumbnail/${Date.now()}-${customThumbnailFile.name}`;
             newCustomThumbUploadResult = await uploadFile(storage, thumbPath, customThumbnailFile, setUploadProgress);
-        } else if (customThumbnailPreview === null && initialEpisode?.customThumbnailUrl) {
+        } else if (customThumbnailPreview === null && initialEpisode?.thumbnails.custom) {
             // This indicates user wants to delete the custom thumbnail
             newCustomThumbUploadResult = { downloadUrl: null, filePath: null };
         }
@@ -347,8 +346,8 @@ export default function VideoUploadDialog({ open, onOpenChange, episode, onSucce
                 newVideoData: videoFile ? { ...newVideoUploadResult!, fileSize: videoFile.size } : undefined,
                 newDefaultThumbnailData: newDefaultThumbUploadResult,
                 newCustomThumbnailData: newCustomThumbUploadResult,
-                oldDefaultThumbnailUrl: initialEpisode?.defaultThumbnailUrl,
-                oldCustomThumbnailUrl: initialEpisode?.customThumbnailUrl,
+                oldDefaultThumbnailUrl: initialEpisode?.thumbnails.default,
+                oldCustomThumbnailUrl: initialEpisode?.thumbnails.custom,
             };
             const result = await updateEpisode(sanitize(payload));
             if (!result.success) throw new Error(result.message);
@@ -554,11 +553,11 @@ export default function VideoUploadDialog({ open, onOpenChange, episode, onSucce
                       accept="video/*"
                       disabled={isProcessing}
                   />
-                  {isEditMode && initialEpisode?.filePath && (
+                  {isEditMode && initialEpisode?.storage.rawPath && (
                     <div className="text-xs text-muted-foreground flex items-center gap-2">
                         <Video className="h-4 w-4"/>
                         <span>현재 파일: </span>
-                        <span className="truncate">{initialEpisode.filePath}</span>
+                        <span className="truncate">{initialEpisode.storage.rawPath}</span>
                     </div>
                   )}
                   {videoFile && <p className="text-sm text-green-600">새 비디오 파일 선택됨: {videoFile.name}</p>}
@@ -600,5 +599,3 @@ export default function VideoUploadDialog({ open, onOpenChange, episode, onSucce
     </>
   );
 }
-
-    

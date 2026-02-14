@@ -80,7 +80,7 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
         oldImagePath = currentData?.[subCollection]?.[pathField];
     } else if (itemType === 'episodes') {
         const episodeData = currentData as Episode;
-        oldImagePath = episodeData.customThumbnailPath || extractPathFromUrl(episodeData.customThumbnailUrl);
+        oldImagePath = episodeData.thumbnails.customPath || extractPathFromUrl(episodeData.thumbnails.custom);
     } else if (fieldToUpdate && pathFieldToUpdate) {
         const oldUrl = subCollection ? currentData?.[subCollection]?.[fieldToUpdate] : currentData?.[fieldToUpdate];
         oldImagePath = currentData?.[pathFieldToUpdate] || extractPathFromUrl(oldUrl);
@@ -134,9 +134,9 @@ export async function updateThumbnail(payload: UpdateThumbnailPayload): Promise<
     } else if (itemType === 'episodes') { // Episode custom thumbnail case
         const episodeData = currentData as Episode;
         dataToUpdate = {
-            customThumbnailUrl: downloadUrl,
-            customThumbnailPath: newImagePath,
-            thumbnailUrl: downloadUrl || episodeData.defaultThumbnailUrl
+            'thumbnails.custom': downloadUrl,
+            'thumbnails.customPath': newImagePath,
+            thumbnailUrl: downloadUrl || episodeData.thumbnails.default
         }
     } else { // Default thumbnail for Field, Classification, Course
         dataToUpdate = {

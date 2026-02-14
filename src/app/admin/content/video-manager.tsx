@@ -54,6 +54,7 @@ const AIStatusIndicator = ({ episode }: {
 
     const handleStartAnalysis = () => {
         startTransition(async () => {
+            const actionText = episode.ai.status === 'completed' ? '재분석' : '분석';
             toast({ title: "AI 분석 요청", description: `'${episode.title}'에 대한 분석을 시작합니다.` });
             const result = await resetAIEpisodeStatus(episode.id);
             if (result.success) {
@@ -104,7 +105,8 @@ const AIStatusIndicator = ({ episode }: {
                     </TooltipContent>
                 </Tooltip>
             );
-        case 'pending':
+        case 'queued':
+        case 'idle':
         default:
              return (
                 <Tooltip>

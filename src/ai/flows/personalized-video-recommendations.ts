@@ -11,6 +11,7 @@
  */
 
 import {ai} from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'genkit';
 
 const VideoRecommendationInputSchema = z.object({
@@ -61,23 +62,27 @@ const videoRecommendationFlow = ai.defineFlow(
     name: 'videoRecommendationFlow',
     inputSchema: VideoRecommendationInputSchema,
     outputSchema: VideoRecommendationOutputSchema,
-    model: 'gemini-2.5-flash',
-    tools: [trendingContentTool],
-    prompt: `You are a video recommendation expert.
-
+  },
+  async (input) => {
+    const { output } = await ai.generate({
+      model: googleAI.model('gemini-2.5-flash'),
+      tools: [trendingContentTool],
+      system: `You are a video recommendation expert.
   Based on the user's viewing history and preferences, recommend videos that they might like.
   Consider the user's viewing history to understand their interests.
   Use the getTrendingContent tool to discover trending videos that might be of interest to the user.
-
-  User ID: {{{userId}}}
-  Viewing History: {{#if viewingHistory}}{{{viewingHistory}}}{{else}}None{{/if}}
-  Preferences: {{#if preferences}}{{{preferences}}}{{else}}None{{/if}}
-
+  `,
+      prompt: `User ID: ${input.userId}
+  Viewing History: ${input.viewingHistory.join(', ') || 'None'}
+  Preferences: ${JSON.stringify(input.preferences) || 'None'}
+  
   Format your response as a JSON object with a "recommendedVideoIds" field containing an array of video IDs.
   `,
-  },
-  async input => {
-    const llmResponse = await ai.runFlow(videoRecommendationFlow, input);
-    return llmResponse;
+      output: {
+        schema: VideoRecommendationOutputSchema,
+      },
+    });
+
+    return output || { recommendedVideoIds: [] };
   }
 );

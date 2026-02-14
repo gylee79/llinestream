@@ -1,5 +1,6 @@
 /**
  * @fileoverview LlineStream Video Processing Pipeline v6.2
+ *
  * Implements a decoupled, two-stage workflow for video processing and AI analysis
  * to prevent Cloud Function timeouts and improve reliability.
  *
@@ -36,56 +37,8 @@ import ffmpegPath from 'ffmpeg-static';
 const { path: ffprobePath } = require('ffprobe-static');
 
 // --- Type Definitions (Self-contained) ---
-type Timestamp = admin.firestore.Timestamp;
+import type { Episode, PipelineStatus } from './types';
 
-interface PipelineStatus {
-    pipeline: "queued" | "processing" | "failed" | "completed";
-    step: "validate" | "ffmpeg" | "encrypt" | "verify" | "manifest" | "keys" | "done" | "idle" | "trigger-exception";
-    playable: boolean;
-    progress: number;
-    jobId?: string;
-    startedAt?: Timestamp;
-    updatedAt?: Timestamp;
-    lastHeartbeatAt?: Timestamp;
-    error?: {
-        step: string;
-        code: string;
-        message: string;
-        hint?: string;
-        raw: string;
-        debugLogPath?: string;
-        ts: Timestamp;
-    } | null;
-}
-
-interface AiStatus {
-    status: "queued" | "processing" | "failed" | "completed" | "blocked" | "idle";
-    jobId?: string;
-    model?: string;
-    attempts?: number;
-    lastHeartbeatAt?: Timestamp;
-    error?: {
-        code: string;
-        message: string;
-        raw: string;
-        debugLogPath?: string;
-        ts: Timestamp;
-    } | null;
-    resultPaths?: {
-        transcript?: string;
-        summary?: string;
-        chapters?: string;
-        quiz?: string;
-    };
-}
-
-interface Episode {
-  id: string;
-  storage: { rawPath: string; encryptedBasePath: string; manifestPath: string; };
-  status: PipelineStatus;
-  ai: AiStatus;
-  encryption: any; // Keep it simple for this context
-}
 
 // 0. Initialize SDKs and Global Configuration
 // ===============================================
@@ -111,6 +64,7 @@ const db = admin.firestore();
 const storage = admin.storage();
 const bucket = storage.bucket();
 const SEGMENT_DURATION_SEC = 4;
+
 
 // 1. Utility & Helper Functions
 // ===============================
@@ -329,7 +283,7 @@ export async function runAiAnalysis(episodeId: string, docRef: admin.firestore.D
 
             let state = uploadedFile.state;
             while (state === FileState.PROCESSING) {
-                await new Promise(resolve => setTimeout(resolve, 10000));
+                await new Promise(resolve => setTimeout(resolve, 10000)); // Increased delay for AI file processing
                 const freshFile = await fileManager.getFile(uploadedFile.name);
                 state = freshFile.state;
             }
@@ -465,7 +419,7 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
             await db.collection('video_keys').doc(keyId).delete();
             console.log(`[DELETE SUCCESS] Encryption key ${keyId} deleted.`);
         } catch (error) {
-            console.error(`[DELETE FAILED] Could not delete encryption key ${keyId} for episode ${episodeId}.`, error);
+            console.error(`[DELETE FAILED] Could not delete encryption key ${keyId}.`, error);
         }
     }
 });

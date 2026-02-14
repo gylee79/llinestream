@@ -14,7 +14,7 @@ import ContentCarousel from '@/components/shared/content-carousel';
 import { motion, AnimatePresence, useMotionValue, animate, useTransform } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import LandingPageSwitch from '../layout/LandingPageSwitch';
+
 
 const CollapsibleUserPanel = ({ user, isMobile }: { user: User, isMobile: boolean }) => {
     const [isOpen, setIsOpen] = useState(false);
