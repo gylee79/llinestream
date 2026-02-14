@@ -1,13 +1,14 @@
 [
   {
     "origin": ["*"],
-    "method": ["GET", "HEAD", "OPTIONS"],
+    "method": ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
     "responseHeader": [
       "Content-Type",
       "Content-Length",
       "Content-Range",
       "Access-Control-Allow-Origin",
-      "Range"
+      "ETag",
+      "x-goog-meta-foo"
     ],
     "maxAgeSeconds": 3600
   }
