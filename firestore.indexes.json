@@ -67,6 +67,14 @@
         { "fieldPath": "episodeId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "bookmarks",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "episodeId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

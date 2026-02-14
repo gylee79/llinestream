@@ -2,16 +2,9 @@
 
 import { initializeAdminApp } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
+import { toJSDate } from '@/lib/date-helpers';
+import type { User, Episode } from '@/lib/types';
 
-/**
- * Server Action to generate a signed URL for a Firebase Storage file.
- * This is necessary because client-side SDKs cannot generate signed URLs.
- *
- * @param token - The user's Firebase Auth ID token for verification.
- * @param videoId - The ID of the episode, used for context (optional, but good for logging/validation).
- * @param filePath - The full path to the file in Firebase Storage.
- * @returns An object with either the signedUrl or an error message.
- */
 export async function getSignedUrl(
   token: string,
   videoId: string,
@@ -36,8 +29,7 @@ export async function getSignedUrl(
       .getSignedUrl({
         version: 'v4',
         action: 'read',
-        expires: Date.now() + 15 * 60 * 1000, // URL expires in 15 minutes
-        virtualHostedStyle: true,
+        expires: Date.now() + 15 * 60 * 1000, // 15 minutes
       });
 
     return { signedUrl };
