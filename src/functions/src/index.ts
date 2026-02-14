@@ -37,7 +37,7 @@ import ffmpegPath from 'ffmpeg-static';
 const { path: ffprobePath } = require('ffprobe-static');
 
 // --- Type Definitions (Self-contained) ---
-import type { Episode, PipelineStatus } from './types';
+import type { Episode, PipelineStatus } from './lib/types';
 
 
 // 0. Initialize SDKs and Global Configuration
