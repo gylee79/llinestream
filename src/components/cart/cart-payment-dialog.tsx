@@ -67,7 +67,7 @@ export default function CartPaymentDialog({ children }: CartPaymentDialogProps) 
         const storeId = process.env.NEXT_PUBLIC_PORTONE_STORE_ID;
         const channelKey = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY;
 
-        if (!storeId || !channelKey) {
+        if (!storeId || !channelKey || storeId === 'YOUR_PORTONE_STORE_ID') {
             console.error("환경변수 에러: PortOne 설정이 누락되었습니다.");
             toast({ variant: 'destructive', title: '설정 오류', description: '결제 설정이 누락되었습니다. 관리자에게 문의하세요.' });
             return;
