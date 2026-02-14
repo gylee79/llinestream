@@ -36,7 +36,34 @@ const initDB = (): Promise<IDBDatabase> => {
 };
 
 export const saveVideo = async (data: OfflineVideoData): Promise<void> => {
+    console.log("Starting offline save for episode:", data.episode.id);
     const dbInstance = await initDB();
+
+    // --- NEW: Fetch AI Content ---
+    let aiContent = null;
+    if (data.episode.ai.status === 'completed' && data.episode.ai.resultPaths?.summary) {
+        console.log("AI summary found, attempting to download for offline use.");
+        try {
+            const auth = getAuth();
+            if (!auth.currentUser) throw new Error("User not authenticated for AI content download.");
+            
+            const token = await auth.currentUser.getIdToken();
+            const summaryPath = data.episode.ai.resultPaths.summary;
+
+            const { signedUrl, error } = await getSignedUrlAction(token, data.episode.id, summaryPath);
+            if (error || !signedUrl) {
+                throw new Error(error || "Failed to get signed URL for AI content.");
+            }
+
+            const response = await fetch(signedUrl);
+            if (!response.ok) throw new Error(`Failed to fetch AI content: ${response.statusText}`);
+            aiContent = await response.json();
+            console.log("Successfully downloaded and parsed AI content.");
+        } catch (error) {
+            console.warn("Could not download AI content for offline use:", error);
+            // Do not fail the whole download if AI content fails, just proceed without it.
+        }
+    }
 
     // 1. Save metadata (everything except the segments map) to the 'videos' store.
     const metadataToSave = {
@@ -45,6 +72,7 @@ export const saveVideo = async (data: OfflineVideoData): Promise<void> => {
         downloadedAt: data.downloadedAt,
         license: data.license,
         manifest: data.manifest,
+        aiContent: aiContent,
     };
     
     const metaTransaction = dbInstance.transaction(VIDEOS_STORE, 'readwrite');
@@ -180,5 +208,3 @@ export const deleteVideo = async (episodeId: string): Promise<void> => {
         transaction.onerror = (e) => reject(new Error('비디오 삭제에 실패했습니다: ' + (e.target as any)?.error?.message));
     });
 };
-
-  

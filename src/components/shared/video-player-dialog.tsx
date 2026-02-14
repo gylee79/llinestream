@@ -79,13 +79,23 @@ const DownloadButton = ({
     }
 };
 
-const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSeconds: number) => void; }) => {
+const SyllabusView = ({ episode, onSeek, offlineVideoData }: { 
+    episode: Episode, 
+    onSeek: (timeInSeconds: number) => void; 
+    offlineVideoData?: OfflineVideoData | null;
+}) => {
     const { authUser } = useUser();
-    const [aiContent, setAiContent] = React.useState<any>(null);
-    const [isLoading, setIsLoading] = React.useState(true);
+    const [aiContent, setAiContent] = React.useState<any>(offlineVideoData?.aiContent || null);
+    const [isLoading, setIsLoading] = React.useState(!offlineVideoData?.aiContent);
     const [error, setError] = React.useState<string | null>(null);
 
     React.useEffect(() => {
+        if (offlineVideoData?.aiContent) {
+            setAiContent(offlineVideoData.aiContent);
+            setIsLoading(false);
+            return;
+        }
+
         const fetchAiContent = async () => {
             if (episode.ai.status !== 'completed' || !episode.ai.resultPaths?.summary) {
                 setIsLoading(false);
@@ -97,7 +107,7 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
                 setError("AI 콘텐츠를 보려면 로그인이 필요합니다.");
                 return;
             }
-            
+
             setIsLoading(true);
             setError(null);
             try {
@@ -131,7 +141,7 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
         };
 
         fetchAiContent();
-    }, [episode.id, episode.ai.status, episode.ai.resultPaths?.summary, authUser]);
+    }, [episode.id, episode.ai.status, episode.ai.resultPaths?.summary, authUser, offlineVideoData]);
 
     if (isLoading) {
         return (
@@ -780,7 +790,13 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     </TabsList>
                     <div className="flex-1 min-h-0">
                         <TabsContent value="syllabus" className="mt-0 h-full">
-                            <ScrollArea className="h-full"><SyllabusView episode={episode} onSeek={handleSeek}/></ScrollArea>
+                            <ScrollArea className="h-full">
+                                <SyllabusView 
+                                    episode={episode} 
+                                    onSeek={handleSeek}
+                                    offlineVideoData={offlineVideoData}
+                                />
+                            </ScrollArea>
                         </TabsContent>
                         <TabsContent value="search" className="mt-0 h-full">{user ? <ChatView episode={episode} user={user}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
                         <TabsContent value="textbook" className="mt-0 h-full"><TextbookView /></TabsContent>
@@ -793,7 +809,3 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
-
-  
-
-    
