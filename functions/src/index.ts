@@ -55,7 +55,7 @@ if (admin.apps.length === 0) {
 setGlobalOptions({
   region: "us-central1",
   secrets: ["GOOGLE_GENAI_API_KEY", "KEK_SECRET"],
-  timeoutSeconds: 3600,
+  timeoutSeconds: 540,
   memory: "4GiB",
   cpu: 2,
 });
