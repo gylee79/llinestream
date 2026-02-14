@@ -4,9 +4,6 @@
  * Implements a decoupled, two-stage workflow for video processing and AI analysis
  * to prevent Cloud Function timeouts and improve reliability.
  *
- * 1. `videoPipelineTrigger`: Handles video transcoding and encryption.
- * 2. `aiAnalysisTrigger`: Handles AI analysis after video processing is complete.
- *
  * Required NPM Packages for this file:
  * "dependencies": {
  *   "@google/generative-ai": "^0.23.0",
@@ -39,70 +36,9 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
 const { path: ffprobePath } = require('ffprobe-static');
 
-// --- Type Definitions (Self-contained to prevent import errors) ---
-type Timestamp = admin.firestore.Timestamp | admin.firestore.FieldValue;
+// --- Type Definitions (Self-contained) ---
+import type { Episode, PipelineStatus } from './types';
 
-interface EncryptionInfo {
-  algorithm: "AES-256-GCM";
-  ivLength: 12;
-  tagLength: 16;
-  keyId: string;
-  kekVersion: 1;
-  aadMode: "path";
-  segmentDurationSec: 4;
-  fragmentEncrypted: true;
-}
-
-interface PipelineStatus {
-    pipeline: "queued" | "processing" | "failed" | "completed";
-    step: "validate" | "ffmpeg" | "encrypt" | "verify" | "manifest" | "keys" | "done" | "idle" | "trigger-exception";
-    playable: boolean;
-    progress: number;
-    jobId?: string;
-    startedAt?: Timestamp;
-    updatedAt?: Timestamp;
-    lastHeartbeatAt?: Timestamp;
-    error?: {
-        step: string;
-        code: string;
-        message: string;
-        hint?: string;
-        raw: string;
-        debugLogPath?: string;
-        ts: Timestamp;
-    } | null;
-}
-
-interface AiStatus {
-    status: "queued" | "processing" | "failed" | "completed" | "blocked" | "idle";
-    jobId?: string;
-    model?: string;
-    attempts?: number;
-    lastHeartbeatAt?: Timestamp;
-    error?: {
-        code: string;
-        message: string;
-        raw: string;
-        debugLogPath?: string;
-        ts: Timestamp;
-    } | null;
-    resultPaths?: {
-        transcript?: string;
-        summary?: string;
-        chapters?: string;
-        quiz?: string;
-    };
-}
-
-interface Episode {
-  id: string;
-  courseId: string;
-  storage: { rawPath: string; encryptedBasePath: string; manifestPath: string; };
-  status: PipelineStatus;
-  ai: AiStatus;
-  encryption: EncryptionInfo;
-  title: string;
-}
 
 // 0. Initialize SDKs and Global Configuration
 // ===============================================
@@ -119,7 +55,7 @@ if (admin.apps.length === 0) {
 setGlobalOptions({
   region: "us-central1",
   secrets: ["GOOGLE_GENAI_API_KEY", "KEK_SECRET"],
-  timeoutSeconds: 540,
+  timeoutSeconds: 3600,
   memory: "4GiB",
   cpu: 2,
 });
