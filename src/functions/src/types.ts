@@ -294,7 +294,6 @@ export interface EpisodeComment {
   createdAt: Timestamp;
 }
 
-
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
@@ -360,6 +359,7 @@ export interface OfflineVideoData {
   license: OfflineLicense;
   manifest: VideoManifest;
   segments: Map<string, ArrayBuffer>;
+  aiContent?: any;
 }
 
 

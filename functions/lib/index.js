@@ -5,9 +5,6 @@
  * Implements a decoupled, two-stage workflow for video processing and AI analysis
  * to prevent Cloud Function timeouts and improve reliability.
  *
- * 1. `videoPipelineTrigger`: Handles video transcoding and encryption.
- * 2. `aiAnalysisTrigger`: Handles AI analysis after video processing is complete.
- *
  * Required NPM Packages for this file:
  * "dependencies": {
  *   "@google/generative-ai": "^0.23.0",
@@ -88,7 +85,7 @@ if (admin.apps.length === 0) {
 (0, v2_1.setGlobalOptions)({
     region: "us-central1",
     secrets: ["GOOGLE_GENAI_API_KEY", "KEK_SECRET"],
-    timeoutSeconds: 540,
+    timeoutSeconds: 3600,
     memory: "4GiB",
     cpu: 2,
 });
