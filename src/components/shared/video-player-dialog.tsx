@@ -80,6 +80,78 @@ const DownloadButton = ({
 };
 
 const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSeconds: number) => void; }) => {
+    const { authUser } = useUser();
+    const [aiContent, setAiContent] = React.useState<any>(null);
+    const [isLoading, setIsLoading] = React.useState(true);
+    const [error, setError] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        const fetchAiContent = async () => {
+            if (episode.ai.status !== 'completed' || !episode.ai.resultPaths?.summary) {
+                setIsLoading(false);
+                return;
+            }
+            // User must be logged in to get a token to access content
+            if (!authUser) {
+                setIsLoading(false);
+                setError("AI 콘텐츠를 보려면 로그인이 필요합니다.");
+                return;
+            }
+            
+            setIsLoading(true);
+            setError(null);
+            try {
+                const token = await authUser.getIdToken();
+                const summaryPath = episode.ai.resultPaths.summary;
+                
+                if (!summaryPath) {
+                    throw new Error("AI 분석 요약 파일 경로를 찾을 수 없습니다.");
+                }
+
+                const { signedUrl, error: urlError } = await getSignedUrlAction(token, episode.id, summaryPath);
+                
+                if (urlError || !signedUrl) {
+                    throw new Error(urlError || 'AI 콘텐츠 접근 URL 생성에 실패했습니다.');
+                }
+
+                const response = await fetch(signedUrl);
+                if (!response.ok) {
+                    throw new Error('AI 콘텐츠를 다운로드하지 못했습니다.');
+                }
+
+                const content = await response.json();
+                setAiContent(content);
+            } catch (err: any) {
+                console.error("Failed to load syllabus content:", err);
+                setError(err.message || 'AI 콘텐츠를 불러오는 중 오류가 발생했습니다.');
+                setAiContent(null);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchAiContent();
+    }, [episode.id, episode.ai.status, episode.ai.resultPaths?.summary, authUser]);
+
+    if (isLoading) {
+        return (
+            <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
+                <Loader className="h-12 w-12 text-muted-foreground animate-spin" />
+                <p className="text-sm text-muted-foreground mt-4">AI 분석 데이터를 불러오는 중...</p>
+            </div>
+        );
+    }
+    
+    if (error) {
+         return (
+            <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
+                <AlertTriangle className="h-12 w-12 text-destructive" />
+                <p className="font-semibold mt-4">오류 발생</p>
+                <p className="text-sm text-muted-foreground mt-2 break-keep">{error}</p>
+            </div>
+        );
+    }
+    
     if (episode.ai.status === 'failed') {
         return (
             <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
@@ -100,12 +172,7 @@ const SyllabusView = ({ episode, onSeek }: { episode: Episode, onSeek: (timeInSe
         );
     }
     
-    // @ts-ignore - ai.resultPaths may not exist in all Episode types from history
-    const aiContentString = episode.ai.resultPaths?.summary;
-    // @ts-ignore
-    const aiContent = aiContentString ? JSON.parse(aiContentString) : null;
-    
-    if (episode.ai.status !== 'completed' || !aiContent) {
+    if (!aiContent) {
         return (
             <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
                 <Loader className="h-12 w-12 text-muted-foreground animate-spin" />
@@ -728,3 +795,5 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 }
 
   
+
+    
