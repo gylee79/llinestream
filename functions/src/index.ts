@@ -1,8 +1,8 @@
 /**
- * @fileoverview LlineStream Video Processing Pipeline v6.2
+ * @fileoverview LlineStream Video Processing Pipeline v6.3
  *
- * Implements a decoupled, two-stage workflow for video processing and AI analysis
- * to prevent Cloud Function timeouts and improve reliability.
+ * Implements a robust, state-machine-driven workflow for video processing and AI analysis
+ * using a single orchestrator function to prevent timeouts and improve reliability.
  *
  * Required NPM Packages for this file:
  * "dependencies": {
@@ -353,49 +353,65 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
 // 4. Cloud Function Triggers
 // ===============================================
 
-export const videoPipelineTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
+/**
+ * Orchestrates the entire video processing and AI analysis pipeline based on the episode's status.
+ * This single trigger acts as a state machine to ensure steps run sequentially and reliably.
+ */
+export const episodeProcessingTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
     const { episodeId } = event.params;
     const change = event.data;
-    if (!change || !change.after.exists) return;
-    
+    if (!change) { return; } 
+
     const docRef = change.after.ref;
-    const afterData = change.after.data() as Episode;
+    const afterData = change.after.exists ? change.after.data() as Episode : null;
     const beforeData = change.before.exists ? change.before.data() as Episode : null;
 
-    if (!process.env.KEK_SECRET || !process.env.GOOGLE_GENAI_API_KEY) {
-        console.error(`[${episodeId}] CRITICAL: Required secrets are missing. Function cannot start.`);
+    if (!afterData) {
+        console.log(`[${episodeId}] Document deleted. Cleanup will be handled by onDocumentDeleted trigger.`);
         return;
     }
     
-    if (afterData.status?.pipeline === 'queued' && beforeData?.status?.pipeline !== 'queued') {
-        console.log(`✨ [${episodeId}] Video pipeline job detected. Starting process...`);
-        await processAndEncryptVideo(episodeId, afterData.storage.rawPath, docRef);
-    }
-});
-
-
-export const aiAnalysisTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
-    const { episodeId } = event.params;
-    const change = event.data;
-    if (!change || !change.after.exists || !change.before.exists) return;
-    
-    const docRef = change.after.ref;
-    const afterData = change.after.data() as Episode;
-    const beforeData = change.before.data() as Episode;
-
-    if (afterData.status?.pipeline === 'completed' && beforeData.status?.pipeline !== 'completed') {
-        console.log(`✅ [${episodeId}] Video pipeline finished. Starting AI analysis...`);
-        const success = await runAiAnalysis(episodeId, docRef, afterData);
+    try {
+        if (!process.env.KEK_SECRET || !process.env.GOOGLE_GENAI_API_KEY) {
+            throw new Error(`Required secrets are missing. Function cannot start.`);
+        }
         
-        if (success) {
+        // Determine if a specific status has changed to avoid redundant executions.
+        const pipelineStatusChanged = beforeData?.status?.pipeline !== afterData.status?.pipeline;
+        const aiStatusChanged = beforeData?.ai?.status !== afterData.ai?.status;
+
+        // === STAGE 1: Video Processing ===
+        // Triggered when a new episode is created and set to 'pending'.
+        if (afterData.status.pipeline === 'pending' && pipelineStatusChanged) {
+            console.log(`[${episodeId}] STAGE 1: Video pipeline job detected. Starting process...`);
+            await processAndEncryptVideo(episodeId, afterData.storage.rawPath, docRef);
+            return; // End execution for this invocation. The next stage will be triggered by the update.
+        }
+
+        // === STAGE 2: AI Analysis ===
+        // Triggered after video processing is 'completed' and AI is ready to be 'queued'.
+        if (afterData.status.pipeline === 'completed' && afterData.ai.status === 'queued' && (pipelineStatusChanged || aiStatusChanged)) {
+            console.log(`[${episodeId}] STAGE 2: Video pipeline finished. Starting AI analysis...`);
+            await runAiAnalysis(episodeId, docRef, afterData);
+            return; // End execution. The cleanup stage will be triggered by this function's update.
+        }
+
+        // === STAGE 3: Cleanup Raw File ===
+        // Triggered after AI analysis is 'completed'.
+        if (afterData.ai.status === 'completed' && aiStatusChanged) {
             if (afterData.storage.rawPath) {
+                console.log(`[${episodeId}] STAGE 3: AI analysis finished. Deleting original raw file.`);
                 await deleteStorageFileByPath(afterData.storage.rawPath);
                 await docRef.update({ 'storage.rawPath': admin.firestore.FieldValue.delete() });
                 console.log(`[${episodeId}] ✅ All jobs finished. Original file deleted.`);
             }
-        } else {
-             console.warn(`[${episodeId}] ⚠️ AI job did not complete successfully. Original file at ${afterData.storage.rawPath} was NOT deleted for manual inspection.`);
+            return; // End of the line for this episode's processing.
         }
+    
+    } catch (e: any) {
+        console.error(`[${episodeId}] UNHANDLED EXCEPTION in episodeProcessingTrigger:`, e);
+        // A fail-safe to mark the pipeline as failed if the orchestrator itself crashes.
+        await failPipeline(docRef, 'trigger-exception', e, '함수 트리거 레벨에서 예상치 못한 오류가 발생했습니다.');
     }
 });
 
