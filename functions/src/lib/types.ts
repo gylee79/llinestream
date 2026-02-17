@@ -1,8 +1,4 @@
-
-
-'use server';
-
-import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
+import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase-admin/firestore';
 
 export type Timestamp = FirebaseTimestamp | FieldValue;
 
@@ -152,6 +148,7 @@ export interface Episode {
       manifestPath: string;
       aiAudioPath?: string;
       thumbnailBasePath?: string; // e.g., episodes/{id}/thumbnails/
+      fileSize?: number;
   };
 
   // Replaces flat thumbnail URLs/paths
@@ -343,7 +340,7 @@ export interface OfflineLicense {
   issuedAt: number; // timestamp
   expiresAt: number; // timestamp
   keyId: string;
-  kekVersion: 1;
+  kekVersion: 1,
   policy: {
       maxDevices: 1,
       allowScreenCapture: false

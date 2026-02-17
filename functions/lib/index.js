@@ -194,7 +194,7 @@ async function processAndEncryptVideo(episodeId, inputFilePath, docRef) {
         }).catch(err => { throw { step: 'ffmpeg', error: err, hint: "DASH segmentation failed." }; });
         await updatePipelineStatus(docRef, { pipeline: 'processing', step: 'encrypt', progress: 40, playable: false });
         const createdFiles = await fs.readdir(tempOutputDir);
-        const mediaSegmentNames = createdFiles.filter(f => f.startsWith('segment_') && f.endsWith('.m4s')).sort((a, b) => parseInt(a.match(/(\\d+)/)?.[0] || '0') - parseInt(b.match(/(\\d+)/)?.[0] || '0'));
+        const mediaSegmentNames = createdFiles.filter(f => f.startsWith('segment_') && f.endsWith('.m4s')).sort((a, b) => parseInt(a.match(/(\d+)/)?.[0] || '0') - parseInt(b.match(/(\d+)/)?.[0] || '0'));
         const allSegmentsToProcess = ['init.mp4', ...mediaSegmentNames];
         const masterKey = crypto.randomBytes(32);
         const encryptedBasePath = `episodes/${episodeId}/segments/`;
