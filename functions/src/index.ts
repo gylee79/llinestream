@@ -1,8 +1,23 @@
 /**
- * @fileoverview LlineStream Video Processing Pipeline v7.0
+ * @fileoverview LlineStream Video Processing Pipeline v6.2
  *
- * Implements a robust, state-machine-driven workflow for video processing and AI analysis
- * using a single orchestrator function to prevent timeouts and improve reliability.
+ * Implements a decoupled, two-stage workflow for video processing and AI analysis
+ * to prevent Cloud Function timeouts and improve reliability.
+ *
+ * Required NPM Packages for this file:
+ * "dependencies": {
+ *   "@google/generative-ai": "^0.23.0",
+ *   "firebase-admin": "^12.0.0",
+ *   "firebase-functions": "^5.0.1",
+ *   "fluent-ffmpeg": "^2.1.3",
+ *   "ffmpeg-static": "^5.2.0",
+ *   "ffprobe-static": "^3.1.0"
+ * },
+ * "devDependencies": {
+ *   "@types/fluent-ffmpeg": "^2.1.24",
+ *   "@types/node": "^20.14.2",
+ *   "typescript": "^5.0.0"
+ * }
  */
 
 // --- Firebase and Node.js Imports ---
@@ -77,23 +92,23 @@ function initializeTools() {
 }
 
 async function updatePipelineStatus(docRef: admin.firestore.DocumentReference, status: Partial<PipelineStatus>) {
-    const updatePayload: { [key: string]: any } = {};
-    for (const [key, value] of Object.entries(status)) {
-        updatePayload[`status.${key}`] = value;
-    }
-    updatePayload['status.updatedAt'] = admin.firestore.FieldValue.serverTimestamp();
-    if (status.step !== 'done') { // Don't update heartbeat for the final 'done' step
-        updatePayload['status.lastHeartbeatAt'] = admin.firestore.FieldValue.serverTimestamp();
-    }
-    await docRef.update(updatePayload);
+    await docRef.update({
+        'status.pipeline': status.pipeline,
+        'status.step': status.step,
+        'status.progress': status.progress,
+        'status.playable': status.playable,
+        'status.updatedAt': admin.firestore.FieldValue.serverTimestamp(),
+        'status.lastHeartbeatAt': admin.firestore.FieldValue.serverTimestamp(),
+    });
 }
 
 async function failPipeline(docRef: admin.firestore.DocumentReference, step: PipelineStatus['step'], error: any, hint?: string) {
     const rawError = (error instanceof Error) ? error.message : String(error);
-    const updatePayload: any = {
+    await docRef.update({
         'status.pipeline': 'failed',
         'status.step': step,
-        'status.progress': 100, // Mark as finished, but failed
+        'status.playable': false,
+        'status.progress': 100,
         'status.error': {
             step: step,
             code: error.code || 'UNKNOWN',
@@ -108,14 +123,7 @@ async function failPipeline(docRef: admin.firestore.DocumentReference, step: Pip
             message: '비디오 처리 파이프라인이 실패하여 AI 분석을 건너뜁니다.',
             ts: admin.firestore.FieldValue.serverTimestamp()
         }
-    };
-    
-    // Video processing failure means the video is unplayable.
-    if (step !== 'ai_analysis' && step !== 'cleanup') {
-        updatePayload['status.playable'] = false;
-    }
-
-    await docRef.update(updatePayload);
+    });
     console.error(`[${docRef.id}] ❌ Pipeline Failed at step '${step}':`, rawError);
 }
 
@@ -129,37 +137,45 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
     const localInputPath = path.join(tempInputDir, 'original_video');
 
     try {
-        await updatePipelineStatus(docRef, { pipeline: 'processing', step: 'ffmpeg', progress: 15 });
+        await updatePipelineStatus(docRef, { pipeline: 'processing', step: 'validate', progress: 5, playable: false });
         await bucket.file(inputFilePath).download({ destination: localInputPath });
 
         const probeData = await new Promise<ffmpeg.FfprobeData>((resolve, reject) => {
             ffmpeg.ffprobe(localInputPath, (err, data) => err ? reject(err) : resolve(data));
-        });
+        }).catch(err => { throw { step: 'validate', error: err }; });
+        
+        const videoStream = probeData.streams.find(s => s.codec_type === 'video');
+        if (!videoStream) throw { step: 'validate', error: new Error("No video stream found.") };
         
         const audioStream = probeData.streams.find(s => s.codec_type === 'audio');
         const duration = probeData.format.duration || 0;
         const codecString = audioStream ? `video/mp4; codecs="avc1.42E01E, mp4a.40.2"` : `video/mp4; codecs="avc1.42E01E"`;
 
+        await updatePipelineStatus(docRef, { pipeline: 'processing', step: 'ffmpeg', progress: 15, playable: false });
         const fragmentedMp4Path = path.join(tempInputDir, 'frag.mp4');
+
         await new Promise<void>((resolve, reject) => {
             const command = ffmpeg(localInputPath).videoCodec('libx264');
             if (audioStream) command.audioCodec('aac');
             command
                 .outputOptions(['-profile:v baseline', '-level 3.0', '-pix_fmt yuv420p', '-g 48', '-keyint_min 48', '-sc_threshold 0', '-movflags frag_keyframe+empty_moov'])
-                .toFormat('mp4').on('error', (err) => reject(err)).on('end', () => resolve())
+                .toFormat('mp4')
+                .on('error', (err) => reject(err))
+                .on('end', () => resolve())
                 .save(fragmentedMp4Path);
         }).catch(err => { throw { step: 'ffmpeg', error: err, hint: "Video transcoding failed." }; });
 
         await new Promise<void>((resolve, reject) => {
             ffmpeg(fragmentedMp4Path)
                 .outputOptions(['-f dash', `-seg_duration ${SEGMENT_DURATION_SEC}`, '-init_seg_name init.mp4', `-media_seg_name segment_%d.m4s`])
-                .on('error', (err) => reject(err)).on('end', () => resolve())
+                .on('error', (err) => reject(err))
+                .on('end', () => resolve())
                 .save(path.join(tempOutputDir, 'manifest.mpd'));
         }).catch(err => { throw { step: 'ffmpeg', error: err, hint: "DASH segmentation failed." }; });
 
-        await updatePipelineStatus(docRef, { step: 'encrypt', progress: 40 });
+        await updatePipelineStatus(docRef, { pipeline: 'processing', step: 'encrypt', progress: 40, playable: false });
         const createdFiles = await fs.readdir(tempOutputDir);
-        const mediaSegmentNames = createdFiles.filter(f => f.startsWith('segment_') && f.endsWith('.m4s')).sort((a, b) => parseInt(a.match(/(\d+)/)?.[0] || '0') - parseInt(b.match(/(\d+)/)?.[0] || '0'));
+        const mediaSegmentNames = createdFiles.filter(f => f.startsWith('segment_') && f.endsWith('.m4s')).sort((a, b) => parseInt(a.match(/(\\d+)/)?.[0] || '0') - parseInt(b.match(/(\\d+)/)?.[0] || '0'));
         const allSegmentsToProcess = ['init.mp4', ...mediaSegmentNames];
         
         const masterKey = crypto.randomBytes(32);
@@ -173,8 +189,10 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
             const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
             const outputFileName = fileName.replace('.mp4', '.enc').replace('.m4s', '.m4s.enc');
             const storagePath = `${encryptedBasePath}${outputFileName}`;
+            
             const aad = Buffer.from(`path:${storagePath}`);
             cipher.setAAD(aad);
+
             const encryptedContent = Buffer.concat([cipher.update(content), cipher.final()]);
             const authTag = cipher.getAuthTag();
             const finalBuffer = Buffer.concat([iv, encryptedContent, authTag]);
@@ -182,7 +200,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
             processedSegmentPaths.push({ name: fileName, path: storagePath });
         }
 
-        await updatePipelineStatus(docRef, { step: 'manifest', progress: 85 });
+        await updatePipelineStatus(docRef, { pipeline: 'processing', step: 'manifest', progress: 85, playable: false });
         const initSegment = processedSegmentPaths.find(s => s.name === 'init.mp4');
         if (!initSegment) throw { step: 'manifest', error: new Error("Manifest creation failed: init segment path not found.") };
         
@@ -195,7 +213,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         const manifestPath = `episodes/${episodeId}/manifest.json`;
         await bucket.file(manifestPath).save(JSON.stringify(manifest, null, 2), { contentType: 'application/json' });
 
-        await updatePipelineStatus(docRef, { step: 'keys', progress: 95 });
+        await updatePipelineStatus(docRef, { pipeline: 'processing', step: 'keys', progress: 95, playable: false });
         const kek = await loadKEK();
         const keyId = `vidkey_${episodeId}`;
         const kekIv = crypto.randomBytes(12);
@@ -204,22 +222,30 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
         const kekAuthTag = kekCipher.getAuthTag();
         const encryptedMasterKeyBlob = Buffer.concat([kekIv, encryptedMasterKey, kekAuthTag]);
         await db.collection('video_keys').doc(keyId).set({
-            keyId, videoId: episodeId, encryptedMasterKey: encryptedMasterKeyBlob.toString('base64'),
-            kekVersion: 1, createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            keyId, videoId: episodeId,
+            encryptedMasterKey: encryptedMasterKeyBlob.toString('base64'),
+            kekVersion: 1,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         
         await docRef.update({
             duration: Math.round(duration),
             'storage.encryptedBasePath': encryptedBasePath,
             'storage.manifestPath': manifestPath,
-            'encryption': { algorithm: 'AES-256-GCM', ivLength: 12, tagLength: 16, keyId, kekVersion: 1, aadMode: "path", segmentDurationSec: SEGMENT_DURATION_SEC, fragmentEncrypted: true },
-            'status.pipeline': 'completed', 'status.step': 'done', 'status.progress': 100, 'status.playable': true, 'status.error': null,
+            'encryption': {
+                algorithm: 'AES-256-GCM', ivLength: 12, tagLength: 16,
+                keyId: keyId, kekVersion: 1, aadMode: "path",
+                segmentDurationSec: SEGMENT_DURATION_SEC, fragmentEncrypted: true
+            },
+            'status.pipeline': 'completed', 'status.step': 'done',
+            'status.progress': 100, 'status.playable': true, 'status.error': null,
+            'status.updatedAt': admin.firestore.FieldValue.serverTimestamp(),
+            'status.lastHeartbeatAt': admin.firestore.FieldValue.serverTimestamp(),
             'ai.status': 'queued',
         });
         
-        console.log(`[${episodeId}] ✅ STAGE 1: Video Pipeline complete.`);
+        console.log(`[${episodeId}] ✅ Video Pipeline complete.`);
         return true;
-
     } catch (error: any) {
         await failPipeline(docRef, error.step || 'unknown', error.error || error, error.hint);
         return false;
@@ -235,11 +261,10 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
 
 export async function runAiAnalysis(episodeId: string, docRef: admin.firestore.DocumentReference, episodeData: Episode): Promise<boolean> {
     const modelName = "gemini-2.5-flash";
+    const { genAI, fileManager } = initializeTools(); // Initialize tools at the start.
+    
     const tempFilePath = path.join(os.tmpdir(), `ai-in-${episodeId}`);
     let uploadedFile: any = null;
-    
-    // Initialize tools at the top. If this fails, the whole function will throw, which is correct.
-    const { genAI, fileManager } = initializeTools();
 
     try {
         console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
@@ -250,14 +275,14 @@ export async function runAiAnalysis(episodeId: string, docRef: admin.firestore.D
             return false;
         }
         await docRef.update({ 'ai.status': 'processing', 'ai.model': modelName });
-
+        
         await bucket.file(episodeData.storage.rawPath).download({ destination: tempFilePath });
         const uploadResponse = await fileManager.uploadFile(tempFilePath, { mimeType: 'video/mp4', displayName: episodeId });
         uploadedFile = uploadResponse.file;
 
         let state = uploadedFile.state;
         while (state === FileState.PROCESSING) {
-            await new Promise(resolve => setTimeout(resolve, 10000));
+            await new Promise(resolve => setTimeout(resolve, 10000)); // Increased delay for AI file processing
             const freshFile = await fileManager.getFile(uploadedFile.name);
             state = freshFile.state;
         }
@@ -298,20 +323,10 @@ export async function runAiAnalysis(episodeId: string, docRef: admin.firestore.D
         console.error(`❌ [${episodeId}] AI analysis failed.`, error);
         return false;
     } finally {
-        if (uploadedFile) {
-            try {
-                // fileManager is guaranteed to be initialized here because it's at the top of the function scope.
-                await fileManager.deleteFile(uploadedFile.name);
-            } catch (e) {
-                console.error(`Failed to delete uploaded file from AI service: ${e}`);
-            }
-        }
+        if (uploadedFile) { try { await fileManager.deleteFile(uploadedFile.name); } catch (e) {console.error(`Failed to delete AI file ${uploadedFile.name}:`, e)} }
         try { await fs.rm(tempFilePath, { force: true }); } catch (e) {}
     }
 }
-
-// 4. Cloud Function Triggers & Orchestrator
-// ===============================================
 
 const deleteStorageFileByPath = async (filePath: string | undefined) => {
     if (!filePath) return;
@@ -325,88 +340,85 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
     }
 };
 
+// 4. Cloud Function Triggers
+// ===============================================
+
 /**
- * Orchestrates the entire video processing and AI analysis pipeline based on the episode's status.
- * This single trigger acts as a state machine to ensure steps run sequentially and reliably.
+ * Triggers the video encoding and encryption pipeline when an episode is created
+ * or its status is manually reset to 'pending'.
  */
-export const episodeProcessingTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
+export const videoPipelineTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
     const { episodeId } = event.params;
     const change = event.data;
-    if (!change) return;
-
-    if (!change.after.exists) {
-        // Document was deleted, cleanup is handled by deleteFilesOnEpisodeDelete
-        return;
+    if (!change || !change.after.exists) {
+        return; // Document was deleted, no action needed.
     }
-    
     const docRef = change.after.ref;
     const afterData = change.after.data() as Episode;
     const beforeData = change.before.exists ? change.before.data() as Episode : null;
 
-    // --- LOOP PREVENTION ---
-    // If the pipeline and AI statuses haven't changed, do nothing.
-    if (beforeData && 
-        beforeData.status?.pipeline === afterData.status?.pipeline && 
-        beforeData.ai?.status === afterData.ai?.status) {
-        return;
-    }
-
     try {
-        // --- STAGE 0/1: Video Processing ---
-        if (afterData.status?.pipeline === 'pending') {
-            console.log(`[${episodeId}] STAGE 1: Video pipeline job detected. Starting process...`);
-            
-            // STAGE 0: Validation
+        if (!process.env.KEK_SECRET || !process.env.GOOGLE_GENAI_API_KEY) {
+            throw new Error(`Required secrets are missing. Function cannot start.`);
+        }
+
+        // Trigger only if the pipeline status is newly set to 'pending'.
+        if (afterData.status?.pipeline === 'pending' && beforeData?.status?.pipeline !== 'pending') {
+            console.log(`✨ [${episodeId}] New video pipeline job detected. Starting process...`);
             if (!afterData.storage?.rawPath) {
-                await failPipeline(docRef, 'validate', new Error('storage.rawPath is missing'), '프론트엔드에서 비디오 파일 경로를 전달하지 못했습니다.');
-                return;
+                 await failPipeline(docRef, 'trigger-exception', new Error('storage.rawPath is missing'), '프론트엔드에서 비디오 파일 경로를 전달하지 못했습니다.');
+                 return;
             }
-            const fileExists = await bucket.file(afterData.storage.rawPath).exists();
-            if (!fileExists[0]) {
-                await failPipeline(docRef, 'validate', new Error(`File does not exist in Storage at path: ${afterData.storage.rawPath}`), '스토리지에서 원본 비디오 파일을 찾을 수 없습니다.');
-                return;
-            }
-
-            // STAGE 1: Core video processing
             await processAndEncryptVideo(episodeId, afterData.storage.rawPath, docRef);
-            return;
         }
-
-        // --- STAGE 2: AI Analysis ---
-        if (afterData.status?.pipeline === 'completed' && afterData.ai?.status === 'queued') {
-            console.log(`[${episodeId}] STAGE 2: AI analysis job detected...`);
-            await runAiAnalysis(episodeId, docRef, afterData);
-            return;
-        }
-        
-        // --- STAGE 3: Cleanup ---
-        const aiHasFinished = afterData.ai?.status === 'completed' || afterData.ai?.status === 'failed' || afterData.ai.status === 'blocked';
-        const aiStatusChanged = beforeData?.ai?.status !== afterData.ai?.status;
-
-        if (aiHasFinished && aiStatusChanged) {
-             if (afterData.storage.rawPath) {
-                console.log(`[${episodeId}] STAGE 3: Cleanup job detected. Deleting original raw file.`);
-                await deleteStorageFileByPath(afterData.storage.rawPath);
-                await docRef.update({ 'storage.rawPath': admin.firestore.FieldValue.delete() });
-                console.log(`[${episodeId}] ✅ All jobs finished. Original file deleted.`);
-            }
-        }
-
     } catch (e: any) {
-        console.error(`[${episodeId}] UNHANDLED EXCEPTION in episodeProcessingTrigger:`, e);
+        console.error(`[${episodeId}] UNHANDLED EXCEPTION in videoPipelineTrigger:`, e);
         await failPipeline(docRef, 'trigger-exception', e, '함수 트리거 레벨에서 예상치 못한 오류가 발생했습니다.');
     }
 });
 
 
 /**
- * Cleans up all associated storage files and keys when an episode document is deleted.
+ * Triggers the AI analysis pipeline after the video processing pipeline completes successfully.
+ * It also handles the final deletion of the raw video file.
  */
+export const aiAnalysisTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
+    const { episodeId } = event.params;
+    const change = event.data;
+    if (!change || !change.after.exists || !change.before.exists) {
+        return;
+    }
+
+    const docRef = change.after.ref;
+    const afterData = change.after.data() as Episode;
+    const beforeData = change.before.data() as Episode;
+
+    // Trigger only when the AI status is newly set to 'queued'.
+    if (afterData.ai?.status === 'queued' && beforeData.ai?.status !== 'queued') {
+        console.log(`✅ [${episodeId}] Video pipeline finished. Starting AI analysis...`);
+        try {
+            const success = await runAiAnalysis(episodeId, docRef, afterData);
+            
+            // AI job finished, now delete the raw file regardless of success/fail
+            if (afterData.storage.rawPath) {
+                await deleteStorageFileByPath(afterData.storage.rawPath);
+                await docRef.update({ 'storage.rawPath': admin.firestore.FieldValue.delete() });
+                console.log(`[${episodeId}] ✅ AI job finished (Success: ${success}). Original raw file deleted.`);
+            } else {
+                 console.log(`[${episodeId}] ✅ AI job finished (Success: ${success}). No raw file path to delete.`);
+            }
+        } catch (e: any) {
+            console.error(`[${episodeId}] UNHANDLED EXCEPTION in aiAnalysisTrigger:`, e);
+            // The runAiAnalysis function has its own error handling that updates the doc.
+        }
+    }
+});
+
+
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
     const { episodeId } = event.params;
     console.log(`[DELETE TRIGGER] Cleaning up for episode ${episodeId}.`);
     
-    // Delete all files in the episode's main storage folder
     const prefix = `episodes/${episodeId}/`;
     try {
         await bucket.deleteFiles({ prefix });
@@ -415,7 +427,6 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
         console.error(`[DELETE FAILED] Could not delete storage files for episode ${episodeId}.`, error);
     }
     
-    // Delete the encryption key if it exists
     const episode = event.data?.data() as Episode;
     const keyId = episode?.encryption?.keyId;
     if (keyId) {
