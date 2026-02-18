@@ -6,7 +6,7 @@ export type Timestamp = FirebaseTimestamp | FieldValue;
 
 export interface PipelineStatus {
     pipeline: "pending" | "processing" | "completed" | "failed";
-    step: "validate" | "transcode" | "encrypt" | "manifest" | "done" | "unknown" | "trigger-exception" | "idle";
+    step: "idle" | "preparing" | "validate" | "transcoding" | "thumbnail" | "encrypting" | "manifest" | "uploading" | "done" | "trigger-exception";
     playable: boolean;
     progress: number;
     error?: { step: string; message: string; ts: Timestamp } | null;
