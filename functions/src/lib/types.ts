@@ -88,7 +88,7 @@ export interface EncryptionInfo {
 
 // From Spec 4.1
 export interface PipelineStatus {
-    pipeline: "queued" | "processing" | "failed" | "completed";
+    pipeline: "pending" | "processing" | "failed" | "completed";
     step: "validate" | "ffmpeg" | "encrypt" | "verify" | "manifest" | "keys" | "done" | "idle" | "trigger-exception";
     playable: boolean;
     progress: number;
@@ -109,7 +109,7 @@ export interface PipelineStatus {
 
 // From Spec 4.4
 export interface AiStatus {
-    status: "queued" | "processing" | "failed" | "completed" | "blocked" | "idle";
+    status: "pending" | "processing" | "failed" | "completed" | "blocked" | "idle";
     jobId?: string;
     model?: string;
     attempts?: number;
@@ -341,10 +341,6 @@ export interface OfflineLicense {
   expiresAt: number; // timestamp
   keyId: string;
   kekVersion: 1,
-  policy: {
-      maxDevices: 1,
-      allowScreenCapture: false
-  },
   // This signature is crucial but requires a server private key.
   // The client must verify it with a public key.
   signature: string; 
@@ -398,3 +394,4 @@ export type CryptoWorkerResponse =
     };
 
     
+
