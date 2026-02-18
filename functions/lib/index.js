@@ -106,11 +106,11 @@ async function runVideoCoreStage(docRef, episode) {
             if (audioStream)
                 command.audioCodec('aac');
             command.outputOptions(['-profile:v baseline', '-level 3.0', '-pix_fmt yuv420p', '-g 48', '-keyint_min 48', '-sc_threshold 0', '-movflags frag_keyframe+empty_moov'])
-                .toFormat('mp4').on('error', rej).on('end', res).save(fragmentedMp4Path);
+                .toFormat('mp4').on('error', rej).on('end', () => res()).save(fragmentedMp4Path);
         });
         await new Promise((res, rej) => {
             (0, fluent_ffmpeg_1.default)(fragmentedMp4Path).outputOptions(['-f dash', `-seg_duration ${SEGMENT_DURATION_SEC}`, '-init_seg_name init.mp4', `-media_seg_name segment_%d.m4s`])
-                .on('error', rej).on('end', res).save(path.join(tempDir, 'manifest.mpd'));
+                .on('error', rej).on('end', () => res()).save(path.join(tempDir, 'manifest.mpd'));
         });
         await updateDoc(docRef, { 'status.step': 'encrypt', 'status.progress': 40 });
         const createdFiles = await fs.readdir(tempDir);
