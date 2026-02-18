@@ -1,8 +1,8 @@
 /**
- * @fileoverview LlineStream Video Processing Pipeline v6.3
+ * @fileoverview LlineStream Video Processing Pipeline v6.2
  *
- * Implements a robust, state-machine-driven workflow for video processing and AI analysis
- * using a single orchestrator function to prevent timeouts and improve reliability.
+ * Implements a decoupled, two-stage workflow for video processing and AI analysis
+ * to prevent Cloud Function timeouts and improve reliability.
  *
  * Required NPM Packages for this file:
  * "dependencies": {
@@ -241,7 +241,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
             'status.progress': 100, 'status.playable': true, 'status.error': null,
             'status.updatedAt': admin.firestore.FieldValue.serverTimestamp(),
             'status.lastHeartbeatAt': admin.firestore.FieldValue.serverTimestamp(),
-            'ai.status': 'pending',
+            'ai.status': 'queued',
         });
         
         console.log(`[${episodeId}] ✅ Video Pipeline complete.`);
@@ -354,64 +354,73 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
 // ===============================================
 
 /**
- * Orchestrates the entire video processing and AI analysis pipeline based on the episode's status.
- * This single trigger acts as a state machine to ensure steps run sequentially and reliably.
+ * Triggers the video encoding and encryption pipeline when an episode is created
+ * or its status is manually reset to 'pending'.
  */
-export const episodeProcessingTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
+export const videoPipelineTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
     const { episodeId } = event.params;
     const change = event.data;
-    if (!change) { return; } 
-
+    if (!change || !change.after.exists) {
+        return; // Document was deleted, no action needed.
+    }
     const docRef = change.after.ref;
-    const afterData = change.after.exists ? change.after.data() as Episode : null;
+    const afterData = change.after.data() as Episode;
     const beforeData = change.before.exists ? change.before.data() as Episode : null;
 
-    if (!afterData) {
-        console.log(`[${episodeId}] Document deleted. Cleanup will be handled by onDocumentDeleted trigger.`);
-        return;
-    }
-    
     try {
         if (!process.env.KEK_SECRET || !process.env.GOOGLE_GENAI_API_KEY) {
             throw new Error(`Required secrets are missing. Function cannot start.`);
         }
-        
-        // Determine if a specific status has changed to avoid redundant executions.
-        const pipelineStatusChanged = beforeData?.status?.pipeline !== afterData.status?.pipeline;
-        const aiStatusChanged = beforeData?.ai?.status !== afterData.ai?.status;
 
-        // === STAGE 1: Video Processing ===
-        // Triggered when a new episode is created and set to 'pending'.
-        if (afterData.status.pipeline === 'pending' && pipelineStatusChanged) {
-            console.log(`[${episodeId}] STAGE 1: Video pipeline job detected. Starting process...`);
+        // Trigger only if the pipeline status is newly set to 'pending'.
+        if (afterData.status?.pipeline === 'pending' && beforeData?.status?.pipeline !== 'pending') {
+            console.log(`✨ [${episodeId}] New video pipeline job detected. Starting process...`);
+            if (!afterData.storage?.rawPath) {
+                 await failPipeline(docRef, 'trigger-exception', new Error('storage.rawPath is missing'), '프론트엔드에서 비디오 파일 경로를 전달하지 못했습니다.');
+                 return;
+            }
             await processAndEncryptVideo(episodeId, afterData.storage.rawPath, docRef);
-            return; // End execution for this invocation. The next stage will be triggered by the update.
         }
+    } catch (e: any) {
+        console.error(`[${episodeId}] UNHANDLED EXCEPTION in videoPipelineTrigger:`, e);
+        await failPipeline(docRef, 'trigger-exception', e, '함수 트리거 레벨에서 예상치 못한 오류가 발생했습니다.');
+    }
+});
 
-        // === STAGE 2: AI Analysis ===
-        // Triggered after video processing is 'completed' and AI is ready to be 'pending'.
-        if (afterData.status.pipeline === 'completed' && afterData.ai.status === 'pending' && (pipelineStatusChanged || aiStatusChanged)) {
-            console.log(`[${episodeId}] STAGE 2: AI analysis...`);
-            await runAiAnalysis(episodeId, docRef, afterData);
-            return; // End execution. The cleanup stage will be triggered by this function's update.
-        }
 
-        // === STAGE 3: Cleanup Raw File ===
-        // Triggered after AI analysis is 'completed'.
-        if (afterData.ai.status === 'completed' && aiStatusChanged) {
+/**
+ * Triggers the AI analysis pipeline after the video processing pipeline completes successfully.
+ * It also handles the final deletion of the raw video file.
+ */
+export const aiAnalysisTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
+    const { episodeId } = event.params;
+    const change = event.data;
+    if (!change || !change.after.exists || !change.before.exists) {
+        return;
+    }
+
+    const docRef = change.after.ref;
+    const afterData = change.after.data() as Episode;
+    const beforeData = change.before.data() as Episode;
+
+    // Trigger only when the AI status is newly set to 'queued'.
+    if (afterData.ai?.status === 'queued' && beforeData.ai?.status !== 'queued') {
+        console.log(`✅ [${episodeId}] Video pipeline finished. Starting AI analysis...`);
+        try {
+            const success = await runAiAnalysis(episodeId, docRef, afterData);
+            
+            // AI job finished, now delete the raw file regardless of success/fail
             if (afterData.storage.rawPath) {
-                console.log(`[${episodeId}] STAGE 3: AI analysis finished. Deleting original raw file.`);
                 await deleteStorageFileByPath(afterData.storage.rawPath);
                 await docRef.update({ 'storage.rawPath': admin.firestore.FieldValue.delete() });
-                console.log(`[${episodeId}] ✅ All jobs finished. Original file deleted.`);
+                console.log(`[${episodeId}] ✅ AI job finished (Success: ${success}). Original raw file deleted.`);
+            } else {
+                 console.log(`[${episodeId}] ✅ AI job finished (Success: ${success}). No raw file path to delete.`);
             }
-            return; // End of the line for this episode's processing.
+        } catch (e: any) {
+            console.error(`[${episodeId}] UNHANDLED EXCEPTION in aiAnalysisTrigger:`, e);
+            // The runAiAnalysis function has its own error handling that updates the doc.
         }
-    
-    } catch (e: any) {
-        console.error(`[${episodeId}] UNHANDLED EXCEPTION in episodeProcessingTrigger:`, e);
-        // A fail-safe to mark the pipeline as failed if the orchestrator itself crashes.
-        await failPipeline(docRef, 'trigger-exception', e, '함수 트리거 레벨에서 예상치 못한 오류가 발생했습니다.');
     }
 });
 
