@@ -1,26 +1,29 @@
+
 'use server';
 
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase-admin/firestore';
 
 export type Timestamp = FirebaseTimestamp | FieldValue;
 
+// From user request:
 export interface PipelineStatus {
     pipeline: "pending" | "processing" | "completed" | "failed";
-    step: "idle" | "preparing" | "validate" | "transcoding" | "thumbnail" | "encrypting" | "manifest" | "uploading" | "done" | "trigger-exception";
-    playable: boolean;
+    // 세분화된 스텝
+    step: "idle" | "preparing" | "transcoding" | "thumbnail" | "encrypting" | "manifest" | "uploading" | "done" | "trigger-exception";
+    playable: boolean; // AI 실패 여부와 상관없이, Stage 1 성공 시 true
     progress: number;
-    error?: { step: string; message: string; ts: Timestamp } | null;
+    error?: { step: string; message: string; ts: any } | null;
 }
 
 export interface AiStatus {
-    status: "idle" | "queued" | "processing" | "completed" | "failed" | "blocked";
+    status: "idle" | "queued" | "processing" | "completed" | "failed";
     model?: string;
     resultPaths?: { 
         summary?: string; 
         transcript?: string; 
         search_data?: string;
     };
-    error?: { code: string; message: string; ts: Timestamp } | null;
+    error?: { code: string; message: string; ts: any } | null;
 }
 
 export interface Episode {
@@ -45,7 +48,7 @@ export interface Episode {
   status: PipelineStatus;
   ai: AiStatus;
   storage: {
-      rawPath?: string;
+      rawPath?: string; 
       encryptedBasePath: string;
       manifestPath: string;
       fileSize?: number;
@@ -363,3 +366,5 @@ export type CryptoWorkerResponse =
         message: string;
       };
     };
+
+    

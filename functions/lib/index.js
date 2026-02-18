@@ -1,4 +1,5 @@
 "use strict";
+'use server';
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -90,7 +91,6 @@ async function failPipeline(docRef, step, error, playable = false) {
         'status.pipeline': 'failed',
         'status.playable': playable,
         'status.error': { step: step, message: rawError, ts: admin.firestore.FieldValue.serverTimestamp() },
-        // Also block AI if the core pipeline fails
         'ai.status': 'blocked',
         'ai.error': { code: 'PIPELINE_FAILED', message: '비디오 처리 파이프라인 실패로 AI 분석이 차단되었습니다.' }
     });
