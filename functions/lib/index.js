@@ -1,9 +1,9 @@
 "use strict";
 /**
- * @fileoverview LlineStream Video Processing Pipeline v6.2
+ * @fileoverview LlineStream Video Processing Pipeline v6.3
  *
- * Implements a decoupled, two-stage workflow for video processing and AI analysis
- * to prevent Cloud Function timeouts and improve reliability.
+ * Implements a robust, state-machine-driven workflow for video processing and AI analysis
+ * using a single orchestrator function to prevent timeouts and improve reliability.
  *
  * Required NPM Packages for this file:
  * "dependencies": {
@@ -57,7 +57,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteFilesOnEpisodeDelete = exports.aiAnalysisTrigger = exports.videoPipelineTrigger = void 0;
+exports.deleteFilesOnEpisodeDelete = exports.episodeProcessingTrigger = void 0;
 exports.runAiAnalysis = runAiAnalysis;
 // --- Firebase and Node.js Imports ---
 const v2_1 = require("firebase-functions/v2");
@@ -363,44 +363,60 @@ const deleteStorageFileByPath = async (filePath) => {
 };
 // 4. Cloud Function Triggers
 // ===============================================
-exports.videoPipelineTrigger = (0, firestore_1.onDocumentWritten)("episodes/{episodeId}", async (event) => {
+/**
+ * Orchestrates the entire video processing and AI analysis pipeline based on the episode's status.
+ * This single trigger acts as a state machine to ensure steps run sequentially and reliably.
+ */
+exports.episodeProcessingTrigger = (0, firestore_1.onDocumentWritten)("episodes/{episodeId}", async (event) => {
     const { episodeId } = event.params;
     const change = event.data;
-    if (!change || !change.after.exists)
+    if (!change) {
         return;
+    }
     const docRef = change.after.ref;
-    const afterData = change.after.data();
+    const afterData = change.after.exists ? change.after.data() : null;
     const beforeData = change.before.exists ? change.before.data() : null;
-    if (!process.env.KEK_SECRET || !process.env.GOOGLE_GENAI_API_KEY) {
-        console.error(`[${episodeId}] CRITICAL: Required secrets are missing. Function cannot start.`);
+    if (!afterData) {
+        console.log(`[${episodeId}] Document deleted. Cleanup will be handled by onDocumentDeleted trigger.`);
         return;
     }
-    if (afterData.status?.pipeline === 'queued' && beforeData?.status?.pipeline !== 'queued') {
-        console.log(`✨ [${episodeId}] Video pipeline job detected. Starting process...`);
-        await processAndEncryptVideo(episodeId, afterData.storage.rawPath, docRef);
-    }
-});
-exports.aiAnalysisTrigger = (0, firestore_1.onDocumentWritten)("episodes/{episodeId}", async (event) => {
-    const { episodeId } = event.params;
-    const change = event.data;
-    if (!change || !change.after.exists || !change.before.exists)
-        return;
-    const docRef = change.after.ref;
-    const afterData = change.after.data();
-    const beforeData = change.before.data();
-    if (afterData.status?.pipeline === 'completed' && beforeData.status?.pipeline !== 'completed') {
-        console.log(`✅ [${episodeId}] Video pipeline finished. Starting AI analysis...`);
-        const success = await runAiAnalysis(episodeId, docRef, afterData);
-        if (success) {
+    try {
+        if (!process.env.KEK_SECRET || !process.env.GOOGLE_GENAI_API_KEY) {
+            throw new Error(`Required secrets are missing. Function cannot start.`);
+        }
+        // Determine if a specific status has changed to avoid redundant executions.
+        const pipelineStatusChanged = beforeData?.status?.pipeline !== afterData.status?.pipeline;
+        const aiStatusChanged = beforeData?.ai?.status !== afterData.ai?.status;
+        // === STAGE 1: Video Processing ===
+        // Triggered when a new episode is created and set to 'pending'.
+        if (afterData.status.pipeline === 'pending' && pipelineStatusChanged) {
+            console.log(`[${episodeId}] STAGE 1: Video pipeline job detected. Starting process...`);
+            await processAndEncryptVideo(episodeId, afterData.storage.rawPath, docRef);
+            return; // End execution for this invocation. The next stage will be triggered by the update.
+        }
+        // === STAGE 2: AI Analysis ===
+        // Triggered after video processing is 'completed' and AI is ready to be 'queued'.
+        if (afterData.status.pipeline === 'completed' && afterData.ai.status === 'queued' && (pipelineStatusChanged || aiStatusChanged)) {
+            console.log(`[${episodeId}] STAGE 2: Video pipeline finished. Starting AI analysis...`);
+            await runAiAnalysis(episodeId, docRef, afterData);
+            return; // End execution. The cleanup stage will be triggered by this function's update.
+        }
+        // === STAGE 3: Cleanup Raw File ===
+        // Triggered after AI analysis is 'completed'.
+        if (afterData.ai.status === 'completed' && aiStatusChanged) {
             if (afterData.storage.rawPath) {
+                console.log(`[${episodeId}] STAGE 3: AI analysis finished. Deleting original raw file.`);
                 await deleteStorageFileByPath(afterData.storage.rawPath);
                 await docRef.update({ 'storage.rawPath': admin.firestore.FieldValue.delete() });
                 console.log(`[${episodeId}] ✅ All jobs finished. Original file deleted.`);
             }
+            return; // End of the line for this episode's processing.
         }
-        else {
-            console.warn(`[${episodeId}] ⚠️ AI job did not complete successfully. Original file at ${afterData.storage.rawPath} was NOT deleted for manual inspection.`);
-        }
+    }
+    catch (e) {
+        console.error(`[${episodeId}] UNHANDLED EXCEPTION in episodeProcessingTrigger:`, e);
+        // A fail-safe to mark the pipeline as failed if the orchestrator itself crashes.
+        await failPipeline(docRef, 'trigger-exception', e, '함수 트리거 레벨에서 예상치 못한 오류가 발생했습니다.');
     }
 });
 exports.deleteFilesOnEpisodeDelete = (0, firestore_1.onDocumentDeleted)("episodes/{episodeId}", async (event) => {
