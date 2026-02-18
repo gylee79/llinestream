@@ -175,7 +175,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
 
         await updatePipelineStatus(docRef, { pipeline: 'processing', step: 'encrypt', progress: 40, playable: false });
         const createdFiles = await fs.readdir(tempOutputDir);
-        const mediaSegmentNames = createdFiles.filter(f => f.startsWith('segment_') && f.endsWith('.m4s')).sort((a, b) => parseInt(a.match(/(\d+)/)?.[0] || '0') - parseInt(b.match(/(\d+)/)?.[0] || '0'));
+        const mediaSegmentNames = createdFiles.filter(f => f.startsWith('segment_') && f.endsWith('.m4s')).sort((a, b) => parseInt(a.match(/(\\d+)/)?.[0] || '0') - parseInt(b.match(/(\\d+)/)?.[0] || '0'));
         const allSegmentsToProcess = ['init.mp4', ...mediaSegmentNames];
         
         const masterKey = crypto.randomBytes(32);
@@ -383,6 +383,11 @@ export const episodeProcessingTrigger = onDocumentWritten("episodes/{episodeId}"
         // === STAGE 1: Video Processing ===
         // Triggered when a new episode is created and set to 'pending'.
         if (afterData.status.pipeline === 'pending' && pipelineStatusChanged) {
+            if (!afterData.storage?.rawPath) {
+                console.error(`[${episodeId}] CRITICAL: Pipeline triggered in 'pending' state but 'storage.rawPath' is missing. Failing job.`);
+                await failPipeline(docRef, 'trigger-exception', new Error('storage.rawPath is missing'), '프론트엔드에서 비디오 파일 경로를 전달하지 못했습니다.');
+                return;
+            }
             console.log(`[${episodeId}] STAGE 1: Video pipeline job detected. Starting process...`);
             await processAndEncryptVideo(episodeId, afterData.storage.rawPath, docRef);
             return; // End execution for this invocation. The next stage will be triggered by the update.

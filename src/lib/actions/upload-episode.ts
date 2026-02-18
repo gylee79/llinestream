@@ -102,7 +102,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             createdAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
             
             storage: {
-                rawPath: filePath,
+                rawPath: filePath, // CRITICAL FIX: Ensure rawPath is saved
                 fileSize: fileSize,
                 encryptedBasePath: `episodes/${episodeId}/segments/`,
                 manifestPath: `episodes/${episodeId}/manifest.json`,
@@ -123,9 +123,11 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
                 playable: false,
                 progress: 0,
                 jobId: '',
+                error: null,
             },
             ai: {
                 status: 'pending',
+                error: null,
             },
             // This will be populated by the backend function.
             // Explicitly define it to match the type.
