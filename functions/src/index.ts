@@ -1,8 +1,8 @@
 /**
- * @fileoverview LlineStream Video Processing Pipeline v7.0
+ * @fileoverview LlineStream Video Processing Pipeline v7.1
  *
- * Implements a robust, state-machine-driven workflow for video processing and AI analysis
- * using a single orchestrator function to prevent timeouts and improve reliability.
+ * Implements a decoupled, two-stage workflow for video processing and AI analysis
+ * to prevent Cloud Function timeouts and improve reliability.
  */
 
 // --- Firebase and Node.js Imports ---
@@ -129,6 +129,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
     const localInputPath = path.join(tempInputDir, 'original_video');
 
     try {
+        // Stage 0: Validation is now part of the trigger logic.
         await updatePipelineStatus(docRef, { pipeline: 'processing', step: 'ffmpeg', progress: 15 });
         await bucket.file(inputFilePath).download({ destination: localInputPath });
 

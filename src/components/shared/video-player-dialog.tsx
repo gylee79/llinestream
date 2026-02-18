@@ -174,7 +174,7 @@ const SyllabusView = ({ episode, onSeek, offlineVideoData }: {
                     <p className="text-xs text-muted-foreground mt-2 break-keep max-w-sm p-2 bg-destructive/10 rounded-md">
                         오류 원인: {episode.ai.error.message}
                     </p>
-                )}
+                )} 
                  <p className="text-xs text-muted-foreground mt-4 break-keep">
                     관리자 페이지에서 재분석을 시도할 수 있습니다.
                 </p>
@@ -216,6 +216,7 @@ const SyllabusView = ({ episode, onSeek, offlineVideoData }: {
                             {data.timeline.map((item: any, i: number) => (
                                 <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white overflow-hidden">
                                     <AccordionTrigger className="text-sm hover:no-underline flex-1 p-3 justify-between w-full">
+                                        {/* 중요: AccordionTrigger는 button입니다. 내부에 div 대신 span을 사용해야 Hydration Error가 발생하지 않습니다. */}
                                         <span className="flex items-center text-left w-full">
                                             <span
                                                 role="button"
