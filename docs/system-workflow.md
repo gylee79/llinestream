@@ -1,105 +1,66 @@
-# [공식] LlineStream 비디오 시스템 워크플로우 (v6.1 - DASH)
+# [공식] LlineStream 비디오 시스템 워크플로우 (v6.3 - 단일 트리거)
 
-**문서 목표:** 비디오 업로드부터 암호화, 온라인 스트리밍, 오프라인 재생, 워터마킹에 이르는 전 과정을 기술적으로 명세합니다. 이 문서는 시스템의 현재 구현 상태를 100% 반영하며, 모든 개발 및 유지보수의 기준점이 됩니다.
+**문서 목표:** 비디오 업로드부터 암호화, AI 분석까지 이어지는 전 과정을 기술적으로 명세합니다. 이 문서는 '상태 머신' 방식으로 동작하는 단일 오케스트레이터(총괄 관리자) 함수의 최종 설계도입니다.
 
 ---
 
-## 1. 아키텍처 개요
+## 1. 아키텍처 개요 (Orchestrator Pattern)
 
-LlineStream은 `DASH (Dynamic Adaptive Streaming over HTTP)` 표준과 유사한 세그먼트 기반 스트리밍 방식을 채택하여, 안정적이고 효율적인 보안 스트리밍을 구현합니다.
+여러 함수가 각자 작동하던 기존 방식 대신, `episodeProcessingTrigger`라는 단일 함수가 Firestore 문서의 '상태' 변화를 감지하며 모든 단계를 순차적으로 지휘합니다. 이를 통해 타임아웃 문제를 해결하고, 작업의 순서와 안정성을 보장합니다.
 
 ```mermaid
 graph TD
-    A[사용자: 동영상 파일 업로드] --> B{Cloud Storage: 원본 임시 저장};
-    B --> C{{Cloud Function: onDocumentWritten 트리거}};
+    A[사용자: 비디오 업로드] --> B(웹사이트: Firestore 문서 생성<br/>- status.pipeline = 'pending'<br/>- storage.rawPath 저장);
     
-    subgraph "Cloud Function: videoPipelineTrigger"
-        C --> D[1. FFMPEG 트랜스코딩<br/>- fMP4 변환 (H.264/AAC)<br/>- DASH 세그먼트 생성];
-        D --> E[2. AES-256-GCM 암호화<br/>- MasterKey로 각 세그먼트 암호화];
-        E --> F[3. Manifest.json 생성<br/>- 코덱, 세그먼트 목록 등 저장];
-        F --> G{Cloud Storage: 암호화 파일 저장<br/>- /init.enc<br/>- /segment_*.m4s.enc<br/>- /manifest.json};
-        E --> H{Firestore: video_keys<br/>- MasterKey를 KEK로 암호화하여 저장};
-        F --> I{Firestore: episodes<br/>- 메타데이터 업데이트};
-    end
+    subgraph "Cloud Function: episodeProcessingTrigger"
+        B -- onWrite 트리거 --> C{상태 감지: 'pending'인가?};
+        C -- 예 --> D[1. 비디오 처리 시작<br/>- FFmpeg 변환/분할<br/>- AES 암호화<br/>- Manifest.json 생성];
+        D --> E{Firestore: 상태 업데이트<br/>- status.pipeline = 'completed'<br/>- ai.status = 'pending'};
 
-    subgraph "온라인 스트리밍"
-        J[클라이언트: 재생 요청] --> K{API: /api/play-session};
-        K --> L[1. MasterKey 복호화<br/>2. MasterKey 및 워터마크 시드 발급];
-        L --> M[클라이언트: 비디오 플레이어];
-        M --> N[manifest.json 요청];
-        N --> O[세그먼트 순차 요청<br/>init.enc, segment_*.m4s.enc];
-        O --> P[Web Worker: MasterKey로 실시간 복호화];
-        P --> Q[MediaSource: 버퍼 주입 및 재생];
-    end
+        E -- onWrite 트리거 (재호출) --> F{상태 감지: pipeline='completed'이고<br/>ai='pending'인가?};
+        F -- 예 --> G[2. AI 분석 시작<br/>- Gemini API 호출<br/>- 요약/타임라인 생성];
+        G --> H{Firestore: 상태 업데이트<br/>- ai.status = 'completed'};
 
-    subgraph "오프라인 저장"
-        R[클라이언트: 저장 요청] --> S{API: /api/offline-license};
-        S --> T[1. MasterKey 복호화<br/>2. MasterKey를 포함한 라이선스 발급];
-        T --> U[클라이언트: Manifest + 모든 세그먼트 다운로드];
-        U --> V{IndexedDB: 암호화된 파일 전체 저장};
+        H -- onWrite 트리거 (재호출) --> I{상태 감지: ai='completed'인가?};
+        I -- 예 --> J[3. 최종 정리<br/>- 원본 비디오 파일(rawPath) 삭제];
     end
+    
+    J --> K([✅ 최종 완료]);
 ```
 
 ---
 
-## 2. 서버 측 처리 파이프라인 (Cloud Function)
+## 2. 상태 전이 및 핵심 로직
 
-모든 서버 측 처리는 `functions/src/index.ts`의 `videoPipelineTrigger` 함수에 의해 트리거되어 `processAndEncryptVideo` 함수에서 실행됩니다.
+### **1단계: 비디오 처리**
+-   **트리거 조건**: `episodes` 컬렉션에 새 문서가 생성되거나 업데이트될 때, `status.pipeline` 필드가 **`'pending'`** 인 경우에만 실행됩니다.
+-   **핵심 작업**:
+    1.  문서의 `storage.rawPath` 경로에 있는 원본 비디오를 다운로드합니다.
+    2.  FFmpeg를 사용하여 비디오를 스트리밍에 적합한 fMP4 포맷으로 변환하고, 4초 단위의 DASH 세그먼트(`init.mp4`, `segment_*.m4s`)로 분할합니다.
+    3.  각 세그먼트를 `AES-256-GCM` 방식으로 암호화하여 스토리지에 업로드합니다.
+    4.  암호화된 세그먼트 목록을 담은 `manifest.json` 파일을 생성하여 업로드합니다.
+    5.  암호화에 사용된 `masterKey`를 KEK로 다시 암호화하여 `video_keys` 컬렉션에 저장합니다.
+-   **완료 후**: 작업이 성공하면, `status.pipeline`을 **`'completed'`** 로, `ai.status`를 **`'pending'`** 으로 업데이트합니다. 이 업데이트가 다시 함수를 트리거하여 2단계로 넘어갑니다.
 
-### 단계 1: FFmpeg 트랜스코딩 및 DASH 분할
+### **2단계: AI 분석**
+-   **트리거 조건**: `episodes` 문서가 업데이트될 때, `status.pipeline`이 `'completed'`이고, `ai.status`가 **`'pending'`** 인 경우에만 실행됩니다.
+-   **핵심 작업**:
+    1.  `storage.rawPath` 경로의 원본 비디오를 Google AI 서버로 업로드하여 분석을 요청합니다.
+    2.  Gemini 모델을 통해 비디오 내용의 **요약(summary)**, **전체 대본(transcript)**, **타임라인(timeline)**을 JSON 형식으로 생성합니다.
+    3.  생성된 요약/타임라인과 대본을 별도의 파일(`summary.json`, `transcript.txt`)로 스토리지에 저장합니다.
+-   **완료 후**: 작업이 성공하면, `ai.status`를 **`'completed'`** 로 업데이트합니다. 이 업데이트가 다시 함수를 트리거하여 3단계로 넘어갑니다.
 
--   **핵심 로직:** 비디오에 **오디오 트랙이 있는지 먼저 확인**하고, 있을 경우에만 오디오 코덱(`aac`) 변환을 실행하여 '소리 없는 비디오' 오류를 방지합니다.
-
-### 단계 2: 세그먼트 단위 암호화
-
--   **암호화 키:** 각 비디오마다 고유한 `masterKey`가 `crypto.randomBytes(32)`로 생성됩니다.
--   **알고리즘:** `AES-256-GCM`을 사용하여 `init.mp4`와 모든 `segment_*.m4s` 파일을 개별적으로 암호화합니다.
--   **무결성 검증 (AAD):** 데이터 변조를 방지하기 위해, 각 세그먼트의 전체 스토리지 경로(`path:episodes/.../segment_1.m4s.enc`)를 AAD(추가 인증 데이터)로 사용합니다.
-
-### 단계 3: 키 관리 및 저장
-
--   **KEK (Key Encryption Key):** `KEK_SECRET` 환경 변수에서 로드된 최상위 키(KEK)는 `masterKey`를 암호화하는 데 사용됩니다.
--   **저장:** KEK로 암호화된 `masterKey`는 `video_keys` 컬렉션에 해당 비디오의 `keyId`와 함께 저장됩니다. **(Salt는 더 이상 사용하지 않아 제거되었습니다.)**
-
----
-
-## 3. 온라인 스트리밍 재생 (핵심 수정 사항)
-
-**주요 파일:** `src/api/play-session/route.ts`, `src/workers/crypto.worker.ts`
-
-### 단계 1: 재생 세션 요청
--   **API:** `/api/play-session`
--   **로직:**
-    1.  서버는 `video_keys`에서 암호화된 마스터 키를 가져옵니다.
-    2.  `KEK_SECRET`을 사용하여 **`masterKey`를 복호화**합니다.
-    3.  **[수정됨]** 더 이상 HKDF로 새로운 키를 파생하지 않고, **복호화된 `masterKey` 자체**를 Base64로 인코딩하여 클라이언트에 전달합니다.
--   **응답 (핵심):**
-    -   `derivedKeyB64`: 복호화된 **`masterKey`**의 Base64 인코딩 문자열.
-    -   `watermarkSeed`: 워터마크 생성을 위한 고유 시드.
-
-### 단계 2: Web Worker에서의 실시간 복호화
--   클라이언트는 서버로부터 받은 `derivedKeyB64` (실제로는 `masterKey`)를 사용하여 암호화된 각 세그먼트를 실시간으로 복호화합니다.
--   **핵심:** 암호화에 사용된 키(`masterKey`)와 복호화에 사용된 키(`derivedKeyB64`로 전달받은 `masterKey`)가 동일하므로, 복호화가 성공적으로 수행됩니다.
+### **3단계: 최종 정리**
+-   **트리거 조건**: `episodes` 문서가 업데이트될 때, `ai.status`가 **`'completed'`** 로 변경된 경우에만 실행됩니다.
+-   **핵심 작업**:
+    1.  더 이상 필요 없는 원본 비디오 파일(`storage.rawPath`)을 스토리지에서 삭제합니다.
+    2.  Firestore 문서에서 `storage.rawPath` 필드를 제거합니다.
+-   **완료 후**: 모든 작업이 종료됩니다.
 
 ---
 
-## 4. 오프라인 저장 및 재생
-
-### 단계 1: 오프라인 라이선스 요청
--   **API:** `/api/offline-license`
--   **로직:**
-    1.  온라인 스트리밍과 동일하게, `masterKey`를 복호화합니다.
-    2.  **[수정됨]** HKDF 파생 로직을 제거하고, **복호화된 `masterKey` 자체**를 `offlineDerivedKey`라는 이름으로 Base64 인코딩하여 라이선스에 포함시켜 반환합니다.
-
-### 단계 2: 콘텐츠 다운로드 및 IndexedDB 저장
--   `manifest.json`, 모든 세그먼트 파일, 그리고 `masterKey`가 포함된 라이선스를 다운로드하여 IndexedDB에 저장합니다.
-
-### 단계 3: 오프라인 재생
--   플레이어는 IndexedDB에서 `masterKey`를 포함한 라이선스와 암호화된 세그먼트를 로드합니다.
--   온라인 스트리밍과 동일한 로직으로, `masterKey`를 사용하여 세그먼트를 복호화하고 `MediaSource`에 주입하여 재생합니다.
-
----
-
-## 5. 결론
-
-이번 v6.1 업데이트는 키 불일치라는 치명적인 논리적 오류를 수정하여, 암호화된 콘텐츠의 온라인 및 오프라인 재생을 모두 정상화하는 데 초점을 맞췄습니다. 또한, 오디오 없는 비디오 처리 문제를 해결하여 시스템의 안정성을 대폭 향상시켰습니다.
+## 3. 안정성 및 오류 처리
+-   **단일 진입점**: 모든 작업은 `episodeProcessingTrigger` 하나를 통해 시작되고 관리되므로, 함수 간의 복잡한 호출 관계가 없습니다.
+-   **상태 기반 실행**: 각 단계는 이전 단계가 성공적으로 완료되었음을 나타내는 '상태'를 기반으로 실행되므로, 순서가 꼬이거나 중복 실행될 위험이 없습니다.
+-   **방어 코드**: 각 단계 시작 시, 필요한 데이터(예: `rawPath`)가 있는지 먼저 확인하고, 없을 경우 작업을 중단하고 명확한 오류를 기록하여 무한 대기 상태를 방지합니다.
+-   **실패 기록**: 어느 단계에서든 오류가 발생하면, `status.pipeline` 또는 `ai.status`를 `'failed'`로 설정하고 `error` 필드에 상세한 원인을 기록하여 문제 추적을 용이하게 합니다.

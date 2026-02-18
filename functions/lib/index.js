@@ -390,6 +390,11 @@ exports.episodeProcessingTrigger = (0, firestore_1.onDocumentWritten)("episodes/
         // === STAGE 1: Video Processing ===
         // Triggered when a new episode is created and set to 'pending'.
         if (afterData.status.pipeline === 'pending' && pipelineStatusChanged) {
+            if (!afterData.storage?.rawPath) {
+                console.error(`[${episodeId}] CRITICAL: Pipeline triggered in 'pending' state but 'storage.rawPath' is missing. Failing job.`);
+                await failPipeline(docRef, 'trigger-exception', new Error('storage.rawPath is missing'), '프론트엔드에서 비디오 파일 경로를 전달하지 못했습니다.');
+                return;
+            }
             console.log(`[${episodeId}] STAGE 1: Video pipeline job detected. Starting process...`);
             await processAndEncryptVideo(episodeId, afterData.storage.rawPath, docRef);
             return; // End execution for this invocation. The next stage will be triggered by the update.

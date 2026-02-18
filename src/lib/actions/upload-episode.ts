@@ -102,7 +102,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             createdAt: admin.firestore.FieldValue.serverTimestamp() as Timestamp,
             
             storage: {
-                rawPath: filePath, // CRITICAL FIX: Ensure rawPath is saved
+                rawPath: filePath,
                 fileSize: fileSize,
                 encryptedBasePath: `episodes/${episodeId}/segments/`,
                 manifestPath: `episodes/${episodeId}/manifest.json`,
