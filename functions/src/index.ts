@@ -1,8 +1,8 @@
 /**
- * @fileoverview LlineStream Video Processing Pipeline v7.1
+ * @fileoverview LlineStream Video Processing Pipeline v7.0
  *
- * Implements a decoupled, two-stage workflow for video processing and AI analysis
- * to prevent Cloud Function timeouts and improve reliability.
+ * Implements a robust, state-machine-driven workflow for video processing and AI analysis
+ * using a single orchestrator function to prevent timeouts and improve reliability.
  */
 
 // --- Firebase and Node.js Imports ---
@@ -120,7 +120,7 @@ async function failPipeline(docRef: admin.firestore.DocumentReference, step: Pip
 }
 
 
-// 2. STAGE 1: Video Processing
+// 2. Core Logic: Video Processing
 // ===============================================
 
 async function processAndEncryptVideo(episodeId: string, inputFilePath: string, docRef: admin.firestore.DocumentReference): Promise<boolean> {
@@ -129,7 +129,6 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
     const localInputPath = path.join(tempInputDir, 'original_video');
 
     try {
-        // Stage 0: Validation is now part of the trigger logic.
         await updatePipelineStatus(docRef, { pipeline: 'processing', step: 'ffmpeg', progress: 15 });
         await bucket.file(inputFilePath).download({ destination: localInputPath });
 
@@ -160,7 +159,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
 
         await updatePipelineStatus(docRef, { step: 'encrypt', progress: 40 });
         const createdFiles = await fs.readdir(tempOutputDir);
-        const mediaSegmentNames = createdFiles.filter(f => f.startsWith('segment_') && f.endsWith('.m4s')).sort((a, b) => parseInt(a.match(/(\\d+)/)?.[0] || '0') - parseInt(b.match(/(\\d+)/)?.[0] || '0'));
+        const mediaSegmentNames = createdFiles.filter(f => f.startsWith('segment_') && f.endsWith('.m4s')).sort((a, b) => parseInt(a.match(/(\d+)/)?.[0] || '0') - parseInt(b.match(/(\d+)/)?.[0] || '0'));
         const allSegmentsToProcess = ['init.mp4', ...mediaSegmentNames];
         
         const masterKey = crypto.randomBytes(32);
@@ -231,7 +230,7 @@ async function processAndEncryptVideo(episodeId: string, inputFilePath: string, 
 }
 
 
-// 3. STAGE 2: AI Analysis
+// 3. Core Logic: AI Analysis
 // ===============================================
 
 export async function runAiAnalysis(episodeId: string, docRef: admin.firestore.DocumentReference, episodeData: Episode): Promise<boolean> {
@@ -239,9 +238,18 @@ export async function runAiAnalysis(episodeId: string, docRef: admin.firestore.D
     const tempFilePath = path.join(os.tmpdir(), `ai-in-${episodeId}`);
     let uploadedFile: any = null;
     
+    // Initialize tools at the top. If this fails, the whole function will throw, which is correct.
+    const { genAI, fileManager } = initializeTools();
+
     try {
-        await docRef.update({ 'ai.status': 'processing', 'ai.model': modelName, 'ai.lastHeartbeatAt': admin.firestore.FieldValue.serverTimestamp() });
-        const { genAI, fileManager } = initializeTools();
+        console.log(`🚀 [${episodeId}] AI Processing started (Target: ${modelName}).`);
+        
+        if (episodeData.status.pipeline !== 'completed' || !episodeData.status.playable || !episodeData.storage.rawPath) {
+            await docRef.update({ 'ai.status': 'blocked', 'ai.error': { code: 'AI_GUARD_BLOCKED', message: 'Video pipeline did not complete successfully or rawPath is missing.', ts: admin.firestore.FieldValue.serverTimestamp() } });
+            console.warn(`[${episodeId}] ⚠️ AI analysis blocked. Pipeline status: ${episodeData.status.pipeline}, Playable: ${episodeData.status.playable}`);
+            return false;
+        }
+        await docRef.update({ 'ai.status': 'processing', 'ai.model': modelName });
 
         await bucket.file(episodeData.storage.rawPath).download({ destination: tempFilePath });
         const uploadResponse = await fileManager.uploadFile(tempFilePath, { mimeType: 'video/mp4', displayName: episodeId });
@@ -279,7 +287,7 @@ export async function runAiAnalysis(episodeId: string, docRef: admin.firestore.D
             'ai.error': null,
         });
 
-        console.log(`[${episodeId}] ✅ STAGE 2: AI analysis succeeded!`);
+        console.log(`[${episodeId}] ✅ AI analysis succeeded!`);
         return true;
 
     } catch (error: any) {
@@ -287,10 +295,17 @@ export async function runAiAnalysis(episodeId: string, docRef: admin.firestore.D
             'ai.status': 'failed',
             'ai.error': { code: 'AI_PROCESSING_FAILED', message: error.message || String(error), raw: JSON.stringify(error, Object.getOwnPropertyNames(error)), ts: admin.firestore.FieldValue.serverTimestamp() }
         });
-        console.error(`❌ [${episodeId}] STAGE 2: AI analysis failed.`, error);
+        console.error(`❌ [${episodeId}] AI analysis failed.`, error);
         return false;
     } finally {
-        if (uploadedFile) { try { await fileManager.deleteFile(uploadedFile.name); } catch (e) {} }
+        if (uploadedFile) {
+            try {
+                // fileManager is guaranteed to be initialized here because it's at the top of the function scope.
+                await fileManager.deleteFile(uploadedFile.name);
+            } catch (e) {
+                console.error(`Failed to delete uploaded file from AI service: ${e}`);
+            }
+        }
         try { await fs.rm(tempFilePath, { force: true }); } catch (e) {}
     }
 }
