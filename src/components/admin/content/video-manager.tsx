@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition, useMemo, useEffect, useCallback } from 'react';
@@ -107,7 +108,7 @@ const AIStatusIndicator = ({ episode }: {
                         </TooltipContent>
                     </Tooltip>
                 );
-            case 'queued':
+            case 'pending':
             case 'idle':
             default:
                 return (
@@ -154,7 +155,7 @@ const KeyStatusIndicator = ({ episode }: { episode: Episode }) => {
         );
     }
 
-    if (episode.status.pipeline === 'processing' || episode.status.pipeline === 'queued' || episode.ai.status === 'processing' || episode.ai.status === 'queued') {
+    if (episode.status.pipeline === 'processing' || episode.status.pipeline === 'pending' || episode.ai.status === 'processing' || episode.ai.status === 'pending') {
         return (
             <Tooltip>
                 <TooltipTrigger>
@@ -536,3 +537,5 @@ useEffect(() => {
     </>
   );
 }
+
+    
