@@ -215,18 +215,22 @@ const SyllabusView = ({ episode, onSeek, offlineVideoData }: {
                         <Accordion type="single" collapsible className="w-full">
                             {data.timeline.map((item: any, i: number) => (
                                 <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white overflow-hidden">
-                                    <AccordionTrigger 
-                                        className="text-sm hover:no-underline text-left px-3 py-2"
-                                    >
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <div 
-                                                className="font-mono text-primary font-bold px-1 h-auto text-xs cursor-pointer hover:underline" 
-                                                onClick={(e) => { e.stopPropagation(); onSeek(parseTimeToSeconds(item.startTime)); }}>
-                                                {item.startTime?.split('.')[0] || '00:00:00'}
-                                            </div>
-                                            <p className="whitespace-normal break-keep cursor-default">{item.subtitle}</p> 
+                                     <div className="flex items-center text-left px-3 py-2">
+                                        <div
+                                            role="button"
+                                            tabIndex={0}
+                                            className="font-mono text-primary font-bold px-1 h-auto text-xs cursor-pointer hover:underline"
+                                            onClick={() => onSeek(parseTimeToSeconds(item.startTime))}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSeek(parseTimeToSeconds(item.startTime)); }}
+                                        >
+                                            {item.startTime?.split('.')[0] || '00:00:00'}
                                         </div>
-                                    </AccordionTrigger>
+                                        <AccordionTrigger 
+                                            className="text-sm hover:no-underline flex-1 p-0 pl-2 justify-between"
+                                        >
+                                            <p className="whitespace-normal break-keep text-left">{item.subtitle}</p> 
+                                        </AccordionTrigger>
+                                    </div>
                                     <AccordionContent className="px-3 pb-3">
                                         <p className="text-sm text-foreground whitespace-pre-line break-keep">{item.description}</p>
                                     </AccordionContent>
