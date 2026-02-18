@@ -1,4 +1,6 @@
 
+'use server';
+
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
@@ -11,7 +13,7 @@ import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
 const { path: ffprobePath } = require('ffprobe-static');
-import type { Episode, PipelineStatus } from './lib/types';
+import type { Episode } from './lib/types';
 
 
 // 0. SDK Initialization and Global Config
@@ -50,13 +52,12 @@ async function updateDoc(docRef: admin.firestore.DocumentReference, data: Record
     await docRef.update({ ...data, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
 }
 
-async function failPipeline(docRef: admin.firestore.DocumentReference, step: PipelineStatus['step'], error: any, playable: boolean = false) {
+async function failPipeline(docRef: admin.firestore.DocumentReference, step: string, error: any, playable: boolean = false) {
     const rawError = (error instanceof Error) ? error.message : String(error);
     await docRef.update({
         'status.pipeline': 'failed',
         'status.playable': playable,
         'status.error': { step: step, message: rawError, ts: admin.firestore.FieldValue.serverTimestamp() },
-        // Also block AI if the core pipeline fails
         'ai.status': 'blocked',
         'ai.error': { code: 'PIPELINE_FAILED', message: '비디오 처리 파이프라인 실패로 AI 분석이 차단되었습니다.' }
     });
@@ -67,7 +68,7 @@ async function failPipeline(docRef: admin.firestore.DocumentReference, step: Pip
 // 2. Pipeline Stage Implementations
 
 async function runVideoCoreStage(docRef: admin.firestore.DocumentReference, episode: Episode) {
-    let currentStep: PipelineStatus['step'] = 'preparing';
+    let currentStep = 'preparing';
     const { id: episodeId, storage: { rawPath } } = episode;
     if (!rawPath) throw { step: 'preparing', error: new Error("storage.rawPath is missing.") };
     
@@ -270,3 +271,6 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
     if (keyId) {
         await db.collection('video_keys').doc(keyId).delete().catch(e => console.error(`Failed to delete key ${keyId}`, e));
     }
+});
+
+    
