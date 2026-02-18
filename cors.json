@@ -7,6 +7,7 @@
       "Content-Length",
       "Content-Range",
       "Access-Control-Allow-Origin",
+      "Range",
       "ETag",
       "x-goog-meta-foo"
     ],

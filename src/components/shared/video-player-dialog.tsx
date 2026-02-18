@@ -215,22 +215,28 @@ const SyllabusView = ({ episode, onSeek, offlineVideoData }: {
                         <Accordion type="single" collapsible className="w-full">
                             {data.timeline.map((item: any, i: number) => (
                                 <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white overflow-hidden">
-                                     <div className="flex items-center text-left px-3 py-2">
-                                        <div
-                                            role="button"
-                                            tabIndex={0}
-                                            className="font-mono text-primary font-bold px-1 h-auto text-xs cursor-pointer hover:underline"
-                                            onClick={() => onSeek(parseTimeToSeconds(item.startTime))}
-                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSeek(parseTimeToSeconds(item.startTime)); }}
-                                        >
-                                            {item.startTime?.split('.')[0] || '00:00:00'}
+                                     <AccordionTrigger className="text-sm hover:no-underline flex-1 p-3 justify-between w-full">
+                                        <div className="flex items-center text-left w-full">
+                                            <span
+                                                role="button"
+                                                tabIndex={0}
+                                                className="font-mono text-primary font-bold px-1 h-auto text-xs cursor-pointer hover:underline"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onSeek(parseTimeToSeconds(item.startTime));
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        e.stopPropagation();
+                                                        onSeek(parseTimeToSeconds(item.startTime));
+                                                    }
+                                                }}
+                                            >
+                                                {item.startTime?.split('.')[0] || '00:00:00'}
+                                            </span>
+                                            <p className="whitespace-normal break-keep text-left flex-1 pl-2">{item.subtitle}</p> 
                                         </div>
-                                        <AccordionTrigger 
-                                            className="text-sm hover:no-underline flex-1 p-0 pl-2 justify-between"
-                                        >
-                                            <p className="whitespace-normal break-keep text-left">{item.subtitle}</p> 
-                                        </AccordionTrigger>
-                                    </div>
+                                    </AccordionTrigger>
                                     <AccordionContent className="px-3 pb-3">
                                         <p className="text-sm text-foreground whitespace-pre-line break-keep">{item.description}</p>
                                     </AccordionContent>

@@ -66,8 +66,9 @@ export const saveVideo = async (data: OfflineVideoData): Promise<void> => {
     }
 
     // 1. Save metadata (everything except the segments map) to the 'videos' store.
-    const metadataToSave = {
+    const metadataToSave: Omit<OfflineVideoData, 'segments'> & { aiContent: any } = {
         ...data,
+        segments: new Map(), // Don't save the map itself in the metadata store
         aiContent: aiContent,
     };
     
@@ -87,34 +88,40 @@ export const saveVideo = async (data: OfflineVideoData): Promise<void> => {
     for (let i = 0; i < segmentPaths.length; i += concurrencyLimit) {
         const batchPaths = segmentPaths.slice(i, i + concurrencyLimit);
 
-        // Download a batch of segments in parallel.
-        const downloadedSegments = await Promise.all(batchPaths.map(async (path) => {
-            const auth = getAuth();
-            const token = await auth.currentUser?.getIdToken();
-            if (!token) throw new Error("Authentication token not found.");
-            
-            const { signedUrl, error } = await getSignedUrlAction(token, data.episode.id, path);
-            if (error || !signedUrl) throw new Error(error || "Failed to get signed URL for segment.");
+        try {
+            // Download a batch of segments in parallel.
+            const downloadedSegments = await Promise.all(batchPaths.map(async (path) => {
+                const auth = getAuth();
+                if (!auth.currentUser) throw new Error("Authentication token not found.");
+                const token = await auth.currentUser.getIdToken();
+                
+                const { signedUrl, error } = await getSignedUrlAction(token, data.episode.id, path);
+                if (error || !signedUrl) throw new Error(error || "Failed to get signed URL for segment.");
 
-            const response = await fetch(signedUrl);
-            if (!response.ok) throw new Error(`Failed to fetch segment: ${response.statusText}`);
-            const segmentBuffer = await response.arrayBuffer();
-            
-            // Key format is crucial for retrieval and deletion.
-            return { key: `${data.episode.id}-${path}`, value: segmentBuffer };
-        }));
+                const response = await fetch(signedUrl);
+                if (!response.ok) throw new Error(`Failed to fetch segment: ${response.statusText}`);
+                const segmentBuffer = await response.arrayBuffer();
+                
+                // Key format is crucial for retrieval and deletion.
+                return { key: `${data.episode.id}-${path}`, value: segmentBuffer };
+            }));
 
-        // Save the downloaded batch to the 'segments' store in a single transaction.
-        const segmentTransaction = dbInstance.transaction(SEGMENTS_STORE, 'readwrite');
-        const segmentStore = segmentTransaction.objectStore(SEGMENTS_STORE);
-        downloadedSegments.forEach(segment => {
-            segmentStore.put(segment.value, segment.key);
-        });
+            // Save the downloaded batch to the 'segments' store in a single transaction.
+            const segmentTransaction = dbInstance.transaction(SEGMENTS_STORE, 'readwrite');
+            const segmentStore = segmentTransaction.objectStore(SEGMENTS_STORE);
+            downloadedSegments.forEach(segment => {
+                segmentStore.put(segment.value, segment.key);
+            });
 
-        await new Promise<void>((resolve, reject) => {
-            segmentTransaction.oncomplete = () => resolve();
-            segmentTransaction.onerror = (e) => reject(new Error('세그먼트 저장에 실패했습니다: ' + (e.target as any)?.error?.message));
-        });
+            await new Promise<void>((resolve, reject) => {
+                segmentTransaction.oncomplete = () => resolve();
+                segmentTransaction.onerror = (e) => reject(new Error('세그먼트 저장에 실패했습니다: ' + (e.target as any)?.error?.message));
+            });
+        } catch (error) {
+            // If any segment fails in a batch, re-throw to stop the whole process.
+            console.error("Error downloading/saving segment batch:", error);
+            throw error;
+        }
     }
 };
 
