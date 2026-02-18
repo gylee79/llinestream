@@ -253,7 +253,7 @@ async function processAndEncryptVideo(episodeId, inputFilePath, docRef) {
             'status.progress': 100, 'status.playable': true, 'status.error': null,
             'status.updatedAt': admin.firestore.FieldValue.serverTimestamp(),
             'status.lastHeartbeatAt': admin.firestore.FieldValue.serverTimestamp(),
-            'ai.status': 'queued',
+            'ai.status': 'pending',
         });
         console.log(`[${episodeId}] ✅ Video Pipeline complete.`);
         return true;
@@ -395,9 +395,9 @@ exports.episodeProcessingTrigger = (0, firestore_1.onDocumentWritten)("episodes/
             return; // End execution for this invocation. The next stage will be triggered by the update.
         }
         // === STAGE 2: AI Analysis ===
-        // Triggered after video processing is 'completed' and AI is ready to be 'queued'.
-        if (afterData.status.pipeline === 'completed' && afterData.ai.status === 'queued' && (pipelineStatusChanged || aiStatusChanged)) {
-            console.log(`[${episodeId}] STAGE 2: Video pipeline finished. Starting AI analysis...`);
+        // Triggered after video processing is 'completed' and AI is ready to be 'pending'.
+        if (afterData.status.pipeline === 'completed' && afterData.ai.status === 'pending' && (pipelineStatusChanged || aiStatusChanged)) {
+            console.log(`[${episodeId}] STAGE 2: AI analysis...`);
             await runAiAnalysis(episodeId, docRef, afterData);
             return; // End execution. The cleanup stage will be triggered by this function's update.
         }
