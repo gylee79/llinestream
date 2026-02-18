@@ -74,7 +74,6 @@ export interface Course {
   createdAt?: Timestamp;
 }
 
-// From Spec 4.3
 export interface EncryptionInfo {
   algorithm: "AES-256-GCM";
   ivLength: 12;
@@ -86,10 +85,9 @@ export interface EncryptionInfo {
   fragmentEncrypted: true;
 }
 
-// From Spec 4.1
 export interface PipelineStatus {
     pipeline: "pending" | "processing" | "failed" | "completed";
-    step: "validate" | "ffmpeg" | "encrypt" | "verify" | "manifest" | "keys" | "done" | "idle" | "trigger-exception";
+    step: "idle" | "validating" | "transcoding_pending" | "transcoding" | "encryption_pending" | "encrypting" | "finalization_pending" | "finalizing" | "done";
     playable: boolean;
     progress: number;
     jobId?: string;
@@ -107,9 +105,8 @@ export interface PipelineStatus {
     } | null;
 }
 
-// From Spec 4.4
 export interface AiStatus {
-    status: "pending" | "processing" | "failed" | "completed" | "blocked" | "idle";
+    status: "pending" | "queued" | "processing" | "failed" | "completed" | "blocked" | "idle";
     jobId?: string;
     model?: string;
     attempts?: number;
@@ -141,31 +138,31 @@ export interface Episode {
   orderIndex?: number;
   createdAt: Timestamp;
   
-  // From Spec 4.2
   storage: {
-      rawPath: string; // Original file path, to be archived
-      encryptedBasePath: string; // e.g., episodes/{id}/segments/
+      rawPath: string; 
+      encryptedBasePath: string; 
       manifestPath: string;
+      tempUnencryptedPath?: string; // For passing state between functions
       aiAudioPath?: string;
-      thumbnailBasePath?: string; // e.g., episodes/{id}/thumbnails/
+      thumbnailBasePath?: string;
       fileSize?: number;
   };
+  
+  // A temporary field to pass the key between encryption and finalization
+  tempMasterKey?: string;
 
-  // Replaces flat thumbnail URLs/paths
   thumbnails: {
       default: string; // URL
       defaultPath: string;
       custom?: string | null; // URL
       customPath?: string | null;
   };
-  thumbnailUrl: string; // Keep for simple display logic (denormalized from custom or default)
+  thumbnailUrl: string; 
 
-  // Combined Status Objects from Spec
   status: PipelineStatus;
   ai: AiStatus;
 
-  // From Spec 4.3
-  encryption: EncryptionInfo;
+  encryption: Partial<EncryptionInfo>; // Partial as it's populated at the end
 }
 
 export interface Job {
