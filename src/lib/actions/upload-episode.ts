@@ -103,8 +103,9 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
             
             storage: {
                 rawPath: filePath,
+                fileSize: fileSize,
                 encryptedBasePath: `episodes/${episodeId}/segments/`,
-                manifestPath: `episodes/${episodeId}/segments/manifest.json`,
+                manifestPath: `episodes/${episodeId}/manifest.json`,
                 thumbnailBasePath: `episodes/${episodeId}/thumbnails/`,
             },
             
@@ -183,6 +184,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             }
             
             dataToUpdate['storage.rawPath'] = newVideoData.filePath;
+            dataToUpdate['storage.fileSize'] = newVideoData.fileSize;
             // Reset status to trigger re-processing
             dataToUpdate['status.pipeline'] = 'pending';
             dataToUpdate['status.step'] = 'idle';
