@@ -172,7 +172,7 @@ export interface Job {
   id: string;
   type: "VIDEO_PIPELINE" | "AI_ANALYSIS";
   episodeId: string;
-  status: "queued" | "running" | "failed" | "succeeded" | "dead";
+  status: "pending" | "running" | "failed" | "succeeded" | "dead";
   attempts: number;
   maxAttempts: number;
   createdAt: Timestamp;
@@ -392,6 +392,3 @@ export type CryptoWorkerResponse =
         message: string;
       };
     };
-
-    
-

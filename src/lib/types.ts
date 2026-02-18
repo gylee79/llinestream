@@ -91,7 +91,7 @@ export interface EncryptionInfo {
 
 // From Spec 4.1
 export interface PipelineStatus {
-    pipeline: "queued" | "processing" | "failed" | "completed";
+    pipeline: "pending" | "processing" | "failed" | "completed";
     step: "validate" | "ffmpeg" | "encrypt" | "verify" | "manifest" | "keys" | "done" | "idle" | "trigger-exception";
     playable: boolean;
     progress: number;
@@ -112,7 +112,7 @@ export interface PipelineStatus {
 
 // From Spec 4.4
 export interface AiStatus {
-    status: "queued" | "processing" | "failed" | "completed" | "blocked" | "idle";
+    status: "pending" | "processing" | "failed" | "completed" | "blocked" | "idle";
     jobId?: string;
     model?: string;
     attempts?: number;
@@ -175,7 +175,7 @@ export interface Job {
   id: string;
   type: "VIDEO_PIPELINE" | "AI_ANALYSIS";
   episodeId: string;
-  status: "queued" | "running" | "failed" | "succeeded" | "dead";
+  status: "pending" | "running" | "failed" | "succeeded" | "dead";
   attempts: number;
   maxAttempts: number;
   createdAt: Timestamp;

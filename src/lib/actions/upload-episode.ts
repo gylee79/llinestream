@@ -124,7 +124,7 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
                 jobId: '',
             },
             ai: {
-                status: 'idle',
+                status: 'pending',
             },
             // This will be populated by the backend function.
             // Explicitly define it to match the type.
@@ -188,7 +188,7 @@ export async function updateEpisode(payload: UpdateEpisodePayload): Promise<Uplo
             dataToUpdate['status.step'] = 'idle';
             dataToUpdate['status.error'] = null;
             dataToUpdate['status.playable'] = false;
-            dataToUpdate['ai.status'] = 'idle';
+            dataToUpdate['ai.status'] = 'pending';
             dataToUpdate['ai.error'] = null;
         }
 
