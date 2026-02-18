@@ -1,3 +1,8 @@
+/**
+ * @fileoverview LlineStream Video Processing Pipeline v8.1
+ * Implements a robust, two-stage workflow for video processing and AI analysis
+ * using two separate, independently triggered Cloud Functions.
+ */
 
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onDocumentWritten, onDocumentDeleted } from "firebase-functions/v2/firestore";
@@ -11,18 +16,16 @@ import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
 const { path: ffprobePath } = require('ffprobe-static');
-import type { Episode, EncryptionInfo } from './lib/types';
+import type { Episode, PipelineStatus } from './lib/types';
 
-// 0. Initialize SDKs and Global Configuration
+// 0. SDK Initialization and Global Config
 if (ffmpegPath) {
     ffmpeg.setFfmpegPath(ffmpegPath);
 }
 ffmpeg.setFfprobePath(ffprobePath);
-
 if (admin.apps.length === 0) {
   admin.initializeApp();
 }
-
 setGlobalOptions({
   region: "us-central1",
   secrets: ["GOOGLE_GENAI_API_KEY", "KEK_SECRET"],
@@ -30,7 +33,6 @@ setGlobalOptions({
   memory: "4GiB",
   cpu: 2,
 });
-
 const db = admin.firestore();
 const storage = admin.storage();
 const bucket = storage.bucket();
@@ -39,73 +41,112 @@ const SEGMENT_DURATION_SEC = 4;
 // 1. Utility & Helper Functions
 let genAI: GoogleGenerativeAI | null = null;
 let fileManager: GoogleAIFileManager | null = null;
+let cachedKEK: Buffer | null = null;
+
+async function loadKEK(): Promise<Buffer> {
+    if (cachedKEK) return cachedKEK;
+    const kekSecret = process.env.KEK_SECRET;
+    if (!kekSecret) throw new Error("CRITICAL: KEK_SECRET is not configured.");
+    const key = Buffer.from(kekSecret, 'base64');
+    if (key.length !== 32) throw new Error(`Invalid KEK format. Expected 32-byte key, received ${key.length} bytes.`);
+    cachedKEK = key;
+    return cachedKEK;
+}
 
 function initializeTools() {
   const apiKey = process.env.GOOGLE_GENAI_API_KEY;
-  if (!apiKey) throw new Error("GOOGLE_GENAI_API_KEY is not configured.");
+  if (!apiKey) throw new Error("GOOGLE_GENAI_API_KEY is missing!");
   if (!genAI) genAI = new GoogleGenerativeAI(apiKey);
   if (!fileManager) fileManager = new GoogleAIFileManager(apiKey);
   return { genAI, fileManager };
 }
 
-async function updateDoc(docRef: admin.firestore.DocumentReference, data: object) {
-    await docRef.update(data);
+async function failPipeline(docRef: admin.firestore.DocumentReference, step: PipelineStatus['step'], error: any, hint?: string) {
+    const rawError = (error instanceof Error) ? error.message : String(error);
+    const updatePayload: any = {
+        'status.pipeline': 'failed', 'status.step': step, 'status.progress': 100,
+        'status.error': {
+            step: step,
+            code: error.code || 'UNKNOWN',
+            message: rawError, hint: hint || '해당 단계에서 처리 중 오류가 발생했습니다.',
+            raw: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+            ts: admin.firestore.FieldValue.serverTimestamp()
+        },
+        'ai.status': 'blocked',
+        'ai.error': {
+            code: 'PIPELINE_FAILED',
+            message: '비디오 처리 파이프라인이 실패하여 AI 분석을 건너뜁니다.',
+            ts: admin.firestore.FieldValue.serverTimestamp()
+        }
+    };
+    if (step !== 'validate') {
+        updatePayload['status.playable'] = false;
+    }
+    await docRef.update(updatePayload);
+    console.error(`[${docRef.id}] ❌ Pipeline Failed at step '${step}':`, rawError);
 }
 
-// 2. Pipeline Stage Implementations
-async function runVideoCoreStage(docRef: admin.firestore.DocumentReference, episode: Episode) {
-    const { id: episodeId, storage: { rawPath } } = episode;
-    if (!rawPath) throw new Error("rawPath is missing");
 
+// --- FUNCTION 1: Video Processing Pipeline ---
+export const videoPipelineTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
+    const change = event.data;
+    if (!change?.after.exists) return; // Deleted
+
+    const afterData = change.after.data() as Episode;
+    const beforeData = change.before.exists ? change.before.data() as Episode : null;
+    
+    // GUARD: Only trigger on creation or manual reset to 'pending'
+    if (afterData.status?.pipeline !== 'pending' || beforeData?.status?.pipeline === 'pending') {
+        return;
+    }
+
+    const { episodeId } = event.params;
+    const docRef = change.after.ref;
+    console.log(`[${episodeId}] 🚀 videoPipelineTrigger activated.`);
+
+    // STAGE 0: Validation
+    if (!afterData.storage?.rawPath || !(await bucket.file(afterData.storage.rawPath).exists())[0]) {
+        await failPipeline(docRef, 'validate', new Error("RawPath Missing or file does not exist."));
+        return;
+    }
+
+    // STAGE 1: Video Core Processing
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), `lline-${episodeId}-`));
-    const localInputPath = path.join(tempDir, 'original_video');
-    const fragmentedMp4Path = path.join(tempDir, 'frag.mp4');
-    const defaultThumbnailPath = path.join(tempDir, 'default_thumb.jpg');
-
     try {
-        await bucket.file(rawPath).download({ destination: localInputPath });
-
-        await updateDoc(docRef, { 'status.step': 'transcode', 'status.progress': 15 });
-
+        await docRef.update({ 'status.pipeline': 'processing', 'status.step': 'transcode', 'status.progress': 10 });
+        const localInputPath = path.join(tempDir, 'original_video');
+        await bucket.file(afterData.storage.rawPath).download({ destination: localInputPath });
+        
         const probeData = await new Promise<ffmpeg.FfprobeData>((res, rej) => ffmpeg.ffprobe(localInputPath, (err, data) => err ? rej(err) : res(data)));
         const audioStream = probeData.streams.find(s => s.codec_type === 'audio');
         const duration = probeData.format.duration || 0;
 
-        // --- Thumbnail Generation ---
-        await new Promise<void>((res, rej) => {
-            ffmpeg(localInputPath)
-                .seekInput(duration / 2)
-                .frames(1)
-                .output(defaultThumbnailPath)
-                .on('error', rej)
-                .on('end', () => res())
-                .run();
-        });
+        // Thumbnail Generation
+        const defaultThumbnailPath = path.join(tempDir, 'default_thumb.jpg');
+        await new Promise<void>((res, rej) => ffmpeg(localInputPath).seekInput(duration / 2).frames(1).output(defaultThumbnailPath).on('error', rej).on('end', () => res()).run());
         const defaultThumbStoragePath = `episodes/${episodeId}/thumbnails/default.jpg`;
         await bucket.upload(defaultThumbnailPath, { destination: defaultThumbStoragePath });
         const defaultThumbUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(defaultThumbStoragePath)}?alt=media`;
 
+        // FFmpeg Transcode & Segment
+        const fragmentedMp4Path = path.join(tempDir, 'frag.mp4');
         await new Promise<void>((res, rej) => {
             const command = ffmpeg(localInputPath).videoCodec('libx264').outputOptions(['-vf', 'scale=-2:1080']);
             if (audioStream) command.audioCodec('aac');
             command.outputOptions(['-profile:v baseline', '-level 3.0', '-pix_fmt yuv420p', '-g 48', '-keyint_min 48', '-sc_threshold 0', '-movflags frag_keyframe+empty_moov'])
                 .toFormat('mp4').on('error', rej).on('end', () => res()).save(fragmentedMp4Path);
         });
-
         await new Promise<void>((res, rej) => {
-            ffmpeg(fragmentedMp4Path).outputOptions(['-f dash', `-seg_duration ${SEGMENT_DURATION_SEC}`, '-init_seg_name init.mp4', `-media_seg_name segment_%d.m4s`])
-                .on('error', rej).on('end', () => res()).save(path.join(tempDir, 'manifest.mpd'));
+            ffmpeg(fragmentedMp4Path).outputOptions(['-f dash', `-seg_duration ${SEGMENT_DURATION_SEC}`, '-init_seg_name init.mp4', `-media_seg_name segment_%d.m4s`]).on('error', rej).on('end', () => res()).save(path.join(tempDir, 'manifest.mpd'));
         });
 
-        await updateDoc(docRef, { 'status.step': 'encrypt', 'status.progress': 40 });
+        // Encryption
+        await docRef.update({ 'status.step': 'encrypt', 'status.progress': 50 });
         const createdFiles = await fs.readdir(tempDir);
         const segmentNames = ['init.mp4', ...createdFiles.filter(f => f.startsWith('segment_')).sort()];
-        
-        const kek = Buffer.from(process.env.KEK_SECRET!, 'base64');
         const masterKey = crypto.randomBytes(32);
         const encryptedBasePath = `episodes/${episodeId}/segments/`;
         const processedSegments = [];
-
         for (const fileName of segmentNames) {
             const content = await fs.readFile(path.join(tempDir, fileName));
             const iv = crypto.randomBytes(12);
@@ -116,8 +157,9 @@ async function runVideoCoreStage(docRef: admin.firestore.DocumentReference, epis
             await bucket.file(storagePath).save(finalBuffer);
             processedSegments.push({ name: fileName, path: storagePath });
         }
-
-        await updateDoc(docRef, { 'status.step': 'manifest', 'status.progress': 85 });
+        
+        // Manifest & Key Storage
+        await docRef.update({ 'status.step': 'manifest', 'status.progress': 90 });
         const manifestPath = `episodes/${episodeId}/manifest.json`;
         const manifest = {
             codec: audioStream ? `video/mp4; codecs="avc1.42E01E, mp4a.40.2"` : `video/mp4; codecs="avc1.42E01E"`,
@@ -127,42 +169,65 @@ async function runVideoCoreStage(docRef: admin.firestore.DocumentReference, epis
         };
         await bucket.file(manifestPath).save(JSON.stringify(manifest));
 
+        const kek = await loadKEK();
         const keyId = `vidkey_${episodeId}`;
         const kekIv = crypto.randomBytes(12);
         const kekCipher = crypto.createCipheriv('aes-256-gcm', kek, kekIv);
         const encryptedMasterKeyBlob = Buffer.concat([kekIv, kekCipher.update(masterKey), kekCipher.final(), kekCipher.getAuthTag()]);
         await db.collection('video_keys').doc(keyId).set({ encryptedMasterKey: encryptedMasterKeyBlob.toString('base64'), kekVersion: 1 });
-        
-        const encryptionInfo: EncryptionInfo = {
-            algorithm: 'AES-256-GCM', ivLength: 12, tagLength: 16, keyId, kekVersion: 1, aadMode: "path", segmentDurationSec: 4, fragmentEncrypted: true
-        };
 
-        await updateDoc(docRef, {
+        // Final Update to trigger AI stage
+        await docRef.update({
             duration: Math.round(duration),
             'storage.encryptedBasePath': encryptedBasePath, 'storage.manifestPath': manifestPath,
             'thumbnails.default': defaultThumbUrl, 'thumbnails.defaultPath': defaultThumbStoragePath,
-            'thumbnailUrl': episode.thumbnails.custom || defaultThumbUrl,
-            'encryption': encryptionInfo,
+            'thumbnailUrl': afterData.thumbnails.custom || defaultThumbUrl,
+            'encryption': { algorithm: 'AES-256-GCM', ivLength: 12, tagLength: 16, keyId, kekVersion: 1, aadMode: "path", segmentDurationSec: 4, fragmentEncrypted: true },
             'status.pipeline': 'completed', 'status.playable': true, 'status.step': 'done', 'status.progress': 100, 'status.error': null,
             'ai.status': 'queued',
         });
+        console.log(`[${episodeId}] ✅ videoPipelineTrigger finished successfully.`);
+
+    } catch (e: any) {
+        await failPipeline(docRef, e.step || 'unknown', e.error || e);
     } finally {
         await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
-}
+});
 
-async function runAiStage(docRef: admin.firestore.DocumentReference, episode: Episode) {
-    const { id: episodeId, storage: { rawPath } } = episode;
-    if (!rawPath) throw new Error("AI analysis requires rawPath, but it was missing.");
+
+// --- FUNCTION 2: AI Analysis and Cleanup ---
+export const aiAnalysisTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
+    const change = event.data;
+    if (!change?.after.exists || !change.before.exists) return;
+
+    const afterData = change.after.data() as Episode;
+    const beforeData = change.before.data() as Episode;
+
+    // GUARD: Only trigger when AI status moves to 'queued'
+    if (afterData.ai?.status !== 'queued' || beforeData.ai?.status === 'queued') {
+        return;
+    }
     
+    const { episodeId } = event.params;
+    const docRef = change.after.ref;
+    console.log(`[${episodeId}] 🚀 aiAnalysisTrigger activated.`);
+    
+    // STAGE 2: AI Intelligence
+    if (!afterData.storage.rawPath) {
+        console.error(`[${episodeId}] AI analysis cannot run because rawPath is missing.`);
+        await docRef.update({ 'ai.status': 'failed', 'ai.error': { code: 'RAWPATH_MISSING', message: 'Original video file path not found for analysis.' }});
+        return;
+    }
+
     initializeTools();
     const tempFilePath = path.join(os.tmpdir(), `ai-${episodeId}`);
     let uploadedFile: any = null;
 
     try {
-        await updateDoc(docRef, { 'ai.status': 'processing', 'ai.model': 'gemini-2.5-flash' });
-
-        await bucket.file(rawPath).download({ destination: tempFilePath });
+        await docRef.update({ 'ai.status': 'processing', 'ai.model': 'gemini-2.5-flash' });
+        await bucket.file(afterData.storage.rawPath).download({ destination: tempFilePath });
+        
         const uploadResponse = await fileManager!.uploadFile(tempFilePath, { mimeType: 'video/mp4' });
         uploadedFile = uploadResponse.file;
         
@@ -182,61 +247,41 @@ async function runAiStage(docRef: admin.firestore.DocumentReference, episode: Ep
         const searchDataPath = `episodes/${episodeId}/ai/search_data.json`;
         await bucket.file(searchDataPath).save(JSON.stringify(output));
 
-        await updateDoc(docRef, { 'ai.status': 'completed', 'ai.resultPaths': { search_data: searchDataPath }, 'ai.error': null });
-    } finally {
-        if (uploadedFile) {
-            try { await fileManager!.deleteFile(uploadedFile.name); } catch (e) {}
-        }
-        try { await fs.rm(tempFilePath, { force: true }); } catch (e) {}
-    }
-}
+        await docRef.update({ 'ai.status': 'completed', 'ai.resultPaths': { search_data: searchDataPath }, 'ai.error': null });
+        console.log(`[${episodeId}] ✅ AI analysis succeeded.`);
 
-async function runCleanupStage(docRef: admin.firestore.DocumentReference, episode: Episode) {
-    if (episode.storage.rawPath) {
-        await bucket.file(episode.storage.rawPath).delete().catch(e => console.error(`Failed to delete rawPath ${episode.storage.rawPath}`, e));
-        await updateDoc(docRef, { 'storage.rawPath': admin.firestore.FieldValue.delete() });
-    }
-}
-
-// 3. Main Orchestrator Trigger
-export const episodeProcessingTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
-    if (!event.data) return;
-    
-    const docRef = event.data.after.ref;
-    const after = event.data.after.data() as Episode;
-    const before = event.data.before?.data() as Episode | undefined;
-
-    // Loop Prevention
-    if (before && after.status?.pipeline === before.status?.pipeline && after.ai?.status === before.ai?.status) {
-        return;
-    }
-
-    try {
-        // Stage 0: Validation & Stage 1: Video Core
-        if (after.status.pipeline === 'pending') {
-            await updateDoc(docRef, { 'status.pipeline': 'processing', 'status.step': 'validate', 'status.progress': 5, 'status.playable': false, 'status.error': null });
-            if (!after.storage?.rawPath || !(await bucket.file(after.storage.rawPath).exists())[0]) {
-                throw { step: 'validate', error: new Error("RawPath Missing or file does not exist.") };
-            }
-            await runVideoCoreStage(docRef, after);
-        }
-        // Stage 2: AI Intelligence
-        else if (after.ai?.status === 'queued') {
-            await runAiStage(docRef, after);
-        }
-        // Stage 3: Cleanup
-        else if (before && (after.ai?.status === 'completed' || after.ai?.status === 'failed') && after.ai?.status !== before.ai?.status) {
-            await runCleanupStage(docRef, after);
-        }
     } catch (e: any) {
-        await updateDoc(docRef, {
-            'status.pipeline': 'failed',
-            'status.playable': (e.step === 'ai_intelligence' || e.step === 'cleanup') ? after.status.playable : false,
-            'status.error': { step: e.step || 'trigger-exception', message: e.message || 'Unknown error', ts: admin.firestore.FieldValue.serverTimestamp() },
-            ...(e.step === 'ai_intelligence' && { 'ai.status': 'failed', 'ai.error': { code: 'AI_PROCESSING_FAILED', message: e.message || 'Unknown AI error', ts: admin.firestore.FieldValue.serverTimestamp() } }),
+        await docRef.update({
+            'ai.status': 'failed',
+            'ai.error': { code: 'AI_PROCESSING_FAILED', message: e.message || 'Unknown AI error' }
         });
+        console.error(`[${episodeId}] ❌ AI analysis failed.`, e);
+    } finally {
+        if (uploadedFile) { try { await fileManager!.deleteFile(uploadedFile.name); } catch (e) {} }
+        try { await fs.rm(tempFilePath, { force: true }); } catch (e) {}
+        
+        // STAGE 3: Cleanup (runs regardless of AI success/fail)
+        if (afterData.storage.rawPath) {
+            await deleteStorageFileByPath(afterData.storage.rawPath);
+            await docRef.update({ 'storage.rawPath': admin.firestore.FieldValue.delete() });
+            console.log(`[${episodeId}] ✅ Cleanup complete. Original file deleted.`);
+        }
     }
 });
+
+
+// --- FUNCTION 3: Cleanup on Deletion ---
+const deleteStorageFileByPath = async (filePath: string | undefined) => {
+    if (!filePath) return;
+    try {
+        const file = bucket.file(filePath);
+        if ((await file.exists())[0]) {
+            await file.delete();
+        }
+    } catch (error) {
+        console.error(`Could not delete storage file at path ${filePath}.`, error);
+    }
+};
 
 export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId}", async (event) => {
     const prefix = `episodes/${event.params.episodeId}/`;

@@ -37,9 +37,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteFilesOnEpisodeDelete = exports.episodeProcessingTrigger = void 0;
-/**
- * @fileoverview LlineStream Video Processing Pipeline v8.0 (State Machine)
- */
 const v2_1 = require("firebase-functions/v2");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const admin = __importStar(require("firebase-admin"));
@@ -63,7 +60,7 @@ if (admin.apps.length === 0) {
 (0, v2_1.setGlobalOptions)({
     region: "us-central1",
     secrets: ["GOOGLE_GENAI_API_KEY", "KEK_SECRET"],
-    timeoutSeconds: 540, // 9 minutes
+    timeoutSeconds: 540,
     memory: "4GiB",
     cpu: 2,
 });
@@ -95,14 +92,28 @@ async function runVideoCoreStage(docRef, episode) {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), `lline-${episodeId}-`));
     const localInputPath = path.join(tempDir, 'original_video');
     const fragmentedMp4Path = path.join(tempDir, 'frag.mp4');
+    const defaultThumbnailPath = path.join(tempDir, 'default_thumb.jpg');
     try {
         await bucket.file(rawPath).download({ destination: localInputPath });
         await updateDoc(docRef, { 'status.step': 'transcode', 'status.progress': 15 });
         const probeData = await new Promise((res, rej) => fluent_ffmpeg_1.default.ffprobe(localInputPath, (err, data) => err ? rej(err) : res(data)));
         const audioStream = probeData.streams.find(s => s.codec_type === 'audio');
         const duration = probeData.format.duration || 0;
+        // --- Thumbnail Generation ---
         await new Promise((res, rej) => {
-            const command = (0, fluent_ffmpeg_1.default)(localInputPath).videoCodec('libx264');
+            (0, fluent_ffmpeg_1.default)(localInputPath)
+                .seekInput(duration / 2)
+                .frames(1)
+                .output(defaultThumbnailPath)
+                .on('error', rej)
+                .on('end', () => res())
+                .run();
+        });
+        const defaultThumbStoragePath = `episodes/${episodeId}/thumbnails/default.jpg`;
+        await bucket.upload(defaultThumbnailPath, { destination: defaultThumbStoragePath });
+        const defaultThumbUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(defaultThumbStoragePath)}?alt=media`;
+        await new Promise((res, rej) => {
+            const command = (0, fluent_ffmpeg_1.default)(localInputPath).videoCodec('libx264').outputOptions(['-vf', 'scale=-2:1080']);
             if (audioStream)
                 command.audioCodec('aac');
             command.outputOptions(['-profile:v baseline', '-level 3.0', '-pix_fmt yuv420p', '-g 48', '-keyint_min 48', '-sc_threshold 0', '-movflags frag_keyframe+empty_moov'])
@@ -134,7 +145,7 @@ async function runVideoCoreStage(docRef, episode) {
         const manifest = {
             codec: audioStream ? `video/mp4; codecs="avc1.42E01E, mp4a.40.2"` : `video/mp4; codecs="avc1.42E01E"`,
             duration: Math.round(duration),
-            init: processedSegments.find(s => s.name === 'init.mp4').path,
+            init: processedSegments.find(s => s.name === 'init.mp4')?.path,
             segments: processedSegments.filter(s => s.name !== 'init.mp4').map(s => ({ path: s.path })),
         };
         await bucket.file(manifestPath).save(JSON.stringify(manifest));
@@ -143,10 +154,15 @@ async function runVideoCoreStage(docRef, episode) {
         const kekCipher = crypto.createCipheriv('aes-256-gcm', kek, kekIv);
         const encryptedMasterKeyBlob = Buffer.concat([kekIv, kekCipher.update(masterKey), kekCipher.final(), kekCipher.getAuthTag()]);
         await db.collection('video_keys').doc(keyId).set({ encryptedMasterKey: encryptedMasterKeyBlob.toString('base64'), kekVersion: 1 });
+        const encryptionInfo = {
+            algorithm: 'AES-256-GCM', ivLength: 12, tagLength: 16, keyId, kekVersion: 1, aadMode: "path", segmentDurationSec: 4, fragmentEncrypted: true
+        };
         await updateDoc(docRef, {
             duration: Math.round(duration),
             'storage.encryptedBasePath': encryptedBasePath, 'storage.manifestPath': manifestPath,
-            'encryption': { keyId, aadMode: "path" }, // Simplified for brevity
+            'thumbnails.default': defaultThumbUrl, 'thumbnails.defaultPath': defaultThumbStoragePath,
+            'thumbnailUrl': episode.thumbnails.custom || defaultThumbUrl,
+            'encryption': encryptionInfo,
             'status.pipeline': 'completed', 'status.playable': true, 'status.step': 'done', 'status.progress': 100, 'status.error': null,
             'ai.status': 'queued',
         });
@@ -176,7 +192,7 @@ async function runAiStage(docRef, episode) {
         if (state === server_1.FileState.FAILED)
             throw new Error("Google AI file processing failed.");
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
-        const prompt = "자막, 요약, 타임라인, 그리고 검색/채팅을 위한 심층 데이터를 JSON으로 뽑아줘.";
+        const prompt = "상세 요약(summary), 타임라인(timeline), 전체 대본(transcript) 뿐만 아니라, AI 검색/채팅을 위한 핵심 키워드(keywords)와 주제(topics)를 JSON으로 추출할 것.";
         const result = await model.generateContent([{ fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } }, { text: prompt }]);
         const output = JSON.parse(result.response.text());
         const searchDataPath = `episodes/${episodeId}/ai/search_data.json`;
@@ -196,10 +212,10 @@ async function runAiStage(docRef, episode) {
         catch (e) { }
     }
 }
-async function runCleanupStage(episode) {
+async function runCleanupStage(docRef, episode) {
     if (episode.storage.rawPath) {
         await bucket.file(episode.storage.rawPath).delete().catch(e => console.error(`Failed to delete rawPath ${episode.storage.rawPath}`, e));
-        await db.collection('episodes').doc(episode.id).update({ 'storage.rawPath': admin.firestore.FieldValue.delete() });
+        await updateDoc(docRef, { 'storage.rawPath': admin.firestore.FieldValue.delete() });
     }
 }
 // 3. Main Orchestrator Trigger
@@ -208,9 +224,9 @@ exports.episodeProcessingTrigger = (0, firestore_1.onDocumentWritten)("episodes/
         return;
     const docRef = event.data.after.ref;
     const after = event.data.after.data();
-    const before = event.data.before.exists ? event.data.before.data() : null;
+    const before = event.data.before?.data();
     // Loop Prevention
-    if (before && after.status.pipeline === before.status.pipeline && after.ai.status === before.ai.status) {
+    if (before && after.status?.pipeline === before.status?.pipeline && after.ai?.status === before.ai?.status) {
         return;
     }
     try {
@@ -223,19 +239,20 @@ exports.episodeProcessingTrigger = (0, firestore_1.onDocumentWritten)("episodes/
             await runVideoCoreStage(docRef, after);
         }
         // Stage 2: AI Intelligence
-        else if (after.ai.status === 'queued') {
+        else if (after.ai?.status === 'queued') {
             await runAiStage(docRef, after);
         }
         // Stage 3: Cleanup
-        else if (before && (after.ai.status === 'completed' || after.ai.status === 'failed') && after.ai.status !== before.ai.status) {
-            await runCleanupStage(after);
+        else if (before && (after.ai?.status === 'completed' || after.ai?.status === 'failed') && after.ai?.status !== before.ai?.status) {
+            await runCleanupStage(docRef, after);
         }
     }
     catch (e) {
-        await docRef.update({
+        await updateDoc(docRef, {
             'status.pipeline': 'failed',
-            'status.playable': false,
-            'status.error': { step: e.step || 'trigger-exception', message: e.message || 'Unknown error' }
+            'status.playable': (e.step === 'ai_intelligence' || e.step === 'cleanup') ? after.status.playable : false,
+            'status.error': { step: e.step || 'trigger-exception', message: e.message || 'Unknown error', ts: admin.firestore.FieldValue.serverTimestamp() },
+            ...(e.step === 'ai_intelligence' && { 'ai.status': 'failed', 'ai.error': { code: 'AI_PROCESSING_FAILED', message: e.message || 'Unknown AI error', ts: admin.firestore.FieldValue.serverTimestamp() } }),
         });
     }
 });

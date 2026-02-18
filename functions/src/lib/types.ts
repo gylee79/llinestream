@@ -1,3 +1,4 @@
+'use server';
 
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase-admin/firestore';
 
@@ -5,22 +6,21 @@ export type Timestamp = FirebaseTimestamp | FieldValue;
 
 export interface PipelineStatus {
     pipeline: "pending" | "processing" | "completed" | "failed";
-    step: "validate" | "transcode" | "encrypt" | "manifest" | "done";
-    playable: boolean; // AI 실패 여부와 상관없이, Stage 1 성공 시 true
+    step: "validate" | "transcode" | "encrypt" | "manifest" | "done" | "unknown" | "trigger-exception" | "idle";
+    playable: boolean;
     progress: number;
-    error?: { step: string; message: string; ts: any } | null;
+    error?: { step: string; message: string; ts: Timestamp } | null;
 }
 
 export interface AiStatus {
-    status: "idle" | "queued" | "processing" | "completed" | "failed";
+    status: "idle" | "queued" | "processing" | "completed" | "failed" | "blocked";
     model?: string;
-    // 검색 및 채팅을 위한 데이터 경로 포함
     resultPaths?: { 
         summary?: string; 
         transcript?: string; 
-        search_data?: string; // keywords, topics 등이 포함된 JSON
+        search_data?: string;
     };
-    error?: { code: string; message: string; ts: any } | null;
+    error?: { code: string; message: string; ts: Timestamp } | null;
 }
 
 export interface Episode {
@@ -29,30 +29,32 @@ export interface Episode {
   instructorId: string;
   title: string;
   description?: string;
-  duration: number; // 정확한 초 단위 시간
+  duration: number;
   isFree: boolean;
   orderIndex?: number;
   createdAt: Timestamp;
   
-  // 썸네일 이원화 구조
   thumbnails: {
-      default: string;      // (필수) 서버가 자동 생성한 썸네일 URL
-      defaultPath: string;  // Storage 경로
-      custom?: string | null;     // (선택) 사용자가 업로드한 이미지
+      default: string;
+      defaultPath: string;
+      custom?: string | null;
       customPath?: string | null;
   };
-  thumbnailUrl: string; // For display, can be custom or default
+  thumbnailUrl: string;
 
   status: PipelineStatus;
   ai: AiStatus;
   storage: {
-      rawPath?: string; // 원본 파일 (처리 후 삭제됨)
+      rawPath?: string;
       encryptedBasePath: string;
       manifestPath: string;
       fileSize?: number;
   };
-  encryption: any; // 기존 암호화 정보 타입 유지
+  encryption: any;
 }
+
+
+// --- Other types (Unchanged as per instruction) ---
 
 export type PlayerState =
   | 'idle'
@@ -303,8 +305,8 @@ export interface OfflineLicense {
   videoId: string;
   userId: string;
   deviceId: string;
-  issuedAt: number; // timestamp
-  expiresAt: number; // timestamp
+  issuedAt: number;
+  expiresAt: number;
   keyId: string;
   kekVersion: 1;
   watermarkSeed: string; 
@@ -321,6 +323,7 @@ export interface OfflineVideoData {
   courseName: string;
   downloadedAt: Date;
   license: OfflineLicense;
+  manifest: VideoManifest;
   segments: Map<string, ArrayBuffer>;
   aiContent?: any;
 }
@@ -340,8 +343,8 @@ export type CryptoWorkerRequest = {
     requestId: string;
     encryptedSegment: ArrayBuffer;
     derivedKeyB64: string;
-    encryption: Partial<EncryptionInfo>;
-    storagePath: string; 
+    encryption: EncryptionInfo;
+    storagePath: string;
   };
 };
 
