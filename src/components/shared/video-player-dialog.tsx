@@ -185,7 +185,7 @@ const SyllabusView = ({ episode, onSeek, offlineVideoData }: {
     if (!aiContent) {
         return (
             <div className="flex-grow flex flex-col items-center justify-center text-center p-4">
-                <Loader className="h-12 w-12 text-muted-foreground animate-spin" />
+                <FileText className="h-12 w-12 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground mt-4 break-keep">AI가 강의 내용을 분석하고 있습니다.<br/>잠시 후 다시 시도해주세요.</p>
             </div>
         );
@@ -215,8 +215,8 @@ const SyllabusView = ({ episode, onSeek, offlineVideoData }: {
                         <Accordion type="single" collapsible className="w-full">
                             {data.timeline.map((item: any, i: number) => (
                                 <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white overflow-hidden">
-                                     <AccordionTrigger className="text-sm hover:no-underline flex-1 p-3 justify-between w-full">
-                                        <div className="flex items-center text-left w-full">
+                                    <AccordionTrigger className="text-sm hover:no-underline flex-1 p-3 justify-between w-full">
+                                        <span className="flex items-center text-left w-full">
                                             <span
                                                 role="button"
                                                 tabIndex={0}
@@ -234,8 +234,8 @@ const SyllabusView = ({ episode, onSeek, offlineVideoData }: {
                                             >
                                                 {item.startTime?.split('.')[0] || '00:00:00'}
                                             </span>
-                                            <p className="whitespace-normal break-keep text-left flex-1 pl-2">{item.subtitle}</p> 
-                                        </div>
+                                            <span className="whitespace-normal break-keep text-left flex-1 pl-2">{item.subtitle}</span> 
+                                        </span>
                                     </AccordionTrigger>
                                     <AccordionContent className="px-3 pb-3">
                                         <p className="text-sm text-foreground whitespace-pre-line break-keep">{item.description}</p>
