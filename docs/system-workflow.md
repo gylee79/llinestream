@@ -8,6 +8,9 @@
 
 하나의 Cloud 함수(`episodeProcessingTrigger`)가 Firestore의 `episodes` 컬렉션에 발생하는 모든 쓰기(create, update) 이벤트를 감지합니다. 함수는 문서의 `status.pipeline`과 `ai.status` 필드를 읽어 현재 어떤 단계를 수행해야 할지 결정하고, 해당 단계의 로직만 실행한 후 종료됩니다. 단계가 성공하면 다음 단계를 위한 상태로 문서를 업데이트하며, 이 업데이트가 다시 함수를 트리거하여 다음 단계가 실행됩니다.
 
+**핵심 원칙: 상태 변경 없음 조기 종료 (Loop Prevention)**
+- 함수 맨 위에서, 이전 상태와 현재 상태를 비교하여 `status.pipeline`과 `ai.status`에 변화가 없으면, 더 이상의 로직을 실행하지 않고 즉시 종료합니다. 이는 불필요한 함수 실행과 잠재적인 무한 루프를 방지하는 핵심적인 방어 코드입니다.
+
 ```mermaid
 graph TD
     A[사용자: 비디오 업로드] --> B(웹사이트: Firestore 문서 생성<br/>- status.pipeline = 'pending');

@@ -90,10 +90,9 @@ async function updatePipelineStatus(docRef: admin.firestore.DocumentReference, s
 
 async function failPipeline(docRef: admin.firestore.DocumentReference, step: PipelineStatus['step'], error: any, hint?: string) {
     const rawError = (error instanceof Error) ? error.message : String(error);
-    await docRef.update({
+    const updatePayload: any = {
         'status.pipeline': 'failed',
         'status.step': step,
-        'status.playable': false, // Core pipeline failure makes video unplayable
         'status.progress': 100, // Mark as finished, but failed
         'status.error': {
             step: step,
@@ -109,7 +108,14 @@ async function failPipeline(docRef: admin.firestore.DocumentReference, step: Pip
             message: '비디오 처리 파이프라인이 실패하여 AI 분석을 건너뜁니다.',
             ts: admin.firestore.FieldValue.serverTimestamp()
         }
-    });
+    };
+    
+    // Video processing failure means the video is unplayable.
+    if (step !== 'ai_analysis' && step !== 'cleanup') {
+        updatePayload['status.playable'] = false;
+    }
+
+    await docRef.update(updatePayload);
     console.error(`[${docRef.id}] ❌ Pipeline Failed at step '${step}':`, rawError);
 }
 
@@ -310,10 +316,10 @@ const deleteStorageFileByPath = async (filePath: string | undefined) => {
 export const episodeProcessingTrigger = onDocumentWritten("episodes/{episodeId}", async (event) => {
     const { episodeId } = event.params;
     const change = event.data;
-    if (!change) return; // Should not happen on 'written' but good practice
+    if (!change) return;
 
     if (!change.after.exists) {
-        console.log(`[${episodeId}] Document deleted. Cleanup will be handled by onDocumentDeleted trigger.`);
+        // Document was deleted, cleanup is handled by deleteFilesOnEpisodeDelete
         return;
     }
     
@@ -321,12 +327,17 @@ export const episodeProcessingTrigger = onDocumentWritten("episodes/{episodeId}"
     const afterData = change.after.data() as Episode;
     const beforeData = change.before.exists ? change.before.data() as Episode : null;
 
-    const pipelineStatusChanged = beforeData?.status?.pipeline !== afterData.status?.pipeline;
-    const aiStatusChanged = beforeData?.ai?.status !== afterData.ai?.status;
+    // --- LOOP PREVENTION ---
+    // If the pipeline and AI statuses haven't changed, do nothing.
+    if (beforeData && 
+        beforeData.status?.pipeline === afterData.status?.pipeline && 
+        beforeData.ai?.status === afterData.ai?.status) {
+        return;
+    }
 
     try {
         // --- STAGE 0/1: Video Processing ---
-        if (afterData.status?.pipeline === 'pending' && pipelineStatusChanged) {
+        if (afterData.status?.pipeline === 'pending') {
             console.log(`[${episodeId}] STAGE 1: Video pipeline job detected. Starting process...`);
             
             // STAGE 0: Validation
@@ -346,14 +357,17 @@ export const episodeProcessingTrigger = onDocumentWritten("episodes/{episodeId}"
         }
 
         // --- STAGE 2: AI Analysis ---
-        if (afterData.status?.pipeline === 'completed' && afterData.ai?.status === 'queued' && (pipelineStatusChanged || aiStatusChanged)) {
+        if (afterData.status?.pipeline === 'completed' && afterData.ai?.status === 'queued') {
             console.log(`[${episodeId}] STAGE 2: AI analysis job detected...`);
             await runAiAnalysis(episodeId, docRef, afterData);
             return;
         }
         
         // --- STAGE 3: Cleanup ---
-        if ((afterData.ai?.status === 'completed' || afterData.ai?.status === 'failed' || afterData.ai.status === 'blocked') && aiStatusChanged) {
+        const aiHasFinished = afterData.ai?.status === 'completed' || afterData.ai?.status === 'failed' || afterData.ai.status === 'blocked';
+        const aiStatusChanged = beforeData?.ai?.status !== afterData.ai?.status;
+
+        if (aiHasFinished && aiStatusChanged) {
              if (afterData.storage.rawPath) {
                 console.log(`[${episodeId}] STAGE 3: Cleanup job detected. Deleting original raw file.`);
                 await deleteStorageFileByPath(afterData.storage.rawPath);

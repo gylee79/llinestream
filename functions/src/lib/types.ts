@@ -1,3 +1,5 @@
+'use server';
+
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase-admin/firestore';
 
 export type Timestamp = FirebaseTimestamp | FieldValue;
@@ -74,6 +76,7 @@ export interface Course {
   createdAt?: Timestamp;
 }
 
+// From Spec 4.3
 export interface EncryptionInfo {
   algorithm: "AES-256-GCM";
   ivLength: 12;
@@ -85,9 +88,10 @@ export interface EncryptionInfo {
   fragmentEncrypted: true;
 }
 
+// From Spec 4.1
 export interface PipelineStatus {
     pipeline: "pending" | "processing" | "failed" | "completed";
-    step: "idle" | "validating" | "transcoding_pending" | "transcoding" | "encryption_pending" | "encrypting" | "finalization_pending" | "finalizing" | "done";
+    step: "validate" | "ffmpeg" | "encrypt" | "verify" | "manifest" | "keys" | "done" | "idle" | "trigger-exception" | "ai_analysis" | "cleanup";
     playable: boolean;
     progress: number;
     jobId?: string;
@@ -105,6 +109,7 @@ export interface PipelineStatus {
     } | null;
 }
 
+// From Spec 4.4
 export interface AiStatus {
     status: "pending" | "queued" | "processing" | "failed" | "completed" | "blocked" | "idle";
     jobId?: string;
@@ -138,31 +143,31 @@ export interface Episode {
   orderIndex?: number;
   createdAt: Timestamp;
   
+  // From Spec 4.2
   storage: {
-      rawPath: string; 
-      encryptedBasePath: string; 
+      rawPath: string; // Original file path, to be archived
+      encryptedBasePath: string; // e.g., episodes/{id}/segments/
       manifestPath: string;
-      tempUnencryptedPath?: string; // For passing state between functions
       aiAudioPath?: string;
-      thumbnailBasePath?: string;
+      thumbnailBasePath?: string; // e.g., episodes/{id}/thumbnails/
       fileSize?: number;
   };
-  
-  // A temporary field to pass the key between encryption and finalization
-  tempMasterKey?: string;
 
+  // Replaces flat thumbnail URLs/paths
   thumbnails: {
       default: string; // URL
       defaultPath: string;
       custom?: string | null; // URL
       customPath?: string | null;
   };
-  thumbnailUrl: string; 
+  thumbnailUrl: string; // Keep for simple display logic (denormalized from custom or default)
 
+  // Combined Status Objects from Spec
   status: PipelineStatus;
   ai: AiStatus;
 
-  encryption: Partial<EncryptionInfo>; // Partial as it's populated at the end
+  // From Spec 4.3
+  encryption: Partial<EncryptionInfo>;
 }
 
 export interface Job {
