@@ -616,7 +616,11 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             const segmentIndex = currentSegmentIndexRef.current;
             if (segmentIndex >= segmentQueueRef.current.length) {
                 if (ms.readyState === 'open' && !sb.updating) {
-                    ms.endOfStream();
+                    try {
+                        ms.endOfStream();
+                    } catch (e) {
+                        console.warn("Error calling endOfStream:", e);
+                    }
                 }
                 return;
             }
@@ -715,16 +719,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     throw new Error("복호화 키가 없습니다.");
                 }
 
-                // Explicitly set the duration on the MediaSource object
-                if (manifest.duration && isFinite(manifest.duration)) {
-                    try {
-                        ms.duration = manifest.duration;
-                    } catch (e) {
-                        // This might fail if segments are already buffered, but it's best effort.
-                        console.error("CRITICAL: Failed to set MediaSource duration.", e);
-                    }
-                }
-                
                 const mimeCodec = manifest.codec;
                 if (!MediaSource.isTypeSupported(mimeCodec)) {
                     throw new Error(`코덱을 지원하지 않습니다: ${mimeCodec}`);
@@ -732,6 +726,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 
                 const sourceBuffer = ms.addSourceBuffer(mimeCodec);
                 sourceBufferRef.current = sourceBuffer;
+
+                if (manifest.duration && isFinite(manifest.duration)) {
+                    try {
+                        ms.duration = manifest.duration;
+                    } catch (e) {
+                         console.warn("Could not set MediaSource duration. This may happen if buffering has already started.", e);
+                    }
+                }
                 
                 sourceBuffer.addEventListener('updateend', () => {
                     currentSegmentIndexRef.current++;

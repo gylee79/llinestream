@@ -172,7 +172,7 @@ export interface Job {
   id: string;
   type: "VIDEO_PIPELINE" | "AI_ANALYSIS";
   episodeId: string;
-  status: "pending" | "running" | "failed" | "succeeded" | "dead";
+  status: "queued" | "running" | "failed" | "succeeded" | "dead";
   attempts: number;
   maxAttempts: number;
   createdAt: Timestamp;
@@ -340,10 +340,16 @@ export interface OfflineLicense {
   issuedAt: number; // timestamp
   expiresAt: number; // timestamp
   keyId: string;
-  kekVersion: 1,
+  kekVersion: 1;
+  watermarkSeed: string; // Added for offline watermarking
+  policy: {
+      maxDevices: 1,
+      allowScreenCapture: false
+  },
   // This signature is crucial but requires a server private key.
   // The client must verify it with a public key.
   signature: string; 
+  offlineDerivedKey: string;
 }
 
 
@@ -354,6 +360,7 @@ export interface OfflineVideoData {
   license: OfflineLicense;
   manifest: VideoManifest;
   segments: Map<string, ArrayBuffer>;
+  aiContent?: any;
 }
 
 
