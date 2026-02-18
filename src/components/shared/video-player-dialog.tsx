@@ -216,12 +216,13 @@ const SyllabusView = ({ episode, onSeek, offlineVideoData }: {
                             {data.timeline.map((item: any, i: number) => (
                                 <AccordionItem value={`item-${i}`} key={i} className="border rounded-md mb-1 bg-white overflow-hidden">
                                     <AccordionTrigger 
-                                        className="text-sm hover:no-underline text-left px-3 py-2" 
-                                        onClick={() => onSeek(parseTimeToSeconds(item.startTime))}
+                                        className="text-sm hover:no-underline text-left px-3 py-2"
                                     >
                                         <div className="flex items-center gap-2 min-w-0">
-                                            <span className="font-mono text-primary font-bold">{item.startTime?.split('.')[0] || '00:00:00'}</span>
-                                            <p className="whitespace-normal break-keep">{item.subtitle}</p> 
+                                            <Button variant="ghost" className="font-mono text-primary font-bold px-1 h-auto text-xs" onClick={(e) => { e.stopPropagation(); onSeek(parseTimeToSeconds(item.startTime)); }}>
+                                                {item.startTime?.split('.')[0] || '00:00:00'}
+                                            </Button>
+                                            <p className="whitespace-normal break-keep cursor-default">{item.subtitle}</p> 
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent className="px-3 pb-3">
@@ -626,17 +627,16 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 let segmentBuffer: ArrayBuffer;
                 if(offlineVideoData) {
                     segmentBuffer = offlineVideoData.segments.get(segmentPath)!;
-                    if(!segmentBuffer) throw new Error(`Offline segment not found: ${segmentPath}`);
+                    if(!segmentBuffer) throw new Error(`오프라인 세그먼트를 찾을 수 없습니다: ${segmentPath}`);
                 } else {
                     const token = await authUser?.getIdToken();
-                    const url = await getSignedUrl(token!, episode.id, segmentPath);
+                    if (!token) throw new Error("Authentication token not available.");
+                    const url = await getSignedUrl(token, episode.id, segmentPath);
                     const res = await fetch(url);
+                    if (!res.ok) throw new Error(`세그먼트 다운로드 실패: ${res.status} ${res.statusText}`);
                     segmentBuffer = await res.arrayBuffer();
                 }
                 
-                // CRITICAL: The 'storagePath' for AAD verification must EXACTLY match the path
-                // used on the server during encryption. Here, we pass the 'path' from the manifest.
-                // The key is now sourced from a secure ref instead of the window object.
                 workerRef.current?.postMessage({
                   type: 'DECRYPT_SEGMENT',
                   payload: { 
@@ -648,7 +648,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                   }
                 });
             } catch (e: any) {
-                console.error(`Error fetching segment ${segmentIndex}:`, e);
+                console.error(`세그먼트 처리 오류 ${segmentIndex}:`, e);
+                setPlayerState('error-fatal');
+                setPlayerMessage(`세그먼트 로딩 실패: ${e.message}`);
+                return; // Stop fetching more segments on error
             }
         };
 
@@ -684,13 +687,15 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 
                 if (offlineVideoData) {
                     if (new Date() > new Date(offlineVideoData.license.expiresAt)) {
+                        setPlayerState('license-expired');
+                        setPlayerMessage('오프라인 라이선스가 만료되었습니다.');
                         throw new Error("오프라인 라이선스가 만료되었습니다.");
                     }
                     manifest = offlineVideoData.manifest;
                     decryptionKeyRef.current = offlineVideoData.license.offlineDerivedKey;
                     setWatermarkSeed(offlineVideoData.license.watermarkSeed);
                 } else {
-                    if (!authUser) throw new Error("로그인 필요");
+                    if (!authUser) throw new Error("로그인이 필요합니다.");
                     const token = await authUser.getIdToken();
                     const sessionRes = await fetch('/api/play-session', {
                         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -707,17 +712,19 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 }
 
                 if (!decryptionKeyRef.current) {
-                    throw new Error("Decryption key is missing.");
+                    throw new Error("복호화 키가 없습니다.");
                 }
-                
+
+                // Explicitly set the duration on the MediaSource object
                 if (manifest.duration && isFinite(manifest.duration)) {
                     try {
                         ms.duration = manifest.duration;
                     } catch (e) {
-                        console.warn("Failed to set MediaSource duration:", e);
+                        // This might fail if segments are already buffered, but it's best effort.
+                        console.error("CRITICAL: Failed to set MediaSource duration.", e);
                     }
                 }
-
+                
                 const mimeCodec = manifest.codec;
                 if (!MediaSource.isTypeSupported(mimeCodec)) {
                     throw new Error(`코덱을 지원하지 않습니다: ${mimeCodec}`);
