@@ -67,11 +67,7 @@ export const saveVideo = async (data: OfflineVideoData): Promise<void> => {
 
     // 1. Save metadata (everything except the segments map) to the 'videos' store.
     const metadataToSave = {
-        episode: data.episode,
-        courseName: data.courseName,
-        downloadedAt: data.downloadedAt,
-        license: data.license,
-        manifest: data.manifest,
+        ...data,
         aiContent: aiContent,
     };
     

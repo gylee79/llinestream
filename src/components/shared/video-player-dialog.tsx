@@ -219,9 +219,11 @@ const SyllabusView = ({ episode, onSeek, offlineVideoData }: {
                                         className="text-sm hover:no-underline text-left px-3 py-2"
                                     >
                                         <div className="flex items-center gap-2 min-w-0">
-                                            <Button variant="ghost" className="font-mono text-primary font-bold px-1 h-auto text-xs" onClick={(e) => { e.stopPropagation(); onSeek(parseTimeToSeconds(item.startTime)); }}>
+                                            <div 
+                                                className="font-mono text-primary font-bold px-1 h-auto text-xs cursor-pointer hover:underline" 
+                                                onClick={(e) => { e.stopPropagation(); onSeek(parseTimeToSeconds(item.startTime)); }}>
                                                 {item.startTime?.split('.')[0] || '00:00:00'}
-                                            </Button>
+                                            </div>
                                             <p className="whitespace-normal break-keep cursor-default">{item.subtitle}</p> 
                                         </div>
                                     </AccordionTrigger>
