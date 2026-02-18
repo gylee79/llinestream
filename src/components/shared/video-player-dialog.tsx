@@ -709,6 +709,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 if (!decryptionKeyRef.current) {
                     throw new Error("Decryption key is missing.");
                 }
+                
+                if (manifest.duration && isFinite(manifest.duration)) {
+                    try {
+                        ms.duration = manifest.duration;
+                    } catch (e) {
+                        console.warn("Failed to set MediaSource duration:", e);
+                    }
+                }
 
                 const mimeCodec = manifest.codec;
                 if (!MediaSource.isTypeSupported(mimeCodec)) {
