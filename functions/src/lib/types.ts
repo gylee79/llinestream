@@ -1,8 +1,58 @@
-'use server';
 
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase-admin/firestore';
 
 export type Timestamp = FirebaseTimestamp | FieldValue;
+
+export interface PipelineStatus {
+    pipeline: "pending" | "processing" | "completed" | "failed";
+    step: "validate" | "transcode" | "encrypt" | "manifest" | "done";
+    playable: boolean; // AI 실패 여부와 상관없이, Stage 1 성공 시 true
+    progress: number;
+    error?: { step: string; message: string; ts: any } | null;
+}
+
+export interface AiStatus {
+    status: "idle" | "queued" | "processing" | "completed" | "failed";
+    model?: string;
+    // 검색 및 채팅을 위한 데이터 경로 포함
+    resultPaths?: { 
+        summary?: string; 
+        transcript?: string; 
+        search_data?: string; // keywords, topics 등이 포함된 JSON
+    };
+    error?: { code: string; message: string; ts: any } | null;
+}
+
+export interface Episode {
+  id: string;
+  courseId: string;
+  instructorId: string;
+  title: string;
+  description?: string;
+  duration: number; // 정확한 초 단위 시간
+  isFree: boolean;
+  orderIndex?: number;
+  createdAt: Timestamp;
+  
+  // 썸네일 이원화 구조
+  thumbnails: {
+      default: string;      // (필수) 서버가 자동 생성한 썸네일 URL
+      defaultPath: string;  // Storage 경로
+      custom?: string | null;     // (선택) 사용자가 업로드한 이미지
+      customPath?: string | null;
+  };
+  thumbnailUrl: string; // For display, can be custom or default
+
+  status: PipelineStatus;
+  ai: AiStatus;
+  storage: {
+      rawPath?: string; // 원본 파일 (처리 후 삭제됨)
+      encryptedBasePath: string;
+      manifestPath: string;
+      fileSize?: number;
+  };
+  encryption: any; // 기존 암호화 정보 타입 유지
+}
 
 export type PlayerState =
   | 'idle'
@@ -87,63 +137,6 @@ export interface EncryptionInfo {
   fragmentEncrypted: true;
 }
 
-// v8.0 상태 관리를 위한 명확한 타입 정의
-export interface PipelineStatus {
-    // pending: 대기 중 (Stage 0 진입 전)
-    // processing: 변환/암호화 중 (Stage 1)
-    // completed: 재생 준비 완료 (Stage 1 성공)
-    // failed: 실패
-    pipeline: "pending" | "processing" | "completed" | "failed";
-    step: "validate" | "transcode" | "encrypt" | "manifest" | "done";
-    playable: boolean; // 비디오 재생 가능 여부 (AI 실패와 무관)
-    progress: number;
-    error?: { step: string; message: string; ts: Timestamp } | null;
-}
-
-export interface AiStatus {
-    // idle: 대기
-    // queued: 비디오 변환 완료 후 분석 대기 (Stage 2 진입)
-    // processing: 분석 중
-    // completed: 분석 완료
-    // failed: 분석 실패
-    status: "idle" | "queued" | "processing" | "completed" | "failed";
-    model?: string;
-    resultPaths?: { summary?: string; transcript?: string; search_data?: string };
-    error?: { code: string; message: string; ts: Timestamp } | null;
-}
-
-
-export interface Episode {
-  id: string;
-  courseId: string;
-  instructorId: string;
-  title: string;
-  description?: string;
-  duration: number;
-  isFree: boolean;
-  orderIndex?: number;
-  createdAt: Timestamp;
-  
-  storage: {
-      rawPath?: string; // 원본 파일 경로 (삭제 대상)
-      encryptedBasePath: string;
-      manifestPath: string;
-      fileSize?: number;
-  };
-
-  thumbnails: {
-      default: string;
-      defaultPath: string;
-      custom?: string | null;
-      customPath?: string | null;
-  };
-  thumbnailUrl: string;
-
-  status: PipelineStatus;
-  ai: AiStatus;
-  encryption: Partial<EncryptionInfo>;
-}
-
 export interface Job {
   id: string;
   type: "VIDEO_PIPELINE" | "AI_ANALYSIS";
@@ -169,7 +162,6 @@ export interface VideoManifest {
   init: string;
   segments: Array<{ path: string; }>;
 }
-
 
 export interface VideoKey {
   keyId: string;
@@ -270,7 +262,6 @@ export interface EpisodeComment {
   createdAt: Timestamp;
 }
 
-
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
@@ -325,17 +316,14 @@ export interface OfflineLicense {
   offlineDerivedKey: string;
 }
 
-
 export interface OfflineVideoData {
   episode: Episode;
   courseName: string;
   downloadedAt: Date;
   license: OfflineLicense;
-  manifest: VideoManifest;
   segments: Map<string, ArrayBuffer>;
   aiContent?: any;
 }
-
 
 export interface OfflineVideoInfo {
   episodeId: string;
