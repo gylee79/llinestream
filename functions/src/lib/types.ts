@@ -76,7 +76,6 @@ export interface Course {
   createdAt?: Timestamp;
 }
 
-// From Spec 4.3
 export interface EncryptionInfo {
   algorithm: "AES-256-GCM";
   ivLength: 12;
@@ -88,47 +87,29 @@ export interface EncryptionInfo {
   fragmentEncrypted: true;
 }
 
-// From Spec 4.1
+// v8.0 상태 관리를 위한 명확한 타입 정의
 export interface PipelineStatus {
-    pipeline: "pending" | "processing" | "failed" | "completed";
-    step: "validate" | "ffmpeg" | "encrypt" | "verify" | "manifest" | "keys" | "done" | "idle" | "trigger-exception" | "ai_analysis" | "cleanup";
-    playable: boolean;
+    // pending: 대기 중 (Stage 0 진입 전)
+    // processing: 변환/암호화 중 (Stage 1)
+    // completed: 재생 준비 완료 (Stage 1 성공)
+    // failed: 실패
+    pipeline: "pending" | "processing" | "completed" | "failed";
+    step: "validate" | "transcode" | "encrypt" | "manifest" | "done";
+    playable: boolean; // 비디오 재생 가능 여부 (AI 실패와 무관)
     progress: number;
-    jobId?: string;
-    startedAt?: Timestamp;
-    updatedAt?: Timestamp;
-    lastHeartbeatAt?: Timestamp;
-    error?: {
-        step: string;
-        code: string;
-        message: string;
-        hint?: string;
-        raw: string;
-        debugLogPath?: string;
-        ts: Timestamp;
-    } | null;
+    error?: { step: string; message: string; ts: Timestamp } | null;
 }
 
-// From Spec 4.4
 export interface AiStatus {
-    status: "pending" | "queued" | "processing" | "failed" | "completed" | "blocked" | "idle";
-    jobId?: string;
+    // idle: 대기
+    // queued: 비디오 변환 완료 후 분석 대기 (Stage 2 진입)
+    // processing: 분석 중
+    // completed: 분석 완료
+    // failed: 분석 실패
+    status: "idle" | "queued" | "processing" | "completed" | "failed";
     model?: string;
-    attempts?: number;
-    lastHeartbeatAt?: Timestamp;
-    error?: {
-        code: string;
-        message: string;
-        raw: string;
-        debugLogPath?: string;
-        ts: Timestamp;
-    } | null;
-    resultPaths?: {
-        transcript?: string;
-        summary?: string;
-        chapters?: string;
-        quiz?: string;
-    };
+    resultPaths?: { summary?: string; transcript?: string; search_data?: string };
+    error?: { code: string; message: string; ts: Timestamp } | null;
 }
 
 
@@ -143,30 +124,23 @@ export interface Episode {
   orderIndex?: number;
   createdAt: Timestamp;
   
-  // From Spec 4.2
   storage: {
-      rawPath: string; // Original file path, to be archived
-      encryptedBasePath: string; // e.g., episodes/{id}/segments/
+      rawPath?: string; // 원본 파일 경로 (삭제 대상)
+      encryptedBasePath: string;
       manifestPath: string;
-      aiAudioPath?: string;
-      thumbnailBasePath?: string; // e.g., episodes/{id}/thumbnails/
       fileSize?: number;
   };
 
-  // Replaces flat thumbnail URLs/paths
   thumbnails: {
-      default: string; // URL
+      default: string;
       defaultPath: string;
-      custom?: string | null; // URL
+      custom?: string | null;
       customPath?: string | null;
   };
-  thumbnailUrl: string; // Keep for simple display logic (denormalized from custom or default)
+  thumbnailUrl: string;
 
-  // Combined Status Objects from Spec
   status: PipelineStatus;
   ai: AiStatus;
-
-  // From Spec 4.3
   encryption: Partial<EncryptionInfo>;
 }
 
@@ -334,7 +308,6 @@ export interface Bookmark {
   episodeTitle?: string;
 }
 
-// From Spec 12.2
 export interface OfflineLicense {
   videoId: string;
   userId: string;
@@ -343,13 +316,11 @@ export interface OfflineLicense {
   expiresAt: number; // timestamp
   keyId: string;
   kekVersion: 1;
-  watermarkSeed: string; // Added for offline watermarking
+  watermarkSeed: string; 
   policy: {
       maxDevices: 1,
       allowScreenCapture: false
   },
-  // This signature is crucial but requires a server private key.
-  // The client must verify it with a public key.
   signature: string; 
   offlineDerivedKey: string;
 }
@@ -381,8 +352,8 @@ export type CryptoWorkerRequest = {
     requestId: string;
     encryptedSegment: ArrayBuffer;
     derivedKeyB64: string;
-    encryption: EncryptionInfo;
-    storagePath: string; // Added for AAD
+    encryption: Partial<EncryptionInfo>;
+    storagePath: string; 
   };
 };
 
