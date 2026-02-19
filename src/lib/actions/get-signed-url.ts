@@ -57,18 +57,21 @@ export async function getSignedUrl(
     // 4. SERVER-SIDE PATH VALIDATION (CRITICAL)
     // Fetch the manifest from storage to verify the requested path belongs to this video.
     // This prevents a user from using a valid session for one video to request segments from another.
-    if (!episodeData.storage.manifestPath) {
-        return { error: 'ERROR_MANIFEST_NOT_FOUND' };
-    }
-    const manifestFile = storage.bucket().file(episodeData.storage.manifestPath);
-    const [manifestContent] = await manifestFile.download();
-    const manifest: VideoManifest = JSON.parse(manifestContent.toString('utf8'));
+    if (requestedPath.startsWith('episodes/')) { // Only validate video segments, not other files like AI results
+        if (!episodeData.storage.manifestPath) {
+            return { error: 'ERROR_MANIFEST_NOT_FOUND' };
+        }
+        const manifestFile = storage.bucket().file(episodeData.storage.manifestPath);
+        const [manifestContent] = await manifestFile.download();
+        const manifest: VideoManifest = JSON.parse(manifestContent.toString('utf8'));
 
-    const validPaths = [manifest.init, ...manifest.segments.map(s => s.path)];
-    if (requestedPath.startsWith('episodes/') && !validPaths.includes(requestedPath)) {
-        console.warn(`[SECURITY_ALERT] User ${userId} tried to access an invalid path '${requestedPath}' for video ${videoId}.`);
-        return { error: 'ERROR_INVALID_PATH' };
+        const validPaths = [manifest.init, ...manifest.segments.map(s => s.path)];
+        if (!validPaths.includes(requestedPath)) {
+            console.warn(`[SECURITY_ALERT] User ${userId} tried to access an invalid path '${requestedPath}' for video ${videoId}.`);
+            return { error: 'ERROR_INVALID_PATH' };
+        }
     }
+
 
     // 5. Generate a short-lived Signed URL (60 seconds)
     const [signedUrl] = await storage
@@ -87,5 +90,4 @@ export async function getSignedUrl(
     return { error: `ERROR_SIGNED_URL_FAILED: ${error.message}` };
   }
 }
-
     

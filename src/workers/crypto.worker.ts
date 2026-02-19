@@ -99,5 +99,4 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
 };
 
 export {};
-
     

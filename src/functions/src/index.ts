@@ -147,6 +147,8 @@ export const videoPipelineTrigger = onDocumentWritten("episodes/{episodeId}", as
             const iv = crypto.randomBytes(12);
             const storagePath = `${encryptedBasePath}${fileName.replace('.mp4', '.enc').replace('.m4s', '.m4s.enc')}`;
             
+            // Per-segment key derivation is a client-side concern for decryption.
+            // Encryption on the server uses the single master key for simplicity and performance.
             const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
             cipher.setAAD(Buffer.from(`path:${storagePath}`));
             const finalBuffer = Buffer.concat([iv, cipher.update(content), cipher.final(), cipher.getAuthTag()]);
@@ -273,5 +275,4 @@ export const deleteFilesOnEpisodeDelete = onDocumentDeleted("episodes/{episodeId
         await db.collection('video_keys').doc(keyId).delete().catch(e => console.error(`Failed to delete key ${keyId}`, e));
     }
 });
-
     
