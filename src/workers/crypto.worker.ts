@@ -1,7 +1,7 @@
 
 /// <reference lib="webworker" />
 
-import type { CryptoWorkerRequest, CryptoWorkerResponse } from '@/lib/types';
+import type { CryptoWorkerRequest, CryptoWorkerResponse, EncryptionInfo } from '@/lib/types';
 
 const base64ToUint8Array = (base64: string): Uint8Array => {
   const binaryString = self.atob(base64);
@@ -43,12 +43,12 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
     return;
   }
   
-  const { requestId, encryptedSegment, masterKeyB64, segmentPath } = event.data.payload as any; // Cast for new props
+  const { requestId, encryptedSegment, masterKeyB64, segmentPath, encryption } = event.data.payload;
 
-  if (!encryptedSegment || !masterKeyB64 || !segmentPath) {
+  if (!encryptedSegment || !masterKeyB64 || !segmentPath || !encryption) {
     const response: CryptoWorkerResponse = {
       type: 'DECRYPT_FAILURE',
-      payload: { requestId, message: 'Incomplete data for decryption (missing segment, key, or path).' },
+      payload: { requestId, message: 'Incomplete data for decryption (missing segment, key, path, or encryption info).' },
     };
     self.postMessage(response);
     return;
@@ -63,16 +63,15 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
     const segmentAesKey = await deriveSegmentKey(hmacKey, segmentPath);
 
     // 3. Decrypt using the derived segment key.
-    const encryptionInfo = (event.data.payload as any).encryption; // Assuming encryption info is still passed
     const aad = new TextEncoder().encode(`path:${segmentPath}`);
-    const iv = encryptedSegment.slice(0, encryptionInfo.ivLength);
-    const ciphertextWithTag = encryptedSegment.slice(encryptionInfo.ivLength);
+    const iv = encryptedSegment.slice(0, encryption.ivLength);
+    const ciphertextWithTag = encryptedSegment.slice(encryption.ivLength);
 
     const decryptedSegment = await self.crypto.subtle.decrypt(
       {
         name: 'AES-GCM',
         iv: iv,
-        tagLength: encryptionInfo.tagLength * 8,
+        tagLength: encryption.tagLength * 8,
         additionalData: aad,
       },
       segmentAesKey,

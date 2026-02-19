@@ -21,9 +21,8 @@ const nextConfig = {
     // To implement JS obfuscation after build:
     // 1. Install the obfuscator: `npm install --save-dev javascript-obfuscator`
     // 2. Add a `postbuild` script in your `package.json` like this:
-    //    "postbuild": "javascript-obfuscator .next/static/chunks --output .next/static/chunks-obfuscated --compact true --self-defending true"
-    // 3. You would then need a script to replace the original chunks with the obfuscated ones.
-    //    This setup is complex and requires careful configuration to ensure source maps are handled correctly for debugging.
+    //    "postbuild": "javascript-obfuscator .next/static --output .next/static-obfuscated --compact true --self-defending true --string-array-encoding 'base64'"
+    //    (Note: The output path needs careful handling to replace original files, this is just an example)
 };
 
 module.exports = nextConfig

@@ -12,7 +12,7 @@ import { createPlaySession } from '@/lib/actions/session-actions';
  * 1. Verifies user authentication.
  * 2. Checks for concurrent session limits using `createPlaySession`.
  * 3. If allowed, fetches and decrypts the master key for the video.
- * 4. Returns the master key and a new session ID to the client.
+ * 4. Returns the master key (for client-side key derivation) and a new session ID to the client.
  */
 export async function POST(req: NextRequest) {
   console.log(`[API /api/play-session] Received request at ${new Date().toISOString()}`);

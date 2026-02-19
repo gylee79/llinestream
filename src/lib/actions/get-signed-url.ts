@@ -57,6 +57,9 @@ export async function getSignedUrl(
     // 4. SERVER-SIDE PATH VALIDATION (CRITICAL)
     // Fetch the manifest from storage to verify the requested path belongs to this video.
     // This prevents a user from using a valid session for one video to request segments from another.
+    if (!episodeData.storage.manifestPath) {
+        return { error: 'ERROR_MANIFEST_NOT_FOUND' };
+    }
     const manifestFile = storage.bucket().file(episodeData.storage.manifestPath);
     const [manifestContent] = await manifestFile.download();
     const manifest: VideoManifest = JSON.parse(manifestContent.toString('utf8'));
@@ -67,7 +70,7 @@ export async function getSignedUrl(
         return { error: 'ERROR_INVALID_PATH' };
     }
 
-    // 5. Generate a short-lived Signed URL
+    // 5. Generate a short-lived Signed URL (60 seconds)
     const [signedUrl] = await storage
       .bucket()
       .file(requestedPath) // Use the validated path

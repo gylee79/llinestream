@@ -461,37 +461,6 @@ const PlayerStatusOverlay = ({ playerState, playerMessage }: { playerState: Play
     );
 };
 
-
-const Watermark = ({ seed }: { seed: string | null }) => {
-    const [positions, setPositions] = React.useState<{ top: string; left: string }[]>([]);
-  
-    React.useEffect(() => {
-      if (seed) {
-        const newPositions = Array.from({ length: 5 }).map(() => ({
-          top: `${Math.random() * 80 + 10}%`,
-          left: `${Math.random() * 80 + 10}%`,
-        }));
-        setPositions(newPositions);
-      }
-    }, [seed]);
-  
-    if (!seed) return null;
-  
-    return (
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
-        {positions.map((pos, i) => (
-          <span
-            key={i}
-            className="absolute text-white/10 text-xs"
-            style={{ ...pos, transform: 'rotate(-15deg)' }}
-          >
-            {seed}
-          </span>
-        ))}
-      </div>
-    );
-  };
-
 interface VideoPlayerDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -694,6 +663,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                       encryptedSegment: segmentBuffer, 
                       masterKeyB64: masterKeyRef.current,
                       segmentPath: segmentPath,
+                      encryption: episode.encryption
                   }
                 });
             } catch (e: any) {
@@ -879,7 +849,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center aspect-video md:aspect-auto md:min-h-0">
                 <PlayerStatusOverlay playerState={playerState} playerMessage={playerMessage} />
                 <video ref={videoRef} className="w-full h-full" autoPlay playsInline controls />
-                {/* Watermark is removed for now, as it requires a session-derived key that is no longer directly created. */}
+                {/* Watermark is removed for now as it's not a core part of this refactor */}
             </div>
 
             <div className="col-span-10 md:col-span-3 bg-white border-l flex flex-col min-h-0 flex-1 md:flex-auto">
