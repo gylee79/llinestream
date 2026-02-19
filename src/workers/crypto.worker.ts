@@ -1,6 +1,7 @@
+
 /// <reference lib="webworker" />
 
-import type { CryptoWorkerRequest, CryptoWorkerResponse, EncryptionInfo } from '@/lib/types';
+import type { CryptoWorkerRequest, CryptoWorkerResponse } from '@/lib/types';
 
 const base64ToUint8Array = (base64: string): Uint8Array => {
   const binaryString = self.atob(base64);
@@ -12,45 +13,69 @@ const base64ToUint8Array = (base64: string): Uint8Array => {
   return bytes;
 };
 
-const importKey = (keyBuffer: ArrayBuffer): Promise<CryptoKey> => {
-  return self.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-256-GCM' }, false, ['decrypt']);
+// --- KEY DERIVATION LOGIC ---
+const importHmacKey = (keyBuffer: ArrayBuffer): Promise<CryptoKey> => {
+  return self.crypto.subtle.importKey('raw', keyBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
 };
+
+const importAesKey = (keyBuffer: ArrayBuffer): Promise<CryptoKey> => {
+  return self.crypto.subtle.importKey('raw', keyBuffer, { name: 'AES-GCM' }, false, ['decrypt']);
+}
+
+/**
+ * Derives a segment-specific AES key from the master key and segment path.
+ * This prevents the master key from being directly used for every decryption.
+ * @param masterKey - The main encryption key for the video.
+ * @param segmentPath - The unique path of the segment, used as info for derivation.
+ * @returns A derived CryptoKey for AES-GCM decryption.
+ */
+const deriveSegmentKey = async (masterKey: CryptoKey, segmentPath: string): Promise<CryptoKey> => {
+    const info = new TextEncoder().encode(segmentPath);
+    // Use HMAC-SHA-256 to derive a new key. The output is a 32-byte hash.
+    const hmac = await self.crypto.subtle.sign('HMAC', masterKey, info);
+    // The derived key is the raw HMAC output, which is a secure pseudo-random value.
+    return importAesKey(hmac);
+};
+
 
 self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
   if (event.data.type !== 'DECRYPT_SEGMENT') {
     return;
   }
   
-  const { requestId, encryptedSegment, derivedKeyB64, encryption, storagePath } = event.data.payload;
+  const { requestId, encryptedSegment, masterKeyB64, segmentPath } = event.data.payload as any; // Cast for new props
 
-  if (!encryptedSegment || !derivedKeyB64 || !encryption || !storagePath) {
+  if (!encryptedSegment || !masterKeyB64 || !segmentPath) {
     const response: CryptoWorkerResponse = {
       type: 'DECRYPT_FAILURE',
-      payload: { requestId, message: 'Incomplete data for decryption (missing segment, key, encryption info, or storagePath).' },
+      payload: { requestId, message: 'Incomplete data for decryption (missing segment, key, or path).' },
     };
     self.postMessage(response);
     return;
   }
   
   try {
-    const keyBuffer = base64ToUint8Array(derivedKeyB64);
-    const cryptoKey = await importKey(keyBuffer.buffer as ArrayBuffer);
-
-    // From Spec 3 & 6.3: Use the segment's storage path as AAD.
-    const aad = new TextEncoder().encode(`path:${storagePath}`);
+    // 1. Import the master key for HMAC derivation.
+    const masterKeyBuffer = base64ToUint8Array(masterKeyB64);
+    const hmacKey = await importHmacKey(masterKeyBuffer.buffer as ArrayBuffer);
     
-    // From Spec 3: [IV(12)][CIPHERTEXT][TAG(16)]
-    const iv = encryptedSegment.slice(0, encryption.ivLength);
-    const ciphertextWithTag = encryptedSegment.slice(encryption.ivLength);
+    // 2. Derive the segment-specific key.
+    const segmentAesKey = await deriveSegmentKey(hmacKey, segmentPath);
+
+    // 3. Decrypt using the derived segment key.
+    const encryptionInfo = (event.data.payload as any).encryption; // Assuming encryption info is still passed
+    const aad = new TextEncoder().encode(`path:${segmentPath}`);
+    const iv = encryptedSegment.slice(0, encryptionInfo.ivLength);
+    const ciphertextWithTag = encryptedSegment.slice(encryptionInfo.ivLength);
 
     const decryptedSegment = await self.crypto.subtle.decrypt(
       {
-        name: 'AES-256-GCM',
+        name: 'AES-GCM',
         iv: iv,
-        tagLength: encryption.tagLength * 8, // Convert bytes to bits
-        additionalData: aad, // Add AAD for integrity check
+        tagLength: encryptionInfo.tagLength * 8,
+        additionalData: aad,
       },
-      cryptoKey,
+      segmentAesKey,
       ciphertextWithTag
     );
     

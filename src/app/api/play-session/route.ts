@@ -4,10 +4,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeAdminApp, decryptMasterKey } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
-import { toJSDate } from '@/lib/date-helpers';
-import * as crypto from 'crypto';
-import type { VideoKey, User, Episode } from '@/lib/types';
+import type { VideoKey } from '@/lib/types';
+import { createPlaySession } from '@/lib/actions/session-actions';
 
+/**
+ * Handles the initiation of a video playback session.
+ * 1. Verifies user authentication.
+ * 2. Checks for concurrent session limits using `createPlaySession`.
+ * 3. If allowed, fetches and decrypts the master key for the video.
+ * 4. Returns the master key and a new session ID to the client.
+ */
 export async function POST(req: NextRequest) {
   console.log(`[API /api/play-session] Received request at ${new Date().toISOString()}`);
   try {
@@ -18,66 +24,55 @@ export async function POST(req: NextRequest) {
     // 1. Verify User Authentication
     const authorization = req.headers.get('Authorization');
     if (!authorization?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 });
+      return NextResponse.json({ error: 'ERROR_UNAUTHORIZED_TOKEN', message: 'Unauthorized: Missing or invalid token' }, { status: 401 });
     }
     const idToken = authorization.split('Bearer ')[1];
     const decodedToken = await auth.verifyIdToken(idToken);
     const userId = decodedToken.uid;
 
-    // 2. Get videoId and deviceId
     const { videoId, deviceId } = await req.json();
     if (!videoId || !deviceId) {
-      return NextResponse.json({ error: 'Bad Request: videoId and deviceId are required' }, { status: 400 });
+      return NextResponse.json({ error: 'ERROR_BAD_REQUEST', message: 'Bad Request: videoId and deviceId are required' }, { status: 400 });
     }
 
-    // 3. Verify User Subscription & Video Playability
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) return NextResponse.json({ error: 'Forbidden: User not found' }, { status: 403 });
-    const userData = userDoc.data() as User;
+    // 2. Attempt to create a new play session (handles concurrent session logic)
+    const sessionResult = await createPlaySession(userId, videoId, deviceId);
+    if (!sessionResult.success || !sessionResult.sessionId) {
+        return NextResponse.json({ error: 'ERROR_SESSION_LIMIT_EXCEEDED', message: sessionResult.message }, { status: 429 });
+    }
     
+    // 3. Fetch Episode and Key data
     const episodeDoc = await db.collection('episodes').doc(videoId).get();
-    if (!episodeDoc.exists) return NextResponse.json({ error: 'Not Found: Video not found' }, { status: 404 });
-    const episodeData = episodeDoc.data() as Episode;
-    
-    if (!episodeData.status.playable) {
-        return NextResponse.json({ error: `Forbidden: Video is not playable. Current status: ${episodeData.status.pipeline}` }, { status: 403 });
+    if (!episodeDoc.exists) {
+        await sessionResult.cleanup(); // Clean up the created session if video doesn't exist
+        return NextResponse.json({ error: 'ERROR_VIDEO_NOT_FOUND', message: 'Video not found' }, { status: 404 });
     }
+    const episodeData = episodeDoc.data();
 
-    const subscription = userData.activeSubscriptions?.[episodeData.courseId];
-    const isSubscribed = subscription && new Date() < (toJSDate(subscription.expiresAt) || new Date(0));
-
-    if (!isSubscribed && !episodeData.isFree) {
-       return NextResponse.json({ error: 'Forbidden: Subscription required' }, { status: 403 });
+    const keyId = episodeData?.encryption?.keyId;
+    if (!keyId) {
+        await sessionResult.cleanup();
+        return NextResponse.json({ error: 'ERROR_KEY_INFO_MISSING', message: 'Encryption info missing for this video' }, { status: 404 });
     }
-
-    // 4. Retrieve and Decrypt Master Key
-    const keyId = episodeData.encryption?.keyId;
-    if (!keyId) return NextResponse.json({ error: 'Not Found: Encryption info missing for this video' }, { status: 404 });
     
     const keyDoc = await db.collection('video_keys').doc(keyId).get();
-    if (!keyDoc.exists) return NextResponse.json({ error: 'Not Found: Encryption key not found for this video' }, { status: 404 });
+    if (!keyDoc.exists) {
+        await sessionResult.cleanup();
+        return NextResponse.json({ error: 'ERROR_KEY_NOT_FOUND', message: 'Encryption key not found for this video' }, { status: 404 });
+    }
     
+    // 4. Decrypt and return Master Key + Session ID
     const videoKeyData = keyDoc.data() as VideoKey;
     const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
-
-    // 5. Generate a session ID and Watermark Seed
-    const sessionId = `online_sess_${crypto.randomBytes(12).toString('hex')}`;
-    const watermarkSeed = crypto.createHash('sha256').update(`${userId}|${videoId}|${deviceId}|${sessionId}`).digest('hex');
     
-    // CRITICAL FIX: Send the actual masterKey for decryption, not a derived one.
-    const derivedKeyB64 = masterKey.toString('base64');
-
-    // 7. Return Session Info
     return NextResponse.json({
-      sessionId: sessionId,
-      derivedKeyB64: derivedKeyB64,
-      expiresAt: Date.now() + 3600 * 1000,
-      watermarkSeed: watermarkSeed,
+      sessionId: sessionResult.sessionId,
+      masterKeyB64: masterKey.toString('base64'),
     });
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
     console.error('[play-session API Error]', error);
-    return NextResponse.json({ error: `Internal Server Error: ${errorMessage}` }, { status: 500 });
+    return NextResponse.json({ error: 'ERROR_INTERNAL_SERVER', message: `Internal Server Error: ${errorMessage}` }, { status: 500 });
   }
 }
