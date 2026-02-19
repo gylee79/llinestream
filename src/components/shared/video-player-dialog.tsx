@@ -5,7 +5,7 @@ import React from 'react';
 import { Button } from '../ui/button';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection, useAuth } from '@/firebase';
 import { Textarea } from '../ui/textarea';
-import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark as BookmarkIcon, Trash2, Download, AlertTriangle, CheckCircle, RotateCcw } from 'lucide-react';
+import { Send, Bot, User as UserIcon, X, Loader, FileText, Clock, ChevronRight, Bookmark as BookmarkIcon, Trash2, Download, AlertTriangle, CheckCircle, RotateCcw, Terminal } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import { askVideoTutor } from '@/ai/flows/video-tutor-flow';
 import { cn, formatDuration } from '@/lib/utils';
@@ -22,34 +22,14 @@ import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/b
 import { Input } from '../ui/input';
 import { saveVideo } from '@/lib/offline-db';
 import { getSignedUrl as getSignedUrlAction } from '@/lib/actions/get-signed-url';
-import { endPlaySession, heartbeatPlaySession } from '@/lib/actions/session-actions';
+import { endPlaySession, heartbeatPlaySession, createPlaySession } from '@/lib/actions/session-actions';
 
 
-// Stage 3: Playback Debugging Structure
-const PLAYBACK_STAGES = {
-  STAGE_1_PLAY_SESSION: 'STAGE_1_PLAY_SESSION',
-  STAGE_2_MANIFEST_FETCH: 'STAGE_2_MANIFEST_FETCH',
-  STAGE_3_SEGMENT_URL_REQUEST: 'STAGE_3_SEGMENT_URL_REQUEST',
-  STAGE_4_SEGMENT_DOWNLOAD: 'STAGE_4_SEGMENT_DOWNLOAD',
-  STAGE_5_WORKER_DECRYPT: 'STAGE_5_WORKER_DECRYPT',
-  STAGE_6_MSE_APPEND: 'STAGE_6_MSE_APPEND',
-  STAGE_7_VIDEO_PLAY: 'STAGE_7_VIDEO_PLAY',
-} as const;
-
-type PlaybackStage = keyof typeof PLAYBACK_STAGES;
-
-const logStage = (stage: PlaybackStage, status: 'START' | 'SUCCESS' | 'FAIL', message?: string) => {
-    const baseMessage = `[Player] ${stage}: ${status}`;
-    const fullMessage = message ? `${baseMessage} - ${message}` : baseMessage;
-    if (status === 'FAIL') {
-        console.error(fullMessage);
-    } else {
-        console.log(fullMessage);
-    }
-};
-
+type PlaybackStage = 'STAGE_1_PLAY_SESSION' | 'STAGE_2_MANIFEST_FETCH' | 'STAGE_3_SEGMENT_URL_REQUEST' | 'STAGE_4_SEGMENT_DOWNLOAD' | 'STAGE_5_WORKER_DECRYPT' | 'STAGE_6_MSE_APPEND' | 'STAGE_7_VIDEO_PLAY';
 
 type DownloadState = 'idle' | 'checking' | 'downloading' | 'saving' | 'completed' | 'forbidden' | 'error';
+type DebugLog = { message: string; timestamp: Date; type: 'info' | 'error' | 'success' };
+
 
 const DownloadButton = ({
     downloadState,
@@ -418,78 +398,40 @@ const BookmarkView = ({ episode, user, videoElement }: { episode: Episode; user:
     );
 };
 
-const PlayerStatusOverlay = ({ playerState, playerMessage }: { playerState: PlayerState, playerMessage: string | null }) => {
-    
-    let content: React.ReactNode = null;
+const PlaybackDebugView = ({ logs }: { logs: DebugLog[] }) => {
+    const scrollAreaRef = React.useRef<HTMLDivElement>(null);
 
-    switch (playerState) {
-        case 'idle':
-        case 'playing':
-        case 'paused':
-        case 'ready':
-             return null;
-        case 'requesting-key':
-        case 'downloading':
-        case 'decrypting':
-             return null;
-        case 'recovering':
-            content = (
-                <>
-                    <RotateCcw className="w-12 h-12 animate-spin mb-4"/>
-                    <p className="font-bold">연결이 불안정하여 복구 중입니다...</p>
-                    <p className="text-sm text-muted-foreground mt-1">{playerMessage}</p>
-                </>
-            );
-            break;
-        case 'error-fatal':
-        case 'error-retryable':
-        case 'license-expired':
-             content = (
-                <>
-                    <AlertTriangle className="w-12 h-12 text-destructive mb-4"/>
-                    <p className="font-semibold">{playerState === 'license-expired' ? '오프라인 라이선스 만료' : '재생 오류'}</p>
-                    <p className="text-sm text-muted-foreground mt-1">{playerMessage}</p>
-                </>
-            );
-            break;
-    }
-    
+    React.useEffect(() => {
+        if (scrollAreaRef.current) {
+            scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+        }
+    }, [logs]);
+
     return (
-        <div className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center text-white p-6 text-center">
-            {content}
+        <div className="bg-gray-900 text-white font-mono text-xs p-2 h-full flex flex-col">
+            <div className="flex-shrink-0 p-2 border-b border-gray-700">실시간 재생 로그</div>
+            <ScrollArea className="flex-1" viewportRef={scrollAreaRef}>
+                <div className="p-2 space-y-1.5">
+                    {logs.map((log, index) => (
+                        <div key={index} className="flex gap-2 items-start">
+                            <span className="text-gray-500 flex-shrink-0">{log.timestamp.toLocaleTimeString()}</span>
+                            <span
+                                className={cn({
+                                    'text-green-400': log.type === 'success',
+                                    'text-red-400': log.type === 'error',
+                                })}
+                            >
+                                {log.type === 'success' ? '✅' : log.type === 'error' ? '❌' : 'ℹ️'}
+                            </span>
+                            <p className="flex-1 whitespace-pre-wrap break-all">{log.message}</p>
+                        </div>
+                    ))}
+                </div>
+            </ScrollArea>
         </div>
     );
 };
 
-const Watermark = ({ seed }: { seed: string | null }) => {
-    const [positions, setPositions] = React.useState<{ top: string; left: string }[]>([]);
-  
-    React.useEffect(() => {
-      if (seed) {
-        const newPositions = Array.from({ length: 5 }).map(() => ({
-          top: `${Math.random() * 80 + 10}%`,
-          left: `${Math.random() * 80 + 10}%`,
-        }));
-        setPositions(newPositions);
-      }
-    }, [seed]);
-  
-    if (!seed) return null;
-  
-    return (
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
-        {positions.map((pos, i) => (
-          <span
-            key={i}
-            className="absolute text-white/10 text-xs"
-            style={{ ...pos, transform: 'rotate(-15deg)' }}
-          >
-            {seed}
-          </span>
-        ))}
-      </div>
-    );
-  };
 
 interface VideoPlayerDialogProps {
   isOpen: boolean;
@@ -506,9 +448,9 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     const { user, authUser } = useUser();
     const { toast } = useToast();
     const firestore = useFirestore();
-    const [playerState, setPlayerState] = React.useState<PlayerState>('idle');
-    const [playerMessage, setPlayerMessage] = React.useState<string | null>(null);
     
+    // Debugging and State
+    const [debugLogs, setDebugLogs] = React.useState<DebugLog[]>([]);
     const [sessionId, setSessionId] = React.useState<string | null>(null);
     const [watermarkSeed, setWatermarkSeed] = React.useState<string | null>(null);
     const [downloadState, setDownloadState] = React.useState<DownloadState>('idle');
@@ -526,6 +468,10 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     
     const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
     const { data: course } = useDoc<Course>(courseRef);
+    
+    const log = React.useCallback((message: string, type: DebugLog['type'] = 'info') => {
+        setDebugLogs(prev => [...prev, { message, type, timestamp: new Date() }]);
+    }, []);
 
     const handleSeek = (timeInSeconds: number) => {
         const video = videoRef.current;
@@ -587,21 +533,20 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     }, [authUser, course, episode, toast]);
 
     const getSignedUrl = async (token: string, videoId: string, fileName: string) => {
-        logStage('STAGE_3_SEGMENT_URL_REQUEST', 'START', `Path: ${fileName}`);
+        log(`STAGE_3_SEGMENT_URL_REQUEST: START - Path: ${fileName}`);
         const { signedUrl, error } = await getSignedUrlAction(token, videoId, fileName);
         if (error || !signedUrl) {
-            logStage('STAGE_3_SEGMENT_URL_REQUEST', 'FAIL', `Error: ${error}`);
-            throw new Error(`URL 요청 실패 (${fileName}): ${error || 'Unknown error'}`);
+            const errorMessage = `URL 요청 실패 (${fileName}): ${error || 'Unknown error'}`;
+            log(`STAGE_3_SEGMENT_URL_REQUEST: FAIL - ${errorMessage}`, 'error');
+            throw new Error(errorMessage);
         }
-        logStage('STAGE_3_SEGMENT_URL_REQUEST', 'SUCCESS');
+        log(`STAGE_3_SEGMENT_URL_REQUEST: SUCCESS`, 'success');
         return signedUrl;
     };
     
     const cleanup = React.useCallback(() => {
         if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
-        if (sessionId) {
-            endPlaySession(sessionId);
-        }
+        if (sessionId) { endPlaySession(sessionId); }
         workerRef.current?.terminate();
         workerRef.current = null;
         activeRequestIdRef.current = null;
@@ -609,59 +554,50 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         
         const video = videoRef.current;
         if (video && video.src) {
-             try {
-                URL.revokeObjectURL(video.src);
-                video.removeAttribute('src');
-                video.load();
-            } catch (e) {}
+             try { URL.revokeObjectURL(video.src); video.removeAttribute('src'); video.load(); } catch (e) {}
         }
         mediaSourceRef.current = null;
         sourceBufferRef.current = null;
-        setPlayerState('idle');
     }, [sessionId]);
 
     const startPlayback = React.useCallback(async (requestId: string) => {
+        log('Player starting...');
         cleanup(); 
         activeRequestIdRef.current = requestId;
 
         if (episode.status?.pipeline === 'failed') {
-            setPlayerState('error-fatal');
-            setPlayerMessage(episode.status.error?.message || '비디오 처리 중 오류 발생.');
+            log(`FATAL: Video processing failed - ${episode.status.error?.message}`, 'error');
             return;
         }
 
         if (!episode.storage.manifestPath || !episode.encryption?.keyId) {
-            setPlayerState('error-fatal');
-            setPlayerMessage('필수 재생 정보(manifest, keyId)가 누락되었습니다.');
+            log('FATAL: Missing manifest path or encryption key ID.', 'error');
             return;
         }
         
         const ms = new MediaSource();
         mediaSourceRef.current = ms;
         
-        ms.addEventListener('sourceopen', () => console.log('[MSE] Event: sourceopen'));
-        ms.addEventListener('sourceended', () => console.log('[MSE] Event: sourceended'));
-        ms.addEventListener('sourceclose', () => console.log('[MSE] Event: sourceclose'));
+        ms.addEventListener('sourceopen', () => log('[MSE] Event: sourceopen'));
+        ms.addEventListener('sourceended', () => log('[MSE] Event: sourceended'));
+        ms.addEventListener('sourceclose', () => log('[MSE] Event: sourceclose'));
 
         if(videoRef.current) {
-            videoRef.current.addEventListener('waiting', () => console.log('[MSE] Video event: waiting (buffering)'));
-            videoRef.current.addEventListener('stalled', () => console.log('[MSE] Video event: stalled (network issue)'));
+            videoRef.current.addEventListener('waiting', () => log('[MSE] Video event: waiting (buffering)'));
+            videoRef.current.addEventListener('stalled', () => log('[MSE] Video event: stalled (network issue)'));
+            videoRef.current.addEventListener('error', () => log(`[MSE] Video element error: ${videoRef.current?.error?.message}`, 'error'));
         }
         
         workerRef.current = new Worker(new URL('../../workers/crypto.worker.ts', import.meta.url));
 
         const fetchAndProcessNextSegment = async () => {
             const sb = sourceBufferRef.current;
-            if (!sb || sb.updating) {
-                return;
-            }
+            if (!sb || sb.updating) return;
 
             const segmentIndex = currentSegmentIndexRef.current;
             if (segmentIndex >= segmentQueueRef.current.length) {
                 if (ms.readyState === 'open' && !sb.updating) {
-                    try {
-                        ms.endOfStream();
-                    } catch (e) { console.warn("Error calling endOfStream:", e); }
+                    try { ms.endOfStream(); } catch (e) { log(`Error calling endOfStream: ${(e as Error).message}`, 'error'); }
                 }
                 return;
             }
@@ -676,16 +612,16 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 } else {
                     const token = await authUser?.getIdToken();
                     if (!token) throw new Error("Authentication token not available.");
-
-                    logStage('STAGE_4_SEGMENT_DOWNLOAD', 'START', `Path: ${segmentPath}`);
+                    
+                    log(`STAGE_4_SEGMENT_DOWNLOAD: START - Path: ${segmentPath}`);
                     const url = await getSignedUrl(token, episode.id, segmentPath);
                     const res = await fetch(url);
-                    if (!res.ok) throw new Error(`세그먼트 다운로드 실패: ${res.status} ${res.statusText}`);
+                    if (!res.ok) throw new Error(`Segment download failed: ${res.status} ${res.statusText}`);
                     segmentBuffer = await res.arrayBuffer();
-                    logStage('STAGE_4_SEGMENT_DOWNLOAD', 'SUCCESS');
+                    log('STAGE_4_SEGMENT_DOWNLOAD: SUCCESS', 'success');
                 }
                 
-                logStage('STAGE_5_WORKER_DECRYPT', 'START', `Segment index: ${segmentIndex}`);
+                log(`STAGE_5_WORKER_DECRYPT: START - Segment index: ${segmentIndex}`);
                 workerRef.current?.postMessage({
                   type: 'DECRYPT_SEGMENT',
                   payload: { 
@@ -697,9 +633,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                   }
                 });
             } catch (e: any) {
-                logStage('STAGE_4_SEGMENT_DOWNLOAD', 'FAIL', e.message);
-                setPlayerState('error-fatal');
-                setPlayerMessage(`세그먼트 로딩 실패: ${e.message}`);
+                log(`STAGE_4_SEGMENT_DOWNLOAD: FAIL - ${e.message}`, 'error');
                 return;
             }
         };
@@ -707,7 +641,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         workerRef.current.onmessage = (event: MessageEvent<CryptoWorkerResponse>) => {
             const { type, payload } = event.data;
             if (type === 'DECRYPT_SUCCESS') {
-                logStage('STAGE_5_WORKER_DECRYPT', 'SUCCESS');
+                log('STAGE_5_WORKER_DECRYPT: SUCCESS', 'success');
                 const { decryptedSegment } = payload;
                 const sb = sourceBufferRef.current;
                 
@@ -717,21 +651,17 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         return;
                     }
                     try {
-                        logStage('STAGE_6_MSE_APPEND', 'START');
+                        log('STAGE_6_MSE_APPEND: START');
                         sb?.appendBuffer(decryptedSegment);
-                        logStage('STAGE_6_MSE_APPEND', 'SUCCESS');
+                        log('STAGE_6_MSE_APPEND: SUCCESS', 'success');
                     } catch (e: any) {
-                        logStage('STAGE_6_MSE_APPEND', 'FAIL', e.message);
-                        setPlayerState('error-fatal');
-                        setPlayerMessage(`미디어 버퍼 추가 실패: ${e.message}`);
+                        log(`STAGE_6_MSE_APPEND: FAIL - ${e.message}`, 'error');
                     }
                 }
                 append();
 
             } else {
-                logStage('STAGE_5_WORKER_DECRYPT', 'FAIL', payload.message);
-                setPlayerState('error-fatal');
-                setPlayerMessage(`복호화 실패: ${payload.message}`);
+                log(`STAGE_5_WORKER_DECRYPT: FAIL - ${payload.message}`, 'error');
             }
         };
         
@@ -741,18 +671,23 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 
                 if (offlineVideoData) {
                     if (new Date() > new Date(offlineVideoData.license.expiresAt)) {
-                        setPlayerState('license-expired');
-                        setPlayerMessage('오프라인 라이선스가 만료되었습니다.');
+                        log('FATAL: Offline license expired.', 'error');
                         throw new Error("오프라인 라이선스가 만료되었습니다.");
                     }
                     manifest = offlineVideoData.manifest;
                     decryptionKeyRef.current = offlineVideoData.license.offlineDerivedKey;
                     setWatermarkSeed(offlineVideoData.license.watermarkSeed);
+                    log('Using offline data.', 'success');
                 } else {
                     if (!authUser) throw new Error("로그인이 필요합니다.");
                     const token = await authUser.getIdToken();
 
-                    logStage('STAGE_1_PLAY_SESSION', 'START');
+                    log('STAGE_1_PLAY_SESSION: START');
+                    const sessionResult = await createPlaySession(user!.id, episode.id, 'web-online-v1');
+                    if (!sessionResult.success || !sessionResult.sessionId) {
+                        throw new Error(sessionResult.message);
+                    }
+                    
                     const sessionRes = await fetch('/api/play-session', {
                         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({ videoId: episode.id, deviceId: 'web-online' })
@@ -765,13 +700,13 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     decryptionKeyRef.current = sessionData.derivedKeyB64;
                     setSessionId(sessionData.sessionId);
                     setWatermarkSeed(sessionData.watermarkSeed);
-                    logStage('STAGE_1_PLAY_SESSION', 'SUCCESS', `Session ID: ${sessionData.sessionId}`);
+                    log(`STAGE_1_PLAY_SESSION: SUCCESS - Session ID: ${sessionData.sessionId}`, 'success');
                     
-                    logStage('STAGE_2_MANIFEST_FETCH', 'START');
+                    log('STAGE_2_MANIFEST_FETCH: START');
                     const manifestUrl = await getSignedUrl(token, episode.id, episode.storage.manifestPath!);
                     const manifestRes = await fetch(manifestUrl);
                     manifest = await manifestRes.json();
-                    logStage('STAGE_2_MANIFEST_FETCH', 'SUCCESS');
+                    log('STAGE_2_MANIFEST_FETCH: SUCCESS', 'success');
                 }
 
                 if (!decryptionKeyRef.current) throw new Error("마스터 키가 없습니다.");
@@ -779,16 +714,17 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 const mimeCodec = manifest.codec;
                 if (!MediaSource.isTypeSupported(mimeCodec)) throw new Error(`코덱을 지원하지 않습니다: ${mimeCodec}`);
                 
+                log(`Codec '${mimeCodec}' is supported.`);
                 const sourceBuffer = ms.addSourceBuffer(mimeCodec);
                 sourceBufferRef.current = sourceBuffer;
                 
-                sourceBuffer.addEventListener('update', () => console.log('[MSE] SourceBuffer event: update'));
-                sourceBuffer.addEventListener('updateend', () => console.log('[MSE] SourceBuffer event: updateend'));
-                sourceBuffer.addEventListener('error', (e) => console.error('[MSE] SourceBuffer event: error', e));
-                sourceBuffer.addEventListener('abort', (e) => console.log('[MSE] SourceBuffer event: abort', e));
+                sourceBuffer.addEventListener('update', () => log('[MSE] SourceBuffer event: update'));
+                sourceBuffer.addEventListener('updateend', () => log('[MSE] SourceBuffer event: updateend'));
+                sourceBuffer.addEventListener('error', (e) => log(`[MSE] SourceBuffer event: error - ${e}`, 'error'));
+                sourceBuffer.addEventListener('abort', (e) => log('[MSE] SourceBuffer event: abort', 'error'));
 
                 if (manifest.duration && isFinite(manifest.duration)) {
-                    try { ms.duration = manifest.duration; } catch (e) { console.warn("Could not set MediaSource duration.", e); }
+                    try { ms.duration = manifest.duration; } catch (e) { log(`Could not set MediaSource duration: ${(e as Error).message}`, 'error'); }
                 }
                 
                 sourceBuffer.addEventListener('updateend', () => {
@@ -802,24 +738,23 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 fetchAndProcessNextSegment();
 
             } catch (e: any) {
-                console.error("Playback setup failed:", e);
-                setPlayerState('error-fatal');
-                setPlayerMessage(e.message);
+                log(`FATAL Playback setup failed: ${e.message}`, 'error');
             }
         });
         
         if (videoRef.current) {
             videoRef.current.src = URL.createObjectURL(ms);
             videoRef.current.play().then(() => {
-                logStage('STAGE_7_VIDEO_PLAY', 'SUCCESS');
+                log('STAGE_7_VIDEO_PLAY: SUCCESS - Autoplay started.', 'success');
             }).catch(e => {
-                logStage('STAGE_7_VIDEO_PLAY', 'FAIL', `Autoplay prevented: ${(e as Error).message}`);
+                log(`STAGE_7_VIDEO_PLAY: FAIL - Autoplay prevented: ${(e as Error).message}`, 'error');
             });
         }
-    }, [cleanup, offlineVideoData, authUser, episode]);
+    }, [cleanup, offlineVideoData, authUser, episode, user, log]);
 
     React.useEffect(() => {
         if (isOpen && videoRef.current) {
+            setDebugLogs([]); // Clear logs on open
             const initialRequestId = uuidv4();
             startPlayback(initialRequestId);
         } else if (!isOpen) {
@@ -827,9 +762,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         }
 
         const handleBeforeUnload = () => {
-            if (sessionId) {
-                endPlaySession(sessionId);
-            }
+            if (sessionId) { endPlaySession(sessionId); }
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
         
@@ -843,7 +776,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         if (sessionId) {
             heartbeatIntervalRef.current = setInterval(() => {
                 heartbeatPlaySession(sessionId);
-            }, 30 * 1000); // 30 seconds
+            }, 30 * 1000);
         }
         return () => {
             if (heartbeatIntervalRef.current) {
@@ -879,18 +812,18 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 bg-muted/30 min-h-0">
             <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center aspect-video md:aspect-auto md:min-h-0">
-                <PlayerStatusOverlay playerState={playerState} playerMessage={playerMessage} />
                 <video ref={videoRef} className="w-full h-full" autoPlay playsInline controls />
                 <Watermark seed={watermarkSeed} />
             </div>
 
             <div className="col-span-10 md:col-span-3 bg-white border-l flex flex-col min-h-0 flex-1 md:flex-auto">
                 <Tabs defaultValue="syllabus" className="flex-1 flex flex-col min-h-0">
-                    <TabsList className="grid w-full grid-cols-4 rounded-none border-b h-12 bg-gray-50/50 flex-shrink-0">
+                    <TabsList className="grid w-full grid-cols-5 rounded-none border-b h-12 bg-gray-50/50 flex-shrink-0">
                         <TabsTrigger value="syllabus" className="text-xs">강의목차</TabsTrigger>
                         <TabsTrigger value="search" className="text-xs">강의검색</TabsTrigger>
                         <TabsTrigger value="textbook" className="text-xs">교재정보</TabsTrigger>
                         <TabsTrigger value="bookmark" className="text-xs">책갈피</TabsTrigger>
+                        <TabsTrigger value="debug" className="text-xs"><Terminal className="w-4 h-4"/></TabsTrigger>
                     </TabsList>
                     <div className="flex-1 min-h-0">
                         <TabsContent value="syllabus" className="mt-0 h-full">
@@ -905,6 +838,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         <TabsContent value="search" className="mt-0 h-full">{user ? <ChatView episode={episode} user={user}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
                         <TabsContent value="textbook" className="mt-0 h-full"><TextbookView /></TabsContent>
                         <TabsContent value="bookmark" className="mt-0 h-full">{user ? <BookmarkView episode={episode} user={user} videoElement={videoRef.current}/> : <p className="p-10 text-center text-xs">로그인이 필요합니다.</p>}</TabsContent>
+                        <TabsContent value="debug" className="mt-0 h-full"><PlaybackDebugView logs={debugLogs} /></TabsContent>
                     </div>
                 </Tabs>
             </div>

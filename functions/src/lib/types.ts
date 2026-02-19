@@ -1,63 +1,6 @@
-
-'use server';
-
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase-admin/firestore';
 
 export type Timestamp = FirebaseTimestamp | FieldValue;
-
-// From user request:
-export interface PipelineStatus {
-    pipeline: "pending" | "processing" | "completed" | "failed";
-    // 세분화된 스텝
-    step: "idle" | "preparing" | "transcoding" | "thumbnail" | "encrypting" | "manifest" | "uploading" | "done" | "trigger-exception";
-    playable: boolean; // AI 실패 여부와 상관없이, Stage 1 성공 시 true
-    progress: number;
-    error?: { step: string; message: string; ts: any } | null;
-}
-
-export interface AiStatus {
-    status: "idle" | "queued" | "processing" | "completed" | "failed";
-    model?: string;
-    resultPaths?: { 
-        summary?: string; 
-        transcript?: string; 
-        search_data?: string;
-    };
-    error?: { code: string; message: string; ts: any } | null;
-}
-
-export interface Episode {
-  id: string;
-  courseId: string;
-  instructorId: string;
-  title: string;
-  description?: string;
-  duration: number;
-  isFree: boolean;
-  orderIndex?: number;
-  createdAt: Timestamp;
-  
-  thumbnails: {
-      default: string;
-      defaultPath: string;
-      custom?: string | null;
-      customPath?: string | null;
-  };
-  thumbnailUrl: string;
-
-  status: PipelineStatus;
-  ai: AiStatus;
-  storage: {
-      rawPath?: string; 
-      encryptedBasePath: string;
-      manifestPath: string;
-      fileSize?: number;
-  };
-  encryption: any;
-}
-
-
-// --- Other types (Unchanged as per instruction) ---
 
 export type PlayerState =
   | 'idle'
@@ -142,11 +85,73 @@ export interface EncryptionInfo {
   fragmentEncrypted: true;
 }
 
+export interface PipelineStatus {
+    pipeline: "pending" | "processing" | "failed" | "completed";
+    step: "idle" | "preparing" | "transcoding" | "thumbnail" | "encrypting" | "manifest" | "uploading" | "done" | "trigger-exception";
+    playable: boolean;
+    progress: number;
+    error?: {
+        step: string;
+        message: string;
+        raw: string;
+        ts: Timestamp;
+    } | null;
+}
+
+export interface AiStatus {
+    status: "pending" | "queued" | "processing" | "failed" | "completed" | "blocked" | "idle";
+    model?: string;
+    error?: {
+        code: string;
+        message: string;
+        raw?: string;
+        ts: Timestamp;
+    } | null;
+    resultPaths?: {
+        transcript?: string;
+        summary?: string;
+        search_data?: string;
+    };
+}
+
+
+export interface Episode {
+  id: string;
+  courseId: string;
+  instructorId: string;
+  title: string;
+  description?: string;
+  duration: number;
+  isFree: boolean;
+  orderIndex?: number;
+  createdAt: Timestamp;
+  
+  storage: {
+      rawPath?: string; 
+      encryptedBasePath: string;
+      manifestPath: string;
+      fileSize?: number;
+  };
+
+  thumbnails: {
+      default: string;
+      defaultPath: string;
+      custom?: string | null;
+      customPath?: string | null;
+  };
+  thumbnailUrl: string; 
+
+  status: PipelineStatus;
+  ai: AiStatus;
+
+  encryption: EncryptionInfo;
+}
+
 export interface Job {
   id: string;
   type: "VIDEO_PIPELINE" | "AI_ANALYSIS";
   episodeId: string;
-  status: "queued" | "running" | "failed" | "succeeded" | "dead";
+  status: "pending" | "running" | "failed" | "succeeded" | "dead";
   attempts: number;
   maxAttempts: number;
   createdAt: Timestamp;
@@ -167,6 +172,7 @@ export interface VideoManifest {
   init: string;
   segments: Array<{ path: string; }>;
 }
+
 
 export interface VideoKey {
   keyId: string;
@@ -267,6 +273,7 @@ export interface EpisodeComment {
   createdAt: Timestamp;
 }
 
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
@@ -308,8 +315,8 @@ export interface OfflineLicense {
   videoId: string;
   userId: string;
   deviceId: string;
-  issuedAt: number;
-  expiresAt: number;
+  issuedAt: number; // timestamp
+  expiresAt: number; // timestamp
   keyId: string;
   kekVersion: 1;
   watermarkSeed: string; 
@@ -321,6 +328,7 @@ export interface OfflineLicense {
   offlineDerivedKey: string;
 }
 
+
 export interface OfflineVideoData {
   episode: Episode;
   courseName: string;
@@ -330,6 +338,7 @@ export interface OfflineVideoData {
   segments: Map<string, ArrayBuffer>;
   aiContent?: any;
 }
+
 
 export interface OfflineVideoInfo {
   episodeId: string;
@@ -366,5 +375,3 @@ export type CryptoWorkerResponse =
         message: string;
       };
     };
-
-    
