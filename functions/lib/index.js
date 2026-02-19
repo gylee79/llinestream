@@ -39,7 +39,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteFilesOnEpisodeDelete = exports.aiAnalysisTrigger = exports.videoPipelineTrigger = void 0;
 /**
- * @fileoverview LlineStream Video Processing Pipeline v9.0 (Extreme Tracking & Stability)
+ * @fileoverview LlineStream Video Processing Pipeline v9.1 (Extreme Tracking & Stability)
  *
  * Implements a robust, decoupled, two-stage workflow with detailed step-by-step
  * tracking and granular error handling to ensure stability and debuggability.
@@ -51,6 +51,7 @@ const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const fs = __importStar(require("fs/promises"));
 const crypto = __importStar(require("crypto"));
+const generative_ai_1 = require("@google/generative-ai");
 const server_1 = require("@google/generative-ai/server");
 const fluent_ffmpeg_1 = __importDefault(require("fluent-ffmpeg"));
 const ffmpeg_static_1 = __importDefault(require("ffmpeg-static"));
@@ -290,7 +291,14 @@ exports.aiAnalysisTrigger = (0, firestore_1.onDocumentWritten)("episodes/{episod
         await docRef.update({ 'ai.status': 'failed', 'ai.error': { code: 'RAW_PATH_MISSING', message: 'Original video file path was missing for AI analysis.' } });
         return;
     }
-    const { genAI, fileManager } = initializeTools();
+    const apiKey = process.env.GOOGLE_GENAI_API_KEY;
+    if (!apiKey) {
+        console.error(`[${episodeId}] ❌ AI Stage Failed: GOOGLE_GENAI_API_KEY is not configured.`);
+        await docRef.update({ 'ai.status': 'failed', 'ai.error': { code: 'MISSING_API_KEY', message: 'AI API 키가 설정되지 않았습니다.' } });
+        return;
+    }
+    const genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
+    const fileManager = new server_1.GoogleAIFileManager(apiKey);
     const tempFilePath = path.join(os.tmpdir(), `ai-${episodeId}`);
     let uploadedFile = null;
     try {
