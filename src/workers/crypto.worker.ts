@@ -42,9 +42,9 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
     return;
   }
   
-  const { requestId, encryptedSegment, derivedKeyB64, segmentPath, encryption } = event.data.payload;
+  const { requestId, encryptedSegment, derivedKeyB64, storagePath, encryption } = event.data.payload;
 
-  if (!encryptedSegment || !derivedKeyB64 || !segmentPath || !encryption) {
+  if (!encryptedSegment || !derivedKeyB64 || !storagePath || !encryption) {
     const response: CryptoWorkerResponse = {
       type: 'DECRYPT_FAILURE',
       payload: { requestId, message: 'Incomplete data for decryption (missing segment, key, path, or encryption info).' },
@@ -59,10 +59,10 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
     const hmacKey = await importHmacKey(deviceKeyBuffer.buffer as ArrayBuffer);
     
     // 2. Derive the final, segment-specific AES key.
-    const segmentAesKey = await deriveSegmentKey(hmacKey, segmentPath);
+    const segmentAesKey = await deriveSegmentKey(hmacKey, storagePath);
 
     // 3. Decrypt using the derived segment key.
-    const aad = new TextEncoder().encode(`path:${segmentPath}`);
+    const aad = new TextEncoder().encode(`path:${storagePath}`);
     const iv = encryptedSegment.slice(0, encryption.ivLength);
     const ciphertextWithTag = encryptedSegment.slice(encryption.ivLength);
 

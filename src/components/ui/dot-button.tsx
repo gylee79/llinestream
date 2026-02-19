@@ -3,7 +3,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from './button';
-import type { CarouselApi } from '@/lib/types';
+import type { CarouselApi } from '@/components/ui/carousel';
 
 type UseDotButtonType = {
   selectedIndex: number;

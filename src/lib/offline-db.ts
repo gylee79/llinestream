@@ -66,9 +66,9 @@ export const saveVideo = async (data: OfflineVideoData): Promise<void> => {
     }
 
     // 1. Save metadata (everything except the segments map) to the 'videos' store.
+    const { segments, ...restOfData } = data;
     const metadataToSave: Omit<OfflineVideoData, 'segments'> & { aiContent: any } = {
-        ...data,
-        segments: new Map(), // Don't save the map itself in the metadata store
+        ...restOfData,
         aiContent: aiContent,
     };
     

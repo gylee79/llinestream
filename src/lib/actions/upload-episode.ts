@@ -106,7 +106,6 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
                 fileSize: fileSize,
                 encryptedBasePath: `episodes/${episodeId}/segments/`,
                 manifestPath: `episodes/${episodeId}/manifest.json`,
-                thumbnailBasePath: `episodes/${episodeId}/thumbnails/`,
             },
             
             thumbnails: {
@@ -122,7 +121,6 @@ export async function saveEpisodeMetadata(payload: SaveMetadataPayload): Promise
                 step: 'idle',
                 playable: false,
                 progress: 0,
-                jobId: '',
                 error: null,
             },
             ai: {

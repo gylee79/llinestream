@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { notFound, useParams, useSearchParams } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where, onSnapshot, Unsubscribe } from 'firebase/firestore';
-import type { Course, Episode, Instructor, EpisodeComment, CarouselApi, EpisodeViewLog } from '@/lib/types';
+import type { Course, Episode, Instructor, EpisodeComment, EpisodeViewLog } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useEffect, useMemo } from 'react';
 import EpisodeListItem from '@/components/shared/episode-list-item';
@@ -14,6 +14,7 @@ import {
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  type CarouselApi,
 } from '@/components/ui/carousel';
 import { DotButton, useDotButton } from '@/components/ui/dot-button';
 import { Button } from '@/components/ui/button';
