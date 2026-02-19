@@ -776,7 +776,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             videoRef.current.play().then(() => {
                 logStage('STAGE_7_VIDEO_PLAY', 'SUCCESS');
             }).catch(e => {
-                logStage('STAGE_7_VIDEO_PLAY', 'FAIL', `Autoplay prevented: ${e.message}`);
+                logStage('STAGE_7_VIDEO_PLAY', 'FAIL', `Autoplay prevented: ${(e as Error).message}`);
             });
         }
     }, [cleanup, offlineVideoData, authUser, episode]);

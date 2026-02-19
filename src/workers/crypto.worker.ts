@@ -25,7 +25,7 @@ const importAesKey = (keyBuffer: ArrayBuffer): Promise<CryptoKey> => {
 /**
  * Derives a segment-specific AES key from the master key and segment path.
  * This prevents the master key from being directly used for every decryption.
- * @param masterKey - The main encryption key for the video.
+ * @param masterKey - The HMAC-ready master key.
  * @param segmentPath - The unique path of the segment, used as info for derivation.
  * @returns A derived CryptoKey for AES-GCM decryption.
  */

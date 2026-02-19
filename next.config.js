@@ -13,7 +13,6 @@ const nextConfig = {
             }
         ],
     },
-    // Add this compiler option
     compiler: {
         // Remove all console.log statements from production builds
         removeConsole: process.env.NODE_ENV === "production",
@@ -21,7 +20,7 @@ const nextConfig = {
     // To implement JS obfuscation after build:
     // 1. Install the obfuscator: `npm install --save-dev javascript-obfuscator`
     // 2. Add a `postbuild` script in your `package.json` like this:
-    //    "postbuild": "javascript-obfuscator .next/static --output .next/static-obfuscated --compact true --self-defending true --string-array-encoding 'base64'"
+    //    "postbuild": "javascript-obfuscator .next --output .next-obfuscated --compact true --self-defending true"
     //    (Note: The output path needs careful handling to replace original files, this is just an example)
 };
 
