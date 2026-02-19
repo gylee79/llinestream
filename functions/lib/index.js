@@ -38,6 +38,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteFilesOnEpisodeDelete = exports.aiAnalysisTrigger = exports.videoPipelineTrigger = void 0;
+/**
+ * @fileoverview LlineStream Video Processing Pipeline v8.1 (Decoupled)
+ *
+ * Implements a fully decoupled, two-stage workflow for video processing and AI analysis
+ * as per the final architectural decision.
+ */
 const v2_1 = require("firebase-functions/v2");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const admin = __importStar(require("firebase-admin"));
@@ -50,7 +56,7 @@ const server_1 = require("@google/generative-ai/server");
 const fluent_ffmpeg_1 = __importDefault(require("fluent-ffmpeg"));
 const ffmpeg_static_1 = __importDefault(require("ffmpeg-static"));
 const { path: ffprobePath } = require('ffprobe-static');
-// 0. SDK Initialization and Global Config
+// 0. Initialize SDKs and Global Configuration
 if (ffmpeg_static_1.default) {
     fluent_ffmpeg_1.default.setFfmpegPath(ffmpeg_static_1.default);
 }
@@ -61,7 +67,7 @@ if (admin.apps.length === 0) {
 (0, v2_1.setGlobalOptions)({
     region: "us-central1",
     secrets: ["GOOGLE_GENAI_API_KEY", "KEK_SECRET"],
-    timeoutSeconds: 540,
+    timeoutSeconds: 540, // 9 minutes
     memory: "4GiB",
     cpu: 2,
 });
@@ -75,7 +81,7 @@ let fileManager = null;
 function initializeTools() {
     const apiKey = process.env.GOOGLE_GENAI_API_KEY;
     if (!apiKey)
-        throw new Error("GOOGLE_GENAI_API_KEY is not configured.");
+        throw new Error("GOOGLE_GENAI_API_KEY is missing!");
     if (!genAI)
         genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
     if (!fileManager)
@@ -85,26 +91,32 @@ function initializeTools() {
 async function updateDoc(docRef, data) {
     await docRef.update({ ...data, 'status.updatedAt': admin.firestore.FieldValue.serverTimestamp() });
 }
-async function failPipeline(docRef, step, error, playable = false) {
+async function failPipeline(docRef, step, error) {
     const rawError = (error instanceof Error) ? error.message : String(error);
     await docRef.update({
         'status.pipeline': 'failed',
-        'status.playable': playable,
-        'status.error': { step: step, message: rawError, ts: admin.firestore.FieldValue.serverTimestamp() },
-        'ai.status': playable ? 'failed' : 'blocked', // If pipeline fails early, block AI. If it fails later, just mark AI as failed.
-        'ai.error': playable ? { code: 'AI_PROCESSING_FAILED', message: `AI 분석 단계에서 오류 발생: ${rawError}` } : { code: 'PIPELINE_FAILED', message: '비디오 처리 파이프라인 실패로 AI 분석이 차단되었습니다.' }
+        'status.playable': false,
+        'status.error': {
+            step: step,
+            message: rawError,
+            ts: admin.firestore.FieldValue.serverTimestamp(),
+            raw: JSON.stringify(error, Object.getOwnPropertyNames(error))
+        },
+        'ai.status': 'blocked',
+        'ai.error': { code: 'PIPELINE_FAILED', message: '비디오 처리 파이프라인 실패로 AI 분석이 차단되었습니다.' }
     });
     console.error(`[${docRef.id}] ❌ Pipeline Failed at step '${step}':`, rawError);
 }
-// 2. Stage 1: Video Core Processing
+// 2. Stage 1: Video Core Processing Trigger
 exports.videoPipelineTrigger = (0, firestore_1.onDocumentWritten)("episodes/{episodeId}", async (event) => {
     if (!event.data)
         return;
     const before = event.data.before.data();
     const after = event.data.after.data();
-    if (before?.status.pipeline === after.status.pipeline)
+    // Trigger only if the pipeline status is newly set to 'pending'.
+    if (before?.status?.pipeline === 'pending' && after?.status?.pipeline === 'pending')
         return;
-    if (after.status.pipeline !== 'pending')
+    if (after?.status?.pipeline !== 'pending')
         return;
     const { id: episodeId } = after;
     const docRef = event.data.after.ref;
@@ -115,6 +127,7 @@ exports.videoPipelineTrigger = (0, firestore_1.onDocumentWritten)("episodes/{epi
         if (!rawPath || !(await bucket.file(rawPath).exists())[0]) {
             throw new Error("storage.rawPath is missing or file does not exist in Storage.");
         }
+        console.log(`[videoPipelineTrigger] Function instance created for ${episodeId}`);
         await updateDoc(docRef, { 'status.pipeline': 'processing', 'status.step': currentStep, 'status.progress': 5 });
         const localInputPath = path.join(tempDir, 'original_video');
         await bucket.file(rawPath).download({ destination: localInputPath });
@@ -153,8 +166,8 @@ exports.videoPipelineTrigger = (0, firestore_1.onDocumentWritten)("episodes/{epi
         for (const fileName of segmentNames) {
             const content = await fs.readFile(path.join(tempDir, fileName));
             const iv = crypto.randomBytes(12);
-            const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
             const storagePath = `${encryptedBasePath}${fileName.replace('.mp4', '.enc').replace('.m4s', '.m4s.enc')}`;
+            const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
             cipher.setAAD(Buffer.from(`path:${storagePath}`));
             const finalBuffer = Buffer.concat([iv, cipher.update(content), cipher.final(), cipher.getAuthTag()]);
             await bucket.file(storagePath).save(finalBuffer);
@@ -188,23 +201,24 @@ exports.videoPipelineTrigger = (0, firestore_1.onDocumentWritten)("episodes/{epi
             'thumbnailUrl': after.thumbnails.custom || defaultThumbUrl,
             'encryption': encryptionInfo,
             'status.pipeline': 'completed', 'status.playable': true, 'status.step': 'done', 'status.progress': 100, 'status.error': null,
-            'ai.status': 'queued',
+            'ai.status': 'queued', // Signal for the next function
         });
     }
     catch (e) {
-        await failPipeline(docRef, currentStep, e, false);
+        await failPipeline(docRef, currentStep, e);
     }
     finally {
         await fs.rm(tempDir, { recursive: true, force: true }).catch(() => { });
     }
 });
-// 3. Stage 2 & 3: AI Intelligence and Cleanup
+// 3. Stage 2 & 3: AI Intelligence and Cleanup Trigger
 exports.aiAnalysisTrigger = (0, firestore_1.onDocumentWritten)("episodes/{episodeId}", async (event) => {
     if (!event.data)
         return;
     const before = event.data.before.data();
     const after = event.data.after.data();
-    if (before?.ai?.status === after.ai?.status)
+    // Trigger only if the AI status is newly set to 'queued'.
+    if (before?.ai?.status === 'queued' && after.ai?.status === 'queued')
         return;
     if (after.ai?.status !== 'queued')
         return;
@@ -231,10 +245,7 @@ exports.aiAnalysisTrigger = (0, firestore_1.onDocumentWritten)("episodes/{episod
         }
         if (state === server_1.FileState.FAILED)
             throw new Error("Google AI file processing failed.");
-        const model = genAI.getGenerativeModel({
-            model: "gemini-2.5-flash",
-            generationConfig: { responseMimeType: "application/json" }
-        });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
         const prompt = "상세 요약(summary), 타임라인(timeline), 전체 대본(transcript) 뿐만 아니라, AI 검색/채팅을 위한 핵심 키워드(keywords)와 주제(topics)를 JSON으로 추출할 것. 모든 결과는 한국어로 작성되어야 합니다.";
         const result = await model.generateContent([{ fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } }, { text: prompt }]);
         const output = JSON.parse(result.response.text());
@@ -260,7 +271,7 @@ exports.aiAnalysisTrigger = (0, firestore_1.onDocumentWritten)("episodes/{episod
             await fs.rm(tempFilePath, { force: true });
         }
         catch (e) { }
-        // Stage 3: Cleanup
+        // Stage 3: Cleanup raw file regardless of AI success/failure
         await bucket.file(rawPath).delete().catch(e => console.error(`Failed to delete rawPath ${rawPath}`, e));
         await updateDoc(docRef, { 'storage.rawPath': admin.firestore.FieldValue.delete() });
     }

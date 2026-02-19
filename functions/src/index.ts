@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -47,14 +46,11 @@ const bucket = storage.bucket();
 const SEGMENT_DURATION_SEC = 4;
 
 // 1. Utility & Helper Functions
-let genAI: GoogleGenerativeAI | null = null;
-let fileManager: GoogleAIFileManager | null = null;
-
 function initializeTools() {
   const apiKey = process.env.GOOGLE_GENAI_API_KEY;
   if (!apiKey) throw new Error("GOOGLE_GENAI_API_KEY is missing!");
-  if (!genAI) genAI = new GoogleGenerativeAI(apiKey);
-  if (!fileManager) fileManager = new GoogleAIFileManager(apiKey);
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const fileManager = new GoogleAIFileManager(apiKey);
   return { genAI, fileManager };
 }
 
@@ -219,7 +215,7 @@ export const aiAnalysisTrigger = onDocumentWritten("episodes/{episodeId}", async
         return;
     }
     
-    initializeTools();
+    const { genAI, fileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), `ai-${episodeId}`);
     let uploadedFile: any = null;
 
