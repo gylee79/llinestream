@@ -1,7 +1,8 @@
+
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { initializeAdminApp, decryptMasterKey, loadKEK } from '@/lib/firebase-admin';
+import { initializeAdminApp, decryptMasterKey } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import type { VideoKey } from '@/lib/types';
 import { createPlaySession } from '@/lib/actions/session-actions';
@@ -13,7 +14,7 @@ import * as crypto from 'crypto';
  * 2. Creates a play session using a transaction to enforce concurrent session limits.
  * 3. If allowed, fetches the master key for the video.
  * 4. **CRITICAL:** Derives a device-specific key from the master key and device ID.
- * 5. Returns the **derived key** (NOT the master key) and a new session ID to the client.
+ * 5. Returns the **derived key** (NOT the master key), a new session ID, and a watermark seed to the client.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -75,13 +76,13 @@ export async function POST(req: NextRequest) {
     const videoKeyData = keyDoc.data() as VideoKey;
     const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
     
-    // **NEW SECURITY STEP**: Derive a key specific to the device.
     const deviceDerivedKey = crypto.createHmac('sha256', masterKey).update(deviceId).digest();
+    const watermarkSeed = crypto.createHash('sha256').update(`${userId}|${videoId}|${deviceId}|${sessionResult.sessionId}`).digest('hex');
     
     return NextResponse.json({
       sessionId: sessionResult.sessionId,
-      // **NEVER** send the masterKey. Send the derived key instead.
       derivedKeyB64: deviceDerivedKey.toString('base64'),
+      watermarkSeed: watermarkSeed,
     });
 
   } catch (error) {

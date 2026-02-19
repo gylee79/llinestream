@@ -1,3 +1,4 @@
+
 'use server';
 
 import { initializeAdminApp } from '@/lib/firebase-admin';
@@ -57,20 +58,28 @@ export async function getSignedUrl(
     const isVideoSegmentRequest = requestedPath.includes('/segments/');
     const isAiContentRequest = requestedPath.includes('/ai/');
 
+    // Only perform manifest check for video segments. AI content path is checked differently.
     if (isVideoSegmentRequest) {
-        if (!episodeData.storage.manifestPath) {
-            return { error: 'ERROR_MANIFEST_NOT_FOUND' };
-        }
-        const manifestFile = storage.bucket().file(episodeData.storage.manifestPath);
-        const [manifestContent] = await manifestFile.download();
-        const manifest: VideoManifest = JSON.parse(manifestContent.toString('utf8'));
+        // The manifest itself is also a protected asset. Check if the request is for the manifest.
+        if (requestedPath === episodeData.storage.manifestPath) {
+            // This is a valid request for the manifest file, proceed to generate URL.
+        } else {
+            // For segment requests, fetch the manifest to verify the segment is part of this episode.
+            if (!episodeData.storage.manifestPath) {
+                return { error: 'ERROR_MANIFEST_NOT_FOUND' };
+            }
+            const manifestFile = storage.bucket().file(episodeData.storage.manifestPath);
+            const [manifestContent] = await manifestFile.download();
+            const manifest: VideoManifest = JSON.parse(manifestContent.toString('utf8'));
 
-        const validPaths = [manifest.init, ...manifest.segments.map(s => s.path)];
-        if (!validPaths.includes(requestedPath)) {
-            console.warn(`[SECURITY_ALERT] User ${userId} tried to access an invalid segment path '${requestedPath}' for video ${videoId}.`);
-            return { error: 'ERROR_INVALID_PATH' };
+            const validPaths = [manifest.init, ...manifest.segments.map(s => s.path)];
+            if (!validPaths.includes(requestedPath)) {
+                console.warn(`[SECURITY_ALERT] User ${userId} tried to access an invalid segment path '${requestedPath}' for video ${videoId}.`);
+                return { error: 'ERROR_INVALID_PATH' };
+            }
         }
     } else if (isAiContentRequest) {
+        // For AI content, check if the requested path is one of the valid paths in resultPaths.
         const validAiPaths = Object.values(episodeData.ai.resultPaths || {});
         if (!validAiPaths.includes(requestedPath)) {
              console.warn(`[SECURITY_ALERT] User ${userId} tried to access an invalid AI content path '${requestedPath}' for video ${videoId}.`);

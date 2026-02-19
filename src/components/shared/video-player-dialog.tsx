@@ -461,6 +461,36 @@ const PlayerStatusOverlay = ({ playerState, playerMessage }: { playerState: Play
     );
 };
 
+const Watermark = ({ seed }: { seed: string | null }) => {
+    const [positions, setPositions] = React.useState<{ top: string; left: string }[]>([]);
+  
+    React.useEffect(() => {
+      if (seed) {
+        const newPositions = Array.from({ length: 5 }).map(() => ({
+          top: `${Math.random() * 80 + 10}%`,
+          left: `${Math.random() * 80 + 10}%`,
+        }));
+        setPositions(newPositions);
+      }
+    }, [seed]);
+  
+    if (!seed) return null;
+  
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
+        {positions.map((pos, i) => (
+          <span
+            key={i}
+            className="absolute text-white/10 text-xs"
+            style={{ ...pos, transform: 'rotate(-15deg)' }}
+          >
+            {seed}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
 interface VideoPlayerDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -480,6 +510,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     const [playerMessage, setPlayerMessage] = React.useState<string | null>(null);
     
     const [sessionId, setSessionId] = React.useState<string | null>(null);
+    const [watermarkSeed, setWatermarkSeed] = React.useState<string | null>(null);
     const [downloadState, setDownloadState] = React.useState<DownloadState>('idle');
     const [downloadDisabledReason, setDownloadDisabledReason] = React.useState<string | undefined>();
 
@@ -709,7 +740,14 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 let manifest: VideoManifest;
                 
                 if (offlineVideoData) {
-                    // Offline playback logic here...
+                    if (new Date() > new Date(offlineVideoData.license.expiresAt)) {
+                        setPlayerState('license-expired');
+                        setPlayerMessage('오프라인 라이선스가 만료되었습니다.');
+                        throw new Error("오프라인 라이선스가 만료되었습니다.");
+                    }
+                    manifest = offlineVideoData.manifest;
+                    decryptionKeyRef.current = offlineVideoData.license.offlineDerivedKey;
+                    setWatermarkSeed(offlineVideoData.license.watermarkSeed);
                 } else {
                     if (!authUser) throw new Error("로그인이 필요합니다.");
                     const token = await authUser.getIdToken();
@@ -726,6 +764,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     const sessionData = await sessionRes.json();
                     decryptionKeyRef.current = sessionData.derivedKeyB64;
                     setSessionId(sessionData.sessionId);
+                    setWatermarkSeed(sessionData.watermarkSeed);
                     logStage('STAGE_1_PLAY_SESSION', 'SUCCESS', `Session ID: ${sessionData.sessionId}`);
                     
                     logStage('STAGE_2_MANIFEST_FETCH', 'START');
@@ -842,6 +881,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
             <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center aspect-video md:aspect-auto md:min-h-0">
                 <PlayerStatusOverlay playerState={playerState} playerMessage={playerMessage} />
                 <video ref={videoRef} className="w-full h-full" autoPlay playsInline controls />
+                <Watermark seed={watermarkSeed} />
             </div>
 
             <div className="col-span-10 md:col-span-3 bg-white border-l flex flex-col min-h-0 flex-1 md:flex-auto">

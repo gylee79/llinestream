@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
        return NextResponse.json({ error: 'Forbidden: Subscription required for download' }, { status: 403 });
     }
 
-    // 4. Retrieve and Decrypt Master Key
+    // 4. Retrieve and Decrypt Master Key, then derive the device key
     const keyId = episodeData.encryption.keyId;
     if (!keyId) {
         return NextResponse.json({ error: 'Not Found: Encryption info missing for this video' }, { status: 404 });
@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Internal Server Error: Master key is missing from key data.' }, { status: 500 });
     }
     const masterKey = await decryptMasterKey(videoKeyData.encryptedMasterKey);
+    const deviceDerivedKey = crypto.createHmac('sha256', masterKey).update(deviceId).digest();
 
     // 5. Generate Signature for the license & Watermark
     const issuedAt = Date.now();
@@ -109,16 +110,14 @@ export async function POST(req: NextRequest) {
       signature: signature,
     };
 
-    // CRITICAL FIX: Send the actual masterKey for decryption, not a derived one.
     return NextResponse.json({
         ...license,
-        offlineDerivedKey: masterKey.toString('base64'),
+        offlineDerivedKey: deviceDerivedKey.toString('base64'),
     });
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
     console.error('[offline-license API Error]', error);
-    // Return a 500 for any other unexpected errors during processing.
     return NextResponse.json({ error: `Internal Server Error: ${errorMessage}` }, { status: 500 });
   }
 }

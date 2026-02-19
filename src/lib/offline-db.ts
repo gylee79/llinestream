@@ -41,16 +41,16 @@ export const saveVideo = async (data: OfflineVideoData): Promise<void> => {
 
     // --- NEW: Fetch AI Content ---
     let aiContent = null;
-    if (data.episode.ai.status === 'completed' && data.episode.ai.resultPaths?.summary) {
+    if (data.episode.ai.status === 'completed' && data.episode.ai.resultPaths?.search_data) {
         console.log("AI summary found, attempting to download for offline use.");
         try {
             const auth = getAuth();
             if (!auth.currentUser) throw new Error("User not authenticated for AI content download.");
             
             const token = await auth.currentUser.getIdToken();
-            const summaryPath = data.episode.ai.resultPaths.summary;
+            const searchDataPath = data.episode.ai.resultPaths.search_data;
 
-            const { signedUrl, error } = await getSignedUrlAction(token, data.episode.id, summaryPath);
+            const { signedUrl, error } = await getSignedUrlAction(token, data.episode.id, searchDataPath);
             if (error || !signedUrl) {
                 throw new Error(error || "Failed to get signed URL for AI content.");
             }
