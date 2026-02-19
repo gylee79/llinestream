@@ -1,3 +1,4 @@
+
 'use server';
 
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase/firestore';
@@ -358,9 +359,9 @@ export type CryptoWorkerRequest = {
   payload: {
     requestId: string;
     encryptedSegment: ArrayBuffer;
-    derivedKeyB64: string; // Changed from masterKeyB64
+    derivedKeyB64: string;
     encryption: EncryptionInfo;
-    storagePath: string; 
+    storagePath: string;
   };
 };
 

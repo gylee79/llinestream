@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark, OfflineVideoData, CryptoWorkerResponse, PlayerState, ChatLog, ChatMessage, OfflineLicense, VideoManifest } from '@/lib/types';
@@ -433,6 +434,36 @@ const PlaybackDebugView = ({ logs }: { logs: DebugLog[] }) => {
 };
 
 
+const Watermark = ({ seed }: { seed: string | null }) => {
+    const [positions, setPositions] = React.useState<{ top: string; left: string }[]>([]);
+  
+    React.useEffect(() => {
+      if (seed) {
+        const newPositions = Array.from({ length: 5 }).map(() => ({
+          top: `${Math.random() * 80 + 10}%`,
+          left: `${Math.random() * 80 + 10}%`,
+        }));
+        setPositions(newPositions);
+      }
+    }, [seed]);
+  
+    if (!seed) return null;
+  
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
+        {positions.map((pos, i) => (
+          <span
+            key={i}
+            className="absolute text-white/10 text-xs"
+            style={{ ...pos, transform: 'rotate(-15deg)' }}
+          >
+            {seed}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
 interface VideoPlayerDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -683,11 +714,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     const token = await authUser.getIdToken();
 
                     log('STAGE_1_PLAY_SESSION: START');
-                    const sessionResult = await createPlaySession(user!.id, episode.id, 'web-online-v1');
-                    if (!sessionResult.success || !sessionResult.sessionId) {
-                        throw new Error(sessionResult.message);
-                    }
-                    
                     const sessionRes = await fetch('/api/play-session', {
                         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({ videoId: episode.id, deviceId: 'web-online' })
