@@ -76,16 +76,12 @@ const storage = admin.storage();
 const bucket = storage.bucket();
 const SEGMENT_DURATION_SEC = 4;
 // 1. Utility & Helper Functions
-let genAI = null;
-let fileManager = null;
 function initializeTools() {
     const apiKey = process.env.GOOGLE_GENAI_API_KEY;
     if (!apiKey)
         throw new Error("GOOGLE_GENAI_API_KEY is missing!");
-    if (!genAI)
-        genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
-    if (!fileManager)
-        fileManager = new server_1.GoogleAIFileManager(apiKey);
+    const genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
+    const fileManager = new server_1.GoogleAIFileManager(apiKey);
     return { genAI, fileManager };
 }
 async function updateDoc(docRef, data) {
@@ -229,7 +225,7 @@ exports.aiAnalysisTrigger = (0, firestore_1.onDocumentWritten)("episodes/{episod
         await docRef.update({ 'ai.status': 'failed', 'ai.error': { code: 'RAW_PATH_MISSING', message: 'Original video file path was missing for AI analysis.' } });
         return;
     }
-    initializeTools();
+    const { genAI, fileManager } = initializeTools();
     const tempFilePath = path.join(os.tmpdir(), `ai-${episodeId}`);
     let uploadedFile = null;
     try {
