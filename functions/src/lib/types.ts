@@ -1,3 +1,5 @@
+
+'use server';
 import type { Timestamp as FirebaseTimestamp, FieldValue } from 'firebase-admin/firestore';
 
 export type Timestamp = FirebaseTimestamp | FieldValue;
@@ -87,12 +89,13 @@ export interface EncryptionInfo {
 
 export interface PipelineStatus {
     pipeline: "pending" | "processing" | "failed" | "completed";
-    step: "idle" | "preparing" | "transcoding" | "thumbnail" | "encrypting" | "manifest" | "uploading" | "done" | "trigger-exception";
+    step: "idle" | "preparing" | "downloading_raw" | "ffprobe_check" | "ffmpeg_transcoding" | "dash_segmenting" | "thumbnail" | "encrypting" | "saving_keys" | "manifest" | "uploading" | "completed" | "done" | "trigger-exception";
     playable: boolean;
     progress: number;
     error?: {
         step: string;
         message: string;
+        stack?: string;
         raw: string;
         ts: Timestamp;
     } | null;
@@ -104,6 +107,7 @@ export interface AiStatus {
     error?: {
         code: string;
         message: string;
+        stack?: string;
         raw?: string;
         ts: Timestamp;
     } | null;
