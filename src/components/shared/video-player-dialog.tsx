@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Episode, Instructor, Course, User, Bookmark, OfflineVideoData, CryptoWorkerResponse, PlayerState, ChatLog, ChatMessage, OfflineLicense, VideoManifest } from '@/lib/types';
@@ -23,6 +22,7 @@ import { addBookmark, deleteBookmark, updateBookmarkNote } from '@/lib/actions/b
 import { Input } from '../ui/input';
 import { saveVideo } from '@/lib/offline-db';
 import { getSignedUrl as getSignedUrlAction } from '@/lib/actions/get-signed-url';
+import { endPlaySession, heartbeatPlaySession } from '@/lib/actions/session-actions';
 
 
 // Stage 3: Playback Debugging Structure
@@ -490,7 +490,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     const activeRequestIdRef = React.useRef<string | null>(null);
     const segmentQueueRef = React.useRef<string[]>([]);
     const currentSegmentIndexRef = React.useRef(0);
-    const masterKeyRef = React.useRef<string | null>(null);
+    const decryptionKeyRef = React.useRef<string | null>(null);
     const heartbeatIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
     
     const courseRef = useMemoFirebase(() => (firestore ? doc(firestore, 'courses', episode.courseId) : null), [firestore, episode.courseId]);
@@ -569,12 +569,12 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     const cleanup = React.useCallback(() => {
         if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
         if (sessionId) {
-            fetch('/api/session/end', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ sessionId }), keepalive: true });
+            endPlaySession(sessionId);
         }
         workerRef.current?.terminate();
         workerRef.current = null;
         activeRequestIdRef.current = null;
-        masterKeyRef.current = null;
+        decryptionKeyRef.current = null;
         
         const video = videoRef.current;
         if (video && video.src) {
@@ -608,7 +608,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
         const ms = new MediaSource();
         mediaSourceRef.current = ms;
         
-        // Stage 4: MSE Event Logging
         ms.addEventListener('sourceopen', () => console.log('[MSE] Event: sourceopen'));
         ms.addEventListener('sourceended', () => console.log('[MSE] Event: sourceended'));
         ms.addEventListener('sourceclose', () => console.log('[MSE] Event: sourceclose'));
@@ -661,7 +660,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                   payload: { 
                       requestId: `${requestId}-${segmentIndex}`, 
                       encryptedSegment: segmentBuffer, 
-                      masterKeyB64: masterKeyRef.current,
+                      derivedKeyB64: decryptionKeyRef.current,
                       segmentPath: segmentPath,
                       encryption: episode.encryption
                   }
@@ -725,7 +724,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                         throw new Error(errorData.message || `보안 세션 시작 실패: ${sessionRes.status}`);
                     }
                     const sessionData = await sessionRes.json();
-                    masterKeyRef.current = sessionData.masterKeyB64;
+                    decryptionKeyRef.current = sessionData.derivedKeyB64;
                     setSessionId(sessionData.sessionId);
                     logStage('STAGE_1_PLAY_SESSION', 'SUCCESS', `Session ID: ${sessionData.sessionId}`);
                     
@@ -736,7 +735,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     logStage('STAGE_2_MANIFEST_FETCH', 'SUCCESS');
                 }
 
-                if (!masterKeyRef.current) throw new Error("마스터 키가 없습니다.");
+                if (!decryptionKeyRef.current) throw new Error("마스터 키가 없습니다.");
 
                 const mimeCodec = manifest.codec;
                 if (!MediaSource.isTypeSupported(mimeCodec)) throw new Error(`코덱을 지원하지 않습니다: ${mimeCodec}`);
@@ -744,7 +743,6 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                 const sourceBuffer = ms.addSourceBuffer(mimeCodec);
                 sourceBufferRef.current = sourceBuffer;
                 
-                // Add MSE event listeners
                 sourceBuffer.addEventListener('update', () => console.log('[MSE] SourceBuffer event: update'));
                 sourceBuffer.addEventListener('updateend', () => console.log('[MSE] SourceBuffer event: updateend'));
                 sourceBuffer.addEventListener('error', (e) => console.error('[MSE] SourceBuffer event: error', e));
@@ -791,12 +789,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
 
         const handleBeforeUnload = () => {
             if (sessionId) {
-                fetch('/api/session/end', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ sessionId }),
-                    keepalive: true
-                });
+                endPlaySession(sessionId);
             }
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
@@ -810,11 +803,7 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     React.useEffect(() => {
         if (sessionId) {
             heartbeatIntervalRef.current = setInterval(() => {
-                fetch('/api/session/heartbeat', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ sessionId })
-                });
+                heartbeatPlaySession(sessionId);
             }, 30 * 1000); // 30 seconds
         }
         return () => {
@@ -843,13 +832,16 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
                     />
                 )}
             </div>
+            <DialogClose className="absolute right-3 top-1/2 -translate-y-1/2 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+            </DialogClose>
         </div>
         
         <div className="flex-1 flex flex-col md:grid md:grid-cols-10 bg-muted/30 min-h-0">
             <div className="col-span-10 md:col-span-7 bg-black relative flex items-center justify-center aspect-video md:aspect-auto md:min-h-0">
                 <PlayerStatusOverlay playerState={playerState} playerMessage={playerMessage} />
                 <video ref={videoRef} className="w-full h-full" autoPlay playsInline controls />
-                {/* Watermark is removed for now as it's not a core part of this refactor */}
             </div>
 
             <div className="col-span-10 md:col-span-3 bg-white border-l flex flex-col min-h-0 flex-1 md:flex-auto">
@@ -881,4 +873,3 @@ export default function VideoPlayerDialog({ isOpen, onOpenChange, episode, instr
     </Dialog>
   );
 }
-    

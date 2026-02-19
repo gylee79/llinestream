@@ -76,7 +76,6 @@ export interface Course {
   createdAt?: Timestamp;
 }
 
-// From Spec 4.3
 export interface EncryptionInfo {
   algorithm: "AES-256-GCM";
   ivLength: 12;
@@ -88,46 +87,34 @@ export interface EncryptionInfo {
   fragmentEncrypted: true;
 }
 
-// From Spec 4.1
 export interface PipelineStatus {
     pipeline: "pending" | "processing" | "failed" | "completed";
-    step: "validate" | "ffmpeg" | "encrypt" | "verify" | "manifest" | "keys" | "done" | "idle" | "trigger-exception";
+    step: "preparing" | "transcoding" | "thumbnail" | "encrypting" | "manifest" | "uploading" | "done" | "idle" | "trigger-exception";
     playable: boolean;
     progress: number;
-    jobId?: string;
-    startedAt?: Timestamp;
-    updatedAt?: Timestamp;
-    lastHeartbeatAt?: Timestamp;
     error?: {
         step: string;
         code: string;
         message: string;
         hint?: string;
         raw: string;
-        debugLogPath?: string;
         ts: Timestamp;
     } | null;
 }
 
-// From Spec 4.4
 export interface AiStatus {
-    status: "pending" | "processing" | "failed" | "completed" | "blocked" | "idle";
-    jobId?: string;
+    status: "pending" | "queued" | "processing" | "failed" | "completed" | "blocked" | "idle";
     model?: string;
-    attempts?: number;
-    lastHeartbeatAt?: Timestamp;
     error?: {
         code: string;
         message: string;
-        raw: string;
-        debugLogPath?: string;
+        raw?: string;
         ts: Timestamp;
     } | null;
     resultPaths?: {
         transcript?: string;
         summary?: string;
-        chapters?: string;
-        quiz?: string;
+        search_data?: string;
     };
 }
 
@@ -143,30 +130,24 @@ export interface Episode {
   orderIndex?: number;
   createdAt: Timestamp;
   
-  // From Spec 4.2
   storage: {
-      rawPath: string; // Original file path, to be archived
-      encryptedBasePath: string; // e.g., episodes/{id}/segments/
+      rawPath?: string; 
+      encryptedBasePath: string;
       manifestPath: string;
-      aiAudioPath?: string;
-      thumbnailBasePath?: string; // e.g., episodes/{id}/thumbnails/
       fileSize?: number;
   };
 
-  // Replaces flat thumbnail URLs/paths
   thumbnails: {
-      default: string; // URL
+      default: string;
       defaultPath: string;
-      custom?: string | null; // URL
+      custom?: string | null;
       customPath?: string | null;
   };
-  thumbnailUrl: string; // Keep for simple display logic (denormalized from custom or default)
+  thumbnailUrl: string; 
 
-  // Combined Status Objects from Spec
   status: PipelineStatus;
   ai: AiStatus;
 
-  // From Spec 4.3
   encryption: EncryptionInfo;
 }
 
@@ -296,6 +277,7 @@ export interface EpisodeComment {
   createdAt: Timestamp;
 }
 
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
@@ -333,7 +315,6 @@ export interface Bookmark {
   episodeTitle?: string;
 }
 
-// From Spec 12.2
 export interface OfflineLicense {
   videoId: string;
   userId: string;
@@ -342,13 +323,11 @@ export interface OfflineLicense {
   expiresAt: number; // timestamp
   keyId: string;
   kekVersion: 1;
-  watermarkSeed: string; // Added for offline watermarking
+  watermarkSeed: string; 
   policy: {
       maxDevices: 1,
       allowScreenCapture: false
   },
-  // This signature is crucial but requires a server private key.
-  // The client must verify it with a public key.
   signature: string; 
   offlineDerivedKey: string;
 }
@@ -379,9 +358,9 @@ export type CryptoWorkerRequest = {
   payload: {
     requestId: string;
     encryptedSegment: ArrayBuffer;
-    derivedKeyB64: string;
+    derivedKeyB64: string; // Changed from masterKeyB64
     encryption: EncryptionInfo;
-    storagePath: string; // Added for AAD
+    storagePath: string; 
   };
 };
 

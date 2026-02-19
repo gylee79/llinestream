@@ -1,4 +1,3 @@
-
 /// <reference lib="webworker" />
 
 import type { CryptoWorkerRequest, CryptoWorkerResponse, EncryptionInfo } from '@/lib/types';
@@ -23,17 +22,17 @@ const importAesKey = (keyBuffer: ArrayBuffer): Promise<CryptoKey> => {
 }
 
 /**
- * Derives a segment-specific AES key from the master key and segment path.
- * This prevents the master key from being directly used for every decryption.
- * @param masterKey - The HMAC-ready master key.
+ * Derives a segment-specific AES key from the device-derived key and segment path.
+ * This is the second level of key derivation, ensuring each segment has a unique key.
+ * @param deviceKey - The HMAC-ready key derived from the master key and deviceId.
  * @param segmentPath - The unique path of the segment, used as info for derivation.
  * @returns A derived CryptoKey for AES-GCM decryption.
  */
-const deriveSegmentKey = async (masterKey: CryptoKey, segmentPath: string): Promise<CryptoKey> => {
+const deriveSegmentKey = async (deviceKey: CryptoKey, segmentPath: string): Promise<CryptoKey> => {
     const info = new TextEncoder().encode(segmentPath);
-    // Use HMAC-SHA-256 to derive a new key. The output is a 32-byte hash.
-    const hmac = await self.crypto.subtle.sign('HMAC', masterKey, info);
-    // The derived key is the raw HMAC output, which is a secure pseudo-random value.
+    // Use HMAC-SHA-256 to derive the final segment key.
+    const hmac = await self.crypto.subtle.sign('HMAC', deviceKey, info);
+    // The derived key is the raw HMAC output.
     return importAesKey(hmac);
 };
 
@@ -43,9 +42,9 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
     return;
   }
   
-  const { requestId, encryptedSegment, masterKeyB64, segmentPath, encryption } = event.data.payload;
+  const { requestId, encryptedSegment, derivedKeyB64, segmentPath, encryption } = event.data.payload;
 
-  if (!encryptedSegment || !masterKeyB64 || !segmentPath || !encryption) {
+  if (!encryptedSegment || !derivedKeyB64 || !segmentPath || !encryption) {
     const response: CryptoWorkerResponse = {
       type: 'DECRYPT_FAILURE',
       payload: { requestId, message: 'Incomplete data for decryption (missing segment, key, path, or encryption info).' },
@@ -55,11 +54,11 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
   }
   
   try {
-    // 1. Import the master key for HMAC derivation.
-    const masterKeyBuffer = base64ToUint8Array(masterKeyB64);
-    const hmacKey = await importHmacKey(masterKeyBuffer.buffer as ArrayBuffer);
+    // 1. Import the device-derived key for HMAC.
+    const deviceKeyBuffer = base64ToUint8Array(derivedKeyB64);
+    const hmacKey = await importHmacKey(deviceKeyBuffer.buffer as ArrayBuffer);
     
-    // 2. Derive the segment-specific key.
+    // 2. Derive the final, segment-specific AES key.
     const segmentAesKey = await deriveSegmentKey(hmacKey, segmentPath);
 
     // 3. Decrypt using the derived segment key.
@@ -99,4 +98,3 @@ self.onmessage = async (event: MessageEvent<CryptoWorkerRequest>) => {
 };
 
 export {};
-    

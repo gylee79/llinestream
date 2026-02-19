@@ -1,4 +1,3 @@
-
 'use server';
 
 import { initializeAdminApp } from '@/lib/firebase-admin';
@@ -7,12 +6,12 @@ import { toJSDate } from '@/lib/date-helpers';
 import type { User, Episode, VideoManifest } from '@/lib/types';
 
 /**
- * Validates a user's permission and generates a short-lived Signed URL for a specific video segment.
- * SECURITY CRITICAL: This function is the gatekeeper for all video content.
+ * Validates a user's permission and generates a short-lived Signed URL for a specific file.
+ * SECURITY CRITICAL: This function is the gatekeeper for all video and AI content.
  * 
  * @param token The user's Firebase Auth ID token.
- * @param videoId The ID of the episode the user wants to access.
- * @param requestedPath The specific storage path of the segment (e.g., 'episodes/xxx/segments/init.enc').
+ * @param videoId The ID of the episode the user wants to access content for.
+ * @param requestedPath The specific storage path of the file (e.g., 'episodes/xxx/segments/init.enc' or 'episodes/xxx/ai/search_data.json').
  * @returns An object containing the signedUrl or an error code.
  */
 export async function getSignedUrl(
@@ -46,7 +45,7 @@ export async function getSignedUrl(
     const episodeData = episodeDoc.data() as Episode;
     const userData = userDoc.data() as User;
 
-    // 3. Verify User's Access Rights
+    // 3. Verify User's Access Rights for the episode
     const subscription = userData.activeSubscriptions?.[episodeData.courseId];
     const isSubscribed = subscription && new Date() < toJSDate(subscription.expiresAt)!;
 
@@ -55,9 +54,10 @@ export async function getSignedUrl(
     }
 
     // 4. SERVER-SIDE PATH VALIDATION (CRITICAL)
-    // Fetch the manifest from storage to verify the requested path belongs to this video.
-    // This prevents a user from using a valid session for one video to request segments from another.
-    if (requestedPath.startsWith('episodes/')) { // Only validate video segments, not other files like AI results
+    const isVideoSegmentRequest = requestedPath.includes('/segments/');
+    const isAiContentRequest = requestedPath.includes('/ai/');
+
+    if (isVideoSegmentRequest) {
         if (!episodeData.storage.manifestPath) {
             return { error: 'ERROR_MANIFEST_NOT_FOUND' };
         }
@@ -67,16 +67,22 @@ export async function getSignedUrl(
 
         const validPaths = [manifest.init, ...manifest.segments.map(s => s.path)];
         if (!validPaths.includes(requestedPath)) {
-            console.warn(`[SECURITY_ALERT] User ${userId} tried to access an invalid path '${requestedPath}' for video ${videoId}.`);
+            console.warn(`[SECURITY_ALERT] User ${userId} tried to access an invalid segment path '${requestedPath}' for video ${videoId}.`);
+            return { error: 'ERROR_INVALID_PATH' };
+        }
+    } else if (isAiContentRequest) {
+        const validAiPaths = Object.values(episodeData.ai.resultPaths || {});
+        if (!validAiPaths.includes(requestedPath)) {
+             console.warn(`[SECURITY_ALERT] User ${userId} tried to access an invalid AI content path '${requestedPath}' for video ${videoId}.`);
             return { error: 'ERROR_INVALID_PATH' };
         }
     }
-
+    // No validation for other file types for now.
 
     // 5. Generate a short-lived Signed URL (60 seconds)
     const [signedUrl] = await storage
       .bucket()
-      .file(requestedPath) // Use the validated path
+      .file(requestedPath)
       .getSignedUrl({
         version: 'v4',
         action: 'read',
@@ -90,4 +96,3 @@ export async function getSignedUrl(
     return { error: `ERROR_SIGNED_URL_FAILED: ${error.message}` };
   }
 }
-    
