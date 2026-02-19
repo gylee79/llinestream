@@ -1,575 +1,86 @@
-# LlineStream System Spec v1
-(Fail-Fast + Deep Debugging + Deterministic Implementation)
-1️⃣ 시스템 철학 (Design Principles)
-✅ 1. Fail-Fast
-
-하나라도 실패하면 즉시 전체 실패
-
-중간 단계 우회 없음
-
-성공한 것만 다음 단계로 전달
-
-✅ 2. Single Source of Truth
-
-상태는 오직 episodes.status와 jobs로만 판단
-
-파생 상태 필드 금지
-
-✅ 3. Deterministic (추측 금지)
-
-암호화 포맷, 파일명, 세그먼트 인덱스, AAD 규칙 모두 고정
-
-개발 AI가 임의 변경 불가
-
-✅ 4. Deep Debugging
-
-실패 시 원인 1초 안에 파악 가능해야 함
-
-모든 실패는 Debug Bundle 생성
-
-2️⃣ 전체 흐름 (High-Level Flow)
-Upload → Job 생성 → Video Pipeline → Verify → Keys → Completed
-        → AI Job → AI 분석 → Completed
-
-
-모든 실행은 Job 기반
-
-Storage/Firestore 트리거 직접 실행 금지
-
-실행은 반드시 Queue → Worker 방식
-
-3️⃣ 핵심 상수 (Immutable Constants)
-ALGO_SEGMENT = AES-256-GCM
-KEY_LEN = 32 bytes
-IV_LEN = 12 bytes
-TAG_LEN = 16 bytes
-
-ENC_FILE_FORMAT = [IV(12)][CIPHERTEXT][TAG(16)]
-
-AAD_MODE = "path"
-AAD_VALUE = utf8("path:" + encryptedSegmentStoragePath)
-
-SEGMENT_DURATION_SEC = 4
-SEGMENT_INDEX_START = 1
-
-VERIFY_TARGET = init + first + middle + last
-
-KEK_SECRET_ENCODING = base64
-KEK_VERSION = 1
-
-VIDEO_PIPELINE.maxAttempts = 2
-AI_ANALYSIS.maxAttempts = 3
-
-WATCHDOG_STALE_MINUTES = 15
-
-4️⃣ Firestore 스키마 (절대 변경 금지)
-episodes/{episodeId}
-4.1 status (비디오 파이프라인)
-status: {
-  pipeline: "queued" | "processing" | "failed" | "completed",
-  step: "validate" | "ffmpeg" | "encrypt" | "verify" | "manifest" | "keys" | "done",
-  playable: boolean,
-  progress: number,
-  jobId: string,
-  startedAt: timestamp,
-  updatedAt: timestamp,
-  lastHeartbeatAt: timestamp,
-  error: {
-    step: string,
-    code: string,
-    message: string,
-    hint: string,
-    raw: string,
-    debugLogPath: string,
-    ts: timestamp
-  }
-}
-
-4.2 storage
-storage: {
-  rawPath: string,
-  encryptedBasePath: string,      // episodes/{id}/segments/
-  manifestPath: string,
-  aiAudioPath: string,
-  thumbnailBasePath: string
-}
-
-4.3 encryption
-encryption: {
-  algorithm: "AES-256-GCM",
-  ivLength: 12,
-  tagLength: 16,
-  keyId: string,
-  kekVersion: 1,
-  aadMode: "path",
-  segmentDurationSec: 4,
-  fragmentEncrypted: true
-}
-
-4.4 ai
-ai: {
-  status: "queued" | "processing" | "failed" | "completed" | "blocked",
-  jobId: string,
-  model: string,
-  attempts: number,
-  lastHeartbeatAt: timestamp,
-  error: {
-    code: string,
-    message: string,
-    raw: string,
-    debugLogPath: string,
-    ts: timestamp
-  },
-  resultPaths: {
-    transcript: string,
-    summary: string,
-    chapters: string,
-    quiz: string
-  }
-}
-
-jobs/{jobId}
-jobs: {
-  type: "VIDEO_PIPELINE" | "AI_ANALYSIS",
-  episodeId: string,
-  status: "queued" | "running" | "failed" | "succeeded" | "dead",
-  attempts: number,
-  maxAttempts: number,
-  createdAt: timestamp,
-  startedAt: timestamp,
-  finishedAt: timestamp,
-  lastHeartbeatAt: timestamp,
-  error: { code, message, raw, ts }
-}
-
-5️⃣ Job Lock 규칙 (중복 실행 절대 금지)
-Worker 시작 시:
-
-트랜잭션으로 jobs.status = running
-
-이미 running/succeeded/failed면 즉시 종료
-
-episodes.status.pipeline == processing AND jobId 다르면 즉시 종료
-
-6️⃣ Video Pipeline 단계별 계약
-Step 1 — validate (ffprobe)
-
-ffprobe.json 저장
-
-실패 시:
-
-pipeline=failed
-
-error.step="validate"
-
-Step 2 — ffmpeg
-반드시 수행:
-
-2-Pass Encoding
-
-DASH segmentation
-
-segmentDuration=4
-
-init.mp4 + segment_%d.m4s
-
-thumbnail/preview 생성
-
-HQ Audio 192k 생성
-
-aiAudioPath 저장
-
-실패 시:
-
-pipeline=failed
-
-error.step="ffmpeg"
-
-Step 3 — encrypt
-
-입력:
-
-init.mp4
-segment_%d.m4s
-
-
-출력:
-
-init.enc
-segment_%d.m4s.enc
-
-
-포맷:
-
-[IV][CIPHERTEXT][TAG]
-
-
-AAD:
-
-utf8("path:" + storagePath)
-
-Step 4 — verify (Self-Verify)
-
-검증:
-
-init
-
-first
-
-middle
-
-last
-
-복호화 성공해야 통과
-
-실패:
-
-error.code = DECRYPT_CHECK_FAILED
-
-Step 5 — manifest
-
-manifest.json 생성
-
-실패 시 전체 실패
-
-Step 6 — keys
-
-masterKey = randomBytes(32)
-
-KEK(base64 decode)
-
-encryptedMasterKeyBlob = [IV][CIPHERTEXT][TAG]
-
-video_keys 저장
-
-kekVersion=1
-
-Step 7 — 완료
-episodes.status.pipeline = completed
-episodes.status.playable = true
-progress = 100
-
-7️⃣ Fail-Fast 정책
-
-아래 단계 중 하나라도 실패 시:
-
-validate
-
-ffmpeg
-
-encrypt
-
-verify
-
-manifest
-
-keys
-
-즉시:
-
-pipeline = failed
-playable = false
-error 기록
-job 종료
-
-
-Raw 아카이브 실패는:
-
-✅ 정책 A (선택됨): 경고만 남기고 completed 유지
-
-8️⃣ Debug Bundle 계약
-
-저장 경로:
-
-logs/{episodeId}/{jobId}/
-
-
-파일 목록:
-
-ffprobe.json
-
-ffmpeg_command.txt
-
-ffmpeg_stderr_tail.txt
-
-env.json
-
-verify_report.json
-
-Firestore 연결:
-
-episodes.status.error.debugLogPath
-
-9️⃣ AI Analyzer 계약
-Guard 조건 (모두 만족해야 시작)
-
-pipeline == completed
-
-playable == true
-
-manifestPath 존재
-
-aiAudioPath 존재
-
-미충족 시:
-
-ai.status = blocked
-ai.error.code = AI_GUARD_BLOCKED
-
-AI 처리
-
-maxAttempts = 3
-
-실패 시 attempts++
-
-성공 시 resultPaths 저장
-
-완료 시 ai.status=completed
-
-🔟 Watchdog (Stuck 처리)
-
-Scheduler: 5분마다
-
-조건:
-
-jobs.status == running
-AND now - lastHeartbeatAt > 15분
-
-
-처리:
-
-jobs.status = failed (JOB_TIMEOUT)
-episodes.status.pipeline = failed
-
-1️⃣1️⃣ Implementation Checklist (코딩 AI용 최종 체크리스트)
-
- Firestore 스키마 정확히 구현
-
- Job Lock 트랜잭션 구현
-
- status.step/progress/heartbeat 업데이트 구현
-
- Fail-fast 즉시 종료 구현
-
- Segment 암호화 포맷 정확히 구현
-
- AAD(path) 정확히 적용
-
- Self-Verify 구현
-
- Debug Bundle 5종 생성
-
- KEK base64 decode 고정
-
- AI Guard 4조건 구현
-
- Watchdog 구현
-
-🎯 최종 결론
-
-이 문서 상태면:
-
-코딩 AI가 추측할 영역 거의 없음
-
-암호화/세그먼트/상태머신 혼선 없음
-
-실패 원인 1초 내 확인 가능
-
-운영 중 무한 processing 재발 방지
-
-KEK 변경 사고 방지 12️⃣ Offline 다운로드 계약 (Secure Offline Contract v1)
-12.1 목표
-
-오프라인 저장은 허용
-
-하지만:
-
-사용자 + 디바이스에 강하게 바인딩
-
-만료 기간 강제
-
-위조 방지
-
-서버 검증 가능한 구조
-
-12.2 Offline License 스펙 (절대 변경 금지)
-발급 API
-POST /api/offline-license
-
-입력
-{
-  "videoId": string,
-  "deviceId": string
-}
-
-License Payload 구조 (JWT or Signed JSON)
-{
-  "videoId": string,
-  "userId": string,
-  "deviceId": string,
-  "issuedAt": timestamp,
-  "expiresAt": timestamp,
-  "keyId": string,
-  "kekVersion": number,
-  "policy": {
-    "maxDevices": number,
-    "allowScreenCapture": false
-  }
-}
-
-필수 조건
-
-서버 개인키로 서명 (Ed25519 또는 RSA)
-
-클라이언트는 공개키로 서명 검증
-
-expiresAt 지나면 재생 차단
-
-deviceId 불일치 시 재생 차단
-
-12.3 Offline 키 파생 규칙 (고정)
-
-Derived Key는 masterKey를 직접 주지 않는다.
-
-파생 방식 (HKDF)
-derivedKey = HKDF(
-  masterKey,
-  salt = SHA256(userId + deviceId),
-  info = videoId + expiresAt
-)
-
-
-결과 길이: 32 bytes
-
-AES-256-GCM 복호화용 키로 사용
-
-12.4 Offline 저장 구조 (IndexedDB)
-OfflineVideoData {
-  episodeId,
-  manifest,
-  encryptedSegments: Map<path, ArrayBuffer>,
-  license,
-  downloadedAt
-}
-
-
-⚠️ 주의:
-
-세그먼트는 암호화된 상태 그대로 저장
-
-복호화 키는 메모리에서만 사용
-
-localStorage에 키 저장 금지
-
-12.5 Offline Guard 조건
-
-재생 전 반드시 검증:
-
-현재 시간 < expiresAt
-
-deviceId 일치
-
-license 서명 유효
-
-keyId 일치
-
-불일치 시:
-
-OFFLINE_LICENSE_INVALID
-
-13️⃣ 워터마크 계약 (Dynamic Forensic Watermark v1)
-13.1 목표
-
-화면 녹화/불법 공유 시 사용자 추적 가능
-
-원본 영상은 변형하지 않음
-
-사용자마다 고유 식별
-
-13.2 Watermark Seed 생성 규칙 (서버)
-생성식 (고정)
-watermarkSeed = SHA256(
-  userId + "|" + videoId + "|" + deviceId + "|" + sessionId
-)
-
-
-64 hex string
-
-play-session 또는 offline-license 발급 시 함께 반환
-
-13.3 온라인 재생 시 계약
-
-/api/play-session 응답에 포함:
-
-{
-  "derivedKeyB64": "...",
-  "watermarkSeed": "...",
-  "expiresAt": timestamp
-}
-
-13.4 워터마크 렌더링 규칙 (클라이언트 고정)
-
-위치: 랜덤 3~6개
-
-opacity: 0.05 ~ 0.15
-
-회전: -15deg
-
-간격 주기적 재배치 (30~60초마다)
-
-pointer-events: none
-
-CSS z-index: video 위
-
-13.5 오프라인 재생 시
-
-offline license에 포함된 userId/deviceId 기반으로 동일 seed 생성
-
-seed는 서버가 주거나, 동일 알고리즘으로 재생성 가능
-
-13.6 워터마크 보안 규칙
-
-seed는 절대 manifest에 저장하지 않음
-
-seed는 세션 기반
-
-로그에 seed 직접 저장 금지 (필요 시 hash만)
-
-14️⃣ 오프라인 + 워터마크 통합 흐름
-
-온라인:
-
-/api/play-session
-→ derivedKey
-→ watermarkSeed
-→ CDN fetch encrypted segments
-→ decrypt in Worker
-→ render watermark overlay
-
-
-오프라인:
-
-/api/offline-license
-→ signed license + expiresAt
-→ derivedKey HKDF
-→ save encrypted segments
-→ playback with license validation
-→ render watermark
-
-15️⃣ Offline/Watermark 체크리스트 (코딩 AI용)
-
- License는 반드시 서버 서명
-
- deviceId mismatch 차단
-
- HKDF 파생 정확히 구현
-
- 세그먼트는 암호화 상태 유지
-
- 복호화 키는 메모리에만 존재
-
- watermarkSeed는 세션 기반 생성
-
- 30~60초마다 위치 재랜덤
-
- expiresAt 초과 시 재생 차단
+# [공식] LlineStream 비디오 시스템 워크플로우 (v8.1 - 2단계 분리형)
+
+**문서 목표:** 비디오 업로드부터 암호화, AI 분석까지 이어지는 전 과정을 기술적으로 명세합니다. 이 문서는 현재 배포된 코드를 100% 기반으로 분석한 결과이며, 두 개의 독립적인 Cloud 함수가 Firestore 문서의 '상태' 변화를 감지하며 각 단계를 수행하는 '2단계 분리형' 아키텍처의 최종 설계도입니다.
+
+---
+
+## 1. 아키텍처 개요 (2-Stage Decoupled Pattern)
+
+두 개의 독립된 Cloud 함수(`videoPipelineTrigger`, `aiAnalysisTrigger`)가 각각 Firestore의 `episodes` 컬렉션 문서 변경을 감시합니다. 각 함수는 특정 상태(`status.pipeline` 또는 `ai.status`)가 자신이 처리해야 할 조건과 일치할 때만 활성화되어 작업을 수행합니다. 이를 통해 긴 작업을 분리하여 타임아웃을 방지하고 안정성을 확보합니다.
+
+```mermaid
+graph TD
+    A[사용자: 비디오 업로드] --> B(웹사이트: Firestore 문서 생성<br/>- status.pipeline = 'pending');
+    
+    subgraph "Cloud Function (videoPipelineTrigger)"
+        B -- onWrite --> C{"상태: 'pending'인가?"};
+        C -- 예 --> D["Stage 1: Video Core<br/>- preparing → transcoding → thumbnail<br/>→ encrypting → manifest → uploading"];
+        D -- 성공 --> E{Firestore: 상태 업데이트<br/>- status.pipeline = 'completed'<br/>- ai.status = 'queued'};
+        D -- 실패 --> F(Firestore: 상태 업데이트<br/>- status.pipeline = 'failed'<br/>- status.error에 실패 단계 기록);
+    end
+    
+    subgraph "Cloud Function (aiAnalysisTrigger)"
+        E -- onWrite --> G{"AI 상태: 'queued'인가?"};
+        G -- 예 --> H["Stage 2: AI Analysis<br/>- Gemini API로 분석 수행<br/>(요약,타임라인,키워드 등)"];
+        H -- 성공 --> I["Stage 3: Cleanup<br/>- 원본 비디오 파일 삭제<br/>- ai.status = 'completed'"];
+        H -- 실패 --> J["Stage 3: Cleanup<br/>- 원본 비디오 파일 삭제<br/>- ai.status = 'failed'"];
+    end
+    
+    F --> Z([❌ 처리 실패]);
+    I --> M([✅ 최종 완료]);
+    J --> M;
+```
+
+---
+
+## 2. 함수별 동작 상세 분석 (100% 코드 기반)
+
+### **`videoPipelineTrigger` (1단계: 비디오 처리)**
+
+*   **역할:** 비디오를 재생 가능한 상태로 만드는 모든 작업을 담당합니다.
+*   **트리거 조건:** `episodes` 문서가 업데이트될 때 실행되며, 내부적으로 `before.status.pipeline`과 `after.status.pipeline`을 비교하여 상태가 `'pending'`으로 **새롭게 변경되었을 때만** 핵심 로직을 수행합니다. (무한 루프 방지)
+
+*   **핵심 로직 (Micro-State 기반 추적):**
+    1.  **[마이크로 스테이트: `preparing`]**: 함수가 시작되면 가장 먼저 `status.step`을 `'preparing'`으로 업데이트합니다. `storage.rawPath`에 지정된 원본 파일을 임시 폴더(`/tmp`)로 다운로드합니다.
+    2.  **[마이크로 스테이트: `transcoding`]**: `status.step`을 `'transcoding'`으로 업데이트하고, `ffmpeg`을 사용하여 원본 비디오를 스트리밍에 적합한 H.264 코덱의 fMP4 포맷으로 변환하고, 4초 단위의 DASH 세그먼트(`init.mp4`, `segment_*.m4s`)로 분할합니다. 이 과정에서 영상의 정확한 `duration`(재생 시간)을 추출하여 Firestore에 기록합니다.
+    3.  **[마이크로 스테이트: `thumbnail`]**: `status.step`을 `'thumbnail'`으로 업데이트합니다. `ffmpeg`을 사용하여 영상의 50% 지점에서 썸네일을 추출하고 `thumbnails.default` 및 `thumbnails.defaultPath` 필드를 업데이트합니다.
+    4.  **[마이크로 스테이트: `encrypting`]**: `status.step`을 `'encrypting'`으로 업데이트합니다. 생성된 모든 세그먼트 파일을 `AES-256-GCM` 알고리즘으로 암호화합니다. 이때 각 파일의 Storage 경로(`path:${storagePath}`)가 무결성 검증(AAD)에 사용됩니다.
+    5.  **[마이크로 스테이트: `manifest`]**: `status.step`을 `'manifest'`으로 업데이트합니다. 암호화된 세그먼트 경로와 코덱 정보가 포함된 `manifest.json` 파일을 생성합니다.
+    6.  **[마이크로 스테이트: `uploading`]**: `status.step`을 `'uploading'`으로 업데이트합니다. 생성된 `manifest.json`과 기본 썸네일 파일을 스토리지에 업로드하고, 비디오 암호화에 사용된 '마스터 키'를 서버의 'KEK'로 다시 암호화하여 `video_keys` 컬렉션에 안전하게 저장합니다.
+
+*   **성공 시:**
+    *   `status.pipeline`을 `'completed'`로, `status.playable`을 `true`로 설정합니다.
+    *   **`ai.status`를 `'queued'`로 변경하여 `aiAnalysisTrigger` 함수를 호출하는 신호를 보냅니다.**
+    *   이후 함수는 즉시 종료됩니다.
+
+*   **실패 시:**
+    *   `try-catch` 구문이 에러를 감지하면, `failPipeline` 함수가 호출됩니다.
+    *   이 함수는 **문제가 발생한 정확한 마이크로 스테이트(`currentStep`)**와 오류 메시지를 Firestore 문서의 `status.error` 필드에 기록하고 `status.pipeline`을 `'failed'`로 설정합니다.
+
+### **`aiAnalysisTrigger` (2단계: AI 분석 및 정리)**
+
+*   **역할:** AI 분석과 후속 정리 작업을 담당합니다.
+*   **트리거 조건:** `episodes` 문서가 업데이트될 때 실행되며, 내부적으로 `before.ai.status`와 `after.ai.status`를 비교하여 상태가 `'queued'`로 **새롭게 변경되었을 때만** 핵심 로직을 수행합니다.
+
+*   **핵심 로직 (`runAiAnalysis` 및 `finally` 블록):**
+    1.  **[Stage 2: AI Analysis]**:
+        *   `ai.status`를 `'processing'`으로 변경합니다.
+        *   `storage.rawPath`에 있는 원본 비디오 파일을 Google AI 파일 관리자에 업로드하고 처리될 때까지 대기합니다.
+        *   `gemini-2.5-flash` 모델을 호출하여 **요약(summary), 타임라인(timeline), 전체 대본(transcript), 키워드(keywords), 주제(topics)**를 포함하는 JSON 데이터를 요청합니다.
+        *   성공 시, AI가 생성한 전체 JSON 데이터를 `search_data.json` 파일로 Storage에 저장하고, 파일 경로를 `ai.resultPaths.search_data`에 기록합니다.
+        *   `ai.status`를 `'completed'`로 업데이트합니다.
+
+    2.  **[Stage 3: Cleanup]**:
+        *   `runAiAnalysis` 함수의 **성공 여부와 관계없이**, `aiAnalysisTrigger` 함수의 `finally` 블록에서 **반드시 실행됩니다.**
+        *   더 이상 필요 없는 원본 비디오 파일(`storage.rawPath`)을 Storage에서 영구적으로 삭제하고, Firestore 문서에서도 해당 필드를 제거합니다.
+        *   `/tmp` 디렉토리를 정리하여 임시 파일을 모두 제거합니다.
+
+*   **중요:** 이 함수의 실패는 `ai.status`를 `'failed'`로 바꿀 뿐, 이미 `true`로 설정된 `status.playable` 상태에는 영향을 주지 않습니다.
+
+### **`deleteFilesOnEpisodeDelete` (정리 함수)**
+
+*   **역할:** 에피소드와 관련된 모든 서버 리소스를 삭제합니다.
+*   **트리거 조건:** Firestore에서 `episodes/{episodeId}` 문서가 삭제될 때 자동으로 실행됩니다.
+*   **처리 내용:**
+    1.  Storage에서 `episodes/{episodeId}/` 경로 하위의 모든 파일(암호화된 세그먼트, 썸네일, AI 결과 등)을 삭제합니다.
+    2.  `video_keys` 컬렉션에서 해당 비디오의 암호화 키 문서를 찾아 삭제합니다.
