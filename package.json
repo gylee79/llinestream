@@ -12,7 +12,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "check:functions": "cd functions && npm run build",
+    "check:functions": "cd functions && npm run build && npm run lint",
     "check:all": "npm run typecheck && npm run check:functions && npm run lint",
     "publish": "firebase deploy"
   },
