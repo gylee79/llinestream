@@ -65,7 +65,7 @@ export async function getSignedUrl(
     const manifest: VideoManifest = JSON.parse(manifestContent.toString('utf8'));
 
     const validPaths = [manifest.init, ...manifest.segments.map(s => s.path)];
-    if (!validPaths.includes(requestedPath)) {
+    if (requestedPath.startsWith('episodes/') && !validPaths.includes(requestedPath)) {
         console.warn(`[SECURITY_ALERT] User ${userId} tried to access an invalid path '${requestedPath}' for video ${videoId}.`);
         return { error: 'ERROR_INVALID_PATH' };
     }
@@ -87,3 +87,5 @@ export async function getSignedUrl(
     return { error: `ERROR_SIGNED_URL_FAILED: ${error.message}` };
   }
 }
+
+    

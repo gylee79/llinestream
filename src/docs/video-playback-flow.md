@@ -52,3 +52,5 @@ sequenceDiagram
     Client->>Server: 23. On Close: End Session<br/>`POST /api/session/end`
     Server->>Firestore: 24. Delete Session Document
 ```
+
+    
